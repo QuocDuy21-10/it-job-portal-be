@@ -12,9 +12,17 @@ async function bootstrap() {
 
   // config jwt guard global
   const reflector = app.get(Reflector);
-  app.useGlobalGuards(new JwtAuthGuard(reflector));
+  // app.useGlobalGuards(new JwtAuthGuard(reflector));
 
   app.useGlobalPipes(new ValidationPipe());
+
+  // config cors
+  app.enableCors({
+    origin: 'http://localhost:3000',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  });
 
   await app.listen(configService.get<string>('PORT'));
 }
