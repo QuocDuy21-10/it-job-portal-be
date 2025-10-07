@@ -44,7 +44,7 @@ export class UsersService {
   }
 
   async update(id: string, updateUserDto: UpdateUserDto) {
-    return await this.userModel.updateOne({ _id: id }, { $set: updateUserDto });
+    return await this.userModel.updateOne({ _id: id }, { ...updateUserDto });
   }
 
   remove(id: string) {
