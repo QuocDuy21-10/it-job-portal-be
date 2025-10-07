@@ -21,7 +21,7 @@ import ms from 'ms';
       inject: [ConfigService], // Inject ConfigService into the factory
     }),
   ],
-  controllers: [AuthController, LocalStrategy, JwtStrategy],
-  providers: [AuthService],
+  providers: [AuthService, LocalStrategy, JwtStrategy],
+  controllers: [AuthController],
 })
 export class AuthModule {}
