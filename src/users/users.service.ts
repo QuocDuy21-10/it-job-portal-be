@@ -70,8 +70,8 @@ export class UsersService {
 
   async findAll(currentPage: number, limit: number, query: string) {
     const { filter, sort, population } = aqp(query);
-    delete filter.page;
-    delete filter.limit;
+    delete filter.current;
+    delete filter.pageSize;
     const offset = (currentPage - 1) * limit;
     let defaultLimit = limit ? limit : 10;
 
@@ -89,7 +89,7 @@ export class UsersService {
     return {
       result,
       meta: {
-        currentPage,
+        current: currentPage,
         pageSize: limit,
         totalPages,
         totalItems,
@@ -134,6 +134,11 @@ export class UsersService {
     this.validateObjectId(id);
     return this.userModel.updateOne({ _id: id }, { refreshToken });
   }
+
+  async findUserByRefreshToken(refreshToken: string) {
+    return await this.userModel.findOne({ refreshToken });
+  }
+
   private validateObjectId(id: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid ID format');

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import ms from 'ms';
@@ -64,5 +64,50 @@ export class AuthService {
       expiresIn: ms(this.configService.get<string>('JWT_REFRESH_EXPIRES_IN')) / 1000,
     });
     return refresh_token;
+  }
+
+  async refreshAccessToken(refreshToken: string, response: Response) {
+    try {
+      this.jwtService.verify(refreshToken, {
+        secret: this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
+      });
+
+      const user = await this.usersService.findUserByRefreshToken(refreshToken);
+
+      if (!user) {
+        throw new BadRequestException('Refresh token không hợp lệ. Vui lòng đăng nhập lại');
+      } else {
+        const { _id, name, email, role } = user;
+        const payload = { sub: 'token refresh', iss: 'from server', _id, name, email, role };
+        const refresh_token = this.createRefreshToken(payload);
+
+        // update user with refresh token
+        this.usersService.updateUserToken(_id.toString(), refresh_token);
+
+        // delete old refresh token
+        response.clearCookie('refresh_token');
+
+        // set refresh token as cookies
+        response.cookie('refresh_token', refresh_token, {
+          httpOnly: true,
+          maxAge: ms(this.configService.get<string>('JWT_REFRESH_EXPIRES_IN')),
+        });
+
+        return {
+          access_token: this.jwtService.sign(payload),
+          user: { _id, name, email, role },
+        };
+      }
+    } catch (error) {
+      throw new BadRequestException('Refresh token không hợp lệ. Vui lòng đăng nhập lại');
+    }
+  }
+
+  async logout(response: Response, user: IUser) {
+    // update refresh token
+    await this.usersService.updateUserToken(user._id, '');
+    // delete refresh token in cookies
+    response.clearCookie('refresh_token');
+    return 'ok';
   }
 }
