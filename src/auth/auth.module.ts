@@ -15,8 +15,8 @@ import ms from 'ms';
     PassportModule,
     JwtModule.registerAsync({
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_ACCESS_TOKEN'),
-        signOptions: { expiresIn: configService.get<string>('JWT_ACCESS_EXPIRES_IN') },
+        secret: configService.get<string>('JWT_ACCESS_TOKEN_SECRET'),
+        signOptions: { expiresIn: ms(configService.get<string>('JWT_ACCESS_EXPIRES_IN')) / 1000 },
       }),
       inject: [ConfigService], // Inject ConfigService into the factory
     }),
