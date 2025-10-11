@@ -15,6 +15,9 @@ export class Company {
   description: String;
 
   @Prop()
+  logo: String;
+
+  @Prop()
   createdAt: Date;
 
   @Prop()
