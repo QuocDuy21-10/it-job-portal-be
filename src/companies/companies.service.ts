@@ -70,7 +70,7 @@ export class CompaniesService {
 
   private validateObjectId(id: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid ID format');
+      throw new BadRequestException(`Not found Company with id = ${id}`);
     }
   }
 }
