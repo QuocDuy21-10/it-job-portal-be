@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsDate,
   IsDateString,
   IsInt,
   IsMongoId,
@@ -90,11 +91,13 @@ export class CreateJobDto {
 
   @IsNotEmpty({ message: 'Start date is required' })
   @Transform(({ value }) => new Date(value))
+  @IsDate({ message: 'startDate must be a valid date' })
   @ApiProperty({ example: '2023-01-01', description: 'Start date of job' })
   startDate: Date;
 
   @IsNotEmpty({ message: 'End date is required' })
   @Transform(({ value }) => new Date(value))
+  @IsDate({ message: 'endDate must be a valid date' })
   @IsAfter('startDate', { message: 'End date must be after start date' })
   @ApiProperty({ example: '2023-01-01', description: 'End date of job' })
   endDate: Date;

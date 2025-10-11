@@ -25,6 +25,6 @@ export class CreateCompanyDto {
   description: String;
 
   @IsNotEmpty({ message: 'Logo is required' })
-  // @IsUrl({}, { message: 'Logo must be a valid URL' })
+  @IsString({ message: 'Logo must be a string' })
   logo: String;
 }
