@@ -9,10 +9,14 @@ import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { IUser } from './users.interface';
 import aqp from 'api-query-params';
 import { User } from 'src/decorator/customize';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(UserModel.name) private userModel: SoftDeleteModel<UserDocument>) {}
+  constructor(
+    @InjectModel(UserModel.name) private userModel: SoftDeleteModel<UserDocument>,
+    private configService: ConfigService,
+  ) {}
   hashPassword(password: string) {
     const salt = genSaltSync(10);
     const hash = hashSync(password, salt);
@@ -99,11 +103,26 @@ export class UsersService {
 
   findOne(id: string) {
     this.validateObjectId(id);
-    return this.userModel.findById({ _id: id }).select('-password');
+    return this.userModel
+      .findById({ _id: id })
+      .select('-password')
+      .populate({
+        path: 'role',
+        select: {
+          _id: 1,
+          name: 1,
+        },
+      });
   }
 
   findOneByUsername(username: string) {
-    return this.userModel.findOne({ email: username });
+    return this.userModel.findOne({ email: username }).populate({
+      path: 'role',
+      select: {
+        name: 1,
+        permissions: 1,
+      },
+    });
   }
 
   isValidPassword(password: string, hash: string) {
@@ -123,6 +142,11 @@ export class UsersService {
 
   async remove(id: string, user: IUser) {
     this.validateObjectId(id);
+    const userAdmin = await this.userModel.findOne({ _id: id });
+    const emailAdmin = this.configService.get<string>('EMAIL_ADMIN');
+    if (userAdmin.email === emailAdmin) {
+      throw new BadRequestException('Cannot delete admin account');
+    }
     await this.userModel.updateOne(
       { _id: id },
       { deletedBy: { _id: user._id, email: user.email } },

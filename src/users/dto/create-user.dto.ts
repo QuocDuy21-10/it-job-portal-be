@@ -139,6 +139,6 @@ export class CreateUserDto {
   @IsNotEmpty({ message: 'Role is required' })
   @IsString({ message: 'Role must be a string' })
   @Transform(({ value }) => value.trim())
-  @ApiProperty({ example: 'ADMIN', description: 'Role of user' })
-  role: string;
+  @IsMongoId({ message: 'Role must be a valid MongoDB ObjectId' })
+  role: mongoose.Schema.Types.ObjectId;
 }

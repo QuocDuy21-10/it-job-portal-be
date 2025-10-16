@@ -74,31 +74,17 @@ export class RolesService {
         name: 1,
         apiPath: 1,
         method: 1,
+        module: 1,
       },
     });
   }
 
   async update(id: string, updateRoleDto: UpdateRoleDto, user: IUser) {
     this.validateObjectId(id);
-    const { name, description, isActive, permissions } = updateRoleDto;
-    // check existing name
-    const existingName = await this.roleModel.findOne({
-      _id: { $ne: id },
-      name,
-      isDeleted: false,
-    });
-    if (existingName) {
-      throw new BadRequestException(
-        `Role with name '${name}' already exists. Please choose a different name.`,
-      );
-    }
     return await this.roleModel.updateOne(
       { _id: id },
       {
-        name,
-        description,
-        isActive,
-        permissions,
+        ...updateRoleDto,
         updatedBy: { _id: user._id, email: user.email },
       },
     );
@@ -106,6 +92,10 @@ export class RolesService {
 
   async remove(id: string, user: IUser) {
     this.validateObjectId(id);
+    const roleAdmin = await this.roleModel.findOne({ _id: id });
+    if (roleAdmin.name === 'ADMIN') {
+      throw new BadRequestException('Cannot delete admin role');
+    }
     await this.roleModel.updateOne(
       { _id: id },
       { deletedBy: { _id: user._id, email: user.email } },
