@@ -18,11 +18,11 @@ export class CompaniesService {
     });
   }
 
-  async findAll(currentPage?: number, limit?: number, query?: string) {
+  async findAll(page?: number, limit?: number, query?: string) {
     const { filter, sort, population } = aqp(query);
     delete filter.current;
     delete filter.pageSize;
-    const offset = (currentPage - 1) * limit;
+    const offset = (page - 1) * limit;
     let defaultLimit = limit ? limit : 10;
 
     const totalItems = (await this.companyModel.find(filter)).length;
@@ -38,7 +38,7 @@ export class CompaniesService {
     return {
       result,
       meta: {
-        current: currentPage,
+        current: page,
         pageSize: limit,
         totalPages,
         totalItems,

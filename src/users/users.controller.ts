@@ -6,7 +6,7 @@ import { Public, ResponseMessage, User } from 'src/decorator/customize';
 import { IUser } from './users.interface';
 import { ApiTags } from '@nestjs/swagger';
 
-@ApiTags('User')
+@ApiTags('User APIs')
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -19,12 +19,8 @@ export class UsersController {
 
   @Get()
   @ResponseMessage('Get list users')
-  findAll(
-    @Query('current') currentPage: string,
-    @Query('pageSize') limit: string,
-    @Query() query: string,
-  ) {
-    return this.usersService.findAll(+currentPage, +limit, query);
+  findAll(@Query('page') page: string, @Query('limit') limit: string, @Query() query: string) {
+    return this.usersService.findAll(+page, +limit, query);
   }
 
   @Public()

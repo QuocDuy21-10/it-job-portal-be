@@ -8,7 +8,7 @@ import { IUser } from 'src/users/users.interface';
 import { ApiBody, ApiTags } from '@nestjs/swagger';
 import { RolesService } from 'src/roles/roles.service';
 
-@ApiTags('Auth')
+@ApiTags('Auth APIs')
 @Controller('auth')
 export class AuthController {
   constructor(

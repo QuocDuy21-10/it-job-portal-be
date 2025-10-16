@@ -4,7 +4,9 @@ import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { ResponseMessage, User } from 'src/decorator/customize';
 import { IUser } from 'src/users/users.interface';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Role APIs')
 @Controller('roles')
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
@@ -17,12 +19,8 @@ export class RolesController {
 
   @Get()
   @ResponseMessage('Roles have been retrieved successfully')
-  findAll(
-    @Query('current') currentPage: string,
-    @Query('pageSize') limit: string,
-    @Query() query: string,
-  ) {
-    return this.rolesService.findAll(+currentPage, +limit, query);
+  findAll(@Query('page') page: string, @Query('limit') limit: string, @Query() query: string) {
+    return this.rolesService.findAll(+page, +limit, query);
   }
 
   @Get(':id')

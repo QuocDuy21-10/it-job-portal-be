@@ -6,7 +6,7 @@ import { ResponseMessage, User } from 'src/decorator/customize';
 import { IUser } from 'src/users/users.interface';
 import { ApiTags } from '@nestjs/swagger';
 
-@ApiTags('Resume')
+@ApiTags('Resume APIs')
 @Controller('resumes')
 export class ResumesController {
   constructor(private readonly resumesService: ResumesService) {}
@@ -19,12 +19,8 @@ export class ResumesController {
 
   @Get()
   @ResponseMessage('Resumes have been retrieved successfully')
-  findAll(
-    @Query('current') currentPage: string,
-    @Query('pageSize') limit: string,
-    @Query() query: string,
-  ) {
-    return this.resumesService.findAll(+currentPage, +limit, query);
+  findAll(@Query('page') page: string, @Query('limit') limit: string, @Query() query: string) {
+    return this.resumesService.findAll(+page, +limit, query);
   }
 
   @Get(':id')

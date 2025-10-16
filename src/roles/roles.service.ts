@@ -37,11 +37,11 @@ export class RolesService {
     return { _id: newRole?._id, createdAt: newRole?.createdAt };
   }
 
-  async findAll(currentPage?: number, limit?: number, query?: string) {
+  async findAll(page?: number, limit?: number, query?: string) {
     const { filter, sort, population, projection } = aqp(query);
     delete filter.current;
     delete filter.pageSize;
-    let offset = (currentPage - 1) * limit;
+    let offset = (page - 1) * limit;
     let defaultLimit = limit ? limit : 10;
 
     const totalItems = (await this.roleModel.find(filter)).length;
@@ -58,10 +58,12 @@ export class RolesService {
     return {
       result,
       meta: {
-        current: currentPage,
-        pageSize: limit,
-        totalPages,
-        totalItems,
+        pagination: {
+          current_page: page,
+          per_page: limit,
+          total_pages: totalPages,
+          total: totalItems,
+        },
       },
     };
   }

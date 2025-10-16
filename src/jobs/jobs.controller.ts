@@ -5,7 +5,7 @@ import { UpdateJobDto } from './dto/update-job.dto';
 import { Public, ResponseMessage, User } from 'src/decorator/customize';
 import { IUser } from 'src/users/users.interface';
 import { ApiTags } from '@nestjs/swagger';
-@ApiTags('Job')
+@ApiTags('Job APIs')
 @Controller('jobs')
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
@@ -19,12 +19,8 @@ export class JobsController {
   @Public()
   @Get()
   @ResponseMessage('Get list jobs')
-  findAll(
-    @Query('current') currentPage: string,
-    @Query('pageSize') limit: string,
-    @Query() query: string,
-  ) {
-    return this.jobsService.findAll(+currentPage, +limit, query);
+  findAll(@Query('page') page: string, @Query('limit') limit: string, @Query() query: string) {
+    return this.jobsService.findAll(+page, +limit, query);
   }
 
   @Public()
