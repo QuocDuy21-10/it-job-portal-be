@@ -152,7 +152,7 @@ export class UsersService {
     this.validateObjectId(id);
     const userAdmin = await this.userModel.findOne({ _id: id });
     const emailAdmin = this.configService.get<string>('EMAIL_ADMIN');
-    if (userAdmin.email === emailAdmin) {
+    if (userAdmin && userAdmin.email === emailAdmin) {
       throw new BadRequestException('Cannot delete admin account');
     }
     await this.userModel.updateOne(
