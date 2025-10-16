@@ -7,6 +7,7 @@ import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose from 'mongoose';
 import aqp from 'api-query-params';
+import { ADMIN_ROLE } from 'src/databases/sample';
 
 @Injectable()
 export class RolesService {
@@ -65,9 +66,9 @@ export class RolesService {
     };
   }
 
-  findOne(id: string) {
+  async findOne(id: string) {
     this.validateObjectId;
-    return this.roleModel.findById(id).populate({
+    return await this.roleModel.findById(id).populate({
       path: 'permissions',
       select: {
         _id: 1,
@@ -93,7 +94,7 @@ export class RolesService {
   async remove(id: string, user: IUser) {
     this.validateObjectId(id);
     const roleAdmin = await this.roleModel.findOne({ _id: id });
-    if (roleAdmin.name === 'ADMIN') {
+    if (roleAdmin.name === ADMIN_ROLE) {
       throw new BadRequestException('Cannot delete admin role');
     }
     await this.roleModel.updateOne(

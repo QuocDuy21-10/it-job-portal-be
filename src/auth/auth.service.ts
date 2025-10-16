@@ -7,6 +7,7 @@ import { IUser } from 'src/users/users.interface';
 import { UsersService } from 'src/users/users.service';
 import * as bcrypt from 'bcryptjs';
 import { Response } from 'express';
+import { RolesService } from 'src/roles/roles.service';
 
 @Injectable()
 export class AuthService {
@@ -14,6 +15,7 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private rolesService: RolesService,
   ) {}
   hashPassword(password: string) {
     const salt = bcrypt.genSaltSync(10);
@@ -25,7 +27,14 @@ export class AuthService {
     if (user) {
       const isValid = this.usersService.isValidPassword(password, user.password);
       if (isValid) {
-        return user;
+        // get user role casting data (ObjectId -> {_id: string, name: string})
+        const userRole = user.role as unknown as { _id: string; name: string };
+        const tempRole = await this.rolesService.findOne(userRole._id);
+        const objectUser = {
+          ...user.toObject(),
+          permissions: tempRole.permissions ?? [],
+        };
+        return objectUser;
       }
     }
     return null;
@@ -40,7 +49,7 @@ export class AuthService {
   }
 
   async login(user: IUser, response: Response) {
-    const { _id, name, email, role } = user;
+    const { _id, name, email, role, permissions } = user;
     const payload = { sub: 'token login', iss: 'from server', _id, name, email, role };
     const refresh_token = this.createRefreshToken(payload);
 
@@ -54,7 +63,7 @@ export class AuthService {
     });
     return {
       access_token: this.jwtService.sign(payload),
-      user: { _id, name, email, role },
+      user: { _id, name, email, role, permissions },
     };
   }
 
@@ -84,6 +93,10 @@ export class AuthService {
         // update user with refresh token
         this.usersService.updateUserToken(_id.toString(), refresh_token);
 
+        // get user role casting data (ObjectId -> {_id: string, name: string})
+        const userRole = user.role as unknown as { _id: string; name: string };
+        const tempRole = await this.rolesService.findOne(userRole._id);
+
         // delete old refresh token
         response.clearCookie('refresh_token');
 
@@ -95,7 +108,7 @@ export class AuthService {
 
         return {
           access_token: this.jwtService.sign(payload),
-          user: { _id, name, email, role },
+          user: { _id, name, email, role, permissions: tempRole.permissions },
         };
       }
     } catch (error) {
