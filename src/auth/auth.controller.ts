@@ -31,7 +31,7 @@ export class AuthController {
     return this.authService.register(RegisterUserDto);
   }
 
-  @Get('/account')
+  @Get('/me')
   @ResponseMessage('Get user information successfully')
   async handleGetAccount(@User() user: IUser) {
     // query database to get permissions
