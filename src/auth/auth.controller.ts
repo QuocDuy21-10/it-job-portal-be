@@ -7,6 +7,7 @@ import { Request, Response } from 'express';
 import { IUser } from 'src/users/users.interface';
 import { ApiBody, ApiTags } from '@nestjs/swagger';
 import { RolesService } from 'src/roles/roles.service';
+import { ThrottlerGuard } from '@nestjs/throttler';
 
 @ApiTags('Auth APIs')
 @Controller('auth')
@@ -18,6 +19,7 @@ export class AuthController {
 
   @Public()
   @UseGuards(LocalAuthGuard)
+  @UseGuards(ThrottlerGuard)
   @ApiBody({ type: LoginUserDto })
   @Post('/login')
   @ResponseMessage('Login successfully')
