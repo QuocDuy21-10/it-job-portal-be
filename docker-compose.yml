@@ -1,0 +1,67 @@
+services:
+  # MongoDB Service
+  mongodb:
+    image: mongo:7.0
+    container_name: job-portal-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - job-portal-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # NestJS Backend Service
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ${NODE_ENV:-development}
+    container_name: job-portal-backend
+    restart: unless-stopped
+    ports:
+      - '${PORT:-8081}:${PORT:-8081}'
+    environment:
+      - PORT=${PORT:-8081}
+      - MONGO_URL=mongodb://root:123456@mongodb:27017/my-job-portal?authSource=admin
+      - NODE_ENV=${NODE_ENV:-development}
+      - JWT_ACCESS_TOKEN_SECRET=${JWT_ACCESS_TOKEN_SECRET}
+      - JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN}
+      - JWT_REFRESH_TOKEN_SECRET=${JWT_REFRESH_TOKEN_SECRET}
+      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN}
+      - EMAIL_ADMIN=${EMAIL_ADMIN}
+      - INIT_PASSWORD=${INIT_PASSWORD}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_EMAIL=${SMTP_EMAIL}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+    volumes:
+      # Mount source code for development hot-reload
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - job-portal-network
+    command: npm run start:dev
+
+networks:
+  job-portal-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
