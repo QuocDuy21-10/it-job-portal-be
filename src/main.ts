@@ -8,6 +8,7 @@ import { TransformInterceptor } from './core/transform.interceptor';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { join } from 'path';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -67,6 +68,9 @@ async function bootstrap() {
       persistAuthorization: true,
     },
   });
+
+  // config helmet
+  app.use(helmet());
 
   await app.listen(configService.get<string>('PORT'));
   Logger.log(`Application is running on port ${configService.get<string>('PORT')}`);
