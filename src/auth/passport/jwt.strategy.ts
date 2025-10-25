@@ -23,7 +23,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const { _id, name, email, role } = payload;
     // assign permission to req.user
     const userRole = role as unknown as { _id: string; name: string };
-    const tempRole = (await this.rolesService.findOne(userRole._id)).toObject();
-    return { _id, name, email, role, permissions: tempRole.permissions ?? [] }; // req.user
+    const temp = (await this.rolesService.findOne(userRole._id)).toObject();
+
+    //req.user
+    return {
+      _id,
+      name,
+      email,
+      role,
+      permissions: temp?.permissions ?? [],
+    };
   }
 }
