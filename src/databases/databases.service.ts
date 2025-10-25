@@ -5,8 +5,8 @@ import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { Permission, PermissionDocument } from 'src/permissions/schemas/permission.schema';
 import { Role, RoleDocument } from 'src/roles/schemas/role.schema';
 import { User, UserDocument } from 'src/users/schemas/user.schema';
-import { UsersService } from 'src/users/users.service';
 import { ADMIN_ROLE, INIT_PERMISSIONS, USER_ROLE } from './sample';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class DatabasesService implements OnModuleInit {
@@ -19,7 +19,7 @@ export class DatabasesService implements OnModuleInit {
     private userService: UsersService,
   ) {}
   async onModuleInit() {
-    const isInit = this.configService.get<string>('SHOULD_INIT_SAMPLE_DATA');
+    const isInit = this.configService.get<string>('NODE_ENV') === 'development' ? true : false;
     if (Boolean(isInit)) {
       const countUser = await this.userModel.count({});
       const countPermission = await this.permissionModel.count({});
@@ -54,7 +54,7 @@ export class DatabasesService implements OnModuleInit {
         await this.userModel.insertMany([
           {
             _id: '647b5108a8a243e8191855b5',
-            name: "I'm admin",
+            name: 'Admin',
             email: this.configService.get<string>('EMAIL_ADMIN'),
             password: this.userService.hashPassword(
               this.configService.get<string>('INIT_PASSWORD'),
@@ -66,7 +66,7 @@ export class DatabasesService implements OnModuleInit {
           },
 
           {
-            name: "I'm normal user",
+            name: 'Normal User',
             email: 'user@gmail.com',
             password: this.userService.hashPassword(
               this.configService.get<string>('INIT_PASSWORD'),

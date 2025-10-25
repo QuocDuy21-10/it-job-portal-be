@@ -15,6 +15,7 @@ export class AuthController {
     private authService: AuthService,
     private rolesService: RolesService,
   ) {}
+
   @Public()
   @UseGuards(LocalAuthGuard)
   @ApiBody({ type: LoginUserDto })

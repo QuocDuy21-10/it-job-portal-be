@@ -27,17 +27,13 @@ export class UsersService {
   }
   async create(CreateUserDto: CreateUserDto, @User() user: IUser) {
     const { name, email, password, age, gender, address, role, company } = CreateUserDto;
-    const isExist = await this.userModel.findOne({ email });
-    if (isExist) {
+    const isExistEmail = await this.userModel.findOne({ email, isDeleted: false });
+    if (isExistEmail) {
       throw new BadRequestException(
-        `Email: ${email} already exists in the system. Please use another email.`,
+        `Email already exists in the system. Please use another email.`,
       );
     }
-
-    // get user role
-    const userRole = await this.roleModel.findOne({ name: USER_ROLE });
     const hashedPassword = this.hashPassword(password);
-
     let newUser = await this.userModel.create({
       name,
       email,
@@ -45,7 +41,7 @@ export class UsersService {
       age,
       gender,
       address,
-      role: userRole?._id,
+      role,
       company,
       createdBy: {
         _id: user._id,
@@ -59,31 +55,31 @@ export class UsersService {
   }
 
   async register(user: RegisterUserDto) {
-    const { name, email, password, age, gender, address } = user;
-    const isExistEmail = await this.userModel.findOne({ email });
+    const { name, email, password } = user;
+    const isExistEmail = await this.userModel.findOne({ email, isDeleted: false });
     if (isExistEmail) {
       throw new BadRequestException(
-        `Email: ${email} đã tồn tại trên hệ thống. Vui lòng sử dụng email khác.`,
+        `Email already exists in the system. Please use another email.`,
       );
     }
+    // get user role
+    const userRole = await this.roleModel.findOne({ name: USER_ROLE });
+
     const hashedPassword = this.hashPassword(password);
     let newUser = await this.userModel.create({
       name,
       email,
       password: hashedPassword,
-      age,
-      gender,
-      address,
-      role: 'JOB_SEEKER',
+      role: userRole?._id,
     });
     return newUser;
   }
 
-  async findAll(page: number, limit: number, query: string) {
+  async findAll(currentPage: number, limit: number, query: string) {
     const { filter, sort, population } = aqp(query);
-    delete filter.page;
-    delete filter.limit;
-    const offset = (page - 1) * limit;
+    delete filter.current;
+    delete filter.pageSize;
+    let offset = (currentPage - 1) * limit;
     let defaultLimit = limit ? limit : 10;
 
     const totalItems = (await this.userModel.find(filter)).length;
@@ -100,12 +96,10 @@ export class UsersService {
     return {
       result,
       meta: {
-        pagination: {
-          current_page: page,
-          per_page: limit,
-          total_pages: totalPages,
-          total: totalItems,
-        },
+        current: currentPage,
+        pageSize: limit,
+        pages: totalPages,
+        total: totalItems,
       },
     };
   }
@@ -124,8 +118,8 @@ export class UsersService {
       });
   }
 
-  findOneByUsername(username: string) {
-    return this.userModel.findOne({ email: username }).populate({
+  findOneByUserEmail(email: string) {
+    return this.userModel.findOne({ email: email }).populate({
       path: 'role',
       select: {
         name: 1,
@@ -175,7 +169,6 @@ export class UsersService {
       },
     });
   }
-
   private validateObjectId(id: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid ID format');

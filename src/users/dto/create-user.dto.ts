@@ -7,6 +7,7 @@ import {
   IsNotEmptyObject,
   IsNumber,
   IsObject,
+  IsOptional,
   IsString,
   Max,
   MaxLength,
@@ -47,35 +48,14 @@ export class RegisterUserDto {
   @Transform(({ value }) => value.trim())
   @ApiProperty({ example: '123456', description: 'Password of user' })
   password: string;
-
-  @IsNotEmpty({ message: 'Age is required' })
-  @IsNumber({}, { message: 'Age must be a number' })
-  @Type(() => Number)
-  @Min(18, { message: 'Age must be at least 18' })
-  @Max(100, { message: 'Age must be at most 100' })
-  @ApiProperty({ example: 20, description: 'Age of user' })
-  age: number;
-
-  @IsNotEmpty({ message: 'Gender is required' })
-  @IsString({ message: 'Gender must be a string' })
-  @MaxLength(10, { message: 'Gender is too long (max: 10 chars)' })
-  @Transform(({ value }) => value.trim())
-  @ApiProperty({ example: 'male', description: 'Gender of user' })
-  gender: string;
-
-  @IsNotEmpty({ message: 'Address is required' })
-  @IsString({ message: 'Address must be a string' })
-  @MaxLength(200, { message: 'Address is too long (max: 200 chars)' })
-  @Transform(({ value }) => value.trim())
-  @ApiProperty({ example: 'Ha Noi', description: 'Address of user' })
-  address: string;
 }
 
 export class LoginUserDto {
-  @IsString({ message: 'username must be a string' })
-  @IsNotEmpty({ message: 'username is required' })
+  @IsString({ message: 'Email must be a string' })
+  @IsNotEmpty({ message: 'Email is required' })
+  @IsEmail({}, { message: 'Email must be a valid email' })
   @Transform(({ value }) => value.trim())
-  @ApiProperty({ example: 'admin@gmail.com', description: 'username' })
+  @ApiProperty({ example: 'admin@gmail.com', description: 'Email' })
   readonly username: string;
 
   @IsString({ message: 'password must be a string' })
