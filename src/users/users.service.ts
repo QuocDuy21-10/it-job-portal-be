@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { CreateUserDto, RegisterUserDto } from './dto/create-user.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User as UserModel, UserDocument } from './schemas/user.schema';
@@ -12,6 +12,7 @@ import { User } from 'src/decorator/customize';
 import { ConfigService } from '@nestjs/config';
 import { Role, RoleDocument } from 'src/roles/schemas/role.schema';
 import { USER_ROLE } from 'src/databases/sample';
+import { AuthRegisterDto } from 'src/auth/dto/auth-register.dto';
 
 @Injectable()
 export class UsersService {
@@ -54,7 +55,7 @@ export class UsersService {
     };
   }
 
-  async register(user: RegisterUserDto) {
+  async register(user: AuthRegisterDto) {
     const { name, email, password } = user;
     const isExistEmail = await this.userModel.findOne({ email, isDeleted: false });
     if (isExistEmail) {
