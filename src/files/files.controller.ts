@@ -12,7 +12,7 @@ import {
 } from '@nestjs/swagger';
 import { CreateFileDto } from './dto/create-file.dto';
 
-@ApiTags('File API')
+@ApiTags('File')
 @Controller('files')
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}

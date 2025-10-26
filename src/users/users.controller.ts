@@ -67,7 +67,6 @@ export class UsersController {
     return this.usersService.findAll(+page, +limit, query);
   }
 
-  @Public()
   @Get(':id')
   @ApiOperation({
     summary: 'Get information of a user by ID',

@@ -64,7 +64,7 @@ export class AuthController {
 
   @Public()
   @ApiOperation({
-    summary: 'Refresh access token',
+    summary: 'Refresh access token (Public API)',
     description: 'API to refresh access token using refresh token (stored in httpOnly cookie).',
   })
   @ApiResponse({

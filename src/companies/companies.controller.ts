@@ -34,7 +34,7 @@ export class CompaniesController {
   @Public()
   @Get()
   @ApiOperation({
-    summary: 'Get a list of companies (with pagination)',
+    summary: 'Get a list of companies with pagination (Public API)',
     description:
       'Public API to get a list of all companies with pagination and search. Does not require authentication.',
   })
@@ -60,7 +60,7 @@ export class CompaniesController {
   @Public()
   @Get(':id')
   @ApiOperation({
-    summary: 'Get detailed information of a company by ID',
+    summary: 'Get detailed information of a company by ID (Public API)',
     description:
       'Public API to get detailed information of a company based on ID. Does not require authentication.',
   })

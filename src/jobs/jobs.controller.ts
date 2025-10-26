@@ -24,7 +24,7 @@ export class JobsController {
   @Public()
   @Get()
   @ApiOperation({
-    summary: 'Get all job postings',
+    summary: 'Get list job postings with pagination (Public API)',
     description:
       'Retrieves a paginated list of all active job postings. Supports filtering and sorting.',
   })
@@ -50,7 +50,7 @@ export class JobsController {
   @Public()
   @Get(':id')
   @ApiOperation({
-    summary: 'Get job by ID',
+    summary: 'Get job by ID (Public API)',
     description: 'Retrieves detailed information about a specific job posting by its ID',
   })
   @ResponseMessage('Get job by id')
