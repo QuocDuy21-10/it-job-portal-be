@@ -1,13 +1,12 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
   IsDate,
-  IsDateString,
+  IsEnum,
   IsInt,
-  IsMongoId,
   IsNotEmpty,
   IsNotEmptyObject,
   IsNumber,
@@ -19,91 +18,103 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import mongoose from 'mongoose';
+import { CompanyDto } from 'src/companies/dto/company.dto';
 import { IsAfter } from 'src/decorator/is-after.decorator';
-
-class Company {
-  @IsNotEmpty({ message: 'Company ID is required' })
-  @IsMongoId({ message: 'Company ID must be a valid MongoDB ObjectId' })
-  _id: mongoose.Schema.Types.ObjectId;
-
-  @IsNotEmpty({ message: 'Company name is required' })
-  @IsString({ message: 'Company name must be a string' })
-  @MaxLength(100, { message: 'Company name is too long (max: 100 chars)' })
-  name: string;
-}
+import { JobLevel } from '../enums/job-level.enum';
 
 export class CreateJobDto {
   @IsNotEmpty({ message: 'Name is required' })
   @IsString({ message: 'Name must be a string' })
   @MaxLength(100, { message: 'Name is too long (max: 100 chars)' })
-  @Transform(({ value }) => value.trim())
-  @ApiProperty({ example: 'Software Engineer', description: 'Name of job' })
+  @Transform(({ value }) => value?.trim())
+  @ApiProperty({
+    example: 'Senior Backend Engineer',
+    description: 'Title/name of the job position',
+  })
   name: string;
 
-  @IsNotEmpty({ message: 'Skill is required' })
-  @IsArray({ message: 'Skill must be an array' })
+  @IsNotEmpty({ message: 'Skills are required' })
+  @IsArray({ message: 'Skills must be an array' })
   @ArrayMinSize(1, { message: 'At least one skill is required' })
   @IsString({ each: true, message: 'Each skill must be a string' })
-  @MaxLength(100, { each: true, message: 'Skill is too long (max: 100 chars)' })
-  @Transform(({ value }) => value.map(skill => skill.trim()))
-  @ApiProperty({ example: ['Java', 'Python'], description: 'Skill of job' })
-  skill: string[];
+  @MaxLength(100, { each: true, message: 'Skill name is too long (max: 100 chars)' })
+  @Transform(({ value }) =>
+    Array.isArray(value) ? value.map(skill => skill?.trim()).filter(Boolean) : value,
+  )
+  @ApiProperty({
+    example: ['NestJS', 'MongoDB', 'TypeScript', 'Docker'],
+    description: 'Required skills for the job',
+  })
+  skills: string[];
 
   @IsNotEmptyObject({ nullable: true }, { message: 'Company is required' })
   @IsObject({ message: 'Company must be an object' })
   @ValidateNested()
-  @Type(() => Company)
-  @ApiProperty({ type: Company, description: 'Company of job' })
-  company: Company;
+  @Type(() => CompanyDto)
+  @ApiProperty({ type: CompanyDto, description: 'Company of job' })
+  company: CompanyDto;
 
   @IsNotEmpty({ message: 'Location is required' })
   @IsString({ message: 'Location must be a string' })
   @MaxLength(200, { message: 'Location is too long (max: 200 chars)' })
   @Transform(({ value }) => value.trim())
-  @ApiProperty({ example: 'Ha Noi', description: 'Location of job' })
+  @ApiProperty({ example: 'Ha Noi, Vietnam', description: 'Job location/office address' })
   location: string;
 
   @IsNotEmpty({ message: 'Salary is required' })
   @IsNumber({}, { message: 'Salary must be a number' })
   @IsPositive({ message: 'Salary must be greater than 0' })
-  @ApiProperty({ example: 1000000, description: 'Salary of job' })
+  @ApiProperty({ example: 25000000, description: 'Monthly salary in VND' })
   salary: number;
 
   @IsNotEmpty({ message: 'Quantity is required' })
   @IsInt({ message: 'Quantity must be an integer' })
   @Min(1, { message: 'Quantity must be at least 1' })
   @Max(1000, { message: 'Quantity is too large (max: 1000)' })
-  @ApiProperty({ example: 10, description: 'Quantity of job' })
+  @ApiProperty({ example: 5, description: 'Number of positions available' })
   quantity: number;
 
   @IsNotEmpty({ message: 'Level is required' })
+  @IsEnum(JobLevel, { message: 'Level must be a valid job level' })
   @IsString({ message: 'Level must be a string' })
   @MaxLength(50, { message: 'Level is too long (max: 50 chars)' })
-  @ApiProperty({ example: 'Junior', description: 'Level of job' })
-  level: string;
+  @ApiProperty({
+    example: JobLevel.SENIOR,
+    description: 'Experience level required for the job',
+    enum: JobLevel,
+    enumName: 'JobLevel',
+  })
+  level: JobLevel;
 
   @IsNotEmpty({ message: 'Description is required' })
   @IsString({ message: 'Description must be a string' })
   @MaxLength(2000, { message: 'Description is too long (max: 2000 chars)' })
-  @ApiProperty({ example: 'Description ...', description: 'Description of job' })
+  @Transform(({ value }) => value?.trim())
+  @ApiProperty({
+    example: 'We are looking for an experienced backend engineer to join our team...',
+    description: 'Detailed job description',
+  })
   description: string;
 
   @IsNotEmpty({ message: 'Start date is required' })
-  @Transform(({ value }) => new Date(value))
+  @Transform(({ value }) => (value ? new Date(value) : value))
   @IsDate({ message: 'startDate must be a valid date' })
-  @ApiProperty({ example: '2023-01-01', description: 'Start date of job' })
+  @ApiProperty({ example: '2025-11-01', description: 'Job posting start date (ISO 8601 format)' })
   startDate: Date;
 
   @IsNotEmpty({ message: 'End date is required' })
-  @Transform(({ value }) => new Date(value))
+  @Transform(({ value }) => (value ? new Date(value) : value))
   @IsDate({ message: 'endDate must be a valid date' })
   @IsAfter('startDate', { message: 'End date must be after start date' })
-  @ApiProperty({ example: '2023-01-01', description: 'End date of job' })
+  @ApiProperty({ example: '2025-12-31', description: 'Job posting end date (ISO 8601 format)' })
   endDate: Date;
 
   @IsNotEmpty({ message: 'isActive is required' })
   @IsBoolean({ message: 'isActive must be a boolean' })
-  @ApiProperty({ example: false, description: 'isActive of job' })
+  @ApiProperty({
+    example: true,
+    description: 'Whether the job posting is active',
+    default: true,
+  })
   isActive: boolean;
 }

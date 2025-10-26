@@ -1,15 +1,16 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
 import { Role } from 'src/roles/schemas/role.schema';
+import { Gender } from '../enums/user-gender.enum';
 
 export type UserDocument = HydratedDocument<User>;
 
 @Schema({ timestamps: true })
 export class User {
-  @Prop({ required: true })
+  @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop({ required: true, unique: true })
+  @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email: string;
 
   @Prop({ required: true })
@@ -18,19 +19,20 @@ export class User {
   @Prop()
   age?: number;
 
-  @Prop()
+  @Prop({ enum: Gender })
   gender?: string;
 
-  @Prop()
+  @Prop({ trim: true })
   address?: string;
 
   @Prop({ type: Object })
   company?: {
     _id: mongoose.Schema.Types.ObjectId;
     name: string;
+    logo?: string;
   };
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Role.name })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Role.name, required: true })
   role: mongoose.Schema.Types.ObjectId;
 
   @Prop()

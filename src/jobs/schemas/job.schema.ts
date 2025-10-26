@@ -1,36 +1,34 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
+import { JobLevel } from '../enums/job-level.enum';
 
 export type JobDocument = HydratedDocument<Job>;
 
 @Schema({ timestamps: true })
 export class Job {
-  @Prop()
+  @Prop({ required: true, trim: true })
   name: string;
 
   @Prop({ required: true })
   skills: string[];
 
-  @Prop({ type: Object })
+  @Prop({ type: Object, required: true })
   company: {
     _id: mongoose.Schema.Types.ObjectId;
     name: string;
-    logo: string;
+    logo?: string;
   };
 
-  @Prop()
+  @Prop({ required: true, trim: true })
   location: string;
 
-  @Prop()
+  @Prop({ required: true, trim: true })
   salary: number;
 
-  @Prop()
+  @Prop({ required: true })
   quantity: number;
 
-  @Prop()
-  address: string;
-
-  @Prop()
+  @Prop({ required: true, trim: true, enum: JobLevel })
   level: string;
 
   @Prop()
@@ -42,38 +40,38 @@ export class Job {
   @Prop()
   endDate: Date;
 
-  @Prop()
+  @Prop({ default: true, required: true })
   isActive: boolean;
 
   @Prop({ type: Object })
-  createdBy: {
+  createdBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };
 
   @Prop({ type: Object })
-  updatedBy: {
+  updatedBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };
 
   @Prop({ type: Object })
-  deletedBy: {
+  deletedBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };
 
   @Prop()
-  createdAt: Date;
+  createdAt?: Date;
 
   @Prop()
-  updatedAt: Date;
+  updatedAt?: Date;
 
   @Prop()
-  isDeleted: boolean;
+  isDeleted?: boolean;
 
   @Prop()
-  deletedAt: Date;
+  deletedAt?: Date;
 }
 
 export const JobSchema = SchemaFactory.createForClass(Job);

@@ -22,23 +22,15 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @UseGuards(ThrottlerGuard)
   @ApiOperation({
-    summary: 'Đăng nhập',
+    summary: 'Login',
     description:
-      'Đăng nhập với email và mật khẩu để nhận access_token và thông tin user và permission.',
+      'Login with email and password to receive an access token and user information and permissions.',
   })
   @ApiBody({ type: AuthEmailLoginDto })
   @ApiResponse({
     status: HttpStatus.CREATED,
-    description: 'Đăng nhập thành công. Trả về access_token và thông tin user và permission.',
+    description: 'Login successful. Return access token and user information and permissions.',
     type: AuthEmailLoginDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.UNAUTHORIZED,
-    description: 'Sai email hoặc mật khẩu.',
-  })
-  @ApiResponse({
-    status: HttpStatus.TOO_MANY_REQUESTS,
-    description: 'Bạn đã request quá nhanh, vui lòng thử lại sau.',
   })
   @Post('/login')
   @ResponseMessage('Login successfully')
@@ -48,12 +40,8 @@ export class AuthController {
 
   @Public()
   @ApiOperation({
-    summary: 'Đăng ký người dùng mới',
-    description: 'Đăng ký người dùng mới với email và mật khẩu.',
-  })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'Register a new user successfully. Trả về thông tin user: id va thời gian tạo.',
+    summary: 'Register a new user',
+    description: 'Register a new user with email and password.',
   })
   @ResponseMessage('Register a new user successfully')
   @Post('/register')
@@ -63,17 +51,8 @@ export class AuthController {
 
   @Get('/me')
   @ApiOperation({
-    summary: 'Lấy thông tin tài khoản đang đăng nhập',
-    description: 'Lấy thông tin tài khoản đang đăng nhập.',
-  })
-  @ApiBearerAuth()
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Get user information successfully',
-  })
-  @ApiResponse({
-    status: HttpStatus.UNAUTHORIZED,
-    description: 'Chưa đăng nhập hoặc token không hợp lệ.',
+    summary: 'Get information of the current user',
+    description: 'Get information of the current user.',
   })
   @ResponseMessage('Get user information successfully')
   async handleGetAccount(@User() user: IUser) {
@@ -85,17 +64,16 @@ export class AuthController {
 
   @Public()
   @ApiOperation({
-    summary: 'Làm mới access token',
-    description:
-      'API này sử dụng refresh_token (lưu trong httpOnly cookie) để cấp access_token mới.',
+    summary: 'Refresh access token',
+    description: 'API to refresh access token using refresh token (stored in httpOnly cookie).',
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Get new access token successfully',
+    description: 'Get new access token successfully.',
   })
   @ApiResponse({
     status: HttpStatus.UNAUTHORIZED,
-    description: 'Refresh token không hợp lệ hoặc đã hết hạn.',
+    description: 'Invalid or expired refresh token.',
   })
   @Get('/refresh')
   @ResponseMessage('Get new access token successfully')
@@ -106,17 +84,8 @@ export class AuthController {
 
   @Post('/logout')
   @ApiOperation({
-    summary: 'Đăng xuất',
-    description: 'Đăng xuất và xóa refresh token khỏi cookie.',
-  })
-  @ApiBearerAuth()
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Logout successfully',
-  })
-  @ApiResponse({
-    status: HttpStatus.UNAUTHORIZED,
-    description: 'Chưa đăng nhập hoặc token không hợp lệ.',
+    summary: 'Logout',
+    description: 'API to logout and clear cookies.',
   })
   @ResponseMessage('Logout successfully')
   handleLogout(@Res({ passthrough: true }) response: Response, @User() user: IUser) {

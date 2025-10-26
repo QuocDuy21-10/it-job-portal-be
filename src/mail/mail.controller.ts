@@ -6,7 +6,7 @@ import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { Subscriber, SubscriberDocument } from 'src/subscribers/schemas/subscriber.schema';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 import { InjectModel } from '@nestjs/mongoose';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Cron } from '@nestjs/schedule';
 
 @ApiTags('Mail')
@@ -20,6 +20,10 @@ export class MailController {
   ) {}
   @Get()
   @Public()
+  @ApiOperation({
+    summary: 'Gửi email',
+    description: 'Gửi email giới thiệu việc làm tới tất cả người đăng ký dựa trên kỹ năng của họ.',
+  })
   @ResponseMessage('Send email')
   @Cron('0 0 0 * * 0') // 0h0m0s (every sunday)
   async handleTestEmail() {

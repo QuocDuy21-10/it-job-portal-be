@@ -5,44 +5,44 @@ export type CompanyDocument = HydratedDocument<Company>;
 
 @Schema({ timestamps: true })
 export class Company {
-  @Prop()
+  @Prop({ required: true, unique: true, index: true, trim: true })
   name: string;
 
-  @Prop()
+  @Prop({ required: true, trim: true })
   address: string;
 
-  @Prop()
-  description: String;
+  @Prop({ required: true, trim: true })
+  description: string;
+
+  @Prop({ trim: true, default: null })
+  logo?: string;
 
   @Prop()
-  logo: String;
+  createdAt?: Date;
 
   @Prop()
-  createdAt: Date;
+  updatedAt?: Date;
 
   @Prop()
-  updatedAt: Date;
+  deletedAt?: Date;
 
   @Prop()
-  deletedAt: Date;
-
-  @Prop()
-  isDeleted: boolean;
+  isDeleted?: boolean;
 
   @Prop({ type: Object, default: null })
-  createdBy: {
+  createdBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };
 
   @Prop({ type: Object, default: null })
-  updatedBy: {
+  updatedBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };
 
   @Prop({ type: Object, default: null })
-  deletedBy: {
+  deletedBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };

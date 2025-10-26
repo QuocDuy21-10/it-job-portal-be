@@ -15,20 +15,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import mongoose from 'mongoose';
-
-class Company {
-  @IsNotEmpty({ message: 'Company ID is required' })
-  @IsMongoId({ message: 'Company ID must be a valid MongoDB ObjectId' })
-  @Type(() => mongoose.Schema.Types.ObjectId)
-  @ApiProperty({ example: '64b64c4f5311236168a109ca', description: 'Company ID' })
-  _id: mongoose.Schema.Types.ObjectId;
-
-  @IsNotEmpty({ message: 'Company name is required' })
-  @IsString({ message: 'Company name must be a string' })
-  @MaxLength(100, { message: 'Company name is too long (max: 100 chars)' })
-  @ApiProperty({ example: 'Google Inc', description: 'Company name' })
-  name: string;
-}
+import { CompanyDto } from 'src/companies/dto/company.dto';
 
 export class CreateUserDto {
   @IsNotEmpty({ message: 'Name is required' })
@@ -59,7 +46,6 @@ export class CreateUserDto {
 
   @IsNotEmpty({ message: 'Gender is required' })
   @IsString({ message: 'Gender must be a string' })
-  @MaxLength(10, { message: 'Gender is too long (max: 10 chars)' })
   @Transform(({ value }) => value.trim())
   @ApiProperty({ example: 'male', description: 'Gender of user' })
   gender: string;
@@ -75,9 +61,9 @@ export class CreateUserDto {
   @IsOptional()
   @IsObject({ message: 'Company must be an object' })
   @ValidateNested()
-  @Type(() => Company)
-  @ApiProperty({ type: Company, description: 'Company of user' })
-  company?: Company;
+  @Type(() => CompanyDto)
+  @ApiProperty({ type: CompanyDto, description: 'Company of user' })
+  company?: CompanyDto;
 
   @IsNotEmpty({ message: 'Role is required' })
   @IsString({ message: 'Role must be a string' })
