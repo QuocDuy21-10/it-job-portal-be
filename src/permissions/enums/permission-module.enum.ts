@@ -1,0 +1,10 @@
+export enum PermissionModule {
+  USER = 'USERS',
+  ROLE = 'ROLES',
+  PERMISSION = 'PERMISSIONS',
+  COMPANY = 'COMPANIES',
+  JOB = 'JOBS',
+  RESUME = 'RESUMES',
+  FILES = 'FILES',
+  SUBSCRIBERS = 'SUBSCRIBERS',
+}

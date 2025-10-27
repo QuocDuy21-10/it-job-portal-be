@@ -7,6 +7,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import aqp from 'api-query-params';
 import mongoose from 'mongoose';
+import { ResumeStatus } from './enums/resume-status.enum';
 
 @Injectable()
 export class ResumesService {
@@ -15,10 +16,10 @@ export class ResumesService {
     const newResume = await this.resumeModel.create({
       email: user.email,
       userId: user._id,
-      status: 'PENDING',
+      status: ResumeStatus.PENDING,
       histories: [
         {
-          status: 'PENDING',
+          status: ResumeStatus.PENDING,
           updatedAt: new Date(),
           updatedBy: { _id: user._id, email: user.email },
         },
@@ -31,8 +32,8 @@ export class ResumesService {
 
   async findAll(page?: number, limit?: number, query?: string) {
     const { filter, sort, population, projection } = aqp(query);
-    delete filter.current;
-    delete filter.pageSize;
+    delete filter.page;
+    delete filter.limit;
     let offset = (page - 1) * limit;
     let defaultLimit = limit ? limit : 10;
 

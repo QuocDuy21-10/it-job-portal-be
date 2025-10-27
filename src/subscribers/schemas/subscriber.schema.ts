@@ -11,38 +11,38 @@ export class Subscriber {
   @Prop()
   name: string;
 
-  @Prop()
+  @Prop({ required: true })
   skills: string[];
 
   @Prop({ type: Object })
-  createdBy: {
+  createdBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };
 
   @Prop({ type: Object })
-  updatedBy: {
+  updatedBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };
 
   @Prop({ type: Object })
-  deletedBy: {
+  deletedBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };
 
   @Prop()
-  createdAt: Date;
+  createdAt?: Date;
 
   @Prop()
-  updatedAt: Date;
+  updatedAt?: Date;
 
   @Prop()
-  isDeleted: boolean;
+  isDeleted?: boolean;
 
   @Prop()
-  deletedAt: Date;
+  deletedAt?: Date;
 }
 
 export const SubscriberSchema = SchemaFactory.createForClass(Subscriber);

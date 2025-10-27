@@ -19,7 +19,6 @@ export class MailController {
     @InjectModel(Job.name) private jobModel: SoftDeleteModel<JobDocument>,
   ) {}
   @Get()
-  @Public()
   @ApiOperation({
     summary: 'Gửi email',
     description: 'Gửi email giới thiệu việc làm tới tất cả người đăng ký dựa trên kỹ năng của họ.',

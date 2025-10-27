@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Res, Query } from '@
 import { ResumesService } from './resumes.service';
 import { CreateResumeDto, CreateUserCvDto } from './dto/create-resume.dto';
 import { UpdateResumeDto } from './dto/update-resume.dto';
-import { ResponseMessage, User } from 'src/decorator/customize';
+import { ResponseMessage, SkipCheckPermission, User } from 'src/decorator/customize';
 import { IUser } from 'src/users/users.interface';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
@@ -64,11 +64,12 @@ export class ResumesController {
   }
 
   @Post('by-user')
+  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Get resume by user',
     description: 'Retrieves resume associated with the authenticated user.',
   })
-  @ResponseMessage('Resume created successfully')
+  @ResponseMessage('Resume has been retrieved successfully')
   getResumeByUser(@User() user: IUser) {
     return this.resumesService.getResumeByUser(user);
   }

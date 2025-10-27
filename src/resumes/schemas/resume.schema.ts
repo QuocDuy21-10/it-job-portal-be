@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
 import { Company } from 'src/companies/schemas/company.schema';
 import { Job } from 'src/jobs/schemas/job.schema';
+import { ResumeStatus } from '../enums/resume-status.enum';
 
 export type ResumeDocument = HydratedDocument<Resume>;
 
@@ -16,14 +17,14 @@ export class Resume {
   @Prop()
   url: string;
 
-  @Prop()
+  @Prop({ required: true, enum: ResumeStatus, default: ResumeStatus.PENDING })
   status: string;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Company.name })
-  companyId: mongoose.Schema.Types.ObjectId;
+  companyId?: mongoose.Schema.Types.ObjectId;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Job.name })
-  jobId: mongoose.Schema.Types.ObjectId;
+  jobId?: mongoose.Schema.Types.ObjectId;
 
   @Prop({ type: mongoose.Schema.Types.Array })
   histories: {
@@ -36,34 +37,34 @@ export class Resume {
   }[];
 
   @Prop({ type: Object })
-  createdBy: {
+  createdBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };
 
   @Prop({ type: Object })
-  updatedBy: {
+  updatedBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };
 
   @Prop({ type: Object })
-  deletedBy: {
+  deletedBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };
 
   @Prop()
-  createdAt: Date;
+  createdAt?: Date;
 
   @Prop()
-  updatedAt: Date;
+  updatedAt?: Date;
 
   @Prop()
-  isDeleted: boolean;
+  isDeleted?: boolean;
 
   @Prop()
-  deletedAt: Date;
+  deletedAt?: Date;
 }
 
 export const ResumeSchema = SchemaFactory.createForClass(Resume);

@@ -1,51 +1,53 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
+import { PermissionMethod } from '../enums/permission-method.enum';
+import { PermissionModule } from '../enums/permission-module.enum';
 
 export type PermissionDocument = HydratedDocument<Permission>;
 
 @Schema({ timestamps: true })
 export class Permission {
-  @Prop()
+  @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop()
+  @Prop({ required: true })
   apiPath: string;
 
-  @Prop()
+  @Prop({ required: true, enum: PermissionMethod })
   method: string;
 
-  @Prop()
+  @Prop({ required: true, enum: PermissionModule })
   module: string;
 
   @Prop({ type: Object })
-  createdBy: {
+  createdBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };
 
   @Prop({ type: Object })
-  updatedBy: {
+  updatedBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };
 
   @Prop({ type: Object })
-  deletedBy: {
+  deletedBy?: {
     _id: mongoose.Schema.Types.ObjectId;
     email: string;
   };
 
   @Prop()
-  createdAt: Date;
+  createdAt?: Date;
 
   @Prop()
-  updatedAt: Date;
+  updatedAt?: Date;
 
   @Prop()
-  isDeleted: boolean;
+  isDeleted?: boolean;
 
   @Prop()
-  deletedAt: Date;
+  deletedAt?: Date;
 }
 
 export const PermissionSchema = SchemaFactory.createForClass(Permission);

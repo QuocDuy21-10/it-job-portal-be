@@ -30,7 +30,6 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Create a new user',
     description:

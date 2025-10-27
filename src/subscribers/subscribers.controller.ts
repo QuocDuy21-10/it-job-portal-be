@@ -6,7 +6,7 @@ import { ResponseMessage, SkipCheckPermission, User } from 'src/decorator/custom
 import { IUser } from 'src/users/users.interface';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
-@ApiTags('subscribers')
+@ApiTags('Subscriber')
 @Controller('subscribers')
 export class SubscribersController {
   constructor(private readonly subscribersService: SubscribersService) {}
@@ -29,12 +29,8 @@ export class SubscribersController {
     description: 'Retrieves a paginated list of all subscribers. Supports filtering and sorting.',
   })
   @ResponseMessage('Fetch subscribers with paginate')
-  findAll(
-    @Query('current') currentPage: string,
-    @Query('pageSize') limit: string,
-    @Query() query: string,
-  ) {
-    return this.subscribersService.findAll(+currentPage, +limit, query);
+  findAll(@Query('page') page: string, @Query('limit') limit: string, @Query() query: string) {
+    return this.subscribersService.findAll(+page, +limit, query);
   }
 
   @Get(':id')

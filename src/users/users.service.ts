@@ -76,11 +76,11 @@ export class UsersService {
     return newUser;
   }
 
-  async findAll(currentPage: number, limit: number, query: string) {
+  async findAll(page: number, limit: number, query: string) {
     const { filter, sort, population } = aqp(query);
-    delete filter.current;
-    delete filter.pageSize;
-    let offset = (currentPage - 1) * limit;
+    delete filter.page;
+    delete filter.limit;
+    let offset = (page - 1) * limit;
     let defaultLimit = limit ? limit : 10;
 
     const totalItems = (await this.userModel.find(filter)).length;
@@ -91,13 +91,13 @@ export class UsersService {
       .skip(offset)
       .limit(defaultLimit)
       .sort(sort as any)
-      .select('-password')
+      .select('-password -refreshToken')
       .populate(population)
       .exec();
     return {
       result,
       meta: {
-        current: currentPage,
+        current: page,
         pageSize: limit,
         pages: totalPages,
         total: totalItems,
@@ -109,7 +109,7 @@ export class UsersService {
     this.validateObjectId(id);
     return this.userModel
       .findById({ _id: id })
-      .select('-password')
+      .select('-password -refreshToken')
       .populate({
         path: 'role',
         select: {

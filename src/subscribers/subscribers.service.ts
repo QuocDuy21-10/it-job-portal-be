@@ -40,12 +40,12 @@ export class SubscribersService {
     };
   }
 
-  async findAll(currentPage?: number, limit?: number, query?: string) {
+  async findAll(page?: number, limit?: number, query?: string) {
     const { filter, sort, population, projection } = aqp(query);
-    delete filter.current;
-    delete filter.pageSize;
+    delete filter.page;
+    delete filter.limit;
 
-    let offset = (+currentPage - 1) * +limit;
+    let offset = (+page - 1) * +limit;
     let defaultLimit = +limit ? +limit : 10;
 
     const totalItems = (await this.subscriberModel.find(filter)).length;
@@ -63,10 +63,12 @@ export class SubscribersService {
     return {
       result,
       meta: {
-        current: currentPage,
-        pageSize: limit,
-        pages: totalPages,
-        total: totalItems,
+        pagination: {
+          current_page: page,
+          per_page: limit,
+          total_pages: totalPages,
+          total: totalItems,
+        },
       },
     };
   }

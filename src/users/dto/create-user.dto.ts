@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsEmail,
+  IsEnum,
   IsMongoId,
   IsNotEmpty,
   IsNotEmptyObject,
@@ -16,23 +17,21 @@ import {
 } from 'class-validator';
 import mongoose from 'mongoose';
 import { CompanyDto } from 'src/companies/dto/company.dto';
+import { Gender } from '../enums/user-gender.enum';
 
 export class CreateUserDto {
   @IsNotEmpty({ message: 'Name is required' })
   @IsString({ message: 'Name must be a string' })
-  @Transform(({ value }) => value.trim())
   @MaxLength(100, { message: 'Name is too long (max: 100 chars)' })
-  @ApiProperty({ example: 'Quoc Duy', description: 'Name of user' })
+  @ApiProperty({ example: 'Test', description: 'Name of user' })
   name: string;
 
   @IsEmail({}, { message: 'Email is invalid' })
   @IsNotEmpty({ message: 'Email is required' })
-  @Transform(({ value }) => value.trim())
-  @ApiProperty({ example: 'duy@gmail.com', description: 'Email of user' })
+  @ApiProperty({ example: 'test@gmail.com', description: 'Email of user' })
   email: string;
 
   @IsNotEmpty({ message: 'Password is required' })
-  @Transform(({ value }) => value.trim())
   @ApiProperty({ example: '123456', description: 'Password of user' })
   password: string;
 
@@ -46,14 +45,15 @@ export class CreateUserDto {
 
   @IsNotEmpty({ message: 'Gender is required' })
   @IsString({ message: 'Gender must be a string' })
-  @Transform(({ value }) => value.trim())
-  @ApiProperty({ example: 'male', description: 'Gender of user' })
+  @IsEnum(Gender, {
+    message: `Gender must be one of the following values: ${Object.values(Gender).join(', ')}`,
+  })
+  @ApiProperty({ example: Gender.MALE, description: 'Gender of user' })
   gender: string;
 
   @IsNotEmpty({ message: 'Address is required' })
   @IsString({ message: 'Address must be a string' })
   @MaxLength(200, { message: 'Address is too long (max: 200 chars)' })
-  @Transform(({ value }) => value.trim())
   @ApiProperty({ example: 'Ha Noi', description: 'Address of user' })
   address: string;
 
@@ -67,7 +67,7 @@ export class CreateUserDto {
 
   @IsNotEmpty({ message: 'Role is required' })
   @IsString({ message: 'Role must be a string' })
-  @Transform(({ value }) => value.trim())
   @IsMongoId({ message: 'Role must be a valid MongoDB ObjectId' })
+  @ApiProperty({ example: '68fde8987e1103e9e88e0e4e', description: 'Role of user' })
   role: mongoose.Schema.Types.ObjectId;
 }

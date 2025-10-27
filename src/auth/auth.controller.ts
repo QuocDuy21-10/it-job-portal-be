@@ -4,7 +4,7 @@ import { Public, ResponseMessage, User } from 'src/decorator/customize';
 import { LocalAuthGuard } from './local-auth.guard';
 import { Request, Response } from 'express';
 import { IUser } from 'src/users/users.interface';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RolesService } from 'src/roles/roles.service';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthRegisterDto } from './dto/auth-register.dto';
@@ -66,14 +66,6 @@ export class AuthController {
   @ApiOperation({
     summary: 'Refresh access token (Public API)',
     description: 'API to refresh access token using refresh token (stored in httpOnly cookie).',
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Get new access token successfully.',
-  })
-  @ApiResponse({
-    status: HttpStatus.UNAUTHORIZED,
-    description: 'Invalid or expired refresh token.',
   })
   @Get('/refresh')
   @ResponseMessage('Get new access token successfully')
