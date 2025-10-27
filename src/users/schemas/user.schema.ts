@@ -10,7 +10,7 @@ export class User {
   @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop({ required: true, unique: true, lowercase: true, trim: true })
+  @Prop({ required: true, lowercase: true, trim: true })
   email: string;
 
   @Prop({ required: true })
@@ -70,3 +70,17 @@ export class User {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+
+// TẠO PARTIAL UNIQUE INDEX
+// Index này chỉ áp dụng cho documents có isDeleted = false
+UserSchema.index(
+  { email: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { isDeleted: false },
+  },
+);
+
+// Thêm index cho performance khi query
+UserSchema.index({ email: 1, isDeleted: 1 });
+UserSchema.index({ role: 1 });
