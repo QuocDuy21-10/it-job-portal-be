@@ -1,6 +1,13 @@
-import { Controller, Headers, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Headers,
+  Post,
+  UploadedFile,
+  UseFilters,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FilesService } from './files.service';
-import { Public, ResponseMessage } from 'src/decorator/customize';
+import { Public, ResponseMessage, SkipCheckPermission } from 'src/decorator/customize';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBody,
@@ -11,6 +18,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CreateFileDto } from './dto/create-file.dto';
+import { HttpExceptionFilter } from 'src/core/http-exception.filter';
 
 @ApiTags('File')
 @Controller('files')
@@ -18,9 +26,11 @@ export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
   @Post('upload')
+  @SkipCheckPermission()
   @ApiOperation({ summary: 'Upload single file (optionally specify folder_type in headers)' })
   @ResponseMessage('Upload single file')
   @UseInterceptors(FileInterceptor('file'))
+  @UseFilters(new HttpExceptionFilter())
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: CreateFileDto })
   @ApiHeader({
