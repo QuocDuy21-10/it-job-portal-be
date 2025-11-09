@@ -57,8 +57,8 @@ export class CreateUserDto {
   @ApiProperty({ example: 'Ha Noi', description: 'Address of user' })
   address: string;
 
-  @IsNotEmptyObject({ nullable: true }, { message: 'Company is required' })
   @IsOptional()
+  @IsNotEmptyObject({ nullable: true }, { message: 'Company is required' })
   @IsObject({ message: 'Company must be an object' })
   @ValidateNested()
   @Type(() => CompanyDto)

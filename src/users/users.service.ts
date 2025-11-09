@@ -157,7 +157,7 @@ export class UsersService {
     return this.userModel.softDelete({ _id: id });
   }
 
-  async updateUserToken(id: string, refreshToken: string) {
+  async updateUserToken(refreshToken: string, id: string) {
     this.validateObjectId(id);
     return this.userModel.updateOne({ _id: id }, { refreshToken });
   }

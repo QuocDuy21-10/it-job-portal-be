@@ -54,7 +54,7 @@ export class AuthService {
     const refresh_token = this.createRefreshToken(payload);
 
     // update user with refresh token
-    this.usersService.updateUserToken(_id, refresh_token);
+    this.usersService.updateUserToken(refresh_token, _id);
 
     // set refresh token as cookies
     response.cookie('refresh_token', refresh_token, {
@@ -88,10 +88,11 @@ export class AuthService {
       } else {
         const { _id, name, email, role } = user;
         const payload = { sub: 'token refresh', iss: 'from server', _id, name, email, role };
+
         const refresh_token = this.createRefreshToken(payload);
 
         // update user with refresh token
-        this.usersService.updateUserToken(_id.toString(), refresh_token);
+        this.usersService.updateUserToken(refresh_token, _id.toString());
 
         // get user role casting data (ObjectId -> {_id: string, name: string})
         const userRole = user.role as unknown as { _id: string; name: string };

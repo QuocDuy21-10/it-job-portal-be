@@ -109,6 +109,8 @@ export class ResumesService {
           path: 'jobId',
           select: {
             name: 1,
+            location: 1,
+            salary: 1,
           },
         },
       ]);

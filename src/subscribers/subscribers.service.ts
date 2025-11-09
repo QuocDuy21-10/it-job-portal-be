@@ -76,7 +76,7 @@ export class SubscribersService {
   async findOne(id: string) {
     this.validateObjectId(id);
 
-    return await this.subscriberModel.findOne({
+    return await this.subscriberModel.findById({
       _id: id,
     });
   }

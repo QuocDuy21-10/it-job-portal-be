@@ -64,15 +64,17 @@ export class CreateUserCvDto {
   @ApiProperty({ example: 'https://example.com/resume.pdf', description: 'Resume URL' })
   url: string;
 
+  @IsOptional()
   @IsNotEmpty({ message: 'companyId is required' })
   @Type(() => mongoose.Schema.Types.ObjectId)
   @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'Company ID' })
   @IsMongoId({ message: 'companyId must be a valid MongoDB ObjectId' })
-  companyId: mongoose.Schema.Types.ObjectId;
+  companyId?: mongoose.Schema.Types.ObjectId;
 
+  @IsOptional()
   @IsNotEmpty({ message: 'jobId is required' })
   @Type(() => mongoose.Schema.Types.ObjectId)
   @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'Job ID' })
   @IsMongoId({ message: 'jobId must be a valid MongoDB ObjectId' })
-  jobId: mongoose.Schema.Types.ObjectId;
+  jobId?: mongoose.Schema.Types.ObjectId;
 }

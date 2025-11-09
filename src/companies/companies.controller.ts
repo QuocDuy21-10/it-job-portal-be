@@ -31,14 +31,14 @@ export class CompaniesController {
   @ApiQuery({
     name: 'page',
     required: false,
-    type: String,
+    type: Number,
     description: 'Page number (default: 1)',
     example: '1',
   })
   @ApiQuery({
     name: 'limit',
     required: false,
-    type: String,
+    type: Number,
     description: 'Number of items per page (default: 10)',
     example: '10',
   })

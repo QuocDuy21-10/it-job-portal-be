@@ -25,11 +25,14 @@ export class MailController {
   })
   @ResponseMessage('Send email')
   @Cron('0 0 0 * * 0') // 0h0m0s (every sunday)
+  // @Cron('* * * * * *') // every minute
   async handleTestEmail() {
     const subscribers = await this.subscriberModel.find({});
     for (const subs of subscribers) {
       const subsSkills = subs.skills;
-      const jobWithMatchingSkills = await this.jobModel.find({ skills: { $in: subsSkills } });
+      const jobWithMatchingSkills = await this.jobModel.find({
+        skills: { $in: subsSkills },
+      });
       if (jobWithMatchingSkills?.length > 0) {
         const jobs = jobWithMatchingSkills.map(job => {
           return {

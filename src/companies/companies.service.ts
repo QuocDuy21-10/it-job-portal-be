@@ -12,6 +12,15 @@ import aqp from 'api-query-params';
 export class CompaniesService {
   constructor(@InjectModel(Company.name) private companyModel: SoftDeleteModel<CompanyDocument>) {}
   async create(createCompanyDto: CreateCompanyDto, user: IUser) {
+    const isExistName = await this.companyModel.find({
+      name: createCompanyDto.name,
+      isDeleted: false,
+    });
+
+    if (isExistName && isExistName.length > 0) {
+      throw new BadRequestException(`Company with name = ${createCompanyDto.name} already exists`);
+    }
+
     return await this.companyModel.create({
       ...createCompanyDto,
       createdBy: { _id: user._id, email: user.email },
@@ -38,10 +47,12 @@ export class CompaniesService {
     return {
       result,
       meta: {
-        current: page,
-        pageSize: limit,
-        totalPages,
-        totalItems,
+        pagination: {
+          current_page: page,
+          per_page: limit,
+          total_pages: totalPages,
+          total: totalItems,
+        },
       },
     };
   }

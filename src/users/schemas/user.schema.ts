@@ -27,9 +27,9 @@ export class User {
 
   @Prop({ type: Object })
   company?: {
-    _id: mongoose.Schema.Types.ObjectId;
-    name: string;
-    logo?: string;
+    _id?: mongoose.Schema.Types.ObjectId | null;
+    name?: string | null;
+    logo?: string | null;
   };
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Role.name, required: true })

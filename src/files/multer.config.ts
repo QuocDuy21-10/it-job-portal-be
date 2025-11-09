@@ -1,31 +1,39 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { MulterModuleOptions, MulterOptionsFactory } from '@nestjs/platform-express';
-import * as fs from 'fs';
+import fs from 'fs';
 import { diskStorage } from 'multer';
 import path, { join } from 'path';
 
 @Injectable()
 export class MulterConfigService implements MulterOptionsFactory {
-  // Get the root path of the project
   getRootPath = () => {
     return process.cwd();
   };
-  // Create the directory if it does not exist
+
   ensureExists(targetDirectory: string) {
     fs.mkdir(targetDirectory, { recursive: true }, error => {
       if (!error) {
         console.log('Directory successfully created, or it already exists.');
         return;
       }
-      throw new HttpException(
-        {
-          status: HttpStatus.INTERNAL_SERVER_ERROR,
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      switch (error.code) {
+        case 'EEXIST':
+          // Error:
+          // Requested location already exists, but it's not a directory.
+          break;
+        case 'ENOTDIR':
+          // Error:
+          // The parent hierarchy contains a file with the same name as the dir
+          // you're trying to create.
+          break;
+        default:
+          // Some other error like permission denied.
+          console.error(error);
+          break;
+      }
     });
   }
+
   createMulterOptions(): MulterModuleOptions {
     return {
       storage: diskStorage({
@@ -46,7 +54,6 @@ export class MulterConfigService implements MulterOptionsFactory {
         },
       }),
       fileFilter: (req, file, cb) => {
-        // Allowed file types
         const allowedFileTypes = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx'];
         const fileExtension = file.originalname.split('.').pop().toLowerCase();
         const isValidFileType = allowedFileTypes.includes(fileExtension);
@@ -56,7 +63,7 @@ export class MulterConfigService implements MulterOptionsFactory {
         } else cb(null, true);
       },
       limits: {
-        fileSize: 1024 * 1024 * 5, // 5MB
+        fileSize: 1024 * 1024 * 5, // 5 MB
       },
     };
   }

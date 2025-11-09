@@ -25,12 +25,13 @@ import { HttpExceptionFilter } from 'src/core/http-exception.filter';
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
+  @Public()
   @Post('upload')
   @SkipCheckPermission()
-  @ApiOperation({ summary: 'Upload single file (optionally specify folder_type in headers)' })
-  @ResponseMessage('Upload single file')
   @UseInterceptors(FileInterceptor('file'))
   @UseFilters(new HttpExceptionFilter())
+  @ApiOperation({ summary: 'Upload single file (optionally specify folder_type in headers)' })
+  @ResponseMessage('Upload single file')
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: CreateFileDto })
   @ApiHeader({

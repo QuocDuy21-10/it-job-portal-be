@@ -21,6 +21,7 @@ import {
 import { CompanyDto } from 'src/companies/dto/company.dto';
 import { IsAfter } from 'src/decorator/is-after.decorator';
 import { JobLevel } from '../enums/job-level.enum';
+import { JobFormOfWork } from '../enums/job-formwork';
 
 export class CreateJobDto {
   @IsNotEmpty({ message: 'Name is required' })
@@ -85,6 +86,14 @@ export class CreateJobDto {
     enumName: 'JobLevel',
   })
   level: JobLevel;
+
+  @IsNotEmpty({ message: 'Form of work is required' })
+  @IsString({ message: 'Form of work must be a string' })
+  @IsEnum(JobFormOfWork, {
+    message: `formOfWork must be one of the following values: ${Object.values(JobFormOfWork).join(', ')}`,
+  })
+  @ApiProperty({ example: JobFormOfWork.FULL_TIME, description: 'Job form of work' })
+  formOfWork: string;
 
   @IsNotEmpty({ message: 'Description is required' })
   @IsString({ message: 'Description must be a string' })

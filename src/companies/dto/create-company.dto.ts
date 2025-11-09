@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateCompanyDto {
   @IsNotEmpty({ message: 'Name is required' })
@@ -30,4 +30,20 @@ export class CreateCompanyDto {
   @Transform(({ value }) => value?.trim())
   @ApiProperty({ example: 'logo.png', description: 'Logo of company' })
   logo?: string;
+
+  @IsNotEmpty({ message: 'Website is required' })
+  @IsString({ message: 'Website must be a string' })
+  @MaxLength(100, { message: 'Website is too long (max: 100 chars)' })
+  @Transform(({ value }) => value?.trim())
+  @ApiProperty({ example: 'https://google.com', description: 'Website of company' })
+  website: string;
+
+  @IsOptional()
+  @IsNumber(
+    { allowInfinity: false, allowNaN: false },
+    { message: 'Number of employees must be a number' },
+  )
+  @Type(() => Number)
+  @ApiProperty({ example: 5000, description: 'Number of employees in the company' })
+  numberOfEmployees?: number;
 }

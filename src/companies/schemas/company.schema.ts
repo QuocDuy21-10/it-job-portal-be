@@ -5,7 +5,7 @@ export type CompanyDocument = HydratedDocument<Company>;
 
 @Schema({ timestamps: true })
 export class Company {
-  @Prop({ required: true, unique: true, index: true, trim: true })
+  @Prop({ required: true, trim: true })
   name: string;
 
   @Prop({ required: true, trim: true })
@@ -13,6 +13,12 @@ export class Company {
 
   @Prop({ required: true, trim: true })
   description: string;
+
+  @Prop({ trim: true, default: null })
+  website?: string;
+
+  @Prop({ type: Number, default: 0 })
+  numberOfEmployees?: number;
 
   @Prop({ trim: true, default: null })
   logo?: string;
