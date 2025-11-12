@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
-import { IS_PUBLIC_KEY, IS_PUBLIC_PERMISSION } from 'src/decorator/customize';
+import { IS_OPTIONAL_AUTH, IS_PUBLIC_KEY, IS_PUBLIC_PERMISSION } from 'src/decorator/customize';
 import { Request } from 'express';
 
 @Injectable()
@@ -22,6 +22,17 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     if (isPublic) {
       return true;
     }
+
+    const isOptionalAuth = this.reflector.getAllAndOverride<boolean>(
+      IS_OPTIONAL_AUTH,
+      [context.getHandler(), context.getClass()],
+    );
+
+    // If route is marked as OptionalAuth, always allow through
+    if (isOptionalAuth) {
+      return super.canActivate(context) as Promise<boolean> | boolean;
+    }
+
     return super.canActivate(context);
   }
 
@@ -33,6 +44,15 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       context.getHandler(),
       context.getClass(),
     ]);
+
+    const isOptionalAuth = this.reflector.getAllAndOverride<boolean>(
+      IS_OPTIONAL_AUTH,
+      [context.getHandler(), context.getClass()],
+    );
+    // If optional auth and no user, just return undefined (not an error)
+    if (isOptionalAuth) {
+      return user || undefined;
+    }
 
     // You can throw an exception based on either "info" or "err" arguments
     if (err || !user) {

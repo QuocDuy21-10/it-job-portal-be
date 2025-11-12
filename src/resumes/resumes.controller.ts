@@ -27,8 +27,13 @@ export class ResumesController {
     description: 'Retrieves a paginated list of all resumes. Supports filtering and sorting.',
   })
   @ResponseMessage('Resumes have been retrieved successfully')
-  findAll(@Query('page') page: string, @Query('limit') limit: string, @Query() query: string) {
-    return this.resumesService.findAll(+page, +limit, query);
+  findAll(
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+    @Query() query: string,
+    @User() user: IUser,
+  ) {
+    return this.resumesService.findAll(+page, +limit, query, user);
   }
 
   @Get(':id')
@@ -37,8 +42,8 @@ export class ResumesController {
     description: 'Retrieves detailed information about a specific resume by its ID',
   })
   @ResponseMessage('Resume has been retrieved successfully')
-  findOne(@Param('id') id: string) {
-    return this.resumesService.findOne(id);
+  findOne(@Param('id') id: string, @User() user: IUser) {
+    return this.resumesService.findOne(id, user);
   }
 
   @Patch(':id')
@@ -72,5 +77,16 @@ export class ResumesController {
   @ResponseMessage('Resume has been retrieved successfully')
   getResumeByUser(@User() user: IUser) {
     return this.resumesService.getResumeByUser(user);
+  }
+
+  @Post('my-resumes')
+  @SkipCheckPermission()
+  @ApiOperation({
+    summary: 'Get resume of user',
+    description: 'Gets the resume associated with the authenticated user.',
+  })
+  @ResponseMessage('Resume has been retrieved successfully')
+  getResumeOfMe(@User() user: IUser) {
+    return this.resumesService.getResumeOfMe(user);
   }
 }

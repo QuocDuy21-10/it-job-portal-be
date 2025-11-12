@@ -13,6 +13,7 @@ import { ConfigService } from '@nestjs/config';
 import { Role, RoleDocument } from 'src/roles/schemas/role.schema';
 import { USER_ROLE } from 'src/databases/sample';
 import { AuthRegisterDto } from 'src/auth/dto/auth-register.dto';
+import { AuthProvider } from 'src/auth/enums/auth-provider.enum';
 
 @Injectable()
 export class UsersService {
@@ -34,6 +35,15 @@ export class UsersService {
         `Email already exists in the system. Please use another email.`,
       );
     }
+
+    // Validation: HR phải có company
+    const userRole = await this.roleModel.findById(role);
+    if (userRole && userRole.name === 'HR') {
+      if (!company || !company._id) {
+        throw new BadRequestException('HR user must be assigned to a company');
+      }
+    }
+
     const hashedPassword = this.hashPassword(password);
     let newUser = await this.userModel.create({
       name,
@@ -134,6 +144,26 @@ export class UsersService {
 
   async update(id: string, updateUserDto: UpdateUserDto, user: IUser) {
     this.validateObjectId(id);
+
+    // Validation: Nếu update role thành HR hoặc user đã là HR, phải có company
+    if (updateUserDto.role || updateUserDto.company !== undefined) {
+      const existingUser = await this.userModel.findById(id);
+      const roleToCheck = updateUserDto.role || existingUser?.role;
+
+      if (roleToCheck) {
+        const userRole = await this.roleModel.findById(roleToCheck);
+        if (userRole && userRole.name === 'HR') {
+          const companyToCheck = updateUserDto.company !== undefined 
+            ? updateUserDto.company 
+            : existingUser?.company;
+          
+          if (!companyToCheck || !companyToCheck._id) {
+            throw new BadRequestException('HR user must be assigned to a company');
+          }
+        }
+      }
+    }
+
     return await this.userModel.updateOne(
       { _id: id },
       {
@@ -157,7 +187,8 @@ export class UsersService {
     return this.userModel.softDelete({ _id: id });
   }
 
-  async updateUserToken(refreshToken: string, id: string) {
+  async updateUserToken(id: string, refreshToken: string) {
+    console.log(id);
     this.validateObjectId(id);
     return this.userModel.updateOne({ _id: id }, { refreshToken });
   }
@@ -174,5 +205,66 @@ export class UsersService {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid ID format');
     }
+  }
+
+  /**
+   * Find user by Google ID
+   */
+  async findByGoogleId(googleId: string): Promise<UserDocument | null> {
+    return await this.userModel.findOne({ googleId, isDeleted: false }).populate({
+      path: 'role',
+      select: {
+        name: 1,
+      },
+    });
+  }
+
+  /**
+   * Find user by email (for Google login)
+   */
+  async findByEmail(email: string): Promise<UserDocument | null> {
+    return await this.userModel.findOne({ email, isDeleted: false }).populate({
+      path: 'role',
+      select: {
+        name: 1,
+      },
+    });
+  }
+
+  /**
+   * Create new user from Google authentication
+   */
+  async createGoogleUser(googleProfile: {
+    googleId: string;
+    email: string;
+    name: string;
+    avatar?: string;
+  }): Promise<UserDocument> {
+    const { googleId, email, name, avatar } = googleProfile;
+
+    // Get default user role
+    const userRole = await this.roleModel.findOne({ name: USER_ROLE });
+
+    const newUser = await this.userModel.create({
+      googleId,
+      email,
+      name,
+      password: null, // No password for Google users
+      authProvider: AuthProvider.GOOGLE,
+      role: userRole?._id,
+      // You can add avatar to user schema if needed
+    });
+
+    return newUser;
+  }
+
+  /**
+   * Update existing user with Google ID (link Google account)
+   */
+  async linkGoogleAccount(userId: string, googleId: string): Promise<void> {
+    await this.userModel.updateOne(
+      { _id: userId },
+      { googleId, authProvider: AuthProvider.GOOGLE },
+    );
   }
 }

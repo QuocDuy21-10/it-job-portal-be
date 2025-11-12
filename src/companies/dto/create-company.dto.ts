@@ -19,7 +19,7 @@ export class CreateCompanyDto {
 
   @IsNotEmpty({ message: 'Description is required' })
   @IsString({ message: 'Description must be a string' })
-  @MaxLength(1000, { message: 'Description is too long (max: 1000 chars)' })
+  @MaxLength(3000, { message: 'Description is too long (max: 1000 chars)' })
   @Transform(({ value }) => value?.trim())
   @ApiProperty({ example: 'Google ...', description: 'Description of company' })
   description: string;

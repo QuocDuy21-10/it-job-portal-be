@@ -30,10 +30,16 @@ export class ResumesService {
     return { _id: newResume?._id, createdAt: newResume?.createdAt };
   }
 
-  async findAll(page?: number, limit?: number, query?: string) {
+  async findAll(page?: number, limit?: number, query?: string, user?: IUser) {
     const { filter, sort, population, projection } = aqp(query);
     delete filter.page;
     delete filter.limit;
+
+    // Filter theo companyId nếu user là HR
+    if (user && user.role?.name === 'HR' && user.company?._id) {
+      filter.companyId = user.company._id;
+    }
+
     let offset = (page - 1) * limit;
     let defaultLimit = limit ? limit : 10;
 
@@ -61,9 +67,19 @@ export class ResumesService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: IUser) {
     this.validateObjectId(id);
-    return await this.resumeModel.findById(id);
+
+    const resume = await this.resumeModel.findById(id);
+
+    // Nếu user là HR, chỉ cho phép xem resume của công ty họ
+    if (user && user.role?.name === 'HR' && user.company?._id) {
+      if (resume && resume.companyId?.toString() !== user.company._id.toString()) {
+        throw new BadRequestException('You can only view resumes of your own company');
+      }
+    }
+
+    return resume;
   }
 
   async update(id: string, updateResumeDto: UpdateResumeDto, user: IUser) {
@@ -114,6 +130,12 @@ export class ResumesService {
           },
         },
       ]);
+  }
+
+  async getResumeOfMe(user: IUser) {
+    return await this.resumeModel
+      .find({ userId: user._id }).select(['url'])
+      .sort('-createdAt')
   }
 
   private validateObjectId(id: string): void {

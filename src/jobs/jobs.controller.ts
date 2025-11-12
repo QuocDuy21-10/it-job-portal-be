@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestj
 import { JobsService } from './jobs.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
-import { Public, ResponseMessage, User } from 'src/decorator/customize';
+import { OptionalAuth, Public, ResponseMessage, User } from 'src/decorator/customize';
 import { IUser } from 'src/users/users.interface';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 @ApiTags('Job')
@@ -21,7 +21,7 @@ export class JobsController {
     return this.jobsService.create(createJobDto, user);
   }
 
-  @Public()
+  @OptionalAuth()
   @Get()
   @ApiOperation({
     summary: 'Get list job postings with pagination (Public API)',
@@ -43,19 +43,24 @@ export class JobsController {
     example: 10,
   })
   @ResponseMessage('Get list jobs')
-  findAll(@Query('page') page: string, @Query('limit') limit: string, @Query() query: string) {
-    return this.jobsService.findAll(+page, +limit, query);
+  findAll(
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+    @Query() query: string,
+    @User() user: IUser,
+  ) {
+    return this.jobsService.findAll(+page, +limit, query, user);
   }
 
-  @Public()
+  @OptionalAuth()
   @Get(':id')
   @ApiOperation({
     summary: 'Get job by ID (Public API)',
     description: 'Retrieves detailed information about a specific job posting by its ID',
   })
   @ResponseMessage('Get job by id')
-  findOne(@Param('id') id: string) {
-    return this.jobsService.findOne(id);
+  findOne(@Param('id') id: string, @User() user: IUser) {
+    return this.jobsService.findOne(id, user);
   }
 
   @Patch(':id')

@@ -27,10 +27,16 @@ export class CompaniesService {
     });
   }
 
-  async findAll(page?: number, limit?: number, query?: string) {
+  async findAll(page?: number, limit?: number, query?: string, user?: IUser) {
     const { filter, sort, population } = aqp(query);
     delete filter.page;
     delete filter.limit;
+
+    // Filter theo companyId nếu user là HR
+    if (user && user.role?.name === 'HR' && user.company?._id) {
+      filter._id = user.company._id;
+    }
+
     const offset = (page - 1) * limit;
     let defaultLimit = limit ? limit : 10;
 
@@ -57,8 +63,16 @@ export class CompaniesService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: IUser) {
     this.validateObjectId(id);
+
+    // Nếu user là HR, chỉ cho phép xem company của chính họ
+    if (user && user.role?.name === 'HR' && user.company?._id) {
+      if (id !== user.company._id.toString()) {
+        throw new BadRequestException('You can only view your own company');
+      }
+    }
+
     return await this.companyModel.findById(id);
   }
 

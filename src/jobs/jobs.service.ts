@@ -19,10 +19,16 @@ export class JobsService {
     return { _id: newJob._id, createdAt: newJob.createdAt };
   }
 
-  async findAll(page?: number, limit?: number, query?: string) {
+  async findAll(page?: number, limit?: number, query?: string, user?: IUser) {
     const { filter, sort, population } = aqp(query);
     delete filter.page;
     delete filter.limit;
+
+    // Filter theo companyId nếu user là HR
+    if (user && user.role?.name === 'HR' && user.company?._id) {
+      filter['company._id'] = user.company._id;
+    }
+
     let offset = (page - 1) * limit;
     let defaultLimit = limit ? limit : 10;
 
@@ -49,9 +55,30 @@ export class JobsService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: IUser) {
     this.validateObjectId(id);
-    return await this.jobModel.findById(id);
+
+    // Lấy job theo id và populate thông tin công ty (name, numberOfEmployees, address)
+    const job = await this.jobModel.findById(id)
+      .populate({
+        path: 'company',
+        select: {
+          name: 1,
+          numberOfEmployees: 1,
+          address: 1,
+        },
+        model: 'Company',
+      })
+      .exec();
+
+    // Nếu user là HR, chỉ cho phép xem job của công ty họ
+    if (user && user.role?.name === 'HR' && user.company?._id) {
+      if (job && job.company && job.company._id.toString() !== user.company._id.toString()) {
+        throw new BadRequestException('You can only view jobs of your own company');
+      }
+    }
+
+    return job;
   }
 
   async update(id: string, updateJobDto: UpdateJobDto, user: IUser) {

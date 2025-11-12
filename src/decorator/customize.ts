@@ -13,3 +13,6 @@ export const ResponseMessage = (message: string) => SetMetadata(RESPONSE_MESSAGE
 
 export const IS_PUBLIC_PERMISSION = 'isPublicPermission';
 export const SkipCheckPermission = () => SetMetadata(IS_PUBLIC_PERMISSION, true);
+
+export const IS_OPTIONAL_AUTH = 'isOptionalAuth';
+export const OptionalAuth = () => SetMetadata(IS_OPTIONAL_AUTH, true);

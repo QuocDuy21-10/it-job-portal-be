@@ -117,9 +117,9 @@ export class SubscribersService {
     const { email } = user;
     return await this.subscriberModel.findOne(
       {
-        email,
+        email, isDeleted: false,
       },
-      { skills: 1 },
+      { skills: 1, createdAt: 1 },
     );
   }
 

@@ -3,8 +3,9 @@ import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { IUser } from 'src/users/users.interface';
-import { Public, ResponseMessage, User } from 'src/decorator/customize';
+import { OptionalAuth, Public, ResponseMessage, User } from 'src/decorator/customize';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { log } from 'console';
 @ApiTags('Company')
 @Controller('companies')
 export class CompaniesController {
@@ -18,10 +19,11 @@ export class CompaniesController {
   })
   @ResponseMessage('Create a new company')
   create(@Body() createCompanyDto: CreateCompanyDto, @User() user: IUser) {
+   console.log('User create:', user);
     return this.companiesService.create(createCompanyDto, user);
   }
 
-  @Public()
+  @OptionalAuth()
   @Get()
   @ApiOperation({
     summary: 'Get a list of companies with pagination (Public API)',
@@ -43,11 +45,16 @@ export class CompaniesController {
     example: '10',
   })
   @ResponseMessage('Get list companies')
-  findAll(@Query('page') page: string, @Query('limit') limit: string, @Query() query: string) {
-    return this.companiesService.findAll(+page, +limit, query);
+  findAll(
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+    @Query() query: string,
+    @User() user: IUser,
+  ) {
+    return this.companiesService.findAll(+page, +limit, query, user);
   }
 
-  @Public()
+  @OptionalAuth()
   @Get(':id')
   @ApiOperation({
     summary: 'Get detailed information of a company by ID (Public API)',
@@ -55,8 +62,8 @@ export class CompaniesController {
       'Public API to get detailed information of a company based on ID. Does not require authentication.',
   })
   @ResponseMessage('Get company by id')
-  findOne(@Param('id') id: string) {
-    return this.companiesService.findOne(id);
+  findOne(@Param('id') id: string, @User() user: IUser) {
+    return this.companiesService.findOne(id, user);
   }
 
   @Patch(':id')
