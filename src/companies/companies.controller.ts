@@ -19,7 +19,6 @@ export class CompaniesController {
   })
   @ResponseMessage('Create a new company')
   create(@Body() createCompanyDto: CreateCompanyDto, @User() user: IUser) {
-   console.log('User create:', user);
     return this.companiesService.create(createCompanyDto, user);
   }
 

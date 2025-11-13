@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
 import { Role } from 'src/roles/schemas/role.schema';
 import { Gender } from '../enums/user-gender.enum';
+import { AuthProvider } from 'src/auth/enums/auth-provider.enum';
 
 export type UserDocument = HydratedDocument<User>;
 
@@ -13,8 +14,14 @@ export class User {
   @Prop({ required: true, lowercase: true, trim: true })
   email: string;
 
-  @Prop({ required: true })
+  @Prop({ required: false })
   password: string;
+
+  @Prop({ type: String, enum: AuthProvider, default: AuthProvider.LOCAL })
+  authProvider: string;
+
+  @Prop({ unique: true, sparse: true })
+  googleId?: string;
 
   @Prop()
   age?: number;

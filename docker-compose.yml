@@ -45,6 +45,8 @@ services:
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_EMAIL=${SMTP_EMAIL}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     volumes:
       # Mount source code for development hot-reload
       - .:/app

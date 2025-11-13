@@ -42,6 +42,7 @@
     "cron": "^4.3.3",
     "dayjs": "^1.11.18",
     "dotenv": "^17.2.3",
+    "google-auth-library": "^10.5.0",
     "handlebars": "^4.7.8",
     "helmet": "^8.1.0",
     "mongoose": "^7.6.1",

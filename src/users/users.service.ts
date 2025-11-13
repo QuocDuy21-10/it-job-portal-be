@@ -188,7 +188,6 @@ export class UsersService {
   }
 
   async updateUserToken(id: string, refreshToken: string) {
-    console.log(id);
     this.validateObjectId(id);
     return this.userModel.updateOne({ _id: id }, { refreshToken });
   }

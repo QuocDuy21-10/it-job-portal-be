@@ -9,6 +9,7 @@ import { RolesService } from 'src/roles/roles.service';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthRegisterDto } from './dto/auth-register.dto';
 import { AuthEmailLoginDto } from './dto/auth-email-login.dto';
+import { AuthGoogleLoginDto } from './dto/auth-google-login.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -20,7 +21,7 @@ export class AuthController {
 
   @Public()
   @UseGuards(LocalAuthGuard)
-  @UseGuards(ThrottlerGuard)
+  // @UseGuards(ThrottlerGuard)
   @ApiOperation({
     summary: 'Login',
     description:
@@ -47,6 +48,26 @@ export class AuthController {
   @Post('/register')
   handleRegister(@Body() AuthRegisterDto: AuthRegisterDto) {
     return this.authService.register(AuthRegisterDto);
+  }
+
+  @Public()
+  @ApiOperation({
+    summary: 'Login with Google',
+    description:
+      'Authenticate using Google ID token. Verifies token, creates or logs in user, and returns JWT access token.',
+  })
+  @ApiBody({ type: AuthGoogleLoginDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Google login successful. Returns access token and user information.',
+  })
+  @ResponseMessage('Google login successfully')
+  @Post('/google/login')
+  handleGoogleLogin(
+    @Body() authGoogleLoginDto: AuthGoogleLoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    return this.authService.googleLogin(authGoogleLoginDto.idToken, response);
   }
 
   @Get('/me')
