@@ -82,23 +82,33 @@ export class ResumesService {
     return resume;
   }
 
-  async update(id: string, updateResumeDto: UpdateResumeDto, user: IUser) {
+  async update(id: string, updateResumeDto: UpdateResumeDto, user?: IUser) {
     this.validateObjectId(id);
     const { status } = updateResumeDto;
-    return await this.resumeModel.updateOne(
-      { _id: id },
-      {
-        status,
-        updatedBy: { _id: user._id, email: user.email },
-        $push: {
+    
+    const updateData: any = {
+      ...updateResumeDto,
+    };
+
+    // Only add status and history if status is provided
+    if (status) {
+      updateData.status = status;
+      
+      if (user) {
+        updateData.updatedBy = { _id: user._id, email: user.email };
+        updateData.$push = {
           histories: {
             status,
             updatedAt: new Date(),
             updatedBy: { _id: user._id, email: user.email },
           },
-        },
-      },
-    );
+        };
+      }
+    } else if (user) {
+      updateData.updatedBy = { _id: user._id, email: user.email };
+    }
+
+    return await this.resumeModel.updateOne({ _id: id }, updateData);
   }
 
   async remove(id: string, user: IUser) {
