@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-const pdfParse = require('pdf-parse');
 import * as mammoth from 'mammoth';
 import { ParsedDataDto } from 'src/resumes/dto/parsed-data.dto';
+
+// Import pdf-parse v2 - Use PDFParse class
+const { PDFParse } = require('pdf-parse');
 
 @Injectable()
 export class CvParserService {
@@ -40,11 +42,12 @@ export class CvParserService {
    */
   private async extractFromPDF(filePath: string): Promise<string> {
     try {
-      const dataBuffer = fs.readFileSync(filePath);
-      const data = await pdfParse(dataBuffer);
+      // Use PDFParse class (v2 API) with file path
+      const parser = new PDFParse({ url: filePath });
+      const result = await parser.getText();
       
-      this.logger.log(`Extracted ${data.text.length} characters from PDF`);
-      return data.text;
+      this.logger.log(`Extracted ${result.text.length} characters from PDF`);
+      return result.text;
     } catch (error) {
       this.logger.error('PDF extraction error:', error);
       throw new Error(`PDF extraction failed: ${error.message}`);

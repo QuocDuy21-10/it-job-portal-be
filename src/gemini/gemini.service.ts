@@ -18,6 +18,13 @@ export class GeminiService {
   private readonly MATCH_TEMPERATURE = 0.5;
   private readonly REQUEST_TIMEOUT = 30000; // 30 seconds
 
+  // Rate limiting configuration (Gemini 2.0 Flash limits: RPM=15, TPM=1M, RPD=200)
+  private readonly MAX_RETRIES = 3;
+  private readonly INITIAL_RETRY_DELAY = 5000; // 5 seconds
+  private readonly MAX_RETRY_DELAY = 60000; // 60 seconds
+  private lastRequestTime: number = 0;
+  private readonly MIN_REQUEST_INTERVAL = 4000; // 4 seconds between requests (15 RPM = 1 req per 4s)
+
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     
@@ -43,12 +50,15 @@ export class GeminiService {
     try {
       const prompt = this.buildCVParsingPrompt(cvText);
       
-      const result = await this.model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: this.PARSE_TEMPERATURE,
-          maxOutputTokens: this.PARSE_MAX_TOKENS,
-        },
+      // Make request with rate limiting and retry logic
+      const result = await this.makeRequestWithRetry(async () => {
+        return await this.model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: this.PARSE_TEMPERATURE,
+            maxOutputTokens: this.PARSE_MAX_TOKENS,
+          },
+        });
       });
       
       const response = result.response;
@@ -94,12 +104,15 @@ export class GeminiService {
         jobLevel
       );
       
-      const result = await this.model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: this.MATCH_TEMPERATURE,
-          maxOutputTokens: this.MATCH_MAX_TOKENS,
-        },
+      // Make request with rate limiting and retry logic
+      const result = await this.makeRequestWithRetry(async () => {
+        return await this.model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: this.MATCH_TEMPERATURE,
+            maxOutputTokens: this.MATCH_MAX_TOKENS,
+          },
+        });
       });
       
       const response = result.response;
@@ -285,6 +298,99 @@ Return ONLY the JSON object now:
       this.logger.error('Failed to extract JSON:', error);
       throw new Error(`JSON extraction failed: ${error.message}`);
     }
+  }
+
+  /**
+   * Make API request with rate limiting and exponential backoff retry
+   */
+  private async makeRequestWithRetry<T>(
+    requestFn: () => Promise<T>,
+    retryCount: number = 0,
+  ): Promise<T> {
+    try {
+      // Rate limiting: Ensure minimum interval between requests
+      await this.enforceRateLimit();
+
+      // Execute request
+      return await requestFn();
+    } catch (error) {
+      const isRateLimitError = this.isRateLimitError(error);
+      const shouldRetry = retryCount < this.MAX_RETRIES && isRateLimitError;
+
+      if (shouldRetry) {
+        const retryDelay = this.calculateRetryDelay(error, retryCount);
+        
+        this.logger.warn(
+          `Rate limit hit. Retrying in ${retryDelay}ms (attempt ${retryCount + 1}/${this.MAX_RETRIES})`,
+        );
+
+        // Wait before retry
+        await this.sleep(retryDelay);
+
+        // Retry request
+        return this.makeRequestWithRetry(requestFn, retryCount + 1);
+      }
+
+      // Max retries exceeded or non-rate-limit error
+      throw error;
+    }
+  }
+
+  /**
+   * Enforce rate limiting by waiting if needed
+   */
+  private async enforceRateLimit(): Promise<void> {
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
+
+    if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
+      const waitTime = this.MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+      this.logger.debug(`Rate limiting: Waiting ${waitTime}ms before next request`);
+      await this.sleep(waitTime);
+    }
+
+    this.lastRequestTime = Date.now();
+  }
+
+  /**
+   * Check if error is a rate limit error
+   */
+  private isRateLimitError(error: any): boolean {
+    const errorMessage = error?.message || '';
+    return (
+      errorMessage.includes('429') ||
+      errorMessage.includes('Too Many Requests') ||
+      errorMessage.includes('quota') ||
+      errorMessage.includes('rate limit')
+    );
+  }
+
+  /**
+   * Calculate retry delay with exponential backoff
+   */
+  private calculateRetryDelay(error: any, retryCount: number): number {
+    // Try to extract suggested retry delay from error
+    const errorMessage = error?.message || '';
+    const retryMatch = errorMessage.match(/retry in ([\d.]+)s/i);
+    
+    if (retryMatch) {
+      const suggestedDelay = Math.ceil(parseFloat(retryMatch[1]) * 1000);
+      this.logger.debug(`Using API suggested retry delay: ${suggestedDelay}ms`);
+      return Math.min(suggestedDelay, this.MAX_RETRY_DELAY);
+    }
+
+    // Exponential backoff: initialDelay * (2 ^ retryCount)
+    const exponentialDelay = this.INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
+    const delayWithJitter = exponentialDelay + Math.random() * 1000; // Add jitter
+    
+    return Math.min(delayWithJitter, this.MAX_RETRY_DELAY);
+  }
+
+  /**
+   * Sleep for specified milliseconds
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**

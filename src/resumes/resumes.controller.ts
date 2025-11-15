@@ -2,13 +2,16 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Res, Query, UseInter
 import { ResumesService } from './resumes.service';
 import { CreateResumeDto, CreateUserCvDto } from './dto/create-resume.dto';
 import { UpdateResumeDto } from './dto/update-resume.dto';
-import { ResponseMessage, SkipCheckPermission, User } from 'src/decorator/customize';
+import { Public, ResponseMessage, SkipCheckPermission, User } from 'src/decorator/customize';
 import { IUser } from 'src/users/users.interface';
 import { ApiOperation, ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadCvDto } from './dto/upload-cv.dto';
 import { ResumeProcessingService } from './resume-processing.service';
 import { ResumeQueueService } from 'src/queues/services/resume-queue.service';
+import { diskStorage } from 'multer';
+import * as path from 'path';
+import * as fs from 'fs';
 
 @ApiTags('Resume')
 @Controller('resumes')
@@ -99,10 +102,40 @@ export class ResumesController {
   }
 
   // ========== NEW: CV PARSER & AI MATCHING ENDPOINTS ==========
-
   @Post('upload-cv')
   @SkipCheckPermission()
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const uploadPath = path.join(process.cwd(), 'public', 'images', 'resumes');
+          // Ensure directory exists
+          if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+          }
+          cb(null, uploadPath);
+        },
+        filename: (req, file, cb) => {
+          const extName = path.extname(file.originalname);
+          const baseName = path.basename(file.originalname, extName);
+          const finalName = `${baseName}-${Date.now()}${extName}`;
+          cb(null, finalName);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        const allowedFileTypes = ['pdf', 'doc', 'docx', 'txt'];
+        const fileExtension = file.originalname.split('.').pop().toLowerCase();
+        if (!allowedFileTypes.includes(fileExtension)) {
+          cb(new BadRequestException(`Invalid file type: ${fileExtension}. Only PDF, DOC, DOCX, and TXT are allowed.`), false);
+        } else {
+          cb(null, true);
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5 MB
+      },
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary: 'Upload CV and apply for job',
@@ -152,6 +185,13 @@ export class ResumesController {
 
     // Step 5: Get full file path
     const fullFilePath = this.resumeProcessingService.getFullFilePath(resume.url);
+
+    // Step 5.1: Verify file exists before queuing
+    if (!fs.existsSync(fullFilePath)) {
+      throw new BadRequestException(
+        `File not found at path: ${fullFilePath}. Please try uploading again.`,
+      );
+    }
 
     // Step 6: Queue parsing job
     const parseJob = await this.resumeQueueService.addParseResumeJob({

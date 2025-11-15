@@ -132,10 +132,26 @@ export class ResumeProcessingService {
 
   /**
    * Get full file path from relative path
+   * Handles both Docker and local environments
    */
   getFullFilePath(relativeUrl: string): string {
     const path = require('path');
-    return path.join(process.cwd(), 'public', relativeUrl);
+    const fs = require('fs');
+    
+    // Remove 'images/resumes/' prefix if it exists since we'll add 'public' prefix
+    const cleanPath = relativeUrl.replace(/^images\/resumes\//, '');
+    
+    // Build full path
+    const fullPath = path.join(process.cwd(), 'public', 'images', 'resumes', cleanPath);
+    
+    this.logger.log(`Resolved file path: ${relativeUrl} -> ${fullPath}`);
+    
+    // Verify path exists
+    if (!fs.existsSync(fullPath)) {
+      this.logger.warn(`File does not exist at: ${fullPath}`);
+    }
+    
+    return fullPath;
   }
 
   /**

@@ -5,6 +5,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Resume, ResumeSchema } from './schemas/resume.schema';
 import { ResumeProcessingService } from './resume-processing.service';
 import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
+import { MulterModule } from '@nestjs/platform-express';
+import { MulterConfigService } from 'src/files/multer.config';
 
 @Module({
   imports: [
@@ -12,9 +14,12 @@ import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
       { name: Resume.name, schema: ResumeSchema },
       { name: Job.name, schema: JobSchema },
     ]),
+    MulterModule.registerAsync({
+      useClass: MulterConfigService,
+    }),
   ],
   controllers: [ResumesController],
-  providers: [ResumesService, ResumeProcessingService],
+  providers: [ResumesService, ResumeProcessingService, MulterConfigService],
   exports: [
     ResumesService,
     MongooseModule.forFeature([
