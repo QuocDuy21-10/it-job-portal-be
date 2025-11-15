@@ -7,6 +7,7 @@ import { ResumeProcessingService } from './resume-processing.service';
 import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
 import { MulterModule } from '@nestjs/platform-express';
 import { MulterConfigService } from 'src/files/multer.config';
+import { MatchingModule } from 'src/matching/matching.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { MulterConfigService } from 'src/files/multer.config';
     MulterModule.registerAsync({
       useClass: MulterConfigService,
     }),
+    MatchingModule, // 🆕 Added MatchingModule for hybrid matching
   ],
   controllers: [ResumesController],
   providers: [ResumesService, ResumeProcessingService, MulterConfigService],

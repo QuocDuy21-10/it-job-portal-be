@@ -4,6 +4,7 @@ import { Job } from 'bullmq';
 import { RESUME_QUEUE } from '../queues.constants';
 import { CvParserService } from 'src/cv-parser/cv-parser.service';
 import { GeminiService } from 'src/gemini/gemini.service';
+import { MatchingService } from 'src/matching/matching.service';
 import { JobsService } from 'src/jobs/jobs.service';
 import { ParseResumeJobData, AnalyzeResumeJobData } from '../services/resume-queue.service';
 import { ResumePriority } from 'src/resumes/enums/resume-priority.enum';
@@ -27,6 +28,7 @@ export class ResumeQueueProcessor extends WorkerHost {
     @Inject(getModelToken(Resume.name)) private resumeModel: Model<Resume>,
     private readonly cvParserService: CvParserService,
     private readonly geminiService: GeminiService,
+    private readonly matchingService: MatchingService,
     private readonly jobsService: JobsService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
@@ -83,6 +85,8 @@ export class ResumeQueueProcessor extends WorkerHost {
       // Step 3: Clean text
       await job.updateProgress(40);
       const cleanedText = this.cvParserService.cleanText(cvText);
+      console.log("cleanedText:", cleanedText);
+      
       this.logger.log(`[Parse Job ${job.id}] Text cleaned and validated`);
 
       // Step 4: Parse CV using Gemini AI
@@ -130,12 +134,13 @@ export class ResumeQueueProcessor extends WorkerHost {
 
   /**
    * Handle AI analysis job
+   * 🔄 UPDATED: Now uses MatchingService instead of AI for scoring
    */
   private async handleAnalyzeResume(job: Job<AnalyzeResumeJobData>) {
     const { resumeId, jobId } = job.data;
     
     try {
-      this.logger.log(`[Analysis Job ${job.id}] Starting analysis for resume ${resumeId} and job ${jobId}`);
+      this.logger.log(`[Analysis Job ${job.id}] Starting hybrid analysis for resume ${resumeId} and job ${jobId}`);
       await job.updateProgress(10);
 
       // Step 1: Get resume and job data
@@ -156,29 +161,40 @@ export class ResumeQueueProcessor extends WorkerHost {
       this.logger.log(`[Analysis Job ${job.id}] Data fetched: ${jobData.name}`);
       await job.updateProgress(30);
 
-      // Step 2: Perform AI analysis
-      this.logger.log(`[Analysis Job ${job.id}] Calling Gemini AI for matching analysis...`);
+      // Step 2: Perform HYBRID matching (AI extract + Backend score)
+      this.logger.log(`[Analysis Job ${job.id}] Running MatchingService calculation...`);
       await job.updateProgress(40);
       
-      const analysis = await this.geminiService.analyzeResumeJobMatch(
+      // 🆕 Use MatchingService instead of AI
+      const matchResult = await this.matchingService.calculateMatch(
         resume.parsedData,
-        jobData.description || 'No description provided',
-        jobData.skills || [],
-        jobData.level,
+        jobData,
       );
       
-      this.logger.log(`[Analysis Job ${job.id}] AI analysis completed with score: ${analysis.matchingScore}`);
+      this.logger.log(
+        `[Analysis Job ${job.id}] Matching completed - Score: ${matchResult.matchingScore}, Priority: ${matchResult.priority}`,
+      );
       await job.updateProgress(70);
 
-      // Step 3: Determine priority based on matching score
-      const priority = this.calculatePriority(analysis.matchingScore);
-      this.logger.log(`[Analysis Job ${job.id}] Priority calculated: ${priority}`);
+      // Step 3: Convert to AIAnalysis format for backward compatibility
+      const analysis = {
+        matchingScore: matchResult.matchingScore,
+        skillsMatch: matchResult.skillsMatch,
+        strengths: matchResult.strengths,
+        weaknesses: matchResult.weaknesses,
+        summary: matchResult.summary,
+        recommendation: matchResult.recommendation,
+        analyzedAt: matchResult.analyzedAt,
+      };
+
+      this.logger.log(`[Analysis Job ${job.id}] Priority calculated: ${matchResult.priority}`);
       await job.updateProgress(80);
 
-      // Step 4: Update resume with analysis
+      // Step 4: Update resume with analysis and auto status
       await this.resumeModel.findByIdAndUpdate(resumeId, {
         aiAnalysis: analysis,
-        priority,
+        priority: matchResult.priority,
+        status: matchResult.autoStatus, // Auto set status based on score
         isAnalyzed: true,
         analysisError: null,
       });
@@ -186,15 +202,16 @@ export class ResumeQueueProcessor extends WorkerHost {
       await job.updateProgress(100);
 
       this.logger.log(
-        `[Analysis Job ${job.id}] ✅ Successfully analyzed resume ${resumeId} - Score: ${analysis.matchingScore}, Priority: ${priority}`
+        `[Analysis Job ${job.id}] ✅ Successfully analyzed resume ${resumeId} - Score: ${matchResult.matchingScore}, Priority: ${matchResult.priority}, Status: ${matchResult.autoStatus}`
       );
       
       return { 
         success: true, 
         analysis, 
-        priority,
-        matchingScore: analysis.matchingScore,
-        recommendation: analysis.recommendation 
+        priority: matchResult.priority,
+        autoStatus: matchResult.autoStatus,
+        matchingScore: matchResult.matchingScore,
+        recommendation: matchResult.recommendation,
       };
     } catch (error) {
       this.logger.error(`[Analysis Job ${job.id}] ❌ Failed to analyze resume ${resumeId}:`, error.message);
@@ -210,6 +227,7 @@ export class ResumeQueueProcessor extends WorkerHost {
   }
 
   /**
+   * @deprecated - Priority now calculated by MatchingService
    * Calculate priority based on matching score
    */
   private calculatePriority(matchingScore: number): ResumePriority {

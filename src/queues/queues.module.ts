@@ -4,6 +4,7 @@ import { ResumeQueueProcessor } from './processors/resume-queue.processor';
 import { ResumeQueueService } from './services/resume-queue.service';
 import { CvParserModule } from 'src/cv-parser/cv-parser.module';
 import { GeminiModule } from 'src/gemini/gemini.module';
+import { MatchingModule } from 'src/matching/matching.module';
 import { JobsModule } from 'src/jobs/jobs.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Resume, ResumeSchema } from 'src/resumes/schemas/resume.schema';
@@ -27,6 +28,7 @@ export class QueuesModule {
         ]),
         CvParserModule,
         GeminiModule,
+        MatchingModule, // 🆕 Added MatchingModule
         JobsModule,
       ],
       providers: [ResumeQueueProcessor, ResumeQueueService],

@@ -83,12 +83,18 @@ export class GeminiService {
   }
 
   /**
+   * @deprecated Use MatchingService instead for calculating matching scores
+   * This method is kept for backward compatibility only
+   * 
    * Analyze CV against job requirements and calculate matching score
    * @param parsedCV - Parsed CV data
    * @param jobDescription - Job description and requirements
    * @param jobSkills - Required skills for the job
    * @param jobLevel - Job level requirement
    * @returns AI analysis with matching score and recommendations
+   * 
+   * ⚠️ IMPORTANT: New implementations should use MatchingService.calculateMatch()
+   * AI should only be used for data extraction (parseCV), not for matching logic
    */
   async analyzeResumeJobMatch(
     parsedCV: ParsedDataDto,
@@ -155,36 +161,36 @@ IMPORTANT: Return ONLY a valid JSON object with no additional text, markdown, or
 
 Required JSON structure:
 {
-  "fullName": "candidate's full name (string)",
-  "email": "email address (string)",
-  "phone": "phone number with country code if available (string)",
+  "fullName": "candidate's full name (string) | null",
+  "email": "email address (string) | null",
+  "phone": "phone number with country code if available (string) | null",
   "skills": ["skill1", "skill2", "skill3", ...],
   "experience": [
     {
-      "company": "company name",
-      "position": "job title/role",
-      "duration": "time period (e.g., Jan 2020 - Present, 2020-2022)",
-      "description": "brief description of key responsibilities and achievements"
+      "company": "company name | null",
+      "position": "job title/role | null",
+      "duration": "time period (e.g., Jan 2020 - Present, 2020-2022) | null",
+      "description": "brief description of key responsibilities and achievements | null"
     }
   ],
   "education": [
     {
-      "school": "university/institution name",
-      "degree": "degree type (e.g., Bachelor, Master, PhD)",
-      "major": "field of study/specialization",
-      "duration": "time period (e.g., 2016-2020)",
-      "gpa": "GPA if available (optional)"
+      "school": "university/institution name | null",
+      "degree": "degree type (e.g., Bachelor, Master, PhD) | null",
+      "major": "field of study/specialization | null",
+      "duration": "time period (e.g., 2016-2020) | null",
+      "gpa": "GPA if available (optional) | null"
     }
   ],
-  "summary": "brief professional summary or objective (2-3 sentences)",
-  "yearsOfExperience": <number of total years of work experience>
+  "summary": "brief professional summary or objective (2-3 sentences) | null",
+  "yearsOfExperience": <number of total years of work experience | null>
 }
 
 EXTRACTION RULES:
 - Extract all technical and soft skills mentioned
 - Include programming languages, frameworks, tools, and methodologies
 - Calculate yearsOfExperience by analyzing work history dates
-- If information is not found, use empty string "" or empty array []
+- If information is not found, use null or empty array []
 - Ensure all arrays contain at least the most relevant items
 - Phone numbers should include country code if present (e.g., +84, +1)
 
