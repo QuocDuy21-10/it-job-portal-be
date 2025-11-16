@@ -109,13 +109,35 @@ export class CvParserService {
 
   /**
    * Clean and normalize extracted text
+   * Minify text by removing noise characters and converting multiline to single line with periods
    */
   cleanText(text: string): string {
     return text
+      // Remove special unicode characters and noise (bullet points, special symbols, etc.)
+      .replace(/[•◦▪▫■□●○⬤◆◇★☆♦♢]+/g, '') // Remove bullet points
+      .replace(/[\u2022\u2023\u2043\u204C\u204D\u2219\u25CB\u25CF\u25E6]/g, '') // Remove unicode bullets
+      .replace(/[^\x00-\x7F\u00C0-\u024F\u1E00-\u1EFF]/g, '') // Remove non-Latin characters except Vietnamese
+      
+      // Normalize whitespace and line breaks
       .replace(/\r\n/g, '\n') // Normalize line endings
-      .replace(/\n{3,}/g, '\n\n') // Remove excessive line breaks
       .replace(/\t+/g, ' ') // Replace tabs with spaces
-      .replace(/ {2,}/g, ' ') // Remove multiple spaces
+      .replace(/[ ]+/g, ' ') // Remove multiple spaces
+      
+      // Convert multiple line breaks to single line with period separator
+      .replace(/\n{2,}/g, '. ') // Convert paragraph breaks to periods
+      .replace(/\n/g, '. ') // Convert single line breaks to periods
+      
+      // Clean up punctuation
+      .replace(/\.{2,}/g, '.') // Remove multiple periods
+      .replace(/\.\s*\./g, '.') // Remove consecutive periods with spaces
+      .replace(/\s*\.\s*/g, '. ') // Normalize period spacing
+      .replace(/\.\s*,/g, ',') // Remove periods before commas
+      .replace(/,\s*\./g, '.') // Remove commas before periods
+      
+      // Final cleanup
+      .replace(/\s{2,}/g, ' ') // Remove any remaining multiple spaces
+      .replace(/^\.\s*/, '') // Remove leading period
+      .replace(/\s*\.\s*$/, '') // Remove trailing period
       .trim();
   }
 

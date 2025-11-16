@@ -11,19 +11,21 @@ export class GeminiService {
   private readonly model: GenerativeModel;
 
   // Model configuration
-  private readonly MODEL_NAME = 'gemini-2.0-flash-exp';
-  private readonly PARSE_MAX_TOKENS = 2000;
+  private readonly MODEL_NAME = 'gemini-2.5-flash';
+  private readonly PARSE_MAX_TOKENS = 2048;
   private readonly MATCH_MAX_TOKENS = 1500;
   private readonly PARSE_TEMPERATURE = 0.3;
   private readonly MATCH_TEMPERATURE = 0.5;
   private readonly REQUEST_TIMEOUT = 30000; // 30 seconds
 
-  // Rate limiting configuration (Gemini 2.0 Flash limits: RPM=15, TPM=1M, RPD=200)
+  // Rate limiting configuration (Gemini 2.5 Flash FREE tier: RPM=10, TPM=250K, RPD=250)
   private readonly MAX_RETRIES = 3;
   private readonly INITIAL_RETRY_DELAY = 5000; // 5 seconds
   private readonly MAX_RETRY_DELAY = 60000; // 60 seconds
   private lastRequestTime: number = 0;
-  private readonly MIN_REQUEST_INTERVAL = 4000; // 4 seconds between requests (15 RPM = 1 req per 4s)
+  private readonly MIN_REQUEST_INTERVAL = 6000; // 6 seconds between requests (10 RPM = 1 req per 6s)
+
+  
 
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
@@ -56,6 +58,8 @@ export class GeminiService {
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: this.PARSE_TEMPERATURE,
+            topP: 1,
+            topK: 50,
             maxOutputTokens: this.PARSE_MAX_TOKENS,
           },
         });
@@ -82,204 +86,183 @@ export class GeminiService {
     }
   }
 
-  /**
-   * @deprecated Use MatchingService instead for calculating matching scores
-   * This method is kept for backward compatibility only
-   * 
-   * Analyze CV against job requirements and calculate matching score
-   * @param parsedCV - Parsed CV data
-   * @param jobDescription - Job description and requirements
-   * @param jobSkills - Required skills for the job
-   * @param jobLevel - Job level requirement
-   * @returns AI analysis with matching score and recommendations
-   * 
-   * ⚠️ IMPORTANT: New implementations should use MatchingService.calculateMatch()
-   * AI should only be used for data extraction (parseCV), not for matching logic
-   */
-  async analyzeResumeJobMatch(
-    parsedCV: ParsedDataDto,
-    jobDescription: string,
-    jobSkills: string[],
-    jobLevel?: string,
-  ): Promise<AIAnalysisDto> {
-    try {
-      const prompt = this.buildMatchingAnalysisPrompt(
-        parsedCV, 
-        jobDescription, 
-        jobSkills,
-        jobLevel
-      );
+  // async analyzeResumeJobMatch(
+  //   parsedCV: ParsedDataDto,
+  //   jobDescription: string,
+  //   jobSkills: string[],
+  //   jobLevel?: string,
+  // ): Promise<AIAnalysisDto> {
+  //   try {
+  //     const prompt = this.buildMatchingAnalysisPrompt(
+  //       parsedCV, 
+  //       jobDescription, 
+  //       jobSkills,
+  //       jobLevel
+  //     );
       
-      // Make request with rate limiting and retry logic
-      const result = await this.makeRequestWithRetry(async () => {
-        return await this.model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: this.MATCH_TEMPERATURE,
-            maxOutputTokens: this.MATCH_MAX_TOKENS,
-          },
-        });
-      });
+  //     // Make request with rate limiting and retry logic
+  //     const result = await this.makeRequestWithRetry(async () => {
+  //       return await this.model.generateContent({
+  //         contents: [{ role: 'user', parts: [{ text: prompt }] }],
+  //         generationConfig: {
+  //           temperature: this.MATCH_TEMPERATURE,
+  //           maxOutputTokens: this.MATCH_MAX_TOKENS,
+  //         },
+  //       });
+  //     });
       
-      const response = result.response;
-      const text = response.text();
+  //     const response = result.response;
+  //     const text = response.text();
 
-      // Parse JSON response
-      const analysis = this.extractJSON<AIAnalysisDto>(text);
+  //     // Parse JSON response
+  //     const analysis = this.extractJSON<AIAnalysisDto>(text);
       
-      // Validate and fallback
-      if (!analysis.matchingScore || analysis.matchingScore < 0 || analysis.matchingScore > 100) {
-        this.logger.warn('Invalid matching score, using fallback value');
-        analysis.matchingScore = 50; // Default fallback
-      }
+  //     // Validate and fallback
+  //     if (!analysis.matchingScore || analysis.matchingScore < 0 || analysis.matchingScore > 100) {
+  //       this.logger.warn('Invalid matching score, using fallback value');
+  //       analysis.matchingScore = 50; // Default fallback
+  //     }
       
-      analysis.analyzedAt = new Date();
+  //     analysis.analyzedAt = new Date();
       
-      this.logger.log(`Resume analyzed with matching score: ${analysis.matchingScore}`);
-      return analysis;
-    } catch (error) {
-      this.logger.error('Error analyzing resume:', error);
+  //     this.logger.log(`Resume analyzed with matching score: ${analysis.matchingScore}`);
+  //     return analysis;
+  //   } catch (error) {
+  //     this.logger.error('Error analyzing resume:', error);
       
-      // Return fallback analysis
-      return {
-        matchingScore: 50,
-        summary: 'Analysis failed. Manual review required.',
-        recommendation: 'Manual review needed due to analysis error',
-        analyzedAt: new Date(),
-      };
-    }
-  }
+  //     // Return fallback analysis
+  //     return {
+  //       matchingScore: 50,
+  //       summary: 'Analysis failed. Manual review required.',
+  //       recommendation: 'Manual review needed due to analysis error',
+  //       analyzedAt: new Date(),
+  //     };
+  //   }
+  // }
 
   /**
    * Build prompt for CV parsing
    */
   private buildCVParsingPrompt(cvText: string): string {
     return `
-You are an expert CV/Resume parser. Extract the following information from the CV text below.
+You are an expert CV parser. Extract information from the CV text below.
+Return ONLY a valid JSON object matching this structure:
 
-IMPORTANT: Return ONLY a valid JSON object with no additional text, markdown, or code blocks.
-
-Required JSON structure:
 {
-  "fullName": "candidate's full name (string) | null",
-  "email": "email address (string) | null",
-  "phone": "phone number with country code if available (string) | null",
-  "skills": ["skill1", "skill2", "skill3", ...],
+  "skills": ["skill1", "skill2", ...],
   "experience": [
     {
-      "company": "company name | null",
-      "position": "job title/role | null",
-      "duration": "time period (e.g., Jan 2020 - Present, 2020-2022) | null",
-      "description": "brief description of key responsibilities and achievements | null"
+      "company": "string | null",
+      "position": "string | null",
+      "duration": "string (e.g., Jan 2020 - Present) | null",
+      "description": "string | null"
     }
   ],
   "education": [
     {
-      "school": "university/institution name | null",
-      "degree": "degree type (e.g., Bachelor, Master, PhD) | null",
-      "major": "field of study/specialization | null",
-      "duration": "time period (e.g., 2016-2020) | null",
-      "gpa": "GPA if available (optional) | null"
+      "school": "string | null",
+      "degree": "string | null",
+      "major": "string | null",
+      "duration": "string (e.g., 2016-2020) | null",
+      "gpa": "string | null"
     }
   ],
-  "summary": "brief professional summary or objective (2-3 sentences) | null",
-  "yearsOfExperience": <number of total years of work experience | null>
+  "summary": "string | null",
+  "yearsOfExperience": "number | null"
 }
 
-EXTRACTION RULES:
-- Extract all technical and soft skills mentioned
-- Include programming languages, frameworks, tools, and methodologies
-- Calculate yearsOfExperience by analyzing work history dates
-- If information is not found, use null or empty array []
-- Ensure all arrays contain at least the most relevant items
-- Phone numbers should include country code if present (e.g., +84, +1)
+RULES:
+- Extract all relevant technical and soft skills.
+- Calculate total years of work experience from dates.
+- If info is missing, use null or empty array [].
+- Phone numbers should include country code if possible.
 
 CV TEXT:
 ${cvText}
 
-Return ONLY the JSON object. No markdown, no explanation, no additional text.
+Return ONLY the valid JSON object.
 `;
   }
 
   /**
    * Build prompt for matching analysis
    */
-  private buildMatchingAnalysisPrompt(
-    parsedCV: ParsedDataDto,
-    jobDescription: string,
-    jobSkills: string[],
-    jobLevel?: string,
-  ): string {
-    return `
-You are an expert HR analyst and recruiter. Analyze how well this candidate matches the job requirements.
+//   private buildMatchingAnalysisPrompt(
+//     parsedCV: ParsedDataDto,
+//     jobDescription: string,
+//     jobSkills: string[],
+//     jobLevel?: string,
+//   ): string {
+//     return `
+// You are an expert HR analyst and recruiter. Analyze how well this candidate matches the job requirements.
 
-CANDIDATE PROFILE:
-${JSON.stringify(parsedCV, null, 2)}
+// CANDIDATE PROFILE:
+// ${JSON.stringify(parsedCV, null, 2)}
 
-JOB REQUIREMENTS:
-Position Level: ${jobLevel || 'Not specified'}
-Required Skills: ${jobSkills.join(', ')}
-Job Description:
-${jobDescription}
+// JOB REQUIREMENTS:
+// Position Level: ${jobLevel || 'Not specified'}
+// Required Skills: ${jobSkills.join(', ')}
+// Job Description:
+// ${jobDescription}
 
-ANALYSIS TASK:
-Provide a comprehensive matching analysis in JSON format (ONLY JSON, no other text).
+// ANALYSIS TASK:
+// Provide a comprehensive matching analysis in JSON format (ONLY JSON, no other text).
 
-Required JSON structure:
-{
-  "matchingScore": <number 0-100>,
-  "skillsMatch": [
-    {
-      "skill": "skill name from job requirements",
-      "matched": true/false,
-      "proficiencyLevel": "beginner/intermediate/advanced/expert"
-    }
-  ],
-  "strengths": ["strength 1", "strength 2", "strength 3", ...],
-  "weaknesses": ["gap/weakness 1", "gap/weakness 2", ...],
-  "experienceMatch": "brief analysis of how experience aligns with requirements",
-  "educationMatch": "brief analysis of education fit",
-  "summary": "2-3 sentence overall assessment",
-  "recommendation": "HIGHLY_RECOMMENDED / RECOMMENDED / CONSIDER / NOT_RECOMMENDED"
-}
+// Required JSON structure:
+// {
+//   "matchingScore": <number 0-100>,
+//   "skillsMatch": [
+//     {
+//       "skill": "skill name from job requirements",
+//       "matched": true/false,
+//       "proficiencyLevel": "beginner/intermediate/advanced/expert"
+//     }
+//   ],
+//   "strengths": ["strength 1", "strength 2", "strength 3", ...],
+//   "weaknesses": ["gap/weakness 1", "gap/weakness 2", ...],
+//   "experienceMatch": "brief analysis of how experience aligns with requirements",
+//   "educationMatch": "brief analysis of education fit",
+//   "summary": "2-3 sentence overall assessment",
+//   "recommendation": "HIGHLY_RECOMMENDED / RECOMMENDED / CONSIDER / NOT_RECOMMENDED"
+// }
 
-SCORING CRITERIA (0-100):
-- Skills Match: 40 points
-  * Award points for each matched skill
-  * Consider proficiency level
-  * Deduct for missing critical skills
+// SCORING CRITERIA (0-100):
+// - Skills Match: 40 points
+//   * Award points for each matched skill
+//   * Consider proficiency level
+//   * Deduct for missing critical skills
   
-- Experience Relevance: 30 points
-  * Years of experience vs required
-  * Relevant industry/domain experience
-  * Position level match
+// - Experience Relevance: 30 points
+//   * Years of experience vs required
+//   * Relevant industry/domain experience
+//   * Position level match
   
-- Education Fit: 15 points
-  * Degree level appropriateness
-  * Major/field relevance
-  * Prestigious institutions (bonus)
+// - Education Fit: 15 points
+//   * Degree level appropriateness
+//   * Major/field relevance
+//   * Prestigious institutions (bonus)
   
-- Overall Profile: 15 points
-  * Professional summary quality
-  * Career progression
-  * Additional qualifications
+// - Overall Profile: 15 points
+//   * Professional summary quality
+//   * Career progression
+//   * Additional qualifications
 
-SCORE INTERPRETATION:
-- 85-100: EXCELLENT - Top candidate, immediate interview
-- 70-84: GOOD - Strong candidate, priority review
-- 50-69: MODERATE - Potential candidate, consider carefully
-- 30-49: WEAK - Significant gaps, likely not suitable
-- 0-29: POOR - Not a good match
+// SCORE INTERPRETATION:
+// - 85-100: EXCELLENT - Top candidate, immediate interview
+// - 70-84: GOOD - Strong candidate, priority review
+// - 50-69: MODERATE - Potential candidate, consider carefully
+// - 30-49: WEAK - Significant gaps, likely not suitable
+// - 0-29: POOR - Not a good match
 
-IMPORTANT:
-- Be objective and data-driven
-- Consider both hard and soft skills
-- Account for transferable skills
-- Return ONLY valid JSON, no markdown or extra text
+// IMPORTANT:
+// - Be objective and data-driven
+// - Consider both hard and soft skills
+// - Account for transferable skills
+// - Return ONLY valid JSON, no markdown or extra text
 
-Return ONLY the JSON object now:
-`;
-  }
+// Return ONLY the JSON object now:
+// `;
+//   }
 
   /**
    * Extract JSON from AI response
@@ -358,10 +341,12 @@ Return ONLY the JSON object now:
     this.lastRequestTime = Date.now();
   }
 
+  
+
   /**
    * Check if error is a rate limit error
    */
-  private isRateLimitError(error: any): boolean {
+public isRateLimitError(error: any): boolean {
     const errorMessage = error?.message || '';
     return (
       errorMessage.includes('429') ||

@@ -16,10 +16,10 @@ import { Model } from 'mongoose';
 import { InjectQueue } from '@nestjs/bullmq'; 
 
 @Processor(RESUME_QUEUE, {
-  concurrency: 1, // Process jobs sequentially (Gemini API limit: 15 RPM)
+  concurrency: 1, 
   limiter: {
-    max: 15, // Max 15 jobs
-    duration: 60000, // per 60 seconds (1 minute)
+    max: 10, // Gemini 2.5 Flash FREE tier: 10 RPM
+    duration: 60000, // per 60 seconds
   },
 })
 export class ResumeQueueProcessor extends WorkerHost {
@@ -87,7 +87,8 @@ export class ResumeQueueProcessor extends WorkerHost {
       // Step 3: Clean text
       await job.updateProgress(40);
       const cleanedText = this.cvParserService.cleanText(cvText);
-      console.log("cleanedText:", cleanedText);
+      this.logger.log("cleanedText:", cleanedText);
+      this.logger.log(`[Parse Job ${job.id}] Cleaned text length: ${cleanedText.length}`);
       
       this.logger.log(`[Parse Job ${job.id}] Text cleaned and validated`);
 
@@ -239,6 +240,16 @@ export class ResumeQueueProcessor extends WorkerHost {
         analysisError: error.message,
       });
 
+     // 🚀 LOGIC SỬA LỖI:
+      // Nếu đây là lỗi Rate Limit (429), chúng ta KHÔNG throw error.
+      // Việc không throw sẽ khiến BullMQ hiểu là job đã "hoàn thành" (dù là fail)
+      // và sẽ KHÔNG retry.
+      if (this.geminiService.isRateLimitError(error)) {
+        this.logger.warn(`[Parse Job ${job.id}] Rate limit error. Job will not be retried.`);
+        return; // Không re-throw để ngăn BullMQ retry
+      }
+
+      // Nếu là lỗi khác (mất mạng, file hỏng...), re-throw để BullMQ retry.
       throw error;
     }
   }
