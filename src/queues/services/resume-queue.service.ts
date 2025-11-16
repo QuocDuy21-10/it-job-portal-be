@@ -6,6 +6,7 @@ import { RESUME_QUEUE } from '../queues.constants';
 export interface ParseResumeJobData {
   resumeId: string;
   filePath: string;
+  jobId: string; // <-- THÊM DÒNG NÀY
 }
 
 export interface AnalyzeResumeJobData {

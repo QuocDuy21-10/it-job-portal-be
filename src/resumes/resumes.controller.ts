@@ -197,13 +197,14 @@ export class ResumesController {
     const parseJob = await this.resumeQueueService.addParseResumeJob({
       resumeId: resume._id.toString(),
       filePath: fullFilePath,
+      jobId: uploadCvDto.jobId, // <-- THÊM DÒNG NÀY
     });
 
-    // Step 7: Queue analysis job (will wait for parsing to complete)
-    const analysisJob = await this.resumeQueueService.addAnalyzeResumeJob({
-      resumeId: resume._id.toString(),
-      jobId: uploadCvDto.jobId,
-    });
+    // // Step 7: Queue analysis job (will wait for parsing to complete)
+    // const analysisJob = await this.resumeQueueService.addAnalyzeResumeJob({
+    //   resumeId: resume._id.toString(),
+    //   jobId: uploadCvDto.jobId,
+    // });
 
     return {
       resumeId: resume._id,
@@ -213,7 +214,7 @@ export class ResumesController {
       status: 'processing',
       jobs: {
         parseJobId: parseJob.id,
-        analysisJobId: analysisJob.id,
+        // analysisJobId: analysisJob.id,
       },
       file: this.resumeProcessingService.getFileMetadata(file),
       message: 'Your CV has been uploaded and is being processed. You will be notified when analysis is complete.',
@@ -291,6 +292,7 @@ export class ResumesController {
     const job = await this.resumeQueueService.addParseResumeJob({
       resumeId: id,
       filePath: fullFilePath,
+      jobId: resume.jobId.toString(),
     });
 
     return {

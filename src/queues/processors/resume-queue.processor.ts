@@ -1,6 +1,6 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger, Inject } from '@nestjs/common';
-import { Job } from 'bullmq';
+import { Job, Queue } from 'bullmq';
 import { RESUME_QUEUE } from '../queues.constants';
 import { CvParserService } from 'src/cv-parser/cv-parser.service';
 import { GeminiService } from 'src/gemini/gemini.service';
@@ -13,12 +13,13 @@ import { Cache } from 'cache-manager';
 import { getModelToken } from '@nestjs/mongoose';
 import { Resume } from 'src/resumes/schemas/resume.schema';
 import { Model } from 'mongoose';
+import { InjectQueue } from '@nestjs/bullmq'; 
 
 @Processor(RESUME_QUEUE, {
-  concurrency: 5, // Process up to 5 jobs concurrently
+  concurrency: 1, // Process jobs sequentially (Gemini API limit: 15 RPM)
   limiter: {
-    max: 10, // Max 10 jobs
-    duration: 1000, // per 1 second
+    max: 15, // Max 15 jobs
+    duration: 60000, // per 60 seconds (1 minute)
   },
 })
 export class ResumeQueueProcessor extends WorkerHost {
@@ -31,6 +32,7 @@ export class ResumeQueueProcessor extends WorkerHost {
     private readonly matchingService: MatchingService,
     private readonly jobsService: JobsService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @InjectQueue(RESUME_QUEUE) private resumeQueue: Queue,
   ) {
     super();
   }
@@ -53,7 +55,7 @@ export class ResumeQueueProcessor extends WorkerHost {
    * Handle CV parsing job
    */
   private async handleParseResume(job: Job<ParseResumeJobData>) {
-    const { resumeId, filePath } = job.data;
+   const { resumeId, filePath, jobId } = job.data;
     
     try {
       this.logger.log(`[Parse Job ${job.id}] Starting CV parsing for resume ${resumeId}`);
@@ -111,7 +113,22 @@ export class ResumeQueueProcessor extends WorkerHost {
       await this.cacheManager.set(cacheKey, parsedData, 3600);
       await job.updateProgress(100);
 
-      this.logger.log(`[Parse Job ${job.id}] ✅ Successfully parsed CV for resume ${resumeId}`);
+      this.logger.log(`[Parse Job ${job.id}] Successfully parsed CV for resume ${resumeId}`);
+      
+      try {
+        await this.resumeQueue.add('analyze-resume', {
+          resumeId: resumeId,
+          jobId: jobId,
+        }, {
+          priority: 2, // Ưu tiên thấp hơn parse
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+        });
+        this.logger.log(`[Parse Job ${job.id}] Queued analysis job for resume ${resumeId}`);
+      } catch (queueError) {
+        this.logger.error(`[Parse Job ${job.id}] Failed to queue analysis job:`, queueError);
+        // Bạn có thể throw lỗi ở đây nếu muốn job parse này bị coi là failed
+      }
       
       return { 
         success: true, 
