@@ -212,7 +212,7 @@ export class ResumeQueueProcessor extends WorkerHost {
       await this.resumeModel.findByIdAndUpdate(resumeId, {
         aiAnalysis: analysis,
         priority: matchResult.priority,
-        status: matchResult.autoStatus, // Auto set status based on score
+        // status: matchResult.autoStatus, // Auto set status based on score
         isAnalyzed: true,
         analysisError: null,
       });
@@ -220,14 +220,14 @@ export class ResumeQueueProcessor extends WorkerHost {
       await job.updateProgress(100);
 
       this.logger.log(
-        `[Analysis Job ${job.id}] ✅ Successfully analyzed resume ${resumeId} - Score: ${matchResult.matchingScore}, Priority: ${matchResult.priority}, Status: ${matchResult.autoStatus}`
+        `[Analysis Job ${job.id}] ✅ Successfully analyzed resume ${resumeId} - Score: ${matchResult.matchingScore}, Priority: ${matchResult.priority}}`
       );
       
       return { 
         success: true, 
         analysis, 
         priority: matchResult.priority,
-        autoStatus: matchResult.autoStatus,
+        // autoStatus: matchResult.autoStatus,
         matchingScore: matchResult.matchingScore,
         recommendation: matchResult.recommendation,
       };

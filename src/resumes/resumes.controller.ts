@@ -139,7 +139,7 @@ export class ResumesController {
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary: 'Upload CV and apply for job',
-    description: 'Upload CV file (PDF, DOC, DOCX, TXT) and automatically parse + analyze with AI',
+    description: 'Upload CV file (PDF, DOC, DOCX, TXT) and automatically parse + analyze',
   })
   @ApiBody({
     schema: {
@@ -197,24 +197,24 @@ export class ResumesController {
     const parseJob = await this.resumeQueueService.addParseResumeJob({
       resumeId: resume._id.toString(),
       filePath: fullFilePath,
-      jobId: uploadCvDto.jobId, // <-- THÊM DÒNG NÀY
+      jobId: uploadCvDto.jobId, 
     });
 
-    // // Step 7: Queue analysis job (will wait for parsing to complete)
-    // const analysisJob = await this.resumeQueueService.addAnalyzeResumeJob({
-    //   resumeId: resume._id.toString(),
-    //   jobId: uploadCvDto.jobId,
-    // });
+    // Step 7: Queue analysis job (will wait for parsing to complete)
+    const analysisJob = await this.resumeQueueService.addAnalyzeResumeJob({
+      resumeId: resume._id.toString(),
+      jobId: uploadCvDto.jobId,
+    });
 
     return {
-      resumeId: resume._id,
+      _id: resume._id,
       jobId: uploadCvDto.jobId,
       jobName: job.name,
       companyName: job.company.name,
       status: 'processing',
       jobs: {
         parseJobId: parseJob.id,
-        // analysisJobId: analysisJob.id,
+        analysisJobId: analysisJob.id,
       },
       file: this.resumeProcessingService.getFileMetadata(file),
       message: 'Your CV has been uploaded and is being processed. You will be notified when analysis is complete.',

@@ -46,7 +46,7 @@ import type { RedisClientOptions } from 'redis';
         port: configService.get('REDIS_PORT', 6379),
         password: configService.get('REDIS_PASSWORD'),
         db: configService.get('REDIS_CACHE_DB', 1),
-        ttl: configService.get('REDIS_TTL', 3600), // 1 hour default
+        ttl: configService.get('REDIS_TTL', 3600000), // 1 hour default
         max: 100, // maximum number of items in cache
       }),
       inject: [ConfigService],

@@ -70,7 +70,7 @@ class ResumeQueueProcessorExample {
     console.log('Match Result:', {
       score: matchResult.matchingScore,           // 85
       priority: matchResult.priority,             // ResumePriority.EXCELLENT
-      autoStatus: matchResult.autoStatus,         // ResumeStatus.APPROVED
+      // autoStatus: matchResult.autoStatus,         // ResumeStatus.APPROVED
       recommendation: matchResult.recommendation, // "HIGHLY_RECOMMENDED"
       summary: matchResult.summary,
     });
@@ -255,7 +255,7 @@ class ScoringScenarioTests {
     console.log('Over-qualified candidate:', {
       score: result.matchingScore,
       experienceScore: result.experienceScore, // Should be high but penalized
-      autoStatus: result.autoStatus,
+      // autoStatus: result.autoStatus,
     });
   }
 
@@ -312,10 +312,10 @@ class AdminDashboardExample {
       highCount: matchResults.filter((r) => r.priority === 'HIGH').length,
       mediumCount: matchResults.filter((r) => r.priority === 'MEDIUM').length,
       lowCount: matchResults.filter((r) => r.priority === 'LOW').length,
-      autoApproved: matchResults.filter((r) => r.autoStatus === 'APPROVED')
-        .length,
-      autoRejected: matchResults.filter((r) => r.autoStatus === 'REJECTED')
-        .length,
+      // autoApproved: matchResults.filter((r) => r.autoStatus === 'APPROVED')
+      //   .length,
+      // autoRejected: matchResults.filter((r) => r.autoStatus === 'REJECTED')
+      //   .length,
       scoreDistribution: {
         '90-100': matchResults.filter((r) => r.matchingScore >= 90).length,
         '80-89': matchResults.filter(

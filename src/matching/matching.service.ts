@@ -74,7 +74,7 @@ export class MatchingService {
       const priority = this.determinePriority(totalScore);
 
       // 6. Determine auto status
-      const autoStatus = this.determineAutoStatus(totalScore, skillsMatchResult);
+      // const autoStatus = this.determineAutoStatus(totalScore, skillsMatchResult);
 
       // 7. Generate strengths and weaknesses
       const { strengths, weaknesses } = this.generateInsights(
@@ -90,7 +90,7 @@ export class MatchingService {
       const result: MatchResultDto = {
         matchingScore: Math.round(totalScore),
         priority,
-        autoStatus,
+        // autoStatus,
         skillsMatch: skillsMatchResult.matches,
         skillsMatchPercentage: skillsMatchResult.scorePercentage,
         experienceScore,
@@ -429,7 +429,7 @@ export class MatchingService {
    */
   private normalizeSkill(skill: string): string {
     return skill
-      .toLowerCase()
+      .toUpperCase()
       .trim()
       .replace(/[^\w\s+#]/g, '') // Keep alphanumeric, spaces, +, #
       .replace(/\s+/g, ' ');

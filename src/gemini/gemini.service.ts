@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { ParsedDataDto } from 'src/resumes/dto/parsed-data.dto';
 import { AIAnalysisDto } from 'src/resumes/dto/ai-analysis.dto';
+import { log } from 'console';
 
 @Injectable()
 export class GeminiService {
@@ -12,7 +13,7 @@ export class GeminiService {
 
   // Model configuration
   private readonly MODEL_NAME = 'gemini-2.5-flash';
-  private readonly PARSE_MAX_TOKENS = 2048;
+  private readonly PARSE_MAX_TOKENS = 5000;
   private readonly MATCH_MAX_TOKENS = 1500;
   private readonly PARSE_TEMPERATURE = 0.3;
   private readonly MATCH_TEMPERATURE = 0.5;
@@ -66,17 +67,14 @@ export class GeminiService {
       });
       
       const response = result.response;
+      log(response);
       const text = response.text();
+      console.log(text);
+      console.log("EXtractJSON");
 
       // Parse JSON response
       const parsedData = this.extractJSON<ParsedDataDto>(text);
-      
-      // Fallback: Try to extract email and phone with regex if missing
-      if (!parsedData.email || !parsedData.phone) {
-        const fallbackData = this.extractContactInfoWithRegex(cvText);
-        parsedData.email = parsedData.email || fallbackData.email;
-        parsedData.phone = parsedData.phone || fallbackData.phone;
-      }
+      console.log("parsedData: ", parsedData);
       
       this.logger.log('CV parsed successfully');
       return parsedData;
@@ -140,9 +138,7 @@ export class GeminiService {
   //   }
   // }
 
-  /**
-   * Build prompt for CV parsing
-   */
+  //  Build prompt for CV parsing
   private buildCVParsingPrompt(cvText: string): string {
     return `
 You are an expert CV parser. Extract information from the CV text below.
@@ -172,10 +168,9 @@ Return ONLY a valid JSON object matching this structure:
 }
 
 RULES:
-- Extract all relevant technical and soft skills.
+- Extract all relevant soft and technical skills (skills are in uppercase).
 - Calculate total years of work experience from dates.
 - If info is missing, use null or empty array [].
-- Phone numbers should include country code if possible.
 
 CV TEXT:
 ${cvText}
@@ -269,6 +264,8 @@ Return ONLY the valid JSON object.
    */
   private extractJSON<T>(text: string): T {
     try {
+      console.log("EXtractJSON");
+      
       // Remove markdown code blocks if present
       let cleanedText = text.trim();
       
@@ -395,23 +392,23 @@ public isRateLimitError(error: any): boolean {
   /**
    * Extract contact info using regex as fallback
    */
-  private extractContactInfoWithRegex(text: string): { email?: string; phone?: string } {
-    const result: { email?: string; phone?: string } = {};
+  // private extractContactInfoWithRegex(text: string): { email?: string; phone?: string } {
+  //   const result: { email?: string; phone?: string } = {};
 
-    // Email regex
-    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-    const emailMatch = text.match(emailRegex);
-    if (emailMatch && emailMatch.length > 0) {
-      result.email = emailMatch[0];
-    }
+  //   // Email regex
+  //   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+  //   const emailMatch = text.match(emailRegex);
+  //   if (emailMatch && emailMatch.length > 0) {
+  //     result.email = emailMatch[0];
+  //   }
 
-    // Phone regex (supports various formats)
-    const phoneRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}/g;
-    const phoneMatch = text.match(phoneRegex);
-    if (phoneMatch && phoneMatch.length > 0) {
-      result.phone = phoneMatch[0].trim();
-    }
+  //   // Phone regex (supports various formats)
+  //   const phoneRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}/g;
+  //   const phoneMatch = text.match(phoneRegex);
+  //   if (phoneMatch && phoneMatch.length > 0) {
+  //     result.phone = phoneMatch[0].trim();
+  //   }
 
-    return result;
-  }
+  //   return result;
+  // }
 }

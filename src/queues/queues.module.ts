@@ -28,7 +28,7 @@ export class QueuesModule {
         ]),
         CvParserModule,
         GeminiModule,
-        MatchingModule, // 🆕 Added MatchingModule
+        MatchingModule, 
         JobsModule,
       ],
       providers: [ResumeQueueProcessor, ResumeQueueService],

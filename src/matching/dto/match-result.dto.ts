@@ -20,7 +20,7 @@ export class MatchResultDto {
   /**
    * Auto status đề xuất (APPROVED, REVIEWING, REJECTED)
    */
-  autoStatus: ResumeStatus;
+  // autoStatus: ResumeStatus;
 
   /**
    * Chi tiết matching từng skill

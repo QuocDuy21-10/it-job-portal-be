@@ -22,6 +22,7 @@ import { RedisModule } from './redis/redis.module';
 import { GeminiModule } from './gemini/gemini.module';
 import { CvParserModule } from './cv-parser/cv-parser.module';
 import { QueuesModule } from './queues/queues.module';
+import { CvProfilesModule } from './cv-profiles';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { QueuesModule } from './queues/queues.module';
     QueuesModule.forRoot(),
     PermissionsModule,
     RolesModule,
+    CvProfilesModule,
     DatabasesModule,
     SubscribersModule,
     MailModule,
