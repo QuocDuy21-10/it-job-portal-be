@@ -1,8 +1,11 @@
 import { Res } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { ResumeStatus } from '../enums/resume-status.enum';
+import { ResumePriority } from '../enums/resume-priority.enum';
+import { ParsedDataDto } from './parsed-data.dto';
+import { AIAnalysisDto } from './ai-analysis.dto';
 
 export class UpdateResumeDto {
   @IsNotEmpty({ message: 'Status should not be empty' })
@@ -12,5 +15,45 @@ export class UpdateResumeDto {
   })
   @ApiProperty({ example: ResumeStatus.PENDING, description: 'Status of resume' })
   @IsString({ message: 'Status must be a string' })
-  status: string;
+  @IsOptional()
+  status?: string;
+
+  // NEW: CV Parser & AI Analysis fields
+  @ValidateNested()
+  @Type(() => ParsedDataDto)
+  @IsOptional()
+  parsedData?: ParsedDataDto;
+
+  @ValidateNested()
+  @Type(() => AIAnalysisDto)
+  @IsOptional()
+  aiAnalysis?: AIAnalysisDto;
+
+  @IsEnum(ResumePriority)
+  @IsOptional()
+  priority?: string;
+
+  @IsString()
+  @IsOptional()
+  adminNotes?: string;
+
+  @IsString()
+  @IsOptional()
+  hrNotes?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isParsed?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isAnalyzed?: boolean;
+
+  @IsString()
+  @IsOptional()
+  parseError?: string;
+
+  @IsString()
+  @IsOptional()
+  analysisError?: string;
 }

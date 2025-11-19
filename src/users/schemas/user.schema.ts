@@ -26,11 +26,26 @@ export class User {
   @Prop()
   age?: number;
 
+  @Prop({ type: Date })
+  dateOfBirth?: Date;
+
   @Prop({ enum: Gender })
   gender?: string;
 
   @Prop({ trim: true })
   address?: string;
+
+  @Prop({ trim: true })
+  avatar?: string;
+
+  @Prop({ trim: true })
+  phone?: string;
+
+  @Prop({ trim: true })
+  bio?: string;
+
+  @Prop({ trim: true })
+  personalLink?: string;
 
   @Prop({ type: Object })
   company?: {

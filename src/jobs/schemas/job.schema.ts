@@ -79,3 +79,17 @@ export class Job {
 }
 
 export const JobSchema = SchemaFactory.createForClass(Job);
+
+// ========== INDEXES FOR OPTIMIZATION ==========
+// Compound index for common query patterns
+JobSchema.index({ 'company._id': 1, isActive: 1, isDeleted: 1 });
+JobSchema.index({ isActive: 1, endDate: 1, isDeleted: 1 });
+
+// Individual field indexes for filtering
+JobSchema.index({ skills: 1 });
+JobSchema.index({ level: 1 });
+JobSchema.index({ location: 1 });
+JobSchema.index({ createdAt: -1 });
+
+// Text index for search functionality
+JobSchema.index({ name: 'text', description: 'text' });

@@ -18,6 +18,11 @@ import { MailModule } from './mail/mail.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { HealthModule } from './health/health.module';
+import { RedisModule } from './redis/redis.module';
+import { GeminiModule } from './gemini/gemini.module';
+import { CvParserModule } from './cv-parser/cv-parser.module';
+import { QueuesModule } from './queues/queues.module';
+import { CvProfilesModule } from './cv-profiles';
 
 @Module({
   imports: [
@@ -45,14 +50,19 @@ import { HealthModule } from './health/health.module';
       envFilePath: '.env',
       isGlobal: true,
     }),
+    RedisModule,
+    GeminiModule,
+    CvParserModule,
     UsersModule,
     AuthModule,
     CompaniesModule,
     JobsModule,
     FilesModule,
     ResumesModule,
+    QueuesModule.forRoot(),
     PermissionsModule,
     RolesModule,
+    CvProfilesModule,
     DatabasesModule,
     SubscribersModule,
     MailModule,
