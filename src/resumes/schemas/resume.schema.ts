@@ -149,6 +149,9 @@ export class Resume {
   @Prop()
   analysisError?: string;
 
+  @Prop({ type: Object })
+  cvStructuredData?: any; // Snapshot of CvProfile at application time
+
   // ============================================================
 
   @Prop({ type: mongoose.Schema.Types.Array })

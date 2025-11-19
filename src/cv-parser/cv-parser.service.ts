@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as mammoth from 'mammoth';
-import { ParsedDataDto } from 'src/resumes/dto/parsed-data.dto';
 import { PDFParse } from 'pdf-parse';
 
 @Injectable()

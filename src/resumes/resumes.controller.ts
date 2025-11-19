@@ -12,6 +12,7 @@ import { ResumeQueueService } from 'src/queues/services/resume-queue.service';
 import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
+import { SubmitCvOnlineDto } from './dto/submit-cv-online.dto';
 
 @ApiTags('Resume')
 @Controller('resumes')
@@ -99,6 +100,21 @@ export class ResumesController {
   @ResponseMessage('Resume has been retrieved successfully')
   getResumeOfMe(@User() user: IUser) {
     return this.resumesService.getResumeOfMe(user);
+  }
+
+  // ========== NEW: CV ONLINE SUBMISSION (Structured CV) ==========
+  @Post('cv-online')
+  @SkipCheckPermission()
+  @ApiOperation({
+    summary: 'Submit CV Online - Apply using structured CV profile',
+    description: 'Apply for a job using your pre-created structured CV profile. The system will automatically calculate match score and create application.',
+  })
+  @ResponseMessage('CV submitted successfully')
+  async submitCvOnline(
+    @Body() submitCvOnlineDto: SubmitCvOnlineDto,
+    @User() user: IUser,
+  ) {
+    return this.resumesService.submitCvOnline(submitCvOnlineDto, user);
   }
 
   // ========== NEW: CV PARSER & AI MATCHING ENDPOINTS ==========

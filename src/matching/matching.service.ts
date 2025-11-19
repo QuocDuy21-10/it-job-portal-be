@@ -73,10 +73,7 @@ export class MatchingService {
       // 5. Determine priority
       const priority = this.determinePriority(totalScore);
 
-      // 6. Determine auto status
-      // const autoStatus = this.determineAutoStatus(totalScore, skillsMatchResult);
-
-      // 7. Generate strengths and weaknesses
+      // 6. Generate strengths and weaknesses
       const { strengths, weaknesses } = this.generateInsights(
         parsedCV,
         job,
@@ -84,13 +81,12 @@ export class MatchingService {
         experienceScore,
       );
 
-      // 8. Generate recommendation
+      // 7. Generate recommendation
       const recommendation = this.generateRecommendation(totalScore);
 
       const result: MatchResultDto = {
         matchingScore: Math.round(totalScore),
         priority,
-        // autoStatus,
         skillsMatch: skillsMatchResult.matches,
         skillsMatchPercentage: skillsMatchResult.scorePercentage,
         experienceScore,
@@ -304,37 +300,6 @@ export class MatchingService {
     return ResumePriority.LOW;
   }
 
-  /**
-   * Determine auto status based on score and critical skills
-   */
-  private determineAutoStatus(
-    matchingScore: number,
-    skillsMatchResult: any,
-  ): ResumeStatus {
-    const criticalSkillsMatchRate =
-      skillsMatchResult.totalRequired > 0
-        ? (skillsMatchResult.matchedCount / skillsMatchResult.totalRequired) * 100
-        : 0;
-
-    // Auto-approve if excellent score and good skills match
-    if (
-      matchingScore >= SCORE_THRESHOLDS.EXCELLENT &&
-      criticalSkillsMatchRate >= 70
-    ) {
-      return ResumeStatus.APPROVED;
-    }
-
-    // Auto-reject if very low score and poor skills match
-    if (
-      matchingScore < SCORE_THRESHOLDS.LOW &&
-      criticalSkillsMatchRate < 30
-    ) {
-      return ResumeStatus.REJECTED;
-    }
-
-    // Default to reviewing
-    return ResumeStatus.REVIEWING;
-  }
 
   /**
    * Generate insights (strengths and weaknesses)

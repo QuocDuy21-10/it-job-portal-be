@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { ParsedDataDto } from 'src/resumes/dto/parsed-data.dto';
-import { AIAnalysisDto } from 'src/resumes/dto/ai-analysis.dto';
 import { log } from 'console';
 
 @Injectable()
@@ -14,10 +13,9 @@ export class GeminiService {
   // Model configuration
   private readonly MODEL_NAME = 'gemini-2.5-flash';
   private readonly PARSE_MAX_TOKENS = 5000;
-  private readonly MATCH_MAX_TOKENS = 1500;
   private readonly PARSE_TEMPERATURE = 0.3;
-  private readonly MATCH_TEMPERATURE = 0.5;
-  private readonly REQUEST_TIMEOUT = 30000; // 30 seconds
+  private readonly PARSE_TOP_P = 1;
+  private readonly PARSE_TOP_K = 50;
 
   // Rate limiting configuration (Gemini 2.5 Flash FREE tier: RPM=10, TPM=250K, RPD=250)
   private readonly MAX_RETRIES = 3;
@@ -59,8 +57,8 @@ export class GeminiService {
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: this.PARSE_TEMPERATURE,
-            topP: 1,
-            topK: 50,
+            topP: this.PARSE_TOP_P,
+            topK: this.PARSE_TOP_K,
             maxOutputTokens: this.PARSE_MAX_TOKENS,
           },
         });
@@ -83,60 +81,6 @@ export class GeminiService {
       throw new Error(`CV parsing failed: ${error.message}`);
     }
   }
-
-  // async analyzeResumeJobMatch(
-  //   parsedCV: ParsedDataDto,
-  //   jobDescription: string,
-  //   jobSkills: string[],
-  //   jobLevel?: string,
-  // ): Promise<AIAnalysisDto> {
-  //   try {
-  //     const prompt = this.buildMatchingAnalysisPrompt(
-  //       parsedCV, 
-  //       jobDescription, 
-  //       jobSkills,
-  //       jobLevel
-  //     );
-      
-  //     // Make request with rate limiting and retry logic
-  //     const result = await this.makeRequestWithRetry(async () => {
-  //       return await this.model.generateContent({
-  //         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-  //         generationConfig: {
-  //           temperature: this.MATCH_TEMPERATURE,
-  //           maxOutputTokens: this.MATCH_MAX_TOKENS,
-  //         },
-  //       });
-  //     });
-      
-  //     const response = result.response;
-  //     const text = response.text();
-
-  //     // Parse JSON response
-  //     const analysis = this.extractJSON<AIAnalysisDto>(text);
-      
-  //     // Validate and fallback
-  //     if (!analysis.matchingScore || analysis.matchingScore < 0 || analysis.matchingScore > 100) {
-  //       this.logger.warn('Invalid matching score, using fallback value');
-  //       analysis.matchingScore = 50; // Default fallback
-  //     }
-      
-  //     analysis.analyzedAt = new Date();
-      
-  //     this.logger.log(`Resume analyzed with matching score: ${analysis.matchingScore}`);
-  //     return analysis;
-  //   } catch (error) {
-  //     this.logger.error('Error analyzing resume:', error);
-      
-  //     // Return fallback analysis
-  //     return {
-  //       matchingScore: 50,
-  //       summary: 'Analysis failed. Manual review required.',
-  //       recommendation: 'Manual review needed due to analysis error',
-  //       analyzedAt: new Date(),
-  //     };
-  //   }
-  // }
 
   //  Build prompt for CV parsing
   private buildCVParsingPrompt(cvText: string): string {
@@ -179,89 +123,7 @@ Return ONLY the valid JSON object.
 `;
   }
 
-  /**
-   * Build prompt for matching analysis
-   */
-//   private buildMatchingAnalysisPrompt(
-//     parsedCV: ParsedDataDto,
-//     jobDescription: string,
-//     jobSkills: string[],
-//     jobLevel?: string,
-//   ): string {
-//     return `
-// You are an expert HR analyst and recruiter. Analyze how well this candidate matches the job requirements.
-
-// CANDIDATE PROFILE:
-// ${JSON.stringify(parsedCV, null, 2)}
-
-// JOB REQUIREMENTS:
-// Position Level: ${jobLevel || 'Not specified'}
-// Required Skills: ${jobSkills.join(', ')}
-// Job Description:
-// ${jobDescription}
-
-// ANALYSIS TASK:
-// Provide a comprehensive matching analysis in JSON format (ONLY JSON, no other text).
-
-// Required JSON structure:
-// {
-//   "matchingScore": <number 0-100>,
-//   "skillsMatch": [
-//     {
-//       "skill": "skill name from job requirements",
-//       "matched": true/false,
-//       "proficiencyLevel": "beginner/intermediate/advanced/expert"
-//     }
-//   ],
-//   "strengths": ["strength 1", "strength 2", "strength 3", ...],
-//   "weaknesses": ["gap/weakness 1", "gap/weakness 2", ...],
-//   "experienceMatch": "brief analysis of how experience aligns with requirements",
-//   "educationMatch": "brief analysis of education fit",
-//   "summary": "2-3 sentence overall assessment",
-//   "recommendation": "HIGHLY_RECOMMENDED / RECOMMENDED / CONSIDER / NOT_RECOMMENDED"
-// }
-
-// SCORING CRITERIA (0-100):
-// - Skills Match: 40 points
-//   * Award points for each matched skill
-//   * Consider proficiency level
-//   * Deduct for missing critical skills
-  
-// - Experience Relevance: 30 points
-//   * Years of experience vs required
-//   * Relevant industry/domain experience
-//   * Position level match
-  
-// - Education Fit: 15 points
-//   * Degree level appropriateness
-//   * Major/field relevance
-//   * Prestigious institutions (bonus)
-  
-// - Overall Profile: 15 points
-//   * Professional summary quality
-//   * Career progression
-//   * Additional qualifications
-
-// SCORE INTERPRETATION:
-// - 85-100: EXCELLENT - Top candidate, immediate interview
-// - 70-84: GOOD - Strong candidate, priority review
-// - 50-69: MODERATE - Potential candidate, consider carefully
-// - 30-49: WEAK - Significant gaps, likely not suitable
-// - 0-29: POOR - Not a good match
-
-// IMPORTANT:
-// - Be objective and data-driven
-// - Consider both hard and soft skills
-// - Account for transferable skills
-// - Return ONLY valid JSON, no markdown or extra text
-
-// Return ONLY the JSON object now:
-// `;
-//   }
-
-  /**
-   * Extract JSON from AI response
-   */
+  //  Extract JSON from AI response
   private extractJSON<T>(text: string): T {
     try {
       console.log("EXtractJSON");
@@ -286,9 +148,7 @@ Return ONLY the valid JSON object.
     }
   }
 
-  /**
-   * Make API request with rate limiting and exponential backoff retry
-   */
+  //  Make API request with rate limiting and exponential backoff retry
   private async makeRequestWithRetry<T>(
     requestFn: () => Promise<T>,
     retryCount: number = 0,
@@ -322,9 +182,7 @@ Return ONLY the valid JSON object.
     }
   }
 
-  /**
-   * Enforce rate limiting by waiting if needed
-   */
+    // Enforce rate limiting by waiting if needed
   private async enforceRateLimit(): Promise<void> {
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
@@ -340,9 +198,7 @@ Return ONLY the valid JSON object.
 
   
 
-  /**
-   * Check if error is a rate limit error
-   */
+  //  Check if error is a rate limit error
 public isRateLimitError(error: any): boolean {
     const errorMessage = error?.message || '';
     return (
@@ -353,9 +209,7 @@ public isRateLimitError(error: any): boolean {
     );
   }
 
-  /**
-   * Calculate retry delay with exponential backoff
-   */
+  //  Calculate retry delay with exponential backoff
   private calculateRetryDelay(error: any, retryCount: number): number {
     // Try to extract suggested retry delay from error
     const errorMessage = error?.message || '';
@@ -374,41 +228,14 @@ public isRateLimitError(error: any): boolean {
     return Math.min(delayWithJitter, this.MAX_RETRY_DELAY);
   }
 
-  /**
-   * Sleep for specified milliseconds
-   */
+  //  Sleep for specified milliseconds
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  /**
-   * Get token usage estimation
-   * Average tokens: 1 token ≈ 4 characters
-   */
+  //  Get token usage estimation
+  //  Average tokens: 1 token ≈ 4 characters
   estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);
   }
-
-  /**
-   * Extract contact info using regex as fallback
-   */
-  // private extractContactInfoWithRegex(text: string): { email?: string; phone?: string } {
-  //   const result: { email?: string; phone?: string } = {};
-
-  //   // Email regex
-  //   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-  //   const emailMatch = text.match(emailRegex);
-  //   if (emailMatch && emailMatch.length > 0) {
-  //     result.email = emailMatch[0];
-  //   }
-
-  //   // Phone regex (supports various formats)
-  //   const phoneRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}/g;
-  //   const phoneMatch = text.match(phoneRegex);
-  //   if (phoneMatch && phoneMatch.length > 0) {
-  //     result.phone = phoneMatch[0].trim();
-  //   }
-
-  //   return result;
-  // }
 }
