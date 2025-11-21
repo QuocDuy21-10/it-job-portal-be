@@ -7,13 +7,16 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { LocalStrategy } from './passport/local.strategy';
 import { JwtStrategy } from './passport/jwt.strategy';
+import { JwtRefreshStrategy } from './passport/jwt-refresh.strategy';
 import ms from 'ms';
 import { RolesModule } from 'src/roles/roles.module';
+import { SessionsModule } from 'src/sessions/sessions.module';
 
 @Module({
   imports: [
     UsersModule,
     RolesModule,
+    SessionsModule, // Import SessionsModule để sử dụng SessionsService
     PassportModule,
     JwtModule.registerAsync({
       useFactory: async (configService: ConfigService) => ({
@@ -23,7 +26,12 @@ import { RolesModule } from 'src/roles/roles.module';
       inject: [ConfigService], // Inject ConfigService into the factory
     }),
   ],
-  providers: [AuthService, LocalStrategy, JwtStrategy],
+  providers: [
+    AuthService,
+    LocalStrategy,
+    JwtStrategy,
+    JwtRefreshStrategy, // Đăng ký JwtRefreshStrategy
+  ],
   controllers: [AuthController],
 })
 export class AuthModule {}

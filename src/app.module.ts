@@ -23,6 +23,7 @@ import { GeminiModule } from './gemini/gemini.module';
 import { CvParserModule } from './cv-parser/cv-parser.module';
 import { QueuesModule } from './queues/queues.module';
 import { CvProfilesModule } from './cv-profiles';
+import { SessionsModule } from './sessions/sessions.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { CvProfilesModule } from './cv-profiles';
     RedisModule,
     GeminiModule,
     CvParserModule,
+    SessionsModule,
     UsersModule,
     AuthModule,
     CompaniesModule,
