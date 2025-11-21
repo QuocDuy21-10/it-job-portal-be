@@ -73,6 +73,6 @@ async function bootstrap() {
   app.use(helmet());
 
   await app.listen(configService.get<string>('PORT'));
-  Logger.log(`Application is running on port ${configService.get<string>('PORT')}`);
+  Logger.log(`Application is running on port http://localhost:${configService.get<string>('PORT')}/api`);
 }
 bootstrap();

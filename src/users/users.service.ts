@@ -67,6 +67,7 @@ export class UsersService {
 
   async register(user: AuthRegisterDto) {
     const { name, email, password } = user;
+    
     const isExistEmail = await this.userModel.findOne({ email, isDeleted: false });
     if (isExistEmail) {
       throw new BadRequestException(
@@ -187,19 +188,25 @@ export class UsersService {
     return this.userModel.softDelete({ _id: id });
   }
 
-  async updateUserToken(id: string, refreshToken: string) {
+  /**
+   * Update user active status (for email verification)
+   */
+  async updateUserStatus(id: string, isActive: boolean) {
     this.validateObjectId(id);
-    return this.userModel.updateOne({ _id: id }, { refreshToken });
+    return await this.userModel.updateOne({ _id: id }, { isActive });
   }
 
-  async findUserByRefreshToken(refreshToken: string) {
-    return await this.userModel.findOne({ refreshToken }).populate({
-      path: 'role',
-      select: {
-        name: 1,
-      },
-    });
+  /**
+   * Update user password
+   */
+  async updatePassword(id: string, newPasswordHash: string) {
+    this.validateObjectId(id);
+    return await this.userModel.updateOne({ _id: id }, { password: newPasswordHash });
   }
+
+  /**
+   * Validate MongoDB ObjectId format
+   */
   private validateObjectId(id: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid ID format');
@@ -251,7 +258,7 @@ export class UsersService {
       password: null, // No password for Google users
       authProvider: AuthProvider.GOOGLE,
       role: userRole?._id,
-      // You can add avatar to user schema if needed
+      isActive: true, // Google users are auto-activated
     });
 
     return newUser;
