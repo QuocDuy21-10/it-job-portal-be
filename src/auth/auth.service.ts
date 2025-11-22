@@ -18,6 +18,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { v4 as uuidv4 } from 'uuid';
 import { VerifyAuthDto } from './dto/verify-auth.dto';
 import { SessionsService } from 'src/sessions/sessions.service';
+import { JwtAccessPayload, JwtRefreshPayload } from './interfaces/jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
@@ -148,19 +149,22 @@ export class AuthService {
    * @param userAgent - User agent của client
    */
   async login(user: IUser, response: Response, ipAddress: string, userAgent: string) {
-    const { _id, name, email, role, permissions, company } = user;
-    const payload = {
-      sub: 'token login',
-      iss: 'from server',
-      _id,
-      name,
-      email,
-      role,
-      company,
+    const { _id } = user;
+
+    // Tạo payload tối ưu (chỉ chứa userId)
+    const accessPayload: JwtAccessPayload = {
+      sub: _id,
+      type: 'access',
     };
 
-    // Tạo refresh token mới
-    const refresh_token = this.createRefreshToken(payload);
+    const refreshPayload: JwtRefreshPayload = {
+      sub: _id,
+      type: 'refresh',
+    };
+
+    // Tạo tokens
+    const access_token = this.createAccessToken(accessPayload);
+    const refresh_token = this.createRefreshToken(refreshPayload);
 
     // Tạo session mới trong DB (thay vì lưu vào User.refreshToken)
     await this.sessionsService.createSession(_id, refresh_token, userAgent, ipAddress);
@@ -176,18 +180,40 @@ export class AuthService {
       maxAge: ms(this.configService.get<string>('JWT_REFRESH_EXPIRES_IN')),
     });
 
+    // Trả về access token + user info (user đã được hydrate đầy đủ từ validateUser)
     return {
-      access_token: this.jwtService.sign(payload),
-      user: { _id, name, email, role, permissions, company },
+      access_token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions,
+        company: user.company,
+      },
     };
   }
 
-  createRefreshToken(payload: any) {
-    const refresh_token = this.jwtService.sign(payload, {
+  /**
+   * Create Access Token - Token ngắn hạn (15 phút - 1 giờ)
+   * Payload tối ưu: chỉ chứa userId (sub) và type
+   */
+  createAccessToken(payload: JwtAccessPayload): string {
+    return this.jwtService.sign(payload, {
+      secret: this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET'),
+      expiresIn: ms(this.configService.get<string>('JWT_ACCESS_EXPIRES_IN')) / 1000,
+    });
+  }
+
+  /**
+   * Create Refresh Token - Token dài hạn (7-30 ngày)
+   * Payload tối ưu: chỉ chứa userId (sub) và type
+   */
+  createRefreshToken(payload: JwtRefreshPayload): string {
+    return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
       expiresIn: ms(this.configService.get<string>('JWT_REFRESH_EXPIRES_IN')) / 1000,
     });
-    return refresh_token;
   }
 
   /**
@@ -196,7 +222,7 @@ export class AuthService {
    * 
    * @param oldRefreshToken - Refresh token hiện tại từ cookie
    * @param response - Express response để set cookie mới
-   * @param user - User object từ JwtRefreshStrategy
+   * @param user - User object từ JwtRefreshStrategy (đã được hydrate)
    * @param userAgent - User agent của client
    * @param ipAddress - IP address của client
    */
@@ -215,40 +241,35 @@ export class AuthService {
         throw new BadRequestException('Session not found or already used');
       }
 
-      // BƯỚC 2: Lấy thông tin user mới nhất từ DB (để đảm bảo data fresh)
-      const userInDb = await this.usersService.findOne(user._id);
-      if (!userInDb) {
-        throw new BadRequestException('User not found');
-      }
-
-      // BƯỚC 3: Lấy permissions từ role
-      const userRole = userInDb.role as unknown as { _id: string; name: string };
+      // BƯỚC 2: User đã được hydrate đầy đủ từ JwtRefreshStrategy
+      // Lấy thêm permissions từ role (nếu cần)
+      const userRole = user.role as { _id: string; name: string };
       const tempRole = await this.rolesService.findOne(userRole._id);
 
-      // BƯỚC 4: Tạo payload mới
-      const { _id, name, email, role, company } = userInDb;
-      const payload = {
-        sub: 'token refresh',
-        iss: 'from server',
-        _id: _id.toString(),
-        name,
-        email,
-        role,
-        company,
+      // BƯỚC 3: Tạo payload mới (tối ưu - chỉ chứa userId)
+      const accessPayload: JwtAccessPayload = {
+        sub: user._id,
+        type: 'access',
       };
 
-      // BƯỚC 5: Tạo refresh token MỚI
-      const newRefreshToken = this.createRefreshToken(payload);
+      const refreshPayload: JwtRefreshPayload = {
+        sub: user._id,
+        type: 'refresh',
+      };
 
-      // BƯỚC 6: Tạo session MỚI trong DB
+      // BƯỚC 4: Tạo tokens MỚI
+      const newAccessToken = this.createAccessToken(accessPayload);
+      const newRefreshToken = this.createRefreshToken(refreshPayload);
+
+      // BƯỚC 5: Tạo session MỚI trong DB
       await this.sessionsService.createSession(
-        _id.toString(),
+        user._id,
         newRefreshToken,
         userAgent,
         ipAddress,
       );
 
-      // BƯỚC 7: Xóa cookie cũ và set cookie mới
+      // BƯỚC 6: Xóa cookie cũ và set cookie mới
       response.clearCookie('refresh_token');
       response.cookie('refresh_token', newRefreshToken, {
         httpOnly: true,
@@ -257,16 +278,16 @@ export class AuthService {
         maxAge: ms(this.configService.get<string>('JWT_REFRESH_EXPIRES_IN')),
       });
 
-      // BƯỚC 8: Trả về access token mới
+      // BƯỚC 7: Trả về access token mới
       return {
-        access_token: this.jwtService.sign(payload),
+        access_token: newAccessToken,
         user: {
-          _id: _id.toString(),
-          name,
-          email,
-          role,
-          permissions: tempRole.permissions,
-          company,
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          permissions: tempRole?.permissions ?? user.permissions ?? [],
+          company: user.company,
         },
       };
     } catch (error) {
@@ -348,7 +369,7 @@ export class AuthService {
         const existingUser = await this.usersService.findByEmail(googleUser.email);
 
         if (existingUser) {
-          // Link Google account to existing user
+          // Link Google account to existing users
           await this.usersService.linkGoogleAccount(
             existingUser._id.toString(),
             googleUser.googleId,
@@ -382,6 +403,8 @@ export class AuthService {
               logo: user.company.logo,
             }
           : undefined,
+        savedJobs: user.savedJobs?.map(jobId => jobId.toString()) || [],
+        companyFollowed: user.companyFollowed?.map(compId => compId.toString()) || [],
       };
 
       // Step 4: Generate JWT tokens và tạo session
