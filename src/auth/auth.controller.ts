@@ -5,7 +5,6 @@ import { LocalAuthGuard } from './local-auth.guard';
 import { Request, Response } from 'express';
 import { IUser } from 'src/users/users.interface';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { RolesService } from 'src/roles/roles.service';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthRegisterDto } from './dto/auth-register.dto';
 import { AuthEmailLoginDto } from './dto/auth-email-login.dto';
@@ -15,13 +14,14 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyAuthDto } from './dto/verify-auth.dto';
 import { AuthGuard } from '@nestjs/passport';
+import { UsersService } from 'src/users/users.service';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(
     private authService: AuthService,
-    private rolesService: RolesService,
+    private usersService: UsersService,
   ) {}
 
   @Public()
@@ -147,17 +147,32 @@ export class AuthController {
     return this.authService.googleLogin(authGoogleLoginDto.idToken, response);
   }
 
+  /**
+   * PRODUCTION PATTERN:
+   * - LUÔN query DB để lấy Fresh Data (name, role, permissions có thể thay đổi)
+   * - Validate user isActive, isDeleted
+   * - 1 query duy nhất với populate tối ưu
+   * - Loại bỏ query thừa (không gọi rolesService.findOne nữa)
+   * 
+   * LUỒNG HOẠT ĐỘNG:
+   * 1. JwtStrategy validate token → req.user = {_id: userId}
+   * 2. Controller nhận userId từ @User() decorator
+   * 3. Gọi usersService.findUserProfile(userId)
+   * 4. Return complete IUser object với permissions mới nhất
+   */
   @Get('/me')
   @ApiOperation({
-    summary: 'Get information of the current user',
-    description: 'Get information of the current user.',
+    summary: 'Get Current User Profile',
+    description: 'Get full user profile with fresh data from database (name, role, permissions, company, savedJobs, companyFollowed)',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'User profile retrieved successfully with latest data',
   })
   @ResponseMessage('Get user information successfully')
-  async handleGetAccount(@User() user: IUser) {
-    // query database to get permissions
-    const tempRole = (await this.rolesService.findOne(user.role._id)) as any;
-    user.permissions = tempRole.permissions;
-    return { user };
+  async handleGetAccount(@User() user: { _id: string }) {
+    const userProfile = await this.usersService.findUserProfile(user._id);
+    return { user: userProfile };
   }
 
   @Public()

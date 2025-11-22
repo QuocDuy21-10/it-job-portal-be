@@ -15,32 +15,35 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
 
 /**
- * Auth Module - Optimized Architecture
+ * KIẾN TRÚC TỐI ƯU:
+ * 1. JWT Payload nhẹ (chỉ userId + type)
+ * 2. JwtStrategy hydrate user 1 lần (tránh N queries ở từng API)
+ * 3. API /me query lại DB để đảm bảo Fresh Data
+ * 4. Multi-device session management
+ * 5. Token Rotation Pattern (refresh token dùng 1 lần)
  * 
- * Kiến trúc mới:
- * 1. JWT Payload tối ưu (chỉ chứa userId)
- * 2. Hydrate user từ DB trong mỗi request (JwtStrategy)
- * 3. Multi-device session management (SessionsModule)
- * 4. Token Rotation Pattern (refresh token chỉ dùng 1 lần)
- * 5. Clean separation of concerns (Guards, Strategies, Services)
- * 
- * Strategies:
+ * STRATEGIES:
  * - LocalStrategy: Username/password authentication
  * - JwtStrategy: Access token validation + user hydration
- * - JwtRefreshStrategy: Refresh token validation + session checking
+ * - JwtRefreshStrategy: Refresh token validation + session check
  * 
- * Guards:
- * - JwtAuthGuard: Protect routes with access token
- * - JwtRefreshGuard: Protect refresh endpoint
- * - LocalAuthGuard: Login endpoint
+ * MODULES:
+ * - UsersModule: User profile management (cung cấp UsersService cho /me API)
+ * - RolesModule: Role & permission management
+ * - SessionsModule: Multi-device session tracking
+ * 
+ * TẠI SAO HYDRATE USER Ở JwtStrategy?
+ * - Hầu hết APIs cần user.email (audit log: createdBy, updatedBy)
+ * - Một số APIs cần user.role.name, user.company._id (authorization)
+ * - Hydrate 1 lần tại Strategy → tránh query DB ở từng API
+ * - API /me đặc biệt → query lại DB để lấy 100% fresh data
  */
 @Module({
   imports: [
-    UsersModule,
-    RolesModule,
-    SessionsModule, // Multi-device session management
+    UsersModule, 
+    RolesModule, 
+    SessionsModule, 
     PassportModule,
-    // Import MongooseModule để JwtStrategy có thể inject UserModel
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     JwtModule.registerAsync({
       useFactory: async (configService: ConfigService) => ({
@@ -52,11 +55,11 @@ import { User, UserSchema } from 'src/users/schemas/user.schema';
   ],
   providers: [
     AuthService,
-    LocalStrategy,
-    JwtStrategy, // Access token strategy với user hydration
-    JwtRefreshStrategy, // Refresh token strategy với session validation
+    LocalStrategy, 
+    JwtStrategy, 
+    JwtRefreshStrategy, 
   ],
   controllers: [AuthController],
-  exports: [AuthService], // Export để modules khác có thể sử dụng
+  exports: [AuthService],
 })
 export class AuthModule {}

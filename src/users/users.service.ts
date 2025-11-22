@@ -209,6 +209,89 @@ export class UsersService {
   }
 
   /**
+   * MỤC ĐÍCH:
+   * - Lấy thông tin User Profile ĐẦY ĐỦ & MỚI NHẤT từ DB
+   * - Sử dụng cho API GET /auth/me
+   * - Đảm bảo Fresh Data (name, role, permissions có thể thay đổi)
+   * 
+   * KIẾN TRÚC:
+   * - 1 query duy nhất với nested populate tối ưu
+   * - Populate: role → permissions, company, savedJobs IDs, companyFollowed IDs
+   * - Validate: isActive, isDeleted
+   * - Return: IUser interface chuẩn
+   * 
+   * BEST PRACTICE:
+   * - Tách rõ logic Auth vs User Profile
+   * - JwtStrategy chỉ validate token → lightweight
+   * - Controller gọi method này để lấy fresh data
+   * 
+   * @param userId - User ID từ JWT payload
+   * @returns Promise<IUser> - Complete user profile
+   * @throws BadRequestException - Nếu user không tồn tại hoặc bị vô hiệu hóa
+   */
+  async findUserProfile(userId: string): Promise<IUser> {
+    this.validateObjectId(userId);
+    const user = await this.userModel
+      .findById(userId)
+      .populate({
+        path: 'role',
+        select: '_id name permissions',
+        populate: {
+          path: 'permissions',
+          select: '_id name apiPath method module',
+        },
+      })
+      .populate({
+        path: 'company',
+        select: '_id name logo address',
+      })
+      .select('-password') 
+      .lean() // Convert to plain JS object (performance boost)
+      .exec();
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+    if (!user.isActive) {
+      throw new BadRequestException(
+        'Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ admin.',
+      );
+    }
+    if (user.isDeleted) {
+      throw new BadRequestException('Tài khoản đã bị xóa');
+    }
+    const userRole = user.role as any;
+    if (!userRole || !userRole._id) {
+      throw new BadRequestException('Role không hợp lệ. Vui lòng liên hệ admin.');
+    }
+    return {
+      _id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      role: {
+        _id: userRole._id.toString(),
+        name: userRole.name,
+      },
+      permissions:
+        userRole.permissions?.map((perm: any) => ({
+          _id: perm._id?.toString() || '',
+          name: perm.name || '',
+          apiPath: perm.apiPath || '',
+          module: perm.module || '',
+        })) ?? [],
+      company: user.company
+        ? {
+            _id: (user.company as any)._id?.toString() || '',
+            name: (user.company as any).name || '',
+            logo: (user.company as any).logo,
+          }
+        : undefined,
+      savedJobs: user.savedJobs?.map((id: any) => id.toString()) || [],
+      companyFollowed: user.companyFollowed?.map((id: any) => id.toString()) || [],
+    };
+  }
+
+  /**
    * Validate MongoDB ObjectId format
    */
   private validateObjectId(id: string): void {

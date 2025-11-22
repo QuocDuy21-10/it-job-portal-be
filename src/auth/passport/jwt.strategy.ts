@@ -9,19 +9,26 @@ import { User, UserDocument } from 'src/users/schemas/user.schema';
 import { JwtAccessPayload } from '../interfaces/jwt-payload.interface';
 
 /**
- * JWT Access Token Strategy - Optimized Version
+ * KIẾN TRÚC:
+ * 1. Payload cực kỳ nhẹ (chỉ chứa userId + type)
+ * 2. Strategy hydrate user từ DB để lấy fresh data
+ * 3. Populate đầy đủ: role + permissions + company
+ * 4. Validate: isActive, isDeleted → chặn user bị khóa
  * 
- * Kiến trúc mới:
- * 1. Payload chỉ chứa userId (sub) và type - cực kỳ nhẹ
- * 2. Strategy query DB để lấy user data mới nhất (hydrate pattern)
- * 3. Tránh stale data (name, email, role thay đổi)
- * 4. Validate user còn active và role hợp lệ
- * 5. Populate đầy đủ permissions từ role
+ * TẠI SAO HYDRATE Ở ĐÂY?
+ * - Hầu hết APIs cần user.email (audit log: createdBy, updatedBy)
+ * - Một số APIs cần user.role.name, user.company._id (authorization)
+ * - Nếu không hydrate → mỗi API phải query DB → N queries thay vì 1 query
  * 
- * Flow:
- * Client gửi request với Bearer token → Passport verify JWT signature → 
- * validate() được gọi → Query user từ DB → Populate role + permissions →
- * Attach vào req.user → Controller xử lý
+ * API /ME ĐẶC BIỆT:
+ * - API /me SẼ QUERY LẠI DB (gọi usersService.findUserProfile)
+ * - Lý do: Đảm bảo 100% fresh data khi user F5 trang
+ * - Kiểm tra isActive, isDeleted để chặn user bị khóa dù token còn hợp lệ
+ * 
+ * LUỒNG HOẠT ĐỘNG:
+ * Client → Bearer token → Passport verify signature → 
+ * validate() → Query user từ DB (1 query tối ưu) →
+ * Attach full IUser vào req.user → Controller xử lý
  */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -39,14 +46,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   /**
    * Validate JWT Payload - Hydrate user từ DB
    * 
-   * @param payload - Decoded JWT payload {sub: userId, type: 'access'}
-   * @returns IUser object sẽ được attach vào req.user
+   * @param payload - {sub: userId, type: 'access'}
+   * @returns IUser - Full user object với role, permissions, company
    * 
-   * Lợi ích:
-   * - Luôn lấy data mới nhất từ DB (không bị stale)
-   * - Validate user còn tồn tại và active
-   * - Populate đầy đủ role + permissions + company
-   * - Token nhẹ → request nhanh hơn
+   * ⚡ PERFORMANCE:
+   * - 1 query duy nhất với nested populate
+   * - .lean() để convert sang plain JS object (faster)
+   * - Select -password để không trả về sensitive data
    */
   async validate(payload: JwtAccessPayload): Promise<IUser> {
     // BƯỚC 1: Validate payload structure
@@ -54,7 +60,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Invalid token payload');
     }
 
-    // BƯỚC 2: Query user từ DB với populate đầy đủ
+    // BƯỚC 2: Query user với populate tối ưu (1 query duy nhất)
     const user = await this.userModel
       .findById(payload.sub)
       .populate({
@@ -69,7 +75,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         path: 'company',
         select: '_id name logo address',
       })
-      .select('-password -refreshToken') 
+      .select('-password') 
       .lean()
       .exec();
 
@@ -90,7 +96,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Tài khoản đã bị xóa. Token không hợp lệ.');
     }
 
-    // BƯỚC 6: Validate role tồn tại (TypeScript type assertion)
+    // BƯỚC 6: Validate role tồn tại
     const userRole = user.role as any;
     if (!userRole || !userRole._id) {
       throw new UnauthorizedException('Role không hợp lệ. Vui lòng liên hệ admin.');
