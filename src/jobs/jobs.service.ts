@@ -7,15 +7,34 @@ import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { Job, JobDocument } from './schemas/job.schema';
 import mongoose from 'mongoose';
 import aqp from 'api-query-params';
+import { CompanyFollowerQueueService } from 'src/queues/services/company-follower-queue.service';
 
 @Injectable()
 export class JobsService {
-  constructor(@InjectModel(Job.name) private jobModel: SoftDeleteModel<JobDocument>) {}
+  constructor(
+    @InjectModel(Job.name) private jobModel: SoftDeleteModel<JobDocument>,
+    private readonly companyFollowerQueueService: CompanyFollowerQueueService,
+  ) {}
   async create(createJobDto: CreateJobDto, user: IUser) {
     const newJob = await this.jobModel.create({
       ...createJobDto,
       createdBy: { _id: user._id, email: user.email },
     });
+
+    // Add task to queue to notify company followers
+    // This runs asynchronously without blocking the API response
+    try {
+      await this.companyFollowerQueueService.addNewJobNotification({
+        jobId: newJob._id.toString(),
+        companyId: newJob.company._id.toString(),
+        jobName: newJob.name,
+        companyName: newJob.company.name,
+      });
+    } catch (error) {
+      // Log error but don't fail the job creation
+      console.error('Failed to add notification to queue:', error);
+    }
+
     return { _id: newJob._id, createdAt: newJob.createdAt };
   }
 

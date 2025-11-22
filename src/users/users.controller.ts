@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   HttpStatus,
+  HttpCode,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -23,6 +24,8 @@ import {
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
+import { SaveJobDto } from './dto/save-job.dto';
+import { FollowCompanyDto } from './dto/follow-company.dto';
 
 @ApiTags('User')
 @Controller('users')
@@ -95,5 +98,99 @@ export class UsersController {
   @ResponseMessage('Delete user by id')
   remove(@Param('id') id: string, @User() user: IUser) {
     return this.usersService.remove(id, user);
+  }
+
+  // ==================== SAVE JOB ENDPOINTS ====================
+
+  @Post('save-job')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Save a job to user profile',
+    description: 'Add a job to the user\'s saved jobs list. Duplicates are automatically prevented.',
+  })
+  @ApiBody({ type: SaveJobDto })
+  @ResponseMessage('Job saved successfully')
+  async saveJob(@Body() saveJobDto: SaveJobDto, @User() user: IUser) {
+    await this.usersService.saveJob(user._id, saveJobDto.jobId);
+    return { message: 'Job saved successfully' };
+  }
+
+  @Delete('save-job')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Unsave a job from user profile',
+    description: 'Remove a job from the user\'s saved jobs list.',
+  })
+  @ApiBody({ type: SaveJobDto })
+  @ResponseMessage('Job unsaved successfully')
+  async unsaveJob(@Body() saveJobDto: SaveJobDto, @User() user: IUser) {
+    await this.usersService.unsaveJob(user._id, saveJobDto.jobId);
+    return { message: 'Job unsaved successfully' };
+  }
+
+  @Get('saved-jobs')
+  @ApiOperation({
+    summary: 'Get user\'s saved jobs',
+    description: 'Retrieve all jobs that the user has saved with pagination support.',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of items per page (default: 10)',
+    example: 10,
+  })
+  @ResponseMessage('Get saved jobs successfully')
+  async getSavedJobs(
+    @User() user: IUser,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+  ) {
+    return this.usersService.getSavedJobs(user._id, +page, +limit);
+  }
+
+  // ==================== FOLLOW COMPANY ENDPOINTS ====================
+
+  @Post('follow-company')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Follow a company',
+    description: 'Add a company to the user\'s following list. Maximum 5 companies allowed.',
+  })
+  @ApiBody({ type: FollowCompanyDto })
+  @ResponseMessage('Company followed successfully')
+  async followCompany(@Body() followCompanyDto: FollowCompanyDto, @User() user: IUser) {
+    await this.usersService.followCompany(user._id, followCompanyDto.companyId);
+    return { message: 'Company followed successfully' };
+  }
+
+  @Delete('follow-company')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Unfollow a company',
+    description: 'Remove a company from the user\'s following list.',
+  })
+  @ApiBody({ type: FollowCompanyDto })
+  @ResponseMessage('Company unfollowed successfully')
+  async unfollowCompany(@Body() followCompanyDto: FollowCompanyDto, @User() user: IUser) {
+    await this.usersService.unfollowCompany(user._id, followCompanyDto.companyId);
+    return { message: 'Company unfollowed successfully' };
+  }
+
+  @Get('following-companies')
+  @ApiOperation({
+    summary: 'Get user\'s following companies',
+    description: 'Retrieve all companies that the user is following.',
+  })
+  @ResponseMessage('Get following companies successfully')
+  async getFollowingCompanies(@User() user: IUser) {
+    return this.usersService.getFollowingCompanies(user._id);
   }
 }

@@ -63,8 +63,11 @@ export class User {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Role.name, required: true })
   role: mongoose.Schema.Types.ObjectId;
 
-  @Prop()
-  refreshToken?: string;
+  @Prop({ type: [mongoose.Schema.Types.ObjectId], ref: 'Job', default: [] })
+  savedJobs: mongoose.Schema.Types.ObjectId[];
+
+  @Prop({ type: [mongoose.Schema.Types.ObjectId], ref: 'Company', default: [] })
+  companyFollowed: mongoose.Schema.Types.ObjectId[];
 
   @Prop({ type: Object })
   createdBy?: {
@@ -112,3 +115,7 @@ UserSchema.index(
 // Thêm index cho performance khi query
 UserSchema.index({ email: 1, isDeleted: 1 });
 UserSchema.index({ role: 1 });
+
+// Index cho reverse lookup - tìm users theo company hoặc job
+UserSchema.index({ companyFollowed: 1 });
+UserSchema.index({ savedJobs: 1 });

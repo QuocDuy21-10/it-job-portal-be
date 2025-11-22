@@ -14,12 +14,16 @@ import { Role, RoleDocument } from 'src/roles/schemas/role.schema';
 import { USER_ROLE } from 'src/databases/sample';
 import { AuthRegisterDto } from 'src/auth/dto/auth-register.dto';
 import { AuthProvider } from 'src/auth/enums/auth-provider.enum';
+import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
+import { Company, CompanyDocument } from 'src/companies/schemas/company.schema';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectModel(UserModel.name) private userModel: SoftDeleteModel<UserDocument>,
     @InjectModel(Role.name) private roleModel: SoftDeleteModel<RoleDocument>,
+    @InjectModel(Job.name) private jobModel: SoftDeleteModel<JobDocument>,
+    @InjectModel(Company.name) private companyModel: SoftDeleteModel<CompanyDocument>,
     private configService: ConfigService,
   ) {}
   hashPassword(password: string) {
@@ -272,5 +276,184 @@ export class UsersService {
       { _id: userId },
       { googleId, authProvider: AuthProvider.GOOGLE },
     );
+  }
+
+  // ==================== SAVE JOB FEATURE ====================
+
+  /**
+   * Save a job to user's saved jobs list
+   * Uses $addToSet to prevent duplicates
+   */
+  async saveJob(userId: string, jobId: string): Promise<void> {
+    this.validateObjectId(userId);
+    this.validateObjectId(jobId);
+
+    // Validate job exists and is active
+    const job = await this.jobModel.findOne({ _id: jobId, isDeleted: false });
+    if (!job) {
+      throw new BadRequestException('Job not found or has been deleted');
+    }
+
+    // Use $addToSet to add jobId only if it doesn't exist
+    const result = await this.userModel.updateOne(
+      { _id: userId, isDeleted: false },
+      { $addToSet: { savedJobs: new mongoose.Types.ObjectId(jobId) } },
+    );
+
+    if (result.matchedCount === 0) {
+      throw new BadRequestException('User not found');
+    }
+  }
+
+  /**
+   * Remove a job from user's saved jobs list
+   * Uses $pull to remove the jobId
+   */
+  async unsaveJob(userId: string, jobId: string): Promise<void> {
+    this.validateObjectId(userId);
+    this.validateObjectId(jobId);
+
+    // Use $pull to remove jobId from array
+    const result = await this.userModel.updateOne(
+      { _id: userId, isDeleted: false },
+      { $pull: { savedJobs: new mongoose.Types.ObjectId(jobId) } },
+    );
+
+    if (result.matchedCount === 0) {
+      throw new BadRequestException('User not found');
+    }
+  }
+
+  /**
+   * Get all saved jobs for a user with pagination
+   */
+  async getSavedJobs(userId: string, page: number = 1, limit: number = 10) {
+    this.validateObjectId(userId);
+
+    const offset = (page - 1) * limit;
+
+    // Find user and populate saved jobs
+    const user = await this.userModel
+      .findOne({ _id: userId, isDeleted: false })
+      .select('savedJobs')
+      .populate({
+        path: 'savedJobs',
+        match: { isDeleted: false }, // Only get non-deleted jobs
+        select: 'name skills company location salary level formOfWork startDate endDate',
+        populate: {
+          path: 'company',
+          select: 'name logo',
+          model: 'Company',
+        },
+      });
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    const savedJobs = user.savedJobs || [];
+    const total = savedJobs.length;
+    const totalPages = Math.ceil(total / limit);
+
+    // Manual pagination on populated array
+    const paginatedJobs = savedJobs.slice(offset, offset + limit);
+
+    return {
+      result: paginatedJobs,
+      meta: {
+        current: page,
+        pageSize: limit,
+        pages: totalPages,
+        total,
+      },
+    };
+  }
+
+  // ==================== FOLLOW COMPANY FEATURE ====================
+
+  /**
+   * Follow a company (maximum 5 companies)
+   * Uses $addToSet to prevent duplicates
+   */
+  async followCompany(userId: string, companyId: string): Promise<void> {
+    this.validateObjectId(userId);
+    this.validateObjectId(companyId);
+
+    // Validate company exists
+    const company = await this.companyModel.findOne({ _id: companyId, isDeleted: false });
+    if (!company) {
+      throw new BadRequestException('Company not found or has been deleted');
+    }
+
+    // Get current user to check following count
+    const user = await this.userModel.findOne({ _id: userId, isDeleted: false }).select('companyFollowed');
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    // Check if already following this company
+    const isAlreadyFollowing = user.companyFollowed?.some(
+      (id) => id.toString() === companyId,
+    );
+
+    if (isAlreadyFollowing) {
+      throw new BadRequestException('You are already following this company');
+    }
+
+    // Validate maximum 5 companies
+    if (user.companyFollowed && user.companyFollowed.length >= 5) {
+      throw new BadRequestException('You can only follow up to 5 companies. Please unfollow a company first.');
+    }
+
+    // Use $addToSet to add companyId
+    await this.userModel.updateOne(
+      { _id: userId, isDeleted: false },
+      { $addToSet: { companyFollowed: new mongoose.Types.ObjectId(companyId) } },
+    );
+  }
+
+  /**
+   * Unfollow a company
+   * Uses $pull to remove the companyId
+   */
+  async unfollowCompany(userId: string, companyId: string): Promise<void> {
+    this.validateObjectId(userId);
+    this.validateObjectId(companyId);
+
+    // Use $pull to remove companyId from array
+    const result = await this.userModel.updateOne(
+      { _id: userId, isDeleted: false },
+      { $pull: { companyFollowed: new mongoose.Types.ObjectId(companyId) } },
+    );
+
+    if (result.matchedCount === 0) {
+      throw new BadRequestException('User not found');
+    }
+  }
+
+  /**
+   * Get all companies that user is following
+   */
+  async getFollowingCompanies(userId: string) {
+    this.validateObjectId(userId);
+
+    // Find user and populate following companies
+    const user = await this.userModel
+      .findOne({ _id: userId, isDeleted: false })
+      .select('companyFollowed')
+      .populate({
+        path: 'companyFollowed',
+        match: { isDeleted: false }, // Only get non-deleted companies
+        select: 'name logo description address numberOfEmployees',
+      });
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    return {
+      result: user.companyFollowed || [],
+      total: user.companyFollowed?.length || 0,
+    };
   }
 }

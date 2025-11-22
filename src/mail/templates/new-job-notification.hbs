@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Job Notification</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 40px auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .email-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 30px 20px;
+      text-align: center;
+      color: #ffffff;
+    }
+    .email-header h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: bold;
+    }
+    .email-body {
+      padding: 40px 30px;
+      color: #333333;
+      line-height: 1.6;
+    }
+    .greeting {
+      font-size: 18px;
+      margin-bottom: 20px;
+      color: #555555;
+    }
+    .job-info {
+      background-color: #f9f9f9;
+      border-left: 4px solid #667eea;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .job-info h2 {
+      margin: 0 0 10px 0;
+      color: #667eea;
+      font-size: 22px;
+    }
+    .job-info p {
+      margin: 5px 0;
+      color: #666666;
+    }
+    .cta-button {
+      display: inline-block;
+      padding: 15px 40px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 5px;
+      font-weight: bold;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .cta-button:hover {
+      opacity: 0.9;
+    }
+    .footer {
+      background-color: #f4f4f4;
+      padding: 20px;
+      text-align: center;
+      color: #999999;
+      font-size: 12px;
+    }
+    .footer a {
+      color: #667eea;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <!-- Header -->
+    <div class="email-header">
+      <h1>🎉 New Job Alert!</h1>
+    </div>
+
+    <!-- Body -->
+    <div class="email-body">
+      <p class="greeting">Hi {{userName}},</p>
+      
+      <p>Great news! <strong>{{companyName}}</strong>, a company you're following, has just posted a new job opening that might interest you.</p>
+      
+      <div class="job-info">
+        <h2>{{jobName}}</h2>
+        <p><strong>Company:</strong> {{companyName}}</p>
+        <p>This opportunity could be the perfect next step in your career journey!</p>
+      </div>
+
+      <p>Don't miss out on this exciting opportunity. Click the button below to view the full job details and apply:</p>
+
+      <div style="text-align: center;">
+        <a href="{{jobDetailUrl}}" class="cta-button">View Job Details</a>
+      </div>
+
+      <p style="margin-top: 30px; color: #666;">
+        <em>This email was sent because you're following {{companyName}}. Want to manage your notifications? Log in to your account to update your preferences.</em>
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>&copy; {{currentYear}} IT Job Portal. All rights reserved.</p>
+      <p>
+        <a href="#">Unsubscribe</a> | 
+        <a href="#">Privacy Policy</a> | 
+        <a href="#">Contact Us</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>

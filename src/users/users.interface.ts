@@ -17,4 +17,6 @@ export interface IUser {
     name: string;
     logo?: string;
   };
+  savedJobs: string[];
+  companyFollowed: string[];
 }
