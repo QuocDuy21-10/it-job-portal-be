@@ -277,6 +277,7 @@ export class UsersService {
           _id: perm._id?.toString() || '',
           name: perm.name || '',
           apiPath: perm.apiPath || '',
+          method: perm.method || '',
           module: perm.module || '',
         })) ?? [],
       company: user.company

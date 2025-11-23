@@ -13,15 +13,12 @@ import {
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { Public, ResponseMessage, User } from 'src/decorator/customize';
+import { Public, ResponseMessage, SkipCheckPermission, User } from 'src/decorator/customize';
 import { IUser } from './users.interface';
 import {
   ApiTags,
   ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
   ApiQuery,
-  ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
 import { SaveJobDto } from './dto/save-job.dto';
@@ -69,15 +66,7 @@ export class UsersController {
     return this.usersService.findAll(+page, +limit, query);
   }
 
-  @Get(':id')
-  @ApiOperation({
-    summary: 'Get information of a user by ID',
-    description: 'API to get information of a user by ID.',
-  })
-  @ResponseMessage('Get user by id')
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
-  }
+
 
   @Patch(':id')
   @ApiOperation({
@@ -89,18 +78,6 @@ export class UsersController {
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @User() user: IUser) {
     return this.usersService.update(id, updateUserDto, user);
   }
-
-  @Delete(':id')
-  @ApiOperation({
-    summary: 'Delete a user by ID',
-    description: 'API to delete a user by ID.',
-  })
-  @ResponseMessage('Delete user by id')
-  remove(@Param('id') id: string, @User() user: IUser) {
-    return this.usersService.remove(id, user);
-  }
-
-  // ==================== SAVE JOB ENDPOINTS ====================
 
   @Post('save-job')
   @HttpCode(HttpStatus.OK)
@@ -115,6 +92,7 @@ export class UsersController {
     return { message: 'Job saved successfully' };
   }
 
+  @SkipCheckPermission()
   @Delete('save-job')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -192,5 +170,25 @@ export class UsersController {
   @ResponseMessage('Get following companies successfully')
   async getFollowingCompanies(@User() user: IUser) {
     return this.usersService.getFollowingCompanies(user._id);
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Get information of a user by ID',
+    description: 'API to get information of a user by ID.',
+  })
+  @ResponseMessage('Get user by id')
+  findOne(@Param('id') id: string) {
+    return this.usersService.findOne(id);
+  }
+
+  @Delete(':id')
+  @ApiOperation({
+    summary: 'Delete a user by ID',
+    description: 'API to delete a user by ID.',
+  })
+  @ResponseMessage('Delete user by id')
+  remove(@Param('id') id: string, @User() user: IUser) {
+    return this.usersService.remove(id, user);
   }
 }

@@ -2,7 +2,7 @@ import { ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/com
 import { AuthGuard } from '@nestjs/passport';
 import { plainToClass } from 'class-transformer';
 import { validate } from 'class-validator';
-import { AuthEmailLoginDto } from './dto/auth-email-login.dto';
+import { AuthEmailLoginDto } from '../dto/auth-email-login.dto';
 
 @Injectable()
 export class LocalAuthGuard extends AuthGuard('local') {

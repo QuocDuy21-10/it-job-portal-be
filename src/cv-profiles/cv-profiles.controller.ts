@@ -23,9 +23,9 @@ import {
 import { CvProfilesService } from './cv-profiles.service';
 import { CreateCvProfileDto } from './dto/create-cv-profile.dto';
 import { UpdateCvProfileDto } from './dto/update-cv-profile.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SkipCheckPermission, User } from '../decorator/customize';
 import { IUser } from '../users/users.interface';
+import { JwtAuthGuard } from 'src/auth/guards';
 
 @ApiTags('CV Profiles')
 @SkipCheckPermission()

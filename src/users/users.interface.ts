@@ -9,6 +9,7 @@ export interface IUser {
   permissions?: {
     _id: string;
     name: string;
+    method: string;
     apiPath: string;
     module: string;
   }[];

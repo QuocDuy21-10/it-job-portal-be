@@ -115,6 +115,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         userRole.permissions?.map((perm: any) => ({
           _id: perm._id?.toString() || '',
           name: perm.name || '',
+          method: perm.method || '',
           apiPath: perm.apiPath || '',
           module: perm.module || '',
         })) ?? [],

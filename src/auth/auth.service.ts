@@ -393,6 +393,7 @@ export class AuthService {
         permissions: tempRole?.permissions?.map((perm: any) => ({
           _id: perm._id?.toString() || '',
           name: perm.name || '',
+          method: perm.method || '',
           apiPath: perm.apiPath || '',
           module: perm.module || '',
         })) ?? [],

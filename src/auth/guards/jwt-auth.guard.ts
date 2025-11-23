@@ -8,6 +8,7 @@ import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { IS_OPTIONAL_AUTH, IS_PUBLIC_KEY, IS_PUBLIC_PERMISSION } from 'src/decorator/customize';
 import { Request } from 'express';
+import { log } from 'console';
 
 /**
  * JWT Access Token Guard với Permission Checking
@@ -94,9 +95,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     // Permission checking (RBAC)
     const targetMethod = request.method;
+    log("Target method:", targetMethod);
     const targetPath = request.route?.path as string;
+    log("Target path:", targetPath);
 
     const permissions = user?.permissions ?? [];
+    console.log("User permissions:", permissions);
+    
 
     // Tìm permission khớp với method và path
     let isExistPermission = permissions.find((permission) => {
