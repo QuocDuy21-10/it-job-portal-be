@@ -5,7 +5,6 @@ import { UpdateCompanyDto } from './dto/update-company.dto';
 import { IUser } from 'src/users/users.interface';
 import { OptionalAuth, Public, ResponseMessage, User } from 'src/decorator/customize';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { log } from 'console';
 @ApiTags('Company')
 @Controller('companies')
 export class CompaniesController {

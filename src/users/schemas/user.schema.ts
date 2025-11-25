@@ -1,7 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
 import { Role } from 'src/roles/schemas/role.schema';
-import { Gender } from '../enums/user-gender.enum';
 import { AuthProvider } from 'src/auth/enums/auth-provider.enum';
 
 export type UserDocument = HydratedDocument<User>;
@@ -23,29 +22,8 @@ export class User {
   @Prop({ unique: true, sparse: true })
   googleId?: string;
 
-  @Prop()
-  age?: number;
-
-  @Prop({ type: Date })
-  dateOfBirth?: Date;
-
-  @Prop({ enum: Gender })
-  gender?: string;
-
-  @Prop({ trim: true })
-  address?: string;
-
   @Prop({ trim: true })
   avatar?: string;
-
-  @Prop({ trim: true })
-  phone?: string;
-
-  @Prop({ trim: true })
-  bio?: string;
-
-  @Prop({ trim: true })
-  personalLink?: string;
 
   @Prop({ default: false }) 
   isActive: boolean;

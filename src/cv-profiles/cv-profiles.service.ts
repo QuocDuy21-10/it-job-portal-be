@@ -104,15 +104,8 @@ export class CvProfilesService {
    * Throws error if not found
    */
   async getCurrentUserCv(userId: string): Promise<CvProfile> {
-    const cvProfile = await this.findByUserId(userId);
-
-    if (!cvProfile) {
-      throw new NotFoundException(
-        'CV Profile not found. Please create your CV first.',
-      );
-    }
-
-    return cvProfile;
+  const cvProfile = await this.findByUserId(userId);
+  return cvProfile;
   }
 
   /**

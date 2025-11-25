@@ -95,12 +95,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     // Permission checking (RBAC)
     const targetMethod = request.method;
-    log("Target method:", targetMethod);
     const targetPath = request.route?.path as string;
-    log("Target path:", targetPath);
 
     const permissions = user?.permissions ?? [];
-    console.log("User permissions:", permissions);
     
 
     // Tìm permission khớp với method và path

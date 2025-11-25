@@ -7,10 +7,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import mongoose from 'mongoose';
 import { IUser } from 'src/users/users.interface';
 import aqp from 'api-query-params';
+import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 
 @Injectable()
 export class CompaniesService {
-  constructor(@InjectModel(Company.name) private companyModel: SoftDeleteModel<CompanyDocument>) {}
+  constructor(@InjectModel(Company.name) private companyModel: SoftDeleteModel<CompanyDocument>, @InjectModel(Job.name) private jobModel: SoftDeleteModel<JobDocument>,) {}
   async create(createCompanyDto: CreateCompanyDto, user: IUser) {
     const isExistName = await this.companyModel.find({
       name: createCompanyDto.name,
@@ -50,8 +51,24 @@ export class CompaniesService {
       .sort(sort as any)
       .populate(population)
       .exec();
+
+    const resultWithCount = await Promise.all(
+      result.map(async (company) => {
+        const jobCount = await this.jobModel.countDocuments({
+          'company._id': company._id,
+          isActive: true,
+          isDeleted: false,
+        });
+
+        // Convert mongoose doc to plain object to add new field
+        return {
+          ...company.toObject(),
+          totalJobs: jobCount,
+        };
+      }),
+    );
     return {
-      result,
+      result: resultWithCount,
       meta: {
         pagination: {
           current_page: page,

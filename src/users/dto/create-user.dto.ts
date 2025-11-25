@@ -2,22 +2,17 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsEmail,
-  IsEnum,
   IsMongoId,
   IsNotEmpty,
   IsNotEmptyObject,
-  IsNumber,
   IsObject,
   IsOptional,
   IsString,
-  Max,
   MaxLength,
-  Min,
   ValidateNested,
 } from 'class-validator';
 import mongoose from 'mongoose';
 import { CompanyDto } from 'src/companies/dto/company.dto';
-import { Gender } from '../enums/user-gender.enum';
 
 export class CreateUserDto {
   @IsNotEmpty({ message: 'Name is required' })
@@ -34,28 +29,6 @@ export class CreateUserDto {
   @IsNotEmpty({ message: 'Password is required' })
   @ApiProperty({ example: '123456', description: 'Password of user' })
   password: string;
-
-  @IsNotEmpty({ message: 'Age is required' })
-  @IsNumber({}, { message: 'Age must be a number' })
-  @Type(() => Number)
-  @Min(18, { message: 'Age must be at least 18' })
-  @Max(100, { message: 'Age must be at most 100' })
-  @ApiProperty({ example: 20, description: 'Age of user' })
-  age: number;
-
-  @IsNotEmpty({ message: 'Gender is required' })
-  @IsString({ message: 'Gender must be a string' })
-  @IsEnum(Gender, {
-    message: `Gender must be one of the following values: ${Object.values(Gender).join(', ')}`,
-  })
-  @ApiProperty({ example: Gender.MALE, description: 'Gender of user' })
-  gender: string;
-
-  @IsNotEmpty({ message: 'Address is required' })
-  @IsString({ message: 'Address must be a string' })
-  @MaxLength(200, { message: 'Address is too long (max: 200 chars)' })
-  @ApiProperty({ example: 'Ha Noi', description: 'Address of user' })
-  address: string;
 
   @IsOptional()
   @IsNotEmptyObject({ nullable: true }, { message: 'Company is required' })

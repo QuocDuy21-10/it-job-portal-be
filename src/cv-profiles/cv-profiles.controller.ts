@@ -241,9 +241,11 @@ export class CvProfilesController {
     const cvProfile = await this.cvProfilesService.getCurrentUserCv(user._id);
 
     return {
-      statusCode: HttpStatus.OK,
-      message: 'CV Profile retrieved successfully',
-      data: cvProfile,
+      statusCode: HttpStatus.OK, // Luôn trả về 200
+      message: cvProfile 
+        ? 'CV Profile retrieved successfully' 
+        : 'User does not have a CV Profile yet', 
+      data: cvProfile || null, 
     };
   }
 

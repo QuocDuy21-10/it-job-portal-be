@@ -32,7 +32,7 @@ export class UsersService {
     return hash;
   }
   async create(CreateUserDto: CreateUserDto, @User() user: IUser) {
-    const { name, email, password, age, gender, address, role, company } = CreateUserDto;
+    const { name, email, password, role, company } = CreateUserDto;
     const isExistEmail = await this.userModel.findOne({ email, isDeleted: false });
     if (isExistEmail) {
       throw new BadRequestException(
@@ -53,9 +53,6 @@ export class UsersService {
       name,
       email,
       password: hashedPassword,
-      age,
-      gender,
-      address,
       role,
       company,
       createdBy: {
