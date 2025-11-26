@@ -24,6 +24,7 @@ import { CvParserModule } from './cv-parser/cv-parser.module';
 import { QueuesModule } from './queues/queues.module';
 import { CvProfilesModule } from './cv-profiles';
 import { SessionsModule } from './sessions/sessions.module';
+import { StatisticsModule } from './statistics/statistics.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { SessionsModule } from './sessions/sessions.module';
     SubscribersModule,
     MailModule,
     HealthModule,
+    StatisticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
