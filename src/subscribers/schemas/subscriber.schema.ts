@@ -14,6 +14,9 @@ export class Subscriber {
   @Prop({ required: true })
   skills: string[];
 
+  @Prop({ type: String, trim: true })
+  location?: string;
+
   @Prop({ type: Object })
   createdBy?: {
     _id: mongoose.Schema.Types.ObjectId;

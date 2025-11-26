@@ -1,13 +1,15 @@
 import { join } from 'path';
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MailService } from './mail.service';
 import { ConfigService } from '@nestjs/config';
 import { MailController } from './mail.controller';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { MongooseModule } from '@nestjs/mongoose';
-import { Subscriber, SubscriberSchema } from 'src/subscribers/schemas/subscriber.schema';
-import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
+import {
+  Subscriber,
+  SubscriberSchema,
+} from 'src/subscribers/schemas/subscriber.schema';
 
 @Module({
   imports: [
@@ -29,13 +31,15 @@ import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
             strict: true,
           },
         },
-        preview: configService.get<string>('NODE_ENV') === 'development' ? true : false,
+        preview:
+          configService.get<string>('NODE_ENV') === 'development'
+            ? true
+            : false,
       }),
       inject: [ConfigService],
     }),
     MongooseModule.forFeature([
       { name: Subscriber.name, schema: SubscriberSchema },
-      { name: Job.name, schema: JobSchema },
     ]),
   ],
   controllers: [MailController],
@@ -43,3 +47,4 @@ import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
   exports: [MailService],
 })
 export class MailModule {}
+
