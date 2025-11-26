@@ -33,16 +33,7 @@ export class SubscribersController {
     return this.subscribersService.findAll(+page, +limit, query);
   }
 
-  @Get(':id')
-  @SkipCheckPermission()
-  @ApiOperation({
-    summary: 'Fetch subscriber by id',
-    description: 'Retrieves detailed information about a specific subscriber by its ID',
-  })
-  @ResponseMessage('Fetch subscriber by id')
-  findOne(@Param('id') id: string) {
-    return this.subscribersService.findOne(id);
-  }
+
 
   @Patch()
   @ApiOperation({
@@ -77,5 +68,27 @@ export class SubscribersController {
   @SkipCheckPermission()
   getUserSkills(@User() user: IUser) {
     return this.subscribersService.getUserSkills(user);
+  }
+
+  @Get('by-user')
+  @ApiOperation({
+    summary: 'Get my subscriptions',
+    description: 'Retrieves all active subscriptions of the authenticated user.',
+  })
+  @ResponseMessage('Fetch my subscriptions')
+  @SkipCheckPermission()
+  getMySubscriptions(@User() user: IUser) {
+    return this.subscribersService.getMySubscriptions(user);
+  }
+
+  @Get(':id')
+  @SkipCheckPermission()
+  @ApiOperation({
+    summary: 'Fetch subscriber by id',
+    description: 'Retrieves detailed information about a specific subscriber by its ID',
+  })
+  @ResponseMessage('Fetch subscriber by id')
+  findOne(@Param('id') id: string) {
+    return this.subscribersService.findOne(id);
   }
 }

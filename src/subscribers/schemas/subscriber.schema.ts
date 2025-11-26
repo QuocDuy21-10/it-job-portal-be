@@ -8,7 +8,7 @@ export class Subscriber {
   @Prop({ required: true })
   email: string;
 
-  @Prop()
+  @Prop({ required: true })
   name: string;
 
   @Prop({ required: true })

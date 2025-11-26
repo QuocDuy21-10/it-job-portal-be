@@ -73,4 +73,20 @@ export class CreateSubscriberDto {
     description: 'Skills of subscriber (1-20 skills)',
   })
   skills: string[];
+
+  @IsString({ message: 'Location must be a string' })
+  @MaxLength(100, { message: 'Location is too long (max: 100 chars)' })
+  @Transform(({ value }) => {
+    // FIX: Convert về string trước khi trim
+    if (typeof value === 'number') {
+      value = String(value);
+    }
+    return typeof value === 'string' ? value.trim() : value;
+  })
+  @ApiProperty({
+    example: 'Hà Nội',
+    description: 'Preferred location of subscriber',
+    required: false,
+  })
+  location?: string;
 }

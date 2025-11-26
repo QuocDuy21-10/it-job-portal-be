@@ -16,11 +16,15 @@ export class SubscribersService {
   ) {}
 
   async create(createSubscriberDto: CreateSubscriberDto, user: IUser) {
-    const { name, email, skills } = createSubscriberDto;
-    const isExist = await this.subscriberModel.findOne({ email });
-    if (isExist) {
+    const { name, email, skills, location } = createSubscriberDto;
+    const existingSubscriptionsCount = await this.subscriberModel.countDocuments({
+      email,
+      isDeleted: false 
+    });
+
+    if (existingSubscriptionsCount >= 3) {
       throw new BadRequestException(
-        `Email: ${email} đã tồn tại trên hệ thống. Vui lòng sử dụng email khác.`,
+        `Email: ${email} đã đạt giới hạn đăng ký nhận tin (tối đa 3 lần). Vui lòng quản lý các đăng ký cũ trước khi thêm mới.`,
       );
     }
 
@@ -28,6 +32,7 @@ export class SubscribersService {
       name,
       email,
       skills,
+      location,
       createdBy: {
         _id: user._id,
         email: user.email,
@@ -121,6 +126,25 @@ export class SubscribersService {
       },
       { skills: 1, createdAt: 1 },
     );
+  }
+
+  async getMySubscriptions(user: IUser) {
+    const { email } = user;
+    const subscriptions = await this.subscriberModel
+      .find({
+        email,
+        isDeleted: false,
+      })
+      .select('name email skills location createdAt updatedAt')
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    return {
+      subscriptions,
+      total: subscriptions.length,
+      maxAllowed: 3,
+    };
   }
 
   private validateObjectId(id: string): void {
