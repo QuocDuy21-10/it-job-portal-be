@@ -147,19 +147,6 @@ export class AuthController {
     return this.authService.googleLogin(authGoogleLoginDto.idToken, response);
   }
 
-  /**
-   * PRODUCTION PATTERN:
-   * - LUÔN query DB để lấy Fresh Data (name, role, permissions có thể thay đổi)
-   * - Validate user isActive, isDeleted
-   * - 1 query duy nhất với populate tối ưu
-   * - Loại bỏ query thừa (không gọi rolesService.findOne nữa)
-   * 
-   * LUỒNG HOẠT ĐỘNG:
-   * 1. JwtStrategy validate token → req.user = {_id: userId}
-   * 2. Controller nhận userId từ @User() decorator
-   * 3. Gọi usersService.findUserProfile(userId)
-   * 4. Return complete IUser object với permissions mới nhất
-   */
   @Get('/me')
   @ApiOperation({
     summary: 'Get Current User Profile',

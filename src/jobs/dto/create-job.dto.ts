@@ -97,7 +97,7 @@ export class CreateJobDto {
 
   @IsNotEmpty({ message: 'Description is required' })
   @IsString({ message: 'Description must be a string' })
-  @MaxLength(2000, { message: 'Description is too long (max: 2000 chars)' })
+  @MaxLength(5000, { message: 'Description is too long (max: 5000 chars)' })
   @Transform(({ value }) => value?.trim())
   @ApiProperty({
     example: 'We are looking for an experienced backend engineer to join our team...',

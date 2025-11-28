@@ -108,11 +108,13 @@ export class UsersService {
       .exec();
     return {
       result,
-      meta: {
-        current: page,
-        pageSize: limit,
-        pages: totalPages,
-        total: totalItems,
+     meta: {
+        pagination: {
+          current_page: page,
+          per_page: limit,
+          total_pages: totalPages,
+          total: totalItems,
+        },
       },
     };
   }

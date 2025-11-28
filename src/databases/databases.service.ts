@@ -59,9 +59,6 @@ export class DatabasesService implements OnModuleInit {
             password: this.userService.hashPassword(
               this.configService.get<string>('INIT_PASSWORD'),
             ),
-            age: 69,
-            gender: 'male',
-            address: 'VietNam',
             role: adminRole?._id,
           },
 
@@ -71,9 +68,6 @@ export class DatabasesService implements OnModuleInit {
             password: this.userService.hashPassword(
               this.configService.get<string>('INIT_PASSWORD'),
             ),
-            age: 69,
-            gender: 'male',
-            address: 'VietNam',
             role: userRole?._id,
           },
         ]);
