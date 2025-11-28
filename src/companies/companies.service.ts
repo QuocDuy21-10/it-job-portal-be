@@ -54,12 +54,12 @@ export class CompaniesService {
 
     // OPTIMIZED: Batch query for job counts using aggregation
     // Instead of N queries (one per company), use single aggregation query
-    const companyIds = result.map((company) => new mongoose.Types.ObjectId(company._id.toString()));
+    const companyIdStrings = result.map((company) => company._id.toString());
     
     const jobCounts = await this.jobModel.aggregate([
       {
         $match: {
-          'company._id': { $in: companyIds },
+          'company._id': { $in: companyIdStrings },
           isActive: true,
           isDeleted: { $ne: true },
         },
@@ -71,14 +71,13 @@ export class CompaniesService {
         },
       },
     ]);
-
+    
     // Create lookup map for O(1) access
     const jobCountMap = new Map<string, number>();
     jobCounts.forEach((item) => {
-      jobCountMap.set(item._id.toString(), item.totalJobs);
+      jobCountMap.set(item._id, item.totalJobs);
     });
 
-    // Merge job counts with company data
     const resultWithCount = result.map((company) => ({
       ...company.toObject(),
       totalJobs: jobCountMap.get(company._id.toString()) || 0,
