@@ -45,43 +45,57 @@ export class MatchingService {
         `Starting match calculation for job: ${job.name}`,
       );
 
+      // CRITICAL: Validate and normalize inputs to prevent NaN
+      const normalizedCV = this.validateAndNormalizeInputs(parsedCV);
+      const normalizedJob = this.validateJobInputs(job);
+
       // 1. Skills Matching
       const skillsMatchResult = this.calculateSkillsMatch(
-        parsedCV.skills || [],
-        job.skills || [],
+        normalizedCV.skills,
+        normalizedJob.skills,
       );
 
       // 2. Experience Matching
       const experienceScore = this.calculateExperienceScore(
-        parsedCV.yearsOfExperience || 0,
-        job.level,
+        normalizedCV.yearsOfExperience,
+        normalizedJob.level,
       );
 
       // 3. Education Matching (if applicable)
       const educationScore = this.calculateEducationScore(
-        parsedCV.education || [],
-        job.level,
+        normalizedCV.education,
+        normalizedJob.level,
       );
 
-      // 4. Calculate weighted total score
+      // 4. Calculate weighted total score (with NaN protection)
       const totalScore = this.calculateWeightedScore(
         skillsMatchResult.scorePercentage,
         experienceScore,
         educationScore,
       );
 
-      // 5. Determine priority
+      // 5. Validate final score is not NaN
+      if (isNaN(totalScore)) {
+        this.logger.error('NaN detected in final score calculation', {
+          skillsMatchResult,
+          experienceScore,
+          educationScore,
+        });
+        throw new Error('Invalid score calculation resulted in NaN');
+      }
+
+      // 6. Determine priority
       const priority = this.determinePriority(totalScore);
 
-      // 6. Generate strengths and weaknesses
+      // 7. Generate strengths and weaknesses
       const { strengths, weaknesses } = this.generateInsights(
-        parsedCV,
-        job,
+        normalizedCV,
+        normalizedJob,
         skillsMatchResult,
         experienceScore,
       );
 
-      // 7. Generate recommendation
+      // 8. Generate recommendation
       const recommendation = this.generateRecommendation(totalScore);
 
       const result: MatchResultDto = {
@@ -170,16 +184,27 @@ export class MatchingService {
       }
     }
 
-    const scorePercentage =
-      requiredSkills.length > 0
-        ? (totalScore / (requiredSkills.length * 100)) * 100
-        : 0;
+    // FIXED: Tránh division by zero và NaN
+    let scorePercentage = 0;
+    if (requiredSkills.length > 0) {
+      const maxPossibleScore = requiredSkills.length * 100;
+      scorePercentage = (totalScore / maxPossibleScore) * 100;
+      
+      // Safeguard: Ensure valid number
+      if (isNaN(scorePercentage) || !isFinite(scorePercentage)) {
+        this.logger.warn('Invalid scorePercentage calculated, defaulting to 0', {
+          totalScore,
+          requiredSkills: requiredSkills.length,
+        });
+        scorePercentage = 0;
+      }
+    }
 
     return {
       matches,
       matchedCount,
       totalRequired: requiredSkills.length,
-      scorePercentage: Math.round(scorePercentage),
+      scorePercentage: Math.round(Math.max(0, Math.min(100, scorePercentage))),
     };
   }
 
@@ -270,16 +295,33 @@ export class MatchingService {
   /**
    * Calculate weighted total score
    * Formula: (Skills * 0.5) + (Experience * 0.3) + (Education * 0.2)
+   * FIXED: Added NaN protection and validation
    */
   private calculateWeightedScore(
     skillsScore: number,
     experienceScore: number,
     educationScore: number,
   ): number {
+    // Validate inputs are valid numbers
+    const validSkills = this.ensureValidScore(skillsScore, 'skillsScore');
+    const validExperience = this.ensureValidScore(experienceScore, 'experienceScore');
+    const validEducation = this.ensureValidScore(educationScore, 'educationScore');
+
     const totalScore =
-      skillsScore * MATCHING_WEIGHTS.SKILLS +
-      experienceScore * MATCHING_WEIGHTS.EXPERIENCE +
-      educationScore * MATCHING_WEIGHTS.EDUCATION;
+      validSkills * MATCHING_WEIGHTS.SKILLS +
+      validExperience * MATCHING_WEIGHTS.EXPERIENCE +
+      validEducation * MATCHING_WEIGHTS.EDUCATION;
+
+    // Final safeguard
+    if (isNaN(totalScore) || !isFinite(totalScore)) {
+      this.logger.error('NaN or Infinity in weighted score', {
+        validSkills,
+        validExperience,
+        validEducation,
+        totalScore,
+      });
+      return 0; // Default to 0 instead of throwing
+    }
 
     return Math.min(100, Math.max(0, totalScore)); // Clamp to 0-100
   }
@@ -477,5 +519,57 @@ export class MatchingService {
 
     // Default to intermediate if skill is present
     return 'intermediate';
+  }
+
+  // ========== VALIDATION & NORMALIZATION HELPERS ==========
+
+  /**
+   * Validate and normalize CV inputs to prevent NaN
+   * Ensures all required fields have safe default values
+   */
+  private validateAndNormalizeInputs(parsedCV: ParsedDataDto): ParsedDataDto {
+    return {
+      fullName: parsedCV?.fullName || 'Unknown',
+      email: parsedCV?.email || '',
+      phone: parsedCV?.phone || '',
+      skills: Array.isArray(parsedCV?.skills) ? parsedCV.skills.filter(s => s && s.trim()) : [],
+      experience: Array.isArray(parsedCV?.experience) ? parsedCV.experience : [],
+      education: Array.isArray(parsedCV?.education) ? parsedCV.education : [],
+      summary: parsedCV?.summary || '',
+      yearsOfExperience: this.ensureValidNumber(parsedCV?.yearsOfExperience, 0),
+    };
+  }
+
+  /**
+   * Validate job inputs
+   */
+  private validateJobInputs(job: Job): any {
+    return {
+      name: job?.name || 'Unknown Job',
+      skills: Array.isArray(job?.skills) ? job.skills.filter(s => s && s.trim()) : [],
+      level: job?.level || JobLevel.JUNIOR,
+    };
+  }
+
+  /**
+   * Ensure a number is valid, otherwise return default
+   */
+  private ensureValidNumber(value: any, defaultValue: number = 0): number {
+    const num = Number(value);
+    if (isNaN(num) || !isFinite(num)) {
+      return defaultValue;
+    }
+    return Math.max(0, num); // Không cho phép số âm
+  }
+
+  /**
+   * Ensure a score is valid (0-100 range)
+   */
+  private ensureValidScore(score: number, fieldName: string): number {
+    if (isNaN(score) || !isFinite(score)) {
+      this.logger.warn(`Invalid ${fieldName}: ${score}, defaulting to 0`);
+      return 0;
+    }
+    return Math.min(100, Math.max(0, score));
   }
 }
