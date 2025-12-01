@@ -5,7 +5,7 @@ import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { Permission, PermissionDocument } from 'src/permissions/schemas/permission.schema';
 import { Role, RoleDocument } from 'src/roles/schemas/role.schema';
 import { User, UserDocument } from 'src/users/schemas/user.schema';
-import { ADMIN_ROLE, INIT_PERMISSIONS, USER_ROLE } from './sample';
+import { ADMIN_ROLE, HR_ROLE, INIT_PERMISSIONS, USER_ROLE } from './sample';
 import { UsersService } from 'src/users/users.service';
 
 @Injectable()
@@ -45,6 +45,12 @@ export class DatabasesService implements OnModuleInit {
             description: 'Users/Candidates using the system',
             isActive: true,
             permissions: [], //không set quyền, chỉ cần add ROLE
+          },
+          {
+            name: HR_ROLE,
+            description: 'HR role for managing job postings and applicants',
+            isActive: true,
+            permissions: [], 
           },
         ]);
       }

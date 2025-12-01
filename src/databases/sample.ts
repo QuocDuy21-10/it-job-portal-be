@@ -1,5 +1,6 @@
 export const ADMIN_ROLE = 'SUPER ADMIN';
 export const USER_ROLE = 'NORMAL USER';
+export const HR_ROLE = 'HR';
 
 export const INIT_PERMISSIONS = [
   {
@@ -599,4 +600,21 @@ export const INIT_PERMISSIONS = [
     updatedAt: '2025-08-15T07:05:45.472Z',
     __v: 0,
   },
+
+  {
+    _id: "692d5553964d1f6be0c490aa",
+    name: "Get dashboard statistics",
+    apiPath: "/api/v1/statistics/dashboard",
+    method: "GET",
+    module: "STATISTICS",
+    createdBy: {
+      _id: "647b5108a8a243e8191855b5",
+      email: "admin@gmail.com",
+    },
+    isDeleted: false,
+    deletedAt: null,
+    createdAt: "2025-08-20T10:00:00.000Z",
+    updatedAt: "2025-08-20T10:00:00.000Z",
+    __v: 0,
+  }
 ];

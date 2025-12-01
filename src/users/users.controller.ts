@@ -66,8 +66,6 @@ export class UsersController {
     return this.usersService.findAll(+page, +limit, query);
   }
 
-
-
   @Patch(':id')
   @ApiOperation({
     summary: 'Update information of a user by ID',
@@ -79,6 +77,9 @@ export class UsersController {
     return this.usersService.update(id, updateUserDto, user);
   }
 
+  // ==================== SAVED JOBS ENDPOINTS ====================
+
+  @SkipCheckPermission()
   @Post('save-job')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -106,6 +107,7 @@ export class UsersController {
     return { message: 'Job unsaved successfully' };
   }
 
+  @SkipCheckPermission()
   @Get('saved-jobs')
   @ApiOperation({
     summary: 'Get user\'s saved jobs',
@@ -135,7 +137,7 @@ export class UsersController {
   }
 
   // ==================== FOLLOW COMPANY ENDPOINTS ====================
-
+  @SkipCheckPermission()
   @Post('follow-company')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -149,6 +151,7 @@ export class UsersController {
     return { message: 'Company followed successfully' };
   }
 
+  @SkipCheckPermission()
   @Delete('follow-company')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -162,6 +165,7 @@ export class UsersController {
     return { message: 'Company unfollowed successfully' };
   }
 
+  @SkipCheckPermission()
   @Get('following-companies')
   @ApiOperation({
     summary: 'Get user\'s following companies',

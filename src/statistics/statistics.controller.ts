@@ -11,7 +11,7 @@ export class StatisticsController {
   constructor(private readonly statisticsService: StatisticsService) {}
 
   @Get('dashboard')
-  @SkipCheckPermission()    
+  // @SkipCheckPermission()    
   @ApiOperation({
     summary: 'Get dashboard statistics',
     description:
@@ -31,7 +31,7 @@ export class StatisticsController {
   }
 
   @Get('dashboard/refresh')
-  @SkipCheckPermission()
+  // @SkipCheckPermission()
   @ApiOperation({
     summary: 'Clear dashboard cache',
     description:

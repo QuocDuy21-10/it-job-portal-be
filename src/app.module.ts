@@ -25,6 +25,7 @@ import { QueuesModule } from './queues/queues.module';
 import { CvProfilesModule } from './cv-profiles';
 import { SessionsModule } from './sessions/sessions.module';
 import { StatisticsModule } from './statistics/statistics.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -32,8 +33,8 @@ import { StatisticsModule } from './statistics/statistics.module';
     ThrottlerModule.forRoot({
       throttlers: [
         {
-          ttl: 60000,
-          limit: 10,
+          ttl: 60000, // 60 seconds
+          limit: 10,  // 10 requests per ttl for general endpoints
         },
       ],
     }),
@@ -56,6 +57,7 @@ import { StatisticsModule } from './statistics/statistics.module';
     GeminiModule,
     CvParserModule,
     SessionsModule,
+    ChatModule,
     UsersModule,
     AuthModule,
     CompaniesModule,

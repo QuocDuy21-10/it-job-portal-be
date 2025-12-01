@@ -10,6 +10,10 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,111 +23,127 @@ import {
   ApiBody,
   ApiParam,
   ApiQuery,
+  ApiConsumes,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import * as path from 'path';
+import * as fs from 'fs';
 import { CvProfilesService } from './cv-profiles.service';
 import { CreateCvProfileDto } from './dto/create-cv-profile.dto';
-import { UpdateCvProfileDto } from './dto/update-cv-profile.dto';
 import { SkipCheckPermission, User } from '../decorator/customize';
 import { IUser } from '../users/users.interface';
 import { JwtAuthGuard } from 'src/auth/guards';
+import { FilesService } from '../files/files.service';
+import { UpsertCvProfileDto } from './dto/upsert-cv-profile.dto';
 
 @ApiTags('CV Profiles')
 @SkipCheckPermission()
 @Controller('cv-profiles')
 @UseGuards(JwtAuthGuard)
 export class CvProfilesController {
-  constructor(private readonly cvProfilesService: CvProfilesService) {}
+  constructor(
+    private readonly cvProfilesService: CvProfilesService,
+    private readonly filesService: FilesService,
+  ) {}
 
   /**
    * POST /cv-profiles/upsert
-   * Upsert CV Profile for current user
+   * Upsert CV Profile for current user with optional avatar upload
    * If exists -> update, else -> create
    */
   @Post('upsert')
   @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileInterceptor('avatar', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const uploadPath = path.join(process.cwd(), 'public', 'images', 'avatar');
+          // Ensure directory exists
+          if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+          }
+          cb(null, uploadPath);
+        },
+        filename: (req, file, cb) => {
+          const extName = path.extname(file.originalname);
+          const baseName = path.basename(file.originalname, extName);
+          const finalName = `${baseName}-${Date.now()}${extName}`;
+          cb(null, finalName);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        if (!allowedMimeTypes.includes(file.mimetype)) {
+          cb(
+            new BadRequestException(
+              'Only image files (JPEG, PNG, GIF, WEBP) are allowed for avatar',
+            ),
+            false,
+          );
+        } else {
+          cb(null, true);
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5 MB
+      },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Create or Update CV Profile',
+    summary: 'Create or Update CV Profile with Avatar Upload',
     description:
-      'Smart upsert operation. If CV exists, it will be updated. If not, a new CV will be created. This is the recommended endpoint for saving CV data.',
+      'Smart upsert operation with optional avatar file upload. Supports multipart/form-data. ' +
+      'Send CV data as JSON string in "cvData" field and optional avatar file in "avatar" field. ' +
+      'If CV exists, it will be updated. If not, a new CV will be created.',
   })
-  @ApiBody({
-    type: CreateCvProfileDto,
-    description: 'CV Profile data matching CVData interface structure',
-    examples: {
-      'Complete CV': {
-        value: {
-          personalInfo: {
-            fullName: 'Nguyễn Văn A',
-            phone: '0123456789',
-            email: 'nguyenvana@example.com',
-            birthday: '1995-05-15',
-            gender: 'Nam',
-            address: '123 Đường ABC, Quận 1, TPHCM',
-            personalLink: 'https://linkedin.com/in/nguyenvana',
-            bio: 'Experienced Full Stack Developer with 5+ years of experience',
-          },
-          education: [
-            {
-              id: 'edu-1',
-              school: 'Đại học Bách Khoa TPHCM',
-              degree: 'Bachelor of Engineering',
-              field: 'Computer Science',
-              startDate: '2013-09-01',
-              endDate: '2017-06-30',
-              description: 'GPA: 3.8/4.0 - Graduated with honors',
+@ApiBody({
+    schema: {
+      type: 'object',
+      required: ['cvData'],
+      properties: {
+        avatar: {
+          type: 'string',
+          format: 'binary',
+          description: 'Avatar image file (JPEG, PNG, GIF). Max 5MB.',
+        },
+        cvData: {
+          type: 'string',
+          description: 'CV Profile data as JSON string',
+          example: JSON.stringify({
+            personalInfo: {
+              fullName: 'Nguyễn Văn A',
+              title: 'Senior Full Stack Developer',
+              phone: '0123456789',
+              email: 'nguyenvana@example.com',
+              birthday: '1995-05-15',
+              gender: 'Nam',
+              address: '123 Đường ABC, Quận 1, TPHCM',
+              personalLink: 'https://linkedin.com/in/nguyenvana',
+              bio: 'Experienced developer with 5+ years',
             },
-          ],
-          experience: [
-            {
-              id: 'exp-1',
-              company: 'Tech Corp Vietnam',
-              position: 'Senior Backend Developer',
-              startDate: '2020-01-01',
-              endDate: '2023-12-31',
-              description:
-                'Developed and maintained microservices using NestJS, MongoDB, and Redis',
-            },
-          ],
-          skills: [
-            { id: 'skill-1', name: 'NestJS', level: 'Advanced' },
-            { id: 'skill-2', name: 'MongoDB', level: 'Intermediate' },
-            { id: 'skill-3', name: 'TypeScript', level: 'Advanced' },
-          ],
-          languages: [
-            { id: 'lang-1', name: 'Vietnamese', proficiency: 'Native' },
-            { id: 'lang-2', name: 'English', proficiency: 'Fluent' },
-          ],
-          projects: [
-            {
-              id: 'proj-1',
-              name: 'E-commerce Platform',
-              description: 'Full-stack e-commerce solution with payment integration',
-              link: 'https://github.com/user/ecommerce',
-            },
-          ],
-          certificates: [
-            {
-              id: 'cert-1',
-              name: 'AWS Certified Developer',
-              issuer: 'Amazon Web Services',
-              date: '2022-06-15',
-            },
-          ],
-          awards: [
-            {
-              id: 'award-1',
-              name: 'Best Developer of the Year',
-              date: '2023-12-01',
-              description: 'Awarded for outstanding performance and innovation',
-            },
-          ],
+            skills: [
+              { id: 'skill-1', name: 'NestJS', level: 'Advanced' },
+            ],
+            experience: [
+              {
+                id: 'exp-1',
+                company: 'Tech Corp',
+                position: 'Backend Developer',
+                startDate: '2020-01-01',
+                endDate: '2023-12-31',
+                description: 'Developed microservices',
+              },
+            ],
+          }),
         },
       },
     },
   })
   @ApiResponse({
     status: 200,
-    description: 'CV Profile saved successfully',
+    description: 'CV Profile saved successfully with avatar URL',
     schema: {
       example: {
         statusCode: 200,
@@ -133,42 +153,21 @@ export class CvProfilesController {
           userId: '507f1f77bcf86cd799439012',
           personalInfo: {
             fullName: 'Nguyễn Văn A',
+            title: 'Senior Full Stack Developer',
             phone: '0123456789',
             email: 'nguyenvana@example.com',
-            birthday: '1995-05-15',
-            gender: 'Nam',
-            address: '123 Đường ABC, Quận 1, TPHCM',
-            personalLink: 'https://linkedin.com/in/nguyenvana',
-            bio: 'Experienced Full Stack Developer',
+            avatar: 'http://localhost:8000/images/avatar/profile-1234567890.jpg',
           },
-          education: [],
-          experience: [],
           skills: [],
-          languages: [],
-          projects: [],
-          certificates: [],
-          awards: [],
+          experience: [],
           isActive: true,
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          lastUpdated: '2024-01-01T00:00:00.000Z',
         },
       },
     },
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Validation failed',
-    schema: {
-      example: {
-        statusCode: 400,
-        message: [
-          'personalInfo.fullName should not be empty',
-          'personalInfo.email must be an email',
-        ],
-        error: 'Bad Request',
-      },
-    },
+    description: 'Bad Request - Invalid file type or validation failed',
   })
   @ApiResponse({
     status: 401,
@@ -176,15 +175,33 @@ export class CvProfilesController {
   })
   async upsertCvProfile(
     @User() user: IUser,
-    @Body() createCvProfileDto: CreateCvProfileDto,
+     @Body('cvData') cvDataString: string,
+    @UploadedFile() avatarFile?: Express.Multer.File,
   ) {
+    // Parse CV data from JSON string
+    let cvData: UpsertCvProfileDto;
+    try {
+      cvData = JSON.parse(cvDataString);
+    } catch (error) {
+      throw new BadRequestException('Invalid JSON format for cvData field');
+    }
+
+    // Process avatar upload if provided
+    if (avatarFile) {
+      const avatarUrl = this.filesService.processAvatarUpload(avatarFile);
+      cvData.personalInfo = {
+        ...cvData.personalInfo,
+        avatar: avatarUrl,
+      };
+    }
+
+    // Upsert CV profile
     const cvProfile = await this.cvProfilesService.upsertCvProfile(
       user._id,
-      createCvProfileDto,
+      cvData,
     );
 
     return {
-      statusCode: HttpStatus.OK,
       message: 'CV Profile saved successfully',
       data: cvProfile,
     };
@@ -241,7 +258,6 @@ export class CvProfilesController {
     const cvProfile = await this.cvProfilesService.getCurrentUserCv(user._id);
 
     return {
-      statusCode: HttpStatus.OK, // Luôn trả về 200
       message: cvProfile 
         ? 'CV Profile retrieved successfully' 
         : 'User does not have a CV Profile yet', 

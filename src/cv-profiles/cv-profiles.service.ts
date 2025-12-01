@@ -9,12 +9,14 @@ import { Model, Types } from 'mongoose';
 import { CvProfile, CvProfileDocument } from './schemas/cv-profile.schema';
 import { CreateCvProfileDto } from './dto/create-cv-profile.dto';
 import { UpdateCvProfileDto } from './dto/update-cv-profile.dto';
+import { FilesService } from '../files/files.service';
 
 @Injectable()
 export class CvProfilesService {
   constructor(
     @InjectModel(CvProfile.name)
     private cvProfileModel: Model<CvProfileDocument>,
+    private readonly filesService: FilesService,
   ) {}
 
   /**
@@ -104,8 +106,34 @@ export class CvProfilesService {
    * Throws error if not found
    */
   async getCurrentUserCv(userId: string): Promise<CvProfile> {
-  const cvProfile = await this.findByUserId(userId);
-  return cvProfile;
+    const cvProfile = await this.findByUserId(userId);
+    
+    if (cvProfile) {
+      return this.transformCvProfileUrls(cvProfile);
+    }
+    
+    return cvProfile;
+  }
+
+  /**
+   * Transform CV Profile avatar path to full URL
+   * @param cvProfile - CV Profile document
+   * @returns CV Profile with full avatar URL
+   */
+  private transformCvProfileUrls(cvProfile: CvProfile): any {
+    if (!cvProfile) {
+      return cvProfile;
+    }
+
+    const cvObject = (cvProfile as any).toObject ? (cvProfile as any).toObject() : { ...cvProfile };
+
+    // Transform avatar URL if exists and is not already a full URL
+    if (cvObject.personalInfo?.avatar && !cvObject.personalInfo.avatar.startsWith('http')) {
+      const fileName = cvObject.personalInfo.avatar.split('/').pop();
+      cvObject.personalInfo.avatar = this.filesService.buildFileUrl('avatar', fileName);
+    }
+
+    return cvObject;
   }
 
   /**

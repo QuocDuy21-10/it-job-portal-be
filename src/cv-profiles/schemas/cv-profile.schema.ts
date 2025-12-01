@@ -12,6 +12,12 @@ export class PersonalInfo {
   @Prop({ required: true })
   fullName: string;
 
+  @Prop()
+  title: string;
+
+  @Prop()
+  avatar: string;
+
   @Prop({ required: true })
   phone: string;
 

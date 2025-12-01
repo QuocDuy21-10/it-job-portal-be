@@ -24,6 +24,7 @@ export class SubscribersController {
   }
 
   @Get()
+  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Fetch subscribers with paginate',
     description: 'Retrieves a paginated list of all subscribers. Supports filtering and sorting.',
@@ -36,6 +37,7 @@ export class SubscribersController {
 
 
   @Patch()
+  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Update a subscriber',
     description:
@@ -48,6 +50,7 @@ export class SubscribersController {
   }
 
   @Delete(':id')
+  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Delete a subscriber',
     description:
@@ -60,6 +63,7 @@ export class SubscribersController {
   }
 
   @Post('skills')
+  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Get subscriber skills by email',
     description: 'Retrieves the skills associated with the authenticated subscriber.',
@@ -71,6 +75,7 @@ export class SubscribersController {
   }
 
   @Get('by-user')
+  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Get my subscriptions',
     description: 'Retrieves all active subscriptions of the authenticated user.',

@@ -1,6 +1,7 @@
 export enum PermissionModule {
   USER = 'USERS',
   ROLE = 'ROLES',
+  STATISTIC = 'STATISTICS',
   PERMISSION = 'PERMISSIONS',
   COMPANY = 'COMPANIES',
   JOB = 'JOBS',

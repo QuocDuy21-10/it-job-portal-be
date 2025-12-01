@@ -16,6 +16,27 @@ export class PersonalInfoDto {
   @MaxLength(100)
   fullName: string;
 
+
+  @ApiPropertyOptional({
+    description: 'Job title or professional headline',
+    example: 'Senior Full Stack Developer',
+    maxLength: 100,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  title?: string;
+
+  // @ApiPropertyOptional({
+  //   description: 'Avatar URL (auto-generated from uploaded file)',
+  //   example: 'http://localhost:8000/images/avatar/profile-1234567890.jpg',
+  //   maxLength: 500,
+  // })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  avatar?: string;
+
   @ApiProperty({
     description: 'Phone number',
     example: '0123456789',
@@ -24,6 +45,8 @@ export class PersonalInfoDto {
   @IsString()
   @MaxLength(20)
   phone: string;
+
+
 
   @ApiProperty({
     description: 'Email address',

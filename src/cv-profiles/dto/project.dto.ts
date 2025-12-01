@@ -32,6 +32,15 @@ export class ProjectDto {
   @MaxLength(1000)
   description?: string;
 
+  @ApiProperty({
+    description: 'Position held in the project',
+    example: 'Lead Developer',
+    maxLength: 100,
+  })
+  @IsString()
+  @MaxLength(100)
+  position: string;
+
   @ApiPropertyOptional({
     description: 'Project link (GitHub, demo, etc.)',
     example: 'https://github.com/username/ecommerce',
