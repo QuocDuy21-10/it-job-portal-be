@@ -107,6 +107,40 @@ export class JobsService {
       { ...updateJobDto, updatedBy: { _id: user._id, email: user.email } },
     );
   }
+  /**
+   * Find matching jobs based on user skills
+   * Used by ChatService to suggest relevant jobs
+   * @param skills - Array of skill names from user's CV profile
+   * @param limit - Maximum number of jobs to return (default: 3)
+   * @returns Array of matching jobs
+   */
+  async findMatchingJobs(skills: string[], limit: number = 3): Promise<Job[]> {
+    if (!skills || skills.length === 0) {
+      return [];
+    }
+
+    // Create case-insensitive regex for each skill
+    const skillRegexes = skills.map((skill) => new RegExp(skill, 'i'));
+
+    return await this.jobModel
+      .find({
+        isActive: true,
+        isDeleted: false,
+        // Find jobs that have at least one matching skill
+        skills: { $in: skillRegexes },
+        // Filter out expired jobs
+        $or: [
+          { endDate: { $gte: new Date() } },
+          { endDate: null },
+        ],
+      })
+      .select('name company location skills level') // Select only necessary fields to reduce token usage
+      .populate('company', 'name') // Populate company name
+      .sort({ createdAt: -1 }) // Prioritize newest jobs
+      .limit(limit)
+      .lean()
+      .exec();
+  }
 
   async remove(id: string, user: IUser) {
     this.validateObjectId(id);

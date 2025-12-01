@@ -238,4 +238,163 @@ public isRateLimitError(error: any): boolean {
   estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);
   }
+
+  /**
+   * Chat with context - AI Career Advisor with Guardrails
+   * @param message - User message
+   * @param conversationHistory - Previous messages in conversation
+   * @param systemPrompt - System instruction with context and guardrails (can be string or object for backward compatibility)
+   * @returns AI response
+   */
+  async chatWithContext(
+    message: string,
+    conversationHistory: Array<{ role: string; content: string }>,
+    systemPrompt: string | any,
+  ): Promise<string> {
+    try {
+      // Handle both string prompt (new) and object context (old) for backward compatibility
+      let finalSystemInstruction = '';
+      
+      if (typeof systemPrompt === 'string') {
+        finalSystemInstruction = systemPrompt;
+      } else {
+        // Fallback for old code that passes object context
+        finalSystemInstruction = this.buildCareerAdvisorPrompt(systemPrompt);
+      }
+
+      // Build conversation with system instruction as first exchange
+      const contents = [
+        {
+          role: 'user',
+          parts: [{ text: finalSystemInstruction }],
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'Đã nhận thông tin ngữ cảnh. Tôi sẵn sàng hỗ trợ bạn về các vấn đề liên quan đến việc làm và phát triển sự nghiệp trong lĩnh vực IT.' }],
+        },
+      ];
+
+      // Add conversation history (limit to last 10 messages for token efficiency)
+      const recentHistory = conversationHistory.slice(-10);
+      for (const msg of recentHistory) {
+        contents.push({
+          role: msg.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: msg.content }],
+        });
+      }
+
+      // Add new user message
+      contents.push({
+        role: 'user',
+        parts: [{ text: message }],
+      });
+
+      // Make request with rate limiting
+      const result = await this.makeRequestWithRetry(async () => {
+        return await this.model.generateContent({
+          contents,
+          generationConfig: {
+            temperature: 0.7, // Creative but controlled
+            topP: 0.9,
+            topK: 40,
+            maxOutputTokens: 2000, // Increased for detailed job recommendations
+          },
+        });
+      });
+
+      const response = result.response.text();
+      this.logger.log('AI chat response generated successfully');
+      
+      return response;
+    } catch (error) {
+      this.logger.error('Error in chatWithContext:', error);
+      throw new Error(`AI chat failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Build system prompt for AI Career Advisor
+   */
+  private buildCareerAdvisorPrompt(userContext: any): string {
+    const hasCV = !!userContext.cvProfile;
+    const skills = hasCV
+      ? userContext.cvProfile.skills?.map((s: any) => s.name || s).join(', ')
+      : 'Unknown';
+    const experience = hasCV ? userContext.cvProfile.experience?.length || 0 : 0;
+    const yearsOfExp = hasCV ? userContext.cvProfile.yearsOfExperience || 0 : 0;
+    const savedJobsCount = userContext.savedJobs?.length || 0;
+    const appliedJobsCount = userContext.appliedJobs?.length || 0;
+
+    return `You are an AI Career Advisor for an IT job portal in Vietnam.
+
+USER CONTEXT:
+- Name: ${userContext.user?.name || 'User'}
+- Has CV Profile: ${hasCV ? 'Yes' : 'No'}
+- Skills: ${skills}
+- Work Experience: ${experience} positions (${yearsOfExp} years)
+- Saved Jobs: ${savedJobsCount}
+- Applied Jobs: ${appliedJobsCount}
+
+YOUR CAPABILITIES:
+1. Answer questions about job market, career development, and IT skills
+2. Provide CV improvement suggestions based on user profile
+3. Recommend skills to learn for career advancement
+4. Give interview preparation tips
+5. Provide salary insights and negotiation advice
+6. Suggest relevant job positions based on user's experience
+
+RESPONSE RULES:
+- Be friendly, professional, and encouraging
+- Provide actionable, specific advice
+- Use Vietnamese when user speaks Vietnamese, English when user speaks English
+- Keep responses concise (under 300 words)
+- Use bullet points for lists
+- If you don't have enough information, politely ask for clarification
+- Never make up job listings or specific company information
+- End with a helpful follow-up question or suggestion
+
+RESPONSE FORMAT:
+- Start with a brief acknowledgment
+- Provide main advice/answer
+- Use bullet points for multiple items
+- End with next steps or a question
+
+Remember: You are helping Vietnamese IT professionals advance their careers.`;
+  }
+
+  /**
+   * Summarize conversation history (for future use when history gets too long)
+   */
+  async summarizeConversation(
+    messages: Array<{ role: string; content: string }>,
+  ): Promise<string> {
+    try {
+      const conversationText = messages
+        .map((m) => `${m.role}: ${m.content}`)
+        .join('\n\n');
+
+      const prompt = `Summarize this conversation in 2-3 sentences, focusing on key topics discussed and user's main concerns:
+
+${conversationText}
+
+Summary:`;
+
+      const result = await this.makeRequestWithRetry(async () => {
+        return await this.model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.3,
+            topP: 1,
+            topK: 50,
+            maxOutputTokens: 200,
+          },
+        });
+      });
+
+      return result.response.text();
+    } catch (error) {
+      this.logger.error('Error summarizing conversation:', error);
+      return 'Previous conversation context';
+    }
+  }
 }
