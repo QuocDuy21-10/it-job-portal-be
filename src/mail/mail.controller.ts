@@ -5,10 +5,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
-import {
-  Subscriber,
-  SubscriberDocument,
-} from 'src/subscribers/schemas/subscriber.schema';
+import { Subscriber, SubscriberDocument } from 'src/subscribers/schemas/subscriber.schema';
 import { JobRecommendationQueueService } from 'src/queues/services/job-recommendation-queue.service';
 
 @ApiTags('Mail')
@@ -27,14 +24,12 @@ export class MailController {
   @Public()
   @ApiOperation({
     summary: 'Trigger job recommendations manually',
-    description:
-      'Manually trigger job recommendation emails for all subscribers. Use for testing.',
+    description: 'Manually trigger job recommendation emails for all subscribers. Use for testing.',
   })
   @ResponseMessage('Job recommendation task queued successfully')
   async triggerJobRecommendations() {
     await this.queueJobRecommendations();
-    const metrics =
-      await this.jobRecommendationQueueService.getQueueMetrics();
+    const metrics = await this.jobRecommendationQueueService.getQueueMetrics();
     return {
       message: 'Job recommendation tasks queued successfully',
       metrics,
@@ -99,10 +94,7 @@ export class MailController {
 
       this.logger.log('All subscribers queued for job recommendations');
     } catch (error) {
-      this.logger.error(
-        `Failed to queue job recommendations: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Failed to queue job recommendations: ${error.message}`, error.stack);
       throw error;
     }
   }

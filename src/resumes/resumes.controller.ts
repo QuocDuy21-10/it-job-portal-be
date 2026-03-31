@@ -1,4 +1,18 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Res, Query, UseInterceptors, UploadedFile, BadRequestException, Inject } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Res,
+  Query,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+  Inject,
+} from '@nestjs/common';
 import { ResumesService } from './resumes.service';
 import { CreateResumeDto, CreateUserCvDto } from './dto/create-resume.dto';
 import { UpdateResumeDto } from './dto/update-resume.dto';
@@ -107,14 +121,26 @@ export class ResumesController {
   @SkipCheckPermission()
   @ApiOperation({
     summary: 'Submit CV Online - Apply using structured CV profile',
-    description: 'Apply for a job using your pre-created structured CV profile. The system will automatically calculate match score and create application.',
+    description:
+      'Apply for a job using your pre-created structured CV profile. The system will automatically calculate match score and create application.',
   })
   @ResponseMessage('CV submitted successfully')
-  async submitCvOnline(
-    @Body() submitCvOnlineDto: SubmitCvOnlineDto,
-    @User() user: IUser,
-  ) {
-    return this.resumesService.submitCvOnline(submitCvOnlineDto, user);
+  async submitCvOnline(@Body() submitCvOnlineDto: SubmitCvOnlineDto, @User() user: IUser) {
+    const result = await this.resumesService.submitCvOnline(submitCvOnlineDto, user);
+
+    // Notify HR about the new application (fire-and-forget)
+    this.resumesService
+      .notifyHrNewApplication(
+        result._id.toString(),
+        result.jobName,
+        result.companyName,
+        (result as any).jobId?.toString(),
+        user.name,
+        user.email,
+      )
+      .catch(() => {});
+
+    return result;
   }
 
   // ========== NEW: CV PARSER & AI MATCHING ENDPOINTS ==========
@@ -142,7 +168,12 @@ export class ResumesController {
         const allowedFileTypes = ['pdf', 'doc', 'docx', 'txt'];
         const fileExtension = file.originalname.split('.').pop().toLowerCase();
         if (!allowedFileTypes.includes(fileExtension)) {
-          cb(new BadRequestException(`Invalid file type: ${fileExtension}. Only PDF, DOC, DOCX, and TXT are allowed.`), false);
+          cb(
+            new BadRequestException(
+              `Invalid file type: ${fileExtension}. Only PDF, DOC, DOCX, and TXT are allowed.`,
+            ),
+            false,
+          );
         } else {
           cb(null, true);
         }
@@ -193,11 +224,7 @@ export class ResumesController {
     );
 
     // Step 4: Create resume record
-    const resume = await this.resumeProcessingService.createResume(
-      file,
-      uploadCvDto.jobId,
-      user,
-    );
+    const resume = await this.resumeProcessingService.createResume(file, uploadCvDto.jobId, user);
 
     // Step 5: Get full file path
     const fullFilePath = this.resumeProcessingService.getFullFilePath(resume.url);
@@ -213,7 +240,7 @@ export class ResumesController {
     const parseJob = await this.resumeQueueService.addParseResumeJob({
       resumeId: resume._id.toString(),
       filePath: fullFilePath,
-      jobId: uploadCvDto.jobId, 
+      jobId: uploadCvDto.jobId,
     });
 
     // Step 7: Queue analysis job (will wait for parsing to complete)
@@ -222,7 +249,7 @@ export class ResumesController {
       jobId: uploadCvDto.jobId,
     });
 
-    return {
+    const result = {
       _id: resume._id,
       jobId: uploadCvDto.jobId,
       jobName: job.name,
@@ -233,9 +260,24 @@ export class ResumesController {
         analysisJobId: analysisJob.id,
       },
       file: this.resumeProcessingService.getFileMetadata(file),
-      message: 'Your CV has been uploaded and is being processed. You will be notified when analysis is complete.',
+      message:
+        'Your CV has been uploaded and is being processed. You will be notified when analysis is complete.',
       estimatedTime: '30-60 seconds',
     };
+
+    // Notify HR about the new application (fire-and-forget)
+    this.resumesService
+      .notifyHrNewApplication(
+        resume._id.toString(),
+        job.name,
+        job.company.name,
+        job.company._id?.toString(),
+        user.name,
+        user.email,
+      )
+      .catch(() => {});
+
+    return result;
   }
 
   @Get(':id/analysis')

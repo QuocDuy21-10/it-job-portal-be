@@ -39,7 +39,7 @@ export class ResumeProcessingService {
 
     if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException(
-        `Invalid file type: ${file.mimetype}. Only PDF, DOC, DOCX, and TXT are allowed.`
+        `Invalid file type: ${file.mimetype}. Only PDF, DOC, DOCX, and TXT are allowed.`,
       );
     }
 
@@ -47,11 +47,13 @@ export class ResumeProcessingService {
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
       throw new BadRequestException(
-        `File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Maximum size is 5MB.`
+        `File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Maximum size is 5MB.`,
       );
     }
 
-    this.logger.log(`File validated: ${file.filename} (${file.mimetype}, ${(file.size / 1024).toFixed(2)}KB)`);
+    this.logger.log(
+      `File validated: ${file.filename} (${file.mimetype}, ${(file.size / 1024).toFixed(2)}KB)`,
+    );
   }
 
   /**
@@ -89,7 +91,7 @@ export class ResumeProcessingService {
 
     if (existingResume) {
       throw new BadRequestException(
-        'You have already applied to this job. Duplicate applications are not allowed.'
+        'You have already applied to this job. Duplicate applications are not allowed.',
       );
     }
 
@@ -137,20 +139,20 @@ export class ResumeProcessingService {
   getFullFilePath(relativeUrl: string): string {
     const path = require('path');
     const fs = require('fs');
-    
+
     // Remove 'images/resumes/' prefix if it exists since we'll add 'public' prefix
     const cleanPath = relativeUrl.replace(/^images\/resumes\//, '');
-    
+
     // Build full path
     const fullPath = path.join(process.cwd(), 'public', 'images', 'resumes', cleanPath);
-    
+
     this.logger.log(`Resolved file path: ${relativeUrl} -> ${fullPath}`);
-    
+
     // Verify path exists
     if (!fs.existsSync(fullPath)) {
       this.logger.warn(`File does not exist at: ${fullPath}`);
     }
-    
+
     return fullPath;
   }
 
@@ -180,7 +182,7 @@ export class ResumeProcessingService {
 
     if (!resume.isParsed) {
       throw new BadRequestException(
-        'Resume must be parsed before analysis. Please wait for parsing to complete.'
+        'Resume must be parsed before analysis. Please wait for parsing to complete.',
       );
     }
 

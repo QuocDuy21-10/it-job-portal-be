@@ -26,6 +26,7 @@ import { CvProfilesModule } from './cv-profiles';
 import { SessionsModule } from './sessions/sessions.module';
 import { StatisticsModule } from './statistics/statistics.module';
 import { ChatModule } from './chat/chat.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -34,7 +35,7 @@ import { ChatModule } from './chat/chat.module';
       throttlers: [
         {
           ttl: 60000, // 60 seconds
-          limit: 10,  // 10 requests per ttl for general endpoints
+          limit: 10, // 10 requests per ttl for general endpoints
         },
       ],
     }),
@@ -58,6 +59,7 @@ import { ChatModule } from './chat/chat.module';
     CvParserModule,
     SessionsModule,
     ChatModule,
+    NotificationsModule,
     UsersModule,
     AuthModule,
     CompaniesModule,

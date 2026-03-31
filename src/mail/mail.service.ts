@@ -10,6 +10,15 @@ export interface NewJobNotificationData {
   jobId: string;
 }
 
+export interface ApplicationStatusUpdateData {
+  userName: string;
+  userEmail: string;
+  jobName: string;
+  companyName: string;
+  newStatus: string;
+  resumeId: string;
+}
+
 @Injectable()
 export class MailService {
   constructor(
@@ -20,9 +29,7 @@ export class MailService {
   /**
    * Send new job notification to company follower
    */
-  async sendNewJobNotificationToFollower(
-    data: NewJobNotificationData,
-  ): Promise<void> {
+  async sendNewJobNotificationToFollower(data: NewJobNotificationData): Promise<void> {
     const { userName, userEmail, jobName, companyName, jobId } = data;
 
     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
@@ -37,6 +44,42 @@ export class MailService {
         jobName,
         companyName,
         jobDetailUrl,
+        currentYear: new Date().getFullYear(),
+      },
+    });
+  }
+
+  /**
+   * Send application status update email to candidate
+   */
+  async sendApplicationStatusUpdate(data: ApplicationStatusUpdateData): Promise<void> {
+    const { userName, userEmail, jobName, companyName, newStatus, resumeId } = data;
+
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const applicationUrl = `${frontendUrl}/my-applications/${resumeId}`;
+
+    const statusMessages: Record<string, string> = {
+      REVIEWING:
+        'Your application is currently being reviewed by the hiring team. Please be patient.',
+      INTERVIEWING:
+        'Congratulations! You have been shortlisted for an interview. The company will reach out to you with further details soon.',
+      APPROVED:
+        'Congratulations! Your application has been accepted. The company will contact you with the next steps.',
+      REJECTED:
+        "We regret to inform you that your application was not selected for this position. Don't give up — keep exploring other opportunities!",
+    };
+
+    await this.mailerService.sendMail({
+      to: userEmail,
+      subject: `Application Update: ${jobName} at ${companyName}`,
+      template: 'application-status-update',
+      context: {
+        userName,
+        jobName,
+        companyName,
+        newStatus,
+        statusMessage: statusMessages[newStatus] || '',
+        applicationUrl,
         currentYear: new Date().getFullYear(),
       },
     });

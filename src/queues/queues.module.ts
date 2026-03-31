@@ -6,6 +6,8 @@ import { CompanyFollowerQueueProcessor } from './processors/company-follower-que
 import { CompanyFollowerQueueService } from './services/company-follower-queue.service';
 import { JobRecommendationQueueProcessor } from './processors/job-recommendation-queue.processor';
 import { JobRecommendationQueueService } from './services/job-recommendation-queue.service';
+import { ApplicationNotificationQueueProcessor } from './processors/application-notification-queue.processor';
+import { ApplicationNotificationQueueService } from './services/application-notification-queue.service';
 import { CvParserModule } from 'src/cv-parser/cv-parser.module';
 import { GeminiModule } from 'src/gemini/gemini.module';
 import { MatchingModule } from 'src/matching/matching.module';
@@ -20,12 +22,14 @@ import {
   RESUME_QUEUE,
   COMPANY_FOLLOWER_NOTIFICATION_QUEUE,
   JOB_RECOMMENDATION_QUEUE,
+  APPLICATION_NOTIFICATION_QUEUE,
 } from './queues.constants';
 
 export {
   RESUME_QUEUE,
   COMPANY_FOLLOWER_NOTIFICATION_QUEUE,
   JOB_RECOMMENDATION_QUEUE,
+  APPLICATION_NOTIFICATION_QUEUE,
 };
 
 @Global()
@@ -45,6 +49,9 @@ export class QueuesModule {
           },
           {
             name: JOB_RECOMMENDATION_QUEUE,
+          },
+          {
+            name: APPLICATION_NOTIFICATION_QUEUE,
           },
         ),
         MongooseModule.forFeature([
@@ -66,11 +73,14 @@ export class QueuesModule {
         CompanyFollowerQueueService,
         JobRecommendationQueueProcessor,
         JobRecommendationQueueService,
+        ApplicationNotificationQueueProcessor,
+        ApplicationNotificationQueueService,
       ],
       exports: [
         ResumeQueueService,
         CompanyFollowerQueueService,
         JobRecommendationQueueService,
+        ApplicationNotificationQueueService,
       ],
     };
   }
