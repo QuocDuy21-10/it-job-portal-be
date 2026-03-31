@@ -49,7 +49,7 @@ export class UsersService {
     }
 
     const hashedPassword = this.hashPassword(password);
-    let newUser = await this.userModel.create({
+    const newUser = await this.userModel.create({
       name,
       email,
       password: hashedPassword,
@@ -68,7 +68,7 @@ export class UsersService {
 
   async register(user: AuthRegisterDto) {
     const { name, email, password } = user;
-    
+
     const isExistEmail = await this.userModel.findOne({ email, isDeleted: false });
     if (isExistEmail) {
       throw new BadRequestException(
@@ -79,7 +79,7 @@ export class UsersService {
     const userRole = await this.roleModel.findOne({ name: USER_ROLE });
 
     const hashedPassword = this.hashPassword(password);
-    let newUser = await this.userModel.create({
+    const newUser = await this.userModel.create({
       name,
       email,
       password: hashedPassword,
@@ -92,8 +92,8 @@ export class UsersService {
     const { filter, sort, population } = aqp(query);
     delete filter.page;
     delete filter.limit;
-    let offset = (page - 1) * limit;
-    let defaultLimit = limit ? limit : 10;
+    const offset = (page - 1) * limit;
+    const defaultLimit = limit ? limit : 10;
 
     const totalItems = (await this.userModel.find(filter)).length;
     const totalPages = Math.ceil(totalItems / defaultLimit);
@@ -108,7 +108,7 @@ export class UsersService {
       .exec();
     return {
       result,
-     meta: {
+      meta: {
         pagination: {
           current_page: page,
           per_page: limit,
@@ -157,10 +157,9 @@ export class UsersService {
       if (roleToCheck) {
         const userRole = await this.roleModel.findById(roleToCheck);
         if (userRole && userRole.name === 'HR') {
-          const companyToCheck = updateUserDto.company !== undefined 
-            ? updateUserDto.company 
-            : existingUser?.company;
-          
+          const companyToCheck =
+            updateUserDto.company !== undefined ? updateUserDto.company : existingUser?.company;
+
           if (!companyToCheck || !companyToCheck._id) {
             throw new BadRequestException('HR user must be assigned to a company');
           }
@@ -212,18 +211,18 @@ export class UsersService {
    * - Lấy thông tin User Profile ĐẦY ĐỦ & MỚI NHẤT từ DB
    * - Sử dụng cho API GET /auth/me
    * - Đảm bảo Fresh Data (name, role, permissions có thể thay đổi)
-   * 
+   *
    * KIẾN TRÚC:
    * - 1 query duy nhất với nested populate tối ưu
    * - Populate: role → permissions, company, savedJobs IDs, companyFollowed IDs
    * - Validate: isActive, isDeleted
    * - Return: IUser interface chuẩn
-   * 
+   *
    * BEST PRACTICE:
    * - Tách rõ logic Auth vs User Profile
    * - JwtStrategy chỉ validate token → lightweight
    * - Controller gọi method này để lấy fresh data
-   * 
+   *
    * @param userId - User ID từ JWT payload
    * @returns Promise<IUser> - Complete user profile
    * @throws BadRequestException - Nếu user không tồn tại hoặc bị vô hiệu hóa
@@ -244,7 +243,7 @@ export class UsersService {
         path: 'company',
         select: '_id name logo address',
       })
-      .select('-password') 
+      .select('-password')
       .lean() // Convert to plain JS object (performance boost)
       .exec();
 
@@ -252,9 +251,7 @@ export class UsersService {
       throw new BadRequestException('User not found');
     }
     if (!user.isActive) {
-      throw new BadRequestException(
-        'Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ admin.',
-      );
+      throw new BadRequestException('Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ admin.');
     }
     if (user.isDeleted) {
       throw new BadRequestException('Tài khoản đã bị xóa');
@@ -469,15 +466,15 @@ export class UsersService {
     }
 
     // Get current user to check following count
-    const user = await this.userModel.findOne({ _id: userId, isDeleted: false }).select('companyFollowed');
+    const user = await this.userModel
+      .findOne({ _id: userId, isDeleted: false })
+      .select('companyFollowed');
     if (!user) {
       throw new BadRequestException('User not found');
     }
 
     // Check if already following this company
-    const isAlreadyFollowing = user.companyFollowed?.some(
-      (id) => id.toString() === companyId,
-    );
+    const isAlreadyFollowing = user.companyFollowed?.some(id => id.toString() === companyId);
 
     if (isAlreadyFollowing) {
       throw new BadRequestException('You are already following this company');
@@ -485,7 +482,9 @@ export class UsersService {
 
     // Validate maximum 5 companies
     if (user.companyFollowed && user.companyFollowed.length >= 5) {
-      throw new BadRequestException('You can only follow up to 5 companies. Please unfollow a company first.');
+      throw new BadRequestException(
+        'You can only follow up to 5 companies. Please unfollow a company first.',
+      );
     }
 
     // Use $addToSet to add companyId

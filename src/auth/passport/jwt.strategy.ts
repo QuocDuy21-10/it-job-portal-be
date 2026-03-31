@@ -14,19 +14,19 @@ import { JwtAccessPayload } from '../interfaces/jwt-payload.interface';
  * 2. Strategy hydrate user từ DB để lấy fresh data
  * 3. Populate đầy đủ: role + permissions + company
  * 4. Validate: isActive, isDeleted → chặn user bị khóa
- * 
+ *
  * TẠI SAO HYDRATE Ở ĐÂY?
  * - Hầu hết APIs cần user.email (audit log: createdBy, updatedBy)
  * - Một số APIs cần user.role.name, user.company._id (authorization)
  * - Nếu không hydrate → mỗi API phải query DB → N queries thay vì 1 query
- * 
+ *
  * API /ME ĐẶC BIỆT:
  * - API /me SẼ QUERY LẠI DB (gọi usersService.findUserProfile)
  * - Lý do: Đảm bảo 100% fresh data khi user F5 trang
  * - Kiểm tra isActive, isDeleted để chặn user bị khóa dù token còn hợp lệ
- * 
+ *
  * LUỒNG HOẠT ĐỘNG:
- * Client → Bearer token → Passport verify signature → 
+ * Client → Bearer token → Passport verify signature →
  * validate() → Query user từ DB (1 query tối ưu) →
  * Attach full IUser vào req.user → Controller xử lý
  */
@@ -45,10 +45,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   /**
    * Validate JWT Payload - Hydrate user từ DB
-   * 
+   *
    * @param payload - {sub: userId, type: 'access'}
    * @returns IUser - Full user object với role, permissions, company
-   * 
+   *
    * ⚡ PERFORMANCE:
    * - 1 query duy nhất với nested populate
    * - .lean() để convert sang plain JS object (faster)
@@ -75,7 +75,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         path: 'company',
         select: '_id name logo address',
       })
-      .select('-password') 
+      .select('-password')
       .lean()
       .exec();
 
@@ -86,9 +86,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // BƯỚC 4: Validate user còn active
     if (!user.isActive) {
-      throw new UnauthorizedException(
-        'Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ admin.',
-      );
+      throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ admin.');
     }
 
     // BƯỚC 5: Validate user chưa bị soft delete

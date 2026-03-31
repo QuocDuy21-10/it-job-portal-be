@@ -40,7 +40,11 @@ export class AuthController {
   })
   @Post('/login')
   @ResponseMessage('Login successfully')
-  handleLogin(@Req() req: Request, @Res({ passthrough: true }) response: Response, @Ip() ip: string) {
+  handleLogin(
+    @Req() req: Request,
+    @Res({ passthrough: true }) response: Response,
+    @Ip() ip: string,
+  ) {
     const userAgent = req.headers['user-agent'] || 'Unknown Device';
     const ipAddress = ip || req.ip || 'Unknown IP';
     return this.authService.login(req.user as any, response, ipAddress, userAgent);
@@ -57,14 +61,17 @@ export class AuthController {
     return this.authService.register(AuthRegisterDto);
   }
 
-
   @Post('verify')
   @Public()
   @ApiOperation({
     summary: 'Verify account',
-    description: 'Verify user account using verification code sent to email. Typically used after registration or requesting a new code.'
+    description:
+      'Verify user account using verification code sent to email. Typically used after registration or requesting a new code.',
   })
-  @ApiBody({ type: VerifyAuthDto, description: 'Verification payload containing user id and code.' })
+  @ApiBody({
+    type: VerifyAuthDto,
+    description: 'Verification payload containing user id and code.',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Account verified successfully.',
@@ -77,10 +84,10 @@ export class AuthController {
             _id: 'string',
             email: 'user@example.com',
             // ...other user fields
-          }
-        }
-      }
-    }
+          },
+        },
+      },
+    },
   })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid or expired code.' })
   @ResponseMessage('Verify account successfully')
@@ -88,22 +95,22 @@ export class AuthController {
     return this.authService.verifyEmail(verifyAuthDto);
   }
 
-
   @Post('resend-code')
   @Public()
   @ApiOperation({
     summary: 'Resend verification code',
-    description: 'Resend a new verification code to the user\'s email. Used if the previous code expired or was not received.'
+    description:
+      "Resend a new verification code to the user's email. Used if the previous code expired or was not received.",
   })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: 'User ID to resend code for.' }
+        id: { type: 'string', description: 'User ID to resend code for.' },
       },
       required: ['id'],
-      example: { id: 'userId123' }
-    }
+      example: { id: 'userId123' },
+    },
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -112,11 +119,14 @@ export class AuthController {
       example: {
         statusCode: 200,
         message: 'Resend code successfully',
-        data: true
-      }
-    }
+        data: true,
+      },
+    },
   })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'User not found or already verified.' })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'User not found or already verified.',
+  })
   @ResponseMessage('Resend code successfully')
   handleResendCode(@Body('id') id: string) {
     return this.authService.resendCode(id);
@@ -150,7 +160,8 @@ export class AuthController {
   @Get('/me')
   @ApiOperation({
     summary: 'Get Current User Profile',
-    description: 'Get full user profile with fresh data from database (name, role, permissions, company, savedJobs, companyFollowed)',
+    description:
+      'Get full user profile with fresh data from database (name, role, permissions, company, savedJobs, companyFollowed)',
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -163,7 +174,7 @@ export class AuthController {
   }
 
   @Public()
-  @UseGuards(AuthGuard('jwt-refresh')) 
+  @UseGuards(AuthGuard('jwt-refresh'))
   @ApiOperation({
     summary: 'Refresh access token (Public API)',
     description: 'API to refresh access token using refresh token (stored in httpOnly cookie).',

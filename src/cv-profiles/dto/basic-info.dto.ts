@@ -1,9 +1,4 @@
-import {
-  IsString,
-  IsEmail,
-  IsOptional,
-  MaxLength,
-} from 'class-validator';
+import { IsString, IsEmail, IsOptional, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class PersonalInfoDto {
@@ -15,7 +10,6 @@ export class PersonalInfoDto {
   @IsString()
   @MaxLength(100)
   fullName: string;
-
 
   @ApiPropertyOptional({
     description: 'Job title or professional headline',
@@ -45,8 +39,6 @@ export class PersonalInfoDto {
   @IsString()
   @MaxLength(20)
   phone: string;
-
-
 
   @ApiProperty({
     description: 'Email address',

@@ -42,7 +42,7 @@ export class CvParserService {
       // Use PDFParse class (v2 API) with file path
       const parser = new PDFParse({ url: filePath });
       const result = await parser.getText();
-      
+
       this.logger.log(`Extracted ${result.text.length} characters from PDF`);
       return result.text;
     } catch (error) {
@@ -57,7 +57,7 @@ export class CvParserService {
   private async extractFromDOCX(filePath: string): Promise<string> {
     try {
       const result = await mammoth.extractRawText({ path: filePath });
-      
+
       this.logger.log(`Extracted ${result.value.length} characters from DOCX`);
       return result.value;
     } catch (error) {
@@ -72,7 +72,7 @@ export class CvParserService {
   private async extractFromTXT(filePath: string): Promise<string> {
     try {
       const text = fs.readFileSync(filePath, 'utf-8');
-      
+
       this.logger.log(`Extracted ${text.length} characters from TXT`);
       return text;
     } catch (error) {
@@ -109,33 +109,35 @@ export class CvParserService {
    * Minify text by removing noise characters and converting multiline to single line with periods
    */
   cleanText(text: string): string {
-    return text
-      // Remove special unicode characters and noise (bullet points, special symbols, etc.)
-      .replace(/[•◦▪▫■□●○⬤◆◇★☆♦♢]+/g, '') // Remove bullet points
-      .replace(/[\u2022\u2023\u2043\u204C\u204D\u2219\u25CB\u25CF\u25E6]/g, '') // Remove unicode bullets
-      .replace(/[^\x00-\x7F\u00C0-\u024F\u1E00-\u1EFF]/g, '') // Remove non-Latin characters except Vietnamese
-      
-      // Normalize whitespace and line breaks
-      .replace(/\r\n/g, '\n') // Normalize line endings
-      .replace(/\t+/g, ' ') // Replace tabs with spaces
-      .replace(/[ ]+/g, ' ') // Remove multiple spaces
-      
-      // Convert multiple line breaks to single line with period separator
-      .replace(/\n{2,}/g, '. ') // Convert paragraph breaks to periods
-      .replace(/\n/g, '. ') // Convert single line breaks to periods
-      
-      // Clean up punctuation
-      .replace(/\.{2,}/g, '.') // Remove multiple periods
-      .replace(/\.\s*\./g, '.') // Remove consecutive periods with spaces
-      .replace(/\s*\.\s*/g, '. ') // Normalize period spacing
-      .replace(/\.\s*,/g, ',') // Remove periods before commas
-      .replace(/,\s*\./g, '.') // Remove commas before periods
-      
-      // Final cleanup
-      .replace(/\s{2,}/g, ' ') // Remove any remaining multiple spaces
-      .replace(/^\.\s*/, '') // Remove leading period
-      .replace(/\s*\.\s*$/, '') // Remove trailing period
-      .trim();
+    return (
+      text
+        // Remove special unicode characters and noise (bullet points, special symbols, etc.)
+        .replace(/[•◦▪▫■□●○⬤◆◇★☆♦♢]+/g, '') // Remove bullet points
+        .replace(/[\u2022\u2023\u2043\u204C\u204D\u2219\u25CB\u25CF\u25E6]/g, '') // Remove unicode bullets
+        .replace(/[^\x00-\x7F\u00C0-\u024F\u1E00-\u1EFF]/g, '') // Remove non-Latin characters except Vietnamese
+
+        // Normalize whitespace and line breaks
+        .replace(/\r\n/g, '\n') // Normalize line endings
+        .replace(/\t+/g, ' ') // Replace tabs with spaces
+        .replace(/[ ]+/g, ' ') // Remove multiple spaces
+
+        // Convert multiple line breaks to single line with period separator
+        .replace(/\n{2,}/g, '. ') // Convert paragraph breaks to periods
+        .replace(/\n/g, '. ') // Convert single line breaks to periods
+
+        // Clean up punctuation
+        .replace(/\.{2,}/g, '.') // Remove multiple periods
+        .replace(/\.\s*\./g, '.') // Remove consecutive periods with spaces
+        .replace(/\s*\.\s*/g, '. ') // Normalize period spacing
+        .replace(/\.\s*,/g, ',') // Remove periods before commas
+        .replace(/,\s*\./g, '.') // Remove commas before periods
+
+        // Final cleanup
+        .replace(/\s{2,}/g, ' ') // Remove any remaining multiple spaces
+        .replace(/^\.\s*/, '') // Remove leading period
+        .replace(/\s*\.\s*$/, '') // Remove trailing period
+        .trim()
+    );
   }
 
   /**

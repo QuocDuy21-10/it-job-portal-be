@@ -1,8 +1,4 @@
-import {
-  IsOptional,
-  IsArray,
-  ValidateNested,
-} from 'class-validator';
+import { IsOptional, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PersonalInfoDto } from './basic-info.dto';

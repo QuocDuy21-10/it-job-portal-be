@@ -36,9 +36,11 @@ export class FilesService {
 
     const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedMimeTypes.includes(file.mimetype)) {
-      throw new BadRequestException('Only image files (JPEG, JPG, PNG, GIF, WEBP) are allowed for avatar');
+      throw new BadRequestException(
+        'Only image files (JPEG, JPG, PNG, GIF, WEBP) are allowed for avatar',
+      );
     }
-    
+
     // Use filename (renamed by multer) instead of originalname
     return this.buildFileUrl('avatar', file.filename);
   }

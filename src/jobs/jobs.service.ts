@@ -48,8 +48,8 @@ export class JobsService {
       filter['company._id'] = user.company._id;
     }
 
-    let offset = (page - 1) * limit;
-    let defaultLimit = limit ? limit : 10;
+    const offset = (page - 1) * limit;
+    const defaultLimit = limit ? limit : 10;
 
     const totalItems = (await this.jobModel.find(filter)).length;
     const totalPages = Math.ceil(totalItems / defaultLimit);
@@ -78,7 +78,8 @@ export class JobsService {
     this.validateObjectId(id);
 
     // Lấy job theo id và populate thông tin công ty (name, numberOfEmployees, address)
-    const job = await this.jobModel.findById(id)
+    const job = await this.jobModel
+      .findById(id)
       .populate({
         path: 'company',
         select: {
@@ -120,7 +121,7 @@ export class JobsService {
     }
 
     // Create case-insensitive regex for each skill
-    const skillRegexes = skills.map((skill) => new RegExp(skill, 'i'));
+    const skillRegexes = skills.map(skill => new RegExp(skill, 'i'));
 
     return await this.jobModel
       .find({
@@ -129,10 +130,7 @@ export class JobsService {
         // Find jobs that have at least one matching skill
         skills: { $in: skillRegexes },
         // Filter out expired jobs
-        $or: [
-          { endDate: { $gte: new Date() } },
-          { endDate: null },
-        ],
+        $or: [{ endDate: { $gte: new Date() } }, { endDate: null }],
       })
       .select('name company location skills level') // Select only necessary fields to reduce token usage
       .populate('company', 'name') // Populate company name

@@ -2,24 +2,24 @@ import { JobLevel } from 'src/jobs/enums/job-level.enum';
 
 /**
  * MATCHING CONSTANTS
- * 
+ *
  * Tất cả các hằng số, weights, thresholds cho matching logic
  * Dễ dàng điều chỉnh business rules mà không cần sửa code logic
  */
 
 // ===== SCORING WEIGHTS =====
 export const MATCHING_WEIGHTS = {
-  SKILLS: 0.5,        // 50% trọng số cho skills matching
-  EXPERIENCE: 0.3,    // 30% trọng số cho experience
-  EDUCATION: 0.2,     // 20% trọng số cho education
+  SKILLS: 0.5, // 50% trọng số cho skills matching
+  EXPERIENCE: 0.3, // 30% trọng số cho experience
+  EDUCATION: 0.2, // 20% trọng số cho education
 } as const;
 
 // ===== SCORE THRESHOLDS =====
 export const SCORE_THRESHOLDS = {
-  EXCELLENT: 85,  // >= 85: Excellent candidate
-  HIGH: 70,       // >= 70: Good candidate
-  MEDIUM: 50,     // >= 50: Consider candidate
-  LOW: 30,        // < 30: Not recommended
+  EXCELLENT: 85, // >= 85: Excellent candidate
+  HIGH: 70, // >= 70: Good candidate
+  MEDIUM: 50, // >= 50: Consider candidate
+  LOW: 30, // < 30: Not recommended
 } as const;
 
 // ===== SKILL PROFICIENCY LEVELS =====
@@ -97,7 +97,7 @@ export const SKILL_VARIATIONS: Record<string, string[]> = {
   'react native': ['reactnative', 'rn'],
   'node.js': ['node', 'nodejs', 'node js'],
   'vue.js': ['vue', 'vuejs', 'vue js'],
-  'angular': ['angularjs', 'angular.js'],
+  angular: ['angularjs', 'angular.js'],
   'next.js': ['next', 'nextjs'],
   mongodb: ['mongo', 'mongo db'],
   postgresql: ['postgres', 'psql', 'pg'],

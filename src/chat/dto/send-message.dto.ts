@@ -6,7 +6,7 @@ export class SendMessageDto {
     description: 'User message to AI career advisor',
     example: 'Tôi nên học skill gì để trở thành Senior Backend Engineer?',
     minLength: 1,
-    maxLength: 1000
+    maxLength: 1000,
   })
   @IsString()
   @IsNotEmpty({ message: 'Message cannot be empty' })

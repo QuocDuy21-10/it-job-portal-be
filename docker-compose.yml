@@ -1,13 +1,12 @@
 services:
-  # MongoDB Service
   mongodb:
     image: mongo:7.0
     container_name: job-portal-mongodb
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
-      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-123456}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-my-job-portal}
     ports:
       - '27017:27017'
     volumes:
@@ -16,7 +15,7 @@ services:
     networks:
       - job-portal-network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: echo 'db.runCommand("ping").ok' | mongosh -u root -p 123456 --authenticationDatabase admin --quiet
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,9 +26,9 @@ services:
     container_name: job-portal-redis
     restart: unless-stopped
     ports:
-      - '6379:6379' # Mở port 6379 ra máy host của bạn (tiện cho việc debug)
+      - '6379:6379'
     volumes:
-      - redis_data:/data # Volume để lưu trữ dữ liệu Redis
+      - redis_data:/data
     networks:
       - job-portal-network
     healthcheck:
@@ -39,8 +38,8 @@ services:
       retries: 5
       start_period: 20s
 
-  # NestJS Backend Service
   backend:
+    profiles: ['full']
     build:
       context: .
       dockerfile: Dockerfile
@@ -51,7 +50,7 @@ services:
       - '${PORT:-8081}:${PORT:-8081}'
     environment:
       - PORT=${PORT:-8081}
-      - MONGO_URL=mongodb://root:123456@mongodb:27017/my-job-portal?authSource=admin
+      - MONGO_URL=mongodb://${MONGO_INITDB_ROOT_USERNAME:-root}:${MONGO_INITDB_ROOT_PASSWORD:-123456}@mongodb:27017/${MONGO_INITDB_DATABASE:-my-job-portal}?authSource=admin
       - NODE_ENV=${NODE_ENV:-development}
       - JWT_ACCESS_TOKEN_SECRET=${JWT_ACCESS_TOKEN_SECRET}
       - JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN}
@@ -64,12 +63,11 @@ services:
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - REDIS_HOST=redis # Trỏ đến tên service "redis"
+      - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_QUEUE_DB=0 # Database cho BullMQ
-      - REDIS_CACHE_DB=1 # Database cho Cache
+      - REDIS_QUEUE_DB=0
+      - REDIS_CACHE_DB=1
     volumes:
-      # Mount source code for development hot-reload
       - .:/app
       - /app/node_modules
     depends_on:

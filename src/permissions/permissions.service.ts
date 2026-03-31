@@ -44,8 +44,8 @@ export class PermissionsService {
     const { filter, sort, population, projection } = aqp(query);
     delete filter.page;
     delete filter.limit;
-    let offset = (page - 1) * limit;
-    let defaultLimit = limit ? limit : 10;
+    const offset = (page - 1) * limit;
+    const defaultLimit = limit ? limit : 10;
 
     const totalItems = (await this.permissionModel.find(filter)).length;
     const totalPages = Math.ceil(totalItems / defaultLimit);

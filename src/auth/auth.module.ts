@@ -21,17 +21,17 @@ import { User, UserSchema } from 'src/users/schemas/user.schema';
  * 3. API /me query lại DB để đảm bảo Fresh Data
  * 4. Multi-device session management
  * 5. Token Rotation Pattern (refresh token dùng 1 lần)
- * 
+ *
  * STRATEGIES:
  * - LocalStrategy: Username/password authentication
  * - JwtStrategy: Access token validation + user hydration
  * - JwtRefreshStrategy: Refresh token validation + session check
- * 
+ *
  * MODULES:
  * - UsersModule: User profile management (cung cấp UsersService cho /me API)
  * - RolesModule: Role & permission management
  * - SessionsModule: Multi-device session tracking
- * 
+ *
  * TẠI SAO HYDRATE USER Ở JwtStrategy?
  * - Hầu hết APIs cần user.email (audit log: createdBy, updatedBy)
  * - Một số APIs cần user.role.name, user.company._id (authorization)
@@ -40,9 +40,9 @@ import { User, UserSchema } from 'src/users/schemas/user.schema';
  */
 @Module({
   imports: [
-    UsersModule, 
-    RolesModule, 
-    SessionsModule, 
+    UsersModule,
+    RolesModule,
+    SessionsModule,
     PassportModule,
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     JwtModule.registerAsync({
@@ -53,12 +53,7 @@ import { User, UserSchema } from 'src/users/schemas/user.schema';
       inject: [ConfigService],
     }),
   ],
-  providers: [
-    AuthService,
-    LocalStrategy, 
-    JwtStrategy, 
-    JwtRefreshStrategy, 
-  ],
+  providers: [AuthService, LocalStrategy, JwtStrategy, JwtRefreshStrategy],
   controllers: [AuthController],
   exports: [AuthService],
 })

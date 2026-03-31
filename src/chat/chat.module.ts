@@ -10,9 +10,7 @@ import { ChatService } from './chat.service';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: Conversation.name, schema: ConversationSchema }
-    ]),
+    MongooseModule.forFeature([{ name: Conversation.name, schema: ConversationSchema }]),
     GeminiModule,
     CvProfilesModule,
     JobsModule,

@@ -50,7 +50,7 @@ export class DatabasesService implements OnModuleInit {
             name: HR_ROLE,
             description: 'HR role for managing job postings and applicants',
             isActive: true,
-            permissions: [], 
+            permissions: [],
           },
         ]);
       }

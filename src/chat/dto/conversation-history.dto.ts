@@ -8,7 +8,7 @@ export class ConversationHistoryQueryDto {
     example: 1,
     required: false,
     default: 1,
-    minimum: 1
+    minimum: 1,
   })
   @IsOptional()
   @Type(() => Number)
@@ -22,7 +22,7 @@ export class ConversationHistoryQueryDto {
     required: false,
     default: 50,
     minimum: 1,
-    maximum: 100
+    maximum: 100,
   })
   @IsOptional()
   @Type(() => Number)
@@ -36,19 +36,19 @@ export class MessageDto {
   @ApiProperty({
     description: 'Message role',
     example: 'user',
-    enum: ['user', 'assistant']
+    enum: ['user', 'assistant'],
   })
   role: string;
 
   @ApiProperty({
     description: 'Message content',
-    example: 'What skills should I learn?'
+    example: 'What skills should I learn?',
   })
   content: string;
 
   @ApiProperty({
     description: 'Message timestamp',
-    example: '2024-12-01T10:30:00.000Z'
+    example: '2024-12-01T10:30:00.000Z',
   })
   timestamp: Date;
 }
@@ -56,25 +56,25 @@ export class MessageDto {
 export class ConversationHistoryResponseDto {
   @ApiProperty({
     description: 'Array of messages',
-    type: [MessageDto]
+    type: [MessageDto],
   })
   messages: MessageDto[];
 
   @ApiProperty({
     description: 'Total number of messages',
-    example: 100
+    example: 100,
   })
   total: number;
 
   @ApiProperty({
     description: 'Current page',
-    example: 1
+    example: 1,
   })
   page: number;
 
   @ApiProperty({
     description: 'Messages per page',
-    example: 50
+    example: 50,
   })
   limit: number;
 }

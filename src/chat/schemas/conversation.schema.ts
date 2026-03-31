@@ -5,10 +5,10 @@ export type ConversationDocument = Conversation & Document;
 
 @Schema({ _id: false, timestamps: false })
 export class Message {
-  @Prop({ 
-    required: true, 
+  @Prop({
+    required: true,
     enum: ['user', 'assistant'],
-    type: String 
+    type: String,
   })
   role: string;
 
@@ -21,16 +21,16 @@ export class Message {
 
 export const MessageSchema = SchemaFactory.createForClass(Message);
 
-@Schema({ 
+@Schema({
   timestamps: true,
-  collection: 'conversations'
+  collection: 'conversations',
 })
 export class Conversation {
-  @Prop({ 
-    type: Types.ObjectId, 
-    ref: 'User', 
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'User',
     required: true,
-    index: true
+    index: true,
   })
   userId: Types.ObjectId;
 

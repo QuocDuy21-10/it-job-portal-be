@@ -25,7 +25,7 @@ export class User {
   @Prop({ trim: true })
   avatar?: string;
 
-  @Prop({ default: false }) 
+  @Prop({ default: false })
   isActive: boolean;
 
   @Prop()

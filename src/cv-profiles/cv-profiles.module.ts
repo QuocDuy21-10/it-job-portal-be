@@ -7,9 +7,7 @@ import { FilesModule } from '../files/files.module';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: CvProfile.name, schema: CvProfileSchema },
-    ]),
+    MongooseModule.forFeature([{ name: CvProfile.name, schema: CvProfileSchema }]),
     FilesModule,
   ],
   controllers: [CvProfilesController],

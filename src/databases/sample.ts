@@ -602,19 +602,19 @@ export const INIT_PERMISSIONS = [
   },
 
   {
-    _id: "692d5553964d1f6be0c490aa",
-    name: "Get dashboard statistics",
-    apiPath: "/api/v1/statistics/dashboard",
-    method: "GET",
-    module: "STATISTICS",
+    _id: '692d5553964d1f6be0c490aa',
+    name: 'Get dashboard statistics',
+    apiPath: '/api/v1/statistics/dashboard',
+    method: 'GET',
+    module: 'STATISTICS',
     createdBy: {
-      _id: "647b5108a8a243e8191855b5",
-      email: "admin@gmail.com",
+      _id: '647b5108a8a243e8191855b5',
+      email: 'admin@gmail.com',
     },
     isDeleted: false,
     deletedAt: null,
-    createdAt: "2025-08-20T10:00:00.000Z",
-    updatedAt: "2025-08-20T10:00:00.000Z",
+    createdAt: '2025-08-20T10:00:00.000Z',
+    updatedAt: '2025-08-20T10:00:00.000Z',
     __v: 0,
-  }
+  },
 ];

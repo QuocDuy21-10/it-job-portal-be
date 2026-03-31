@@ -47,6 +47,8 @@ lerna-debug.log*
 # temp directory
 .temp
 .tmp
+.agents/
+agent_docs
 
 # Runtime data
 pids

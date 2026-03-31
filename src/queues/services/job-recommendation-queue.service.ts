@@ -41,9 +41,7 @@ export class JobRecommendationQueueService {
       );
       this.logger.debug(`Added subscriber ${subscriberId} to queue`);
     } catch (error) {
-      this.logger.error(
-        `Failed to add subscriber ${subscriberId} to queue: ${error.message}`,
-      );
+      this.logger.error(`Failed to add subscriber ${subscriberId} to queue: ${error.message}`);
       throw error;
     }
   }
@@ -61,7 +59,7 @@ export class JobRecommendationQueueService {
       `Adding ${subscriberIds.length} subscribers to queue in batches of ${batchSize}`,
     );
 
-    const jobs = subscriberIds.map((subscriberId) => ({
+    const jobs = subscriberIds.map(subscriberId => ({
       name: 'send-job-recommendations',
       data: { subscriberId },
       opts: {
@@ -85,20 +83,14 @@ export class JobRecommendationQueueService {
       const batch = jobs.slice(i, i + batchSize);
       try {
         await this.jobRecommendationQueue.addBulk(batch);
-        this.logger.debug(
-          `Added batch ${i / batchSize + 1}/${Math.ceil(jobs.length / batchSize)}`,
-        );
+        this.logger.debug(`Added batch ${i / batchSize + 1}/${Math.ceil(jobs.length / batchSize)}`);
       } catch (error) {
-        this.logger.error(
-          `Failed to add batch ${i / batchSize + 1}: ${error.message}`,
-        );
+        this.logger.error(`Failed to add batch ${i / batchSize + 1}: ${error.message}`);
         // Continue with next batch instead of failing completely
       }
     }
 
-    this.logger.log(
-      `Successfully queued ${subscriberIds.length} job recommendation tasks`,
-    );
+    this.logger.log(`Successfully queued ${subscriberIds.length} job recommendation tasks`);
   }
 
   /**

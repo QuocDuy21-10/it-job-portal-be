@@ -11,7 +11,10 @@ import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 
 @Injectable()
 export class CompaniesService {
-  constructor(@InjectModel(Company.name) private companyModel: SoftDeleteModel<CompanyDocument>, @InjectModel(Job.name) private jobModel: SoftDeleteModel<JobDocument>,) {}
+  constructor(
+    @InjectModel(Company.name) private companyModel: SoftDeleteModel<CompanyDocument>,
+    @InjectModel(Job.name) private jobModel: SoftDeleteModel<JobDocument>,
+  ) {}
   async create(createCompanyDto: CreateCompanyDto, user: IUser) {
     const isExistName = await this.companyModel.find({
       name: createCompanyDto.name,
@@ -39,7 +42,7 @@ export class CompaniesService {
     }
 
     const offset = (page - 1) * limit;
-    let defaultLimit = limit ? limit : 10;
+    const defaultLimit = limit ? limit : 10;
 
     const totalItems = (await this.companyModel.find(filter)).length;
     const totalPages = Math.ceil(totalItems / defaultLimit);
@@ -54,8 +57,8 @@ export class CompaniesService {
 
     // OPTIMIZED: Batch query for job counts using aggregation
     // Instead of N queries (one per company), use single aggregation query
-    const companyIdStrings = result.map((company) => company._id.toString());
-    
+    const companyIdStrings = result.map(company => company._id.toString());
+
     const jobCounts = await this.jobModel.aggregate([
       {
         $match: {
@@ -71,14 +74,14 @@ export class CompaniesService {
         },
       },
     ]);
-    
+
     // Create lookup map for O(1) access
     const jobCountMap = new Map<string, number>();
-    jobCounts.forEach((item) => {
+    jobCounts.forEach(item => {
       jobCountMap.set(item._id, item.totalJobs);
     });
 
-    const resultWithCount = result.map((company) => ({
+    const resultWithCount = result.map(company => ({
       ...company.toObject(),
       totalJobs: jobCountMap.get(company._id.toString()) || 0,
     }));

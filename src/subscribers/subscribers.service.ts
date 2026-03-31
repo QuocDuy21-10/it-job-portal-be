@@ -19,7 +19,7 @@ export class SubscribersService {
     const { name, email, skills, location } = createSubscriberDto;
     const existingSubscriptionsCount = await this.subscriberModel.countDocuments({
       email,
-      isDeleted: false 
+      isDeleted: false,
     });
 
     if (existingSubscriptionsCount >= 3) {
@@ -28,7 +28,7 @@ export class SubscribersService {
       );
     }
 
-    let newSubs = await this.subscriberModel.create({
+    const newSubs = await this.subscriberModel.create({
       name,
       email,
       skills,
@@ -50,8 +50,8 @@ export class SubscribersService {
     delete filter.page;
     delete filter.limit;
 
-    let offset = (+page - 1) * +limit;
-    let defaultLimit = +limit ? +limit : 10;
+    const offset = (+page - 1) * +limit;
+    const defaultLimit = +limit ? +limit : 10;
 
     const totalItems = (await this.subscriberModel.find(filter)).length;
     const totalPages = Math.ceil(totalItems / defaultLimit);
@@ -122,7 +122,8 @@ export class SubscribersService {
     const { email } = user;
     return await this.subscriberModel.findOne(
       {
-        email, isDeleted: false,
+        email,
+        isDeleted: false,
       },
       { skills: 1, createdAt: 1 },
     );

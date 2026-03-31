@@ -118,10 +118,7 @@ export class SessionsService {
    * @returns Số lượng sessions đã deactivate
    */
   async deactivateAllUserSessions(userId: string): Promise<number> {
-    const result = await this.sessionModel.updateMany(
-      { userId },
-      { $set: { isActive: false } },
-    );
+    const result = await this.sessionModel.updateMany({ userId }, { $set: { isActive: false } });
     return result.modifiedCount;
   }
 
@@ -130,10 +127,7 @@ export class SessionsService {
    * @param refreshToken - Refresh token của session
    */
   async updateLastUsedAt(refreshToken: string): Promise<void> {
-    await this.sessionModel.updateOne(
-      { refreshToken },
-      { $set: { lastUsedAt: new Date() } },
-    );
+    await this.sessionModel.updateOne({ refreshToken }, { $set: { lastUsedAt: new Date() } });
   }
 
   /**
@@ -180,7 +174,7 @@ export class SessionsService {
     // Nếu vượt quá limit, xóa các session cũ nhất
     if (sessions.length > maxSessions) {
       const sessionsToDelete = sessions.slice(0, sessions.length - maxSessions);
-      const tokensToDelete = sessionsToDelete.map((s) => s.refreshToken);
+      const tokensToDelete = sessionsToDelete.map(s => s.refreshToken);
       await this.sessionModel.deleteMany({ refreshToken: { $in: tokensToDelete } });
     }
   }

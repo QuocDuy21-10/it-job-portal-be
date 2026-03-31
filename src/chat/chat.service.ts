@@ -12,7 +12,7 @@ import { ConversationHistoryResponseDto } from './dto/conversation-history.dto';
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
-  
+
   // Constants
   private readonly MAX_HISTORY_MESSAGES = 10; // Keep last 10 messages for context
   private readonly MAX_CONVERSATION_LENGTH = 100; // Archive after 100 messages
@@ -50,7 +50,7 @@ export class ChatService {
       const rawAiResponse = await this.geminiService.chatWithContext(
         message,
         history,
-        systemPrompt
+        systemPrompt,
       );
 
       // 6. Parse JSON response (Structured Output)
@@ -61,15 +61,17 @@ export class ChatService {
           .replace(/```json\n?/g, '')
           .replace(/```\n?/g, '')
           .trim();
-        
+
         parsedResponse = JSON.parse(cleanJson);
-        
+
         // Validate structure
         if (!parsedResponse.text || !Array.isArray(parsedResponse.recommendedJobIds)) {
           throw new Error('Invalid JSON structure');
         }
       } catch (error) {
-        this.logger.warn(`Failed to parse AI JSON response: ${error.message}. Falling back to plain text.`);
+        this.logger.warn(
+          `Failed to parse AI JSON response: ${error.message}. Falling back to plain text.`,
+        );
         // Fallback: treat entire response as text if JSON parsing fails
         parsedResponse = {
           text: rawAiResponse,
@@ -79,7 +81,7 @@ export class ChatService {
 
       // 7. Map job IDs to full job objects (for frontend to render as cards)
       const recommendedJobs = userContext.matchingJobs.filter((job: any) =>
-        parsedResponse.recommendedJobIds.includes(job._id.toString())
+        parsedResponse.recommendedJobIds.includes(job._id.toString()),
       );
 
       // 8. Save both user message and AI response (only save text, not job data)
@@ -118,15 +120,15 @@ export class ChatService {
       };
     } catch (error) {
       this.logger.error(`Error sending message for user ${userId}:`, error);
-      
+
       if (error.message?.includes('rate limit') || error.message?.includes('429')) {
         throw new BadRequestException(
-          'AI service is currently busy. Please try again in a few seconds.'
+          'AI service is currently busy. Please try again in a few seconds.',
         );
       }
-      
+
       throw new BadRequestException(
-        `Failed to process message: ${error.message || 'Unknown error'}`
+        `Failed to process message: ${error.message || 'Unknown error'}`,
       );
     }
   }
@@ -154,17 +156,21 @@ export class ChatService {
       }
 
       return {
-        user: user ? {
-          name: user.name,
-          email: user.email,
-        } : null,
-        profile: cvProfile ? {
-          skills: userSkills,
-          experience: cvProfile.experience || [],
-          education: cvProfile.education || [],
-          summary: cvProfile.summary,
-          yearsOfExperience: cvProfile.yearsOfExperience,
-        } : null,
+        user: user
+          ? {
+              name: user.name,
+              email: user.email,
+            }
+          : null,
+        profile: cvProfile
+          ? {
+              skills: userSkills,
+              experience: cvProfile.experience || [],
+              education: cvProfile.education || [],
+              summary: cvProfile.summary,
+              yearsOfExperience: cvProfile.yearsOfExperience,
+            }
+          : null,
         matchingJobs: matchingJobs, // Real job data from database
         appliedJobsCount: appliedJobsCount,
       };
@@ -186,14 +192,15 @@ export class ChatService {
    */
   private buildSystemPrompt(context: any): string {
     // Format matching jobs for AI context - include _id for job card mapping
-    const jobsData = context.matchingJobs?.map((job: any) => ({
-      id: job._id.toString(), // CRITICAL: AI needs ID to recommend specific jobs
-      name: job.name,
-      company: job.company?.name || 'N/A',
-      location: job.location || 'N/A',
-      level: job.level || 'N/A',
-      skills: job.skills || [],
-    })) || [];
+    const jobsData =
+      context.matchingJobs?.map((job: any) => ({
+        id: job._id.toString(), // CRITICAL: AI needs ID to recommend specific jobs
+        name: job.name,
+        company: job.company?.name || 'N/A',
+        location: job.location || 'N/A',
+        level: job.level || 'N/A',
+        skills: job.skills || [],
+      })) || [];
 
     const profileData = context.profile || {};
     const userData = context.user || {};
@@ -274,50 +281,50 @@ REMEMBER: Your purpose is ONLY career counseling for IT professionals. Stay with
    * Get conversation history with pagination
    */
   async getConversationHistory(
-    userId: string, 
-    page: number = 1, 
-    limit: number = 50
+    userId: string,
+    page: number = 1,
+    limit: number = 50,
   ): Promise<ConversationHistoryResponseDto> {
     try {
       this.validateUserId(userId);
       this.validatePagination(page, limit);
 
       const conversation = await this.conversationModel
-        .findOne({ 
-          userId: new Types.ObjectId(userId), 
-          isActive: true 
+        .findOne({
+          userId: new Types.ObjectId(userId),
+          isActive: true,
         })
         .lean()
         .exec();
 
       if (!conversation || !conversation.messages) {
-        return { 
-          messages: [], 
+        return {
+          messages: [],
           total: 0,
           page,
-          limit
+          limit,
         };
       }
 
       // Sort messages by timestamp in ascending order (oldest → newest)
       // This ensures consistent ordering with how frontend adds new messages
-      const sortedMessages = [...conversation.messages].sort((a, b) => 
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      const sortedMessages = [...conversation.messages].sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
       );
 
       const total = sortedMessages.length;
-      
+
       // Calculate pagination - get most recent messages
-      const startIndex = Math.max(0, total - (page * limit));
+      const startIndex = Math.max(0, total - page * limit);
       const endIndex = total;
-      
+
       const messages = sortedMessages.slice(startIndex, endIndex);
 
-      return { 
-        messages, 
+      return {
+        messages,
         total,
         page,
-        limit
+        limit,
       };
     } catch (error) {
       this.logger.error(`Error fetching conversation history for user ${userId}:`, error);
@@ -333,15 +340,15 @@ REMEMBER: Your purpose is ONLY career counseling for IT professionals. Stay with
       this.validateUserId(userId);
 
       const result = await this.conversationModel.updateOne(
-        { 
-          userId: new Types.ObjectId(userId), 
-          isActive: true 
+        {
+          userId: new Types.ObjectId(userId),
+          isActive: true,
         },
-        { 
-          $set: { isActive: false } 
-        }
+        {
+          $set: { isActive: false },
+        },
       );
-      
+
       if (result.modifiedCount > 0) {
         this.logger.log(`Conversation cleared for user ${userId}`);
       }
@@ -358,19 +365,19 @@ REMEMBER: Your purpose is ONLY career counseling for IT professionals. Stay with
    */
   private async getOrCreateConversation(userId: string): Promise<ConversationDocument> {
     let conversation = await this.conversationModel
-      .findOne({ 
-        userId: new Types.ObjectId(userId), 
-        isActive: true 
+      .findOne({
+        userId: new Types.ObjectId(userId),
+        isActive: true,
       })
       .exec();
-    
+
     if (!conversation) {
-      conversation = await this.conversationModel.create({ 
-        userId: new Types.ObjectId(userId), 
+      conversation = await this.conversationModel.create({
+        userId: new Types.ObjectId(userId),
         messages: [],
-        isActive: true
+        isActive: true,
       });
-      
+
       this.logger.log(`Created new conversation for user ${userId}`);
     }
 
@@ -397,10 +404,7 @@ REMEMBER: Your purpose is ONLY career counseling for IT professionals. Stay with
   /**
    * Extract suggested actions from AI response
    */
-  private extractSuggestedActions(
-    aiResponse: string, 
-    userContext: any
-  ): string[] {
+  private extractSuggestedActions(aiResponse: string, userContext: any): string[] {
     const actions: string[] = [];
 
     // Simple keyword-based action extraction

@@ -73,7 +73,13 @@ export class CvProfilesController {
         },
       }),
       fileFilter: (req, file, cb) => {
-        const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        const allowedMimeTypes = [
+          'image/jpeg',
+          'image/jpg',
+          'image/png',
+          'image/gif',
+          'image/webp',
+        ];
         if (!allowedMimeTypes.includes(file.mimetype)) {
           cb(
             new BadRequestException(
@@ -98,7 +104,7 @@ export class CvProfilesController {
       'Send CV data as JSON string in "cvData" field and optional avatar file in "avatar" field. ' +
       'If CV exists, it will be updated. If not, a new CV will be created.',
   })
-@ApiBody({
+  @ApiBody({
     schema: {
       type: 'object',
       required: ['cvData'],
@@ -123,9 +129,7 @@ export class CvProfilesController {
               personalLink: 'https://linkedin.com/in/nguyenvana',
               bio: 'Experienced developer with 5+ years',
             },
-            skills: [
-              { id: 'skill-1', name: 'NestJS', level: 'Advanced' },
-            ],
+            skills: [{ id: 'skill-1', name: 'NestJS', level: 'Advanced' }],
             experience: [
               {
                 id: 'exp-1',
@@ -175,7 +179,7 @@ export class CvProfilesController {
   })
   async upsertCvProfile(
     @User() user: IUser,
-     @Body('cvData') cvDataString: string,
+    @Body('cvData') cvDataString: string,
     @UploadedFile() avatarFile?: Express.Multer.File,
   ) {
     // Parse CV data from JSON string
@@ -196,10 +200,7 @@ export class CvProfilesController {
     }
 
     // Upsert CV profile
-    const cvProfile = await this.cvProfilesService.upsertCvProfile(
-      user._id,
-      cvData,
-    );
+    const cvProfile = await this.cvProfilesService.upsertCvProfile(user._id, cvData);
 
     return {
       message: 'CV Profile saved successfully',
@@ -258,10 +259,10 @@ export class CvProfilesController {
     const cvProfile = await this.cvProfilesService.getCurrentUserCv(user._id);
 
     return {
-      message: cvProfile 
-        ? 'CV Profile retrieved successfully' 
-        : 'User does not have a CV Profile yet', 
-      data: cvProfile || null, 
+      message: cvProfile
+        ? 'CV Profile retrieved successfully'
+        : 'User does not have a CV Profile yet',
+      data: cvProfile || null,
     };
   }
 
@@ -328,14 +329,8 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
-  async updateCurrentUserCv(
-    @User() user: IUser,
-    @Body() updateCvProfileDto: CreateCvProfileDto,
-  ) {
-    const cvProfile = await this.cvProfilesService.upsertCvProfile(
-      user._id,
-      updateCvProfileDto,
-    );
+  async updateCurrentUserCv(@User() user: IUser, @Body() updateCvProfileDto: CreateCvProfileDto) {
+    const cvProfile = await this.cvProfilesService.upsertCvProfile(user._id, updateCvProfileDto);
 
     return {
       statusCode: HttpStatus.OK,
@@ -410,9 +405,7 @@ export class CvProfilesController {
     description: 'Unauthorized - Invalid or missing JWT token',
   })
   async deactivateCvProfile(@User() user: IUser) {
-    const cvProfile = await this.cvProfilesService.deactivateCvProfile(
-      user._id,
-    );
+    const cvProfile = await this.cvProfilesService.deactivateCvProfile(user._id);
 
     return {
       statusCode: HttpStatus.OK,
@@ -573,10 +566,7 @@ export class CvProfilesController {
     status: 403,
     description: 'Forbidden - Admin access required',
   })
-  async getAllCvProfiles(
-    @Query('page') page: string = '1',
-    @Query('limit') limit: string = '10',
-  ) {
+  async getAllCvProfiles(@Query('page') page: string = '1', @Query('limit') limit: string = '10') {
     const pageNum = parseInt(page, 10) || 1;
     const limitNum = parseInt(limit, 10) || 10;
 

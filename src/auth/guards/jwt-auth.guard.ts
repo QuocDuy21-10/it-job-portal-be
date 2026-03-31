@@ -12,9 +12,9 @@ import { log } from 'console';
 
 /**
  * JWT Access Token Guard với Permission Checking
- * 
+ *
  * Sử dụng JwtStrategy để xác thực access token từ Bearer header
- * 
+ *
  * Features:
  * - Xác thực JWT access token
  * - Hydrate user data từ DB (thông qua JwtStrategy)
@@ -22,7 +22,7 @@ import { log } from 'console';
  * - Hỗ trợ public routes (@Public decorator)
  * - Hỗ trợ optional auth (@OptionalAuth decorator)
  * - Hỗ trợ skip permission check (@ResponseMessage decorator với skipPermission)
- * 
+ *
  * Usage:
  * @UseGuards(JwtAuthGuard)
  * @Get('profile')
@@ -98,10 +98,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const targetPath = request.route?.path as string;
 
     const permissions = user?.permissions ?? [];
-    
 
     // Tìm permission khớp với method và path
-    let isExistPermission = permissions.find((permission) => {
+    let isExistPermission = permissions.find(permission => {
       return permission.apiPath === targetPath && permission.method === targetMethod;
     });
 

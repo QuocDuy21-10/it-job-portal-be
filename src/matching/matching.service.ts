@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ParsedDataDto } from 'src/resumes/dto/parsed-data.dto';
 import { Job } from 'src/jobs/schemas/job.schema';
 import { SkillMatchDto } from './dto/skill-match.dto';
-import { 
-  MATCHING_WEIGHTS, 
-  SCORE_THRESHOLDS, 
+import {
+  MATCHING_WEIGHTS,
+  SCORE_THRESHOLDS,
   EXPERIENCE_SCORING,
   SKILL_PROFICIENCY_LEVELS,
   MATCHING_RECOMMENDATIONS,
@@ -16,13 +16,13 @@ import { MatchResultDto } from './dto/match-result.dto';
 
 /**
  * MatchingService - Hybrid CV Matching Engine
- * 
+ *
  * Trách nhiệm:
  * - Nhận parsedData từ AI (extracted JSON)
  * - Nhận jobInfo từ DB
  * - Tự tính toán matching score dựa trên business rules
  * - Không gọi AI để matching (chỉ AI extract data)
- * 
+ *
  * @author Backend Team
  * @architecture Hybrid Parsing Pipeline (AI Extract + Backend Score)
  */
@@ -36,14 +36,9 @@ export class MatchingService {
    * @param job - Thông tin job từ database
    * @returns Match result với score, priority, status, insights
    */
-  async calculateMatch(
-    parsedCV: ParsedDataDto,
-    job: Job,
-  ): Promise<MatchResultDto> {
+  async calculateMatch(parsedCV: ParsedDataDto, job: Job): Promise<MatchResultDto> {
     try {
-      this.logger.log(
-        `Starting match calculation for job: ${job.name}`,
-      );
+      this.logger.log(`Starting match calculation for job: ${job.name}`);
 
       // CRITICAL: Validate and normalize inputs to prevent NaN
       const normalizedCV = this.validateAndNormalizeInputs(parsedCV);
@@ -145,27 +140,22 @@ export class MatchingService {
     let matchedCount = 0;
 
     // Normalize skills for better matching
-    const normalizedCandidateSkills = candidateSkills.map((s) =>
-      this.normalizeSkill(s),
-    );
+    const normalizedCandidateSkills = candidateSkills.map(s => this.normalizeSkill(s));
 
     for (const requiredSkill of requiredSkills) {
       const normalizedRequired = this.normalizeSkill(requiredSkill);
 
       // Check if skill is matched
-      const isMatched = normalizedCandidateSkills.some((candidateSkill) =>
+      const isMatched = normalizedCandidateSkills.some(candidateSkill =>
         this.isSkillMatch(candidateSkill, normalizedRequired),
       );
 
       if (isMatched) {
         matchedCount++;
-        
+
         // Determine proficiency based on skill appearance
-        const proficiency = this.determineProficiency(
-          requiredSkill,
-          candidateSkills,
-        );
-        
+        const proficiency = this.determineProficiency(requiredSkill, candidateSkills);
+
         totalScore += SKILL_PROFICIENCY_LEVELS[proficiency];
 
         matches.push({
@@ -189,7 +179,7 @@ export class MatchingService {
     if (requiredSkills.length > 0) {
       const maxPossibleScore = requiredSkills.length * 100;
       scorePercentage = (totalScore / maxPossibleScore) * 100;
-      
+
       // Safeguard: Ensure valid number
       if (isNaN(scorePercentage) || !isFinite(scorePercentage)) {
         this.logger.warn('Invalid scorePercentage calculated, defaulting to 0', {
@@ -211,10 +201,7 @@ export class MatchingService {
   /**
    * Calculate experience score based on years and job level
    */
-  private calculateExperienceScore(
-    yearsOfExperience: number,
-    jobLevel: string,
-  ): number {
+  private calculateExperienceScore(yearsOfExperience: number, jobLevel: string): number {
     const levelConfig = EXPERIENCE_SCORING[jobLevel as JobLevel];
 
     if (!levelConfig) {
@@ -251,42 +238,37 @@ export class MatchingService {
   /**
    * Calculate education score based on degree level and job requirements
    */
-  private calculateEducationScore(
-    education: any[],
-    jobLevel: string,
-  ): number {
+  private calculateEducationScore(education: any[], jobLevel: string): number {
     if (!education || education.length === 0) {
       return 50; // Neutral score if no education data
     }
 
     // Determine highest degree
-    const degrees = education.map((edu) => edu.degree?.toLowerCase() || '');
-    const hasPhd = degrees.some((d) => d.includes('phd') || d.includes('tiến sĩ'));
-    const hasMaster = degrees.some(
-      (d) => d.includes('master') || d.includes('thạc sĩ'),
-    );
+    const degrees = education.map(edu => edu.degree?.toLowerCase() || '');
+    const hasPhd = degrees.some(d => d.includes('phd') || d.includes('tiến sĩ'));
+    const hasMaster = degrees.some(d => d.includes('master') || d.includes('thạc sĩ'));
     const hasBachelor = degrees.some(
-      (d) => d.includes('bachelor') || d.includes('cử nhân') || d.includes('đại học'),
+      d => d.includes('bachelor') || d.includes('cử nhân') || d.includes('đại học'),
     );
 
     // Score based on job level
     switch (jobLevel) {
       case JobLevel.INTERN:
         return hasBachelor || hasMaster || hasPhd ? 100 : 75;
-      
+
       case JobLevel.JUNIOR:
         return hasBachelor ? 100 : hasMaster || hasPhd ? 100 : 60;
-      
+
       case JobLevel.MID_LEVEL:
         return hasBachelor ? 90 : hasMaster ? 100 : hasPhd ? 100 : 50;
-      
+
       case JobLevel.SENIOR:
         return hasMaster || hasPhd ? 100 : hasBachelor ? 80 : 40;
-      
+
       case JobLevel.LEAD:
       case JobLevel.MANAGER:
         return hasPhd || hasMaster ? 100 : hasBachelor ? 70 : 30;
-      
+
       default:
         return 50;
     }
@@ -342,7 +324,6 @@ export class MatchingService {
     return ResumePriority.LOW;
   }
 
-
   /**
    * Generate insights (strengths and weaknesses)
    */
@@ -380,9 +361,8 @@ export class MatchingService {
     // Additional strengths from CV
     if (parsedCV.education && parsedCV.education.length > 0) {
       const hasAdvancedDegree = parsedCV.education.some(
-        (edu) =>
-          edu.degree?.toLowerCase().includes('master') ||
-          edu.degree?.toLowerCase().includes('phd'),
+        edu =>
+          edu.degree?.toLowerCase().includes('master') || edu.degree?.toLowerCase().includes('phd'),
       );
       if (hasAdvancedDegree) {
         strengths.push('Advanced degree (Master/PhD)');
@@ -452,10 +432,7 @@ export class MatchingService {
     }
 
     // Contains match
-    if (
-      candidateSkill.includes(requiredSkill) ||
-      requiredSkill.includes(candidateSkill)
-    ) {
+    if (candidateSkill.includes(requiredSkill) || requiredSkill.includes(candidateSkill)) {
       return true;
     }
 
@@ -487,10 +464,7 @@ export class MatchingService {
   /**
    * Determine proficiency level based on skill context
    */
-  private determineProficiency(
-    requiredSkill: string,
-    candidateSkills: string[],
-  ): string {
+  private determineProficiency(requiredSkill: string, candidateSkills: string[]): string {
     const skillText = candidateSkills.join(' ').toLowerCase();
     const normalizedSkill = requiredSkill.toLowerCase();
 

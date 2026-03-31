@@ -96,9 +96,7 @@ export class CvProfilesService {
   async findByUserId(userId: string): Promise<CvProfile | null> {
     this.validateUserId(userId);
 
-    return this.cvProfileModel
-      .findOne({ userId: new Types.ObjectId(userId) })
-      .exec();
+    return this.cvProfileModel.findOne({ userId: new Types.ObjectId(userId) }).exec();
   }
 
   /**
@@ -107,11 +105,11 @@ export class CvProfilesService {
    */
   async getCurrentUserCv(userId: string): Promise<CvProfile> {
     const cvProfile = await this.findByUserId(userId);
-    
+
     if (cvProfile) {
       return this.transformCvProfileUrls(cvProfile);
     }
-    
+
     return cvProfile;
   }
 
@@ -208,9 +206,7 @@ export class CvProfilesService {
   async findById(cvProfileId: string): Promise<CvProfile> {
     this.validateUserId(cvProfileId);
 
-    const cvProfile = await this.cvProfileModel
-      .findById(cvProfileId)
-      .exec();
+    const cvProfile = await this.cvProfileModel.findById(cvProfileId).exec();
 
     if (!cvProfile) {
       throw new NotFoundException('CV Profile not found');
@@ -239,12 +235,7 @@ export class CvProfilesService {
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
-      this.cvProfileModel
-        .find()
-        .skip(skip)
-        .limit(limit)
-        .sort({ createdAt: -1 })
-        .exec(),
+      this.cvProfileModel.find().skip(skip).limit(limit).sort({ createdAt: -1 }).exec(),
       this.cvProfileModel.countDocuments().exec(),
     ]);
 

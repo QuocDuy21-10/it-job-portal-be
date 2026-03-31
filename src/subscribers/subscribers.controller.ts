@@ -34,8 +34,6 @@ export class SubscribersController {
     return this.subscribersService.findAll(+page, +limit, query);
   }
 
-
-
   @Patch()
   @SkipCheckPermission()
   @ApiOperation({

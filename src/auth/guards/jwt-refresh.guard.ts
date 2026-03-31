@@ -4,9 +4,9 @@ import { Observable } from 'rxjs';
 
 /**
  * JWT Refresh Token Guard
- * 
+ *
  * Sử dụng JwtRefreshStrategy để xác thực refresh token từ cookie
- * 
+ *
  * Usage:
  * @UseGuards(JwtRefreshGuard)
  * @Post('refresh')

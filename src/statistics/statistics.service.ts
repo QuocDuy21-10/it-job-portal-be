@@ -32,14 +32,10 @@ export class StatisticsService {
     const startTime = Date.now();
 
     // Step 1: Check cache
-    const cachedData = await this.cacheManager.get<DashboardStatsDto>(
-      CACHE_KEYS.DASHBOARD_STATS,
-    );
+    const cachedData = await this.cacheManager.get<DashboardStatsDto>(CACHE_KEYS.DASHBOARD_STATS);
 
     if (cachedData) {
-      this.logger.debug(
-        `Dashboard stats served from cache in ${Date.now() - startTime}ms`,
-      );
+      this.logger.debug(`Dashboard stats served from cache in ${Date.now() - startTime}ms`);
       return {
         ...cachedData,
         fromCache: true,
@@ -49,19 +45,14 @@ export class StatisticsService {
     // Step 2: Compute statistics using parallel aggregations
     this.logger.log('Computing dashboard statistics...');
 
-    const [
-      countJobs24h,
-      countActiveJobs,
-      countHiringCompanies,
-      salaryDistribution,
-      jobTrend,
-    ] = await Promise.all([
-      this.getJobsLast24Hours(),
-      this.getActiveJobsCount(),
-      this.getHiringCompaniesCount(),
-      this.getSalaryDistribution(),
-      this.getJobTrendLast7Days(),
-    ]);
+    const [countJobs24h, countActiveJobs, countHiringCompanies, salaryDistribution, jobTrend] =
+      await Promise.all([
+        this.getJobsLast24Hours(),
+        this.getActiveJobsCount(),
+        this.getHiringCompaniesCount(),
+        this.getSalaryDistribution(),
+        this.getJobTrendLast7Days(),
+      ]);
 
     const stats: DashboardStatsDto = {
       countJobs24h,
@@ -74,15 +65,9 @@ export class StatisticsService {
     };
 
     // Step 3: Cache the result
-    await this.cacheManager.set(
-      CACHE_KEYS.DASHBOARD_STATS,
-      stats,
-      CACHE_TTL.DASHBOARD,
-    );
+    await this.cacheManager.set(CACHE_KEYS.DASHBOARD_STATS, stats, CACHE_TTL.DASHBOARD);
 
-    this.logger.log(
-      `Dashboard stats computed and cached in ${Date.now() - startTime}ms`,
-    );
+    this.logger.log(`Dashboard stats computed and cached in ${Date.now() - startTime}ms`);
 
     return stats;
   }
@@ -189,7 +174,7 @@ export class StatisticsService {
 
     // Map bucket results to labeled ranges
     return result
-      .filter((item) => item._id !== 'other')
+      .filter(item => item._id !== 'other')
       .map((item, index) => ({
         range: SALARY_RANGES.LABELS[index],
         count: item.count,
@@ -201,9 +186,7 @@ export class StatisticsService {
    * Uses $group with $dateToString for daily aggregation
    */
   private async getJobTrendLast7Days(): Promise<JobTrendDto[]> {
-    const last7Days = new Date(
-      Date.now() - TIME_RANGES.DAYS_7 * 24 * 60 * 60 * 1000,
-    );
+    const last7Days = new Date(Date.now() - TIME_RANGES.DAYS_7 * 24 * 60 * 60 * 1000);
 
     const result = await this.jobModel.aggregate([
       {
@@ -243,11 +226,8 @@ export class StatisticsService {
    * Helper: Fill missing dates in trend data
    * Ensures all 7 days are represented even if no jobs created
    */
-  private fillMissingDates(
-    data: JobTrendDto[],
-    days: number,
-  ): JobTrendDto[] {
-    const dateMap = new Map(data.map((item) => [item.date, item.count]));
+  private fillMissingDates(data: JobTrendDto[], days: number): JobTrendDto[] {
+    const dateMap = new Map(data.map(item => [item.date, item.count]));
     const result: JobTrendDto[] = [];
 
     for (let i = days - 1; i >= 0; i--) {

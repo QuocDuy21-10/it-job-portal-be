@@ -4,7 +4,7 @@ import { ResumeStatus } from 'src/resumes/enums/resume-status.enum';
 
 export class MatchResultDto {
   matchingScore: number;
-    // Priority level (EXCELLENT, HIGH, MEDIUM, LOW)
+  // Priority level (EXCELLENT, HIGH, MEDIUM, LOW)
   priority: ResumePriority;
 
   // Chi tiết matching từng skill

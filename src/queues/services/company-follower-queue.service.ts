@@ -25,19 +25,15 @@ export class CompanyFollowerQueueService {
    */
   async addNewJobNotification(payload: NewJobNotificationPayload): Promise<void> {
     try {
-      await this.companyFollowerQueue.add(
-        'send-new-job-notification',
-        payload,
-        {
-          attempts: 3, // Retry 3 times if failed
-          backoff: {
-            type: 'exponential',
-            delay: 5000, // Start with 5 seconds delay
-          },
-          removeOnComplete: true, // Clean up completed jobs
-          removeOnFail: false, // Keep failed jobs for debugging
+      await this.companyFollowerQueue.add('send-new-job-notification', payload, {
+        attempts: 3, // Retry 3 times if failed
+        backoff: {
+          type: 'exponential',
+          delay: 5000, // Start with 5 seconds delay
         },
-      );
+        removeOnComplete: true, // Clean up completed jobs
+        removeOnFail: false, // Keep failed jobs for debugging
+      });
 
       this.logger.log(
         `Added new job notification to queue for job: ${payload.jobId}, company: ${payload.companyId}`,

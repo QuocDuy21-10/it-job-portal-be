@@ -11,24 +11,23 @@ export class GeminiService {
   private readonly model: GenerativeModel;
 
   // Model configuration
-  private readonly MODEL_NAME = 'gemini-2.5-flash';
+  private readonly MODEL_NAME = 'gemini-2.5-flash-lite';
   private readonly PARSE_MAX_TOKENS = 5000;
   private readonly PARSE_TEMPERATURE = 0.3;
   private readonly PARSE_TOP_P = 1;
   private readonly PARSE_TOP_K = 50;
 
   // Rate limiting configuration (Gemini 2.5 Flash FREE tier: RPM=10, TPM=250K, RPD=250)
+  // Rate limiting configuration (Gemini 2.5 Flash FREE tier: RPM=10, TPM=250K, RPD=20)
   private readonly MAX_RETRIES = 3;
   private readonly INITIAL_RETRY_DELAY = 5000; // 5 seconds
   private readonly MAX_RETRY_DELAY = 60000; // 60 seconds
   private lastRequestTime: number = 0;
   private readonly MIN_REQUEST_INTERVAL = 6000; // 6 seconds between requests (10 RPM = 1 req per 6s)
 
-  
-
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
-    
+
     if (!apiKey) {
       this.logger.error('GEMINI_API_KEY is not configured');
       throw new Error('Gemini API key is required');
@@ -50,7 +49,7 @@ export class GeminiService {
   async parseCV(cvText: string): Promise<ParsedDataDto> {
     try {
       const prompt = this.buildCVParsingPrompt(cvText);
-      
+
       // Make request with rate limiting and retry logic
       const result = await this.makeRequestWithRetry(async () => {
         return await this.model.generateContent({
@@ -63,17 +62,17 @@ export class GeminiService {
           },
         });
       });
-      
+
       const response = result.response;
       log(response);
       const text = response.text();
       console.log(text);
-      console.log("EXtractJSON");
+      console.log('EXtractJSON');
 
       // Parse JSON response
       const parsedData = this.extractJSON<ParsedDataDto>(text);
-      console.log("parsedData: ", parsedData);
-      
+      console.log('parsedData: ', parsedData);
+
       this.logger.log('CV parsed successfully');
       return parsedData;
     } catch (error) {
@@ -126,15 +125,15 @@ Return ONLY the valid JSON object.
   //  Extract JSON from AI response
   private extractJSON<T>(text: string): T {
     try {
-      console.log("EXtractJSON");
-      
+      console.log('EXtractJSON');
+
       // Remove markdown code blocks if present
       let cleanedText = text.trim();
-      
+
       // Remove ```json and ``` markers
       cleanedText = cleanedText.replace(/```json\s*/gi, '');
       cleanedText = cleanedText.replace(/```\s*/g, '');
-      
+
       // Find JSON object
       const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
@@ -165,7 +164,7 @@ Return ONLY the valid JSON object.
 
       if (shouldRetry) {
         const retryDelay = this.calculateRetryDelay(error, retryCount);
-        
+
         this.logger.warn(
           `Rate limit hit. Retrying in ${retryDelay}ms (attempt ${retryCount + 1}/${this.MAX_RETRIES})`,
         );
@@ -182,7 +181,7 @@ Return ONLY the valid JSON object.
     }
   }
 
-    // Enforce rate limiting by waiting if needed
+  // Enforce rate limiting by waiting if needed
   private async enforceRateLimit(): Promise<void> {
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
@@ -196,10 +195,8 @@ Return ONLY the valid JSON object.
     this.lastRequestTime = Date.now();
   }
 
-  
-
   //  Check if error is a rate limit error
-public isRateLimitError(error: any): boolean {
+  public isRateLimitError(error: any): boolean {
     const errorMessage = error?.message || '';
     return (
       errorMessage.includes('429') ||
@@ -214,7 +211,7 @@ public isRateLimitError(error: any): boolean {
     // Try to extract suggested retry delay from error
     const errorMessage = error?.message || '';
     const retryMatch = errorMessage.match(/retry in ([\d.]+)s/i);
-    
+
     if (retryMatch) {
       const suggestedDelay = Math.ceil(parseFloat(retryMatch[1]) * 1000);
       this.logger.debug(`Using API suggested retry delay: ${suggestedDelay}ms`);
@@ -224,13 +221,13 @@ public isRateLimitError(error: any): boolean {
     // Exponential backoff: initialDelay * (2 ^ retryCount)
     const exponentialDelay = this.INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
     const delayWithJitter = exponentialDelay + Math.random() * 1000; // Add jitter
-    
+
     return Math.min(delayWithJitter, this.MAX_RETRY_DELAY);
   }
 
   //  Sleep for specified milliseconds
   private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   //  Get token usage estimation
@@ -254,7 +251,7 @@ public isRateLimitError(error: any): boolean {
     try {
       // Handle both string prompt (new) and object context (old) for backward compatibility
       let finalSystemInstruction = '';
-      
+
       if (typeof systemPrompt === 'string') {
         finalSystemInstruction = systemPrompt;
       } else {
@@ -270,7 +267,11 @@ public isRateLimitError(error: any): boolean {
         },
         {
           role: 'model',
-          parts: [{ text: 'Đã nhận thông tin ngữ cảnh. Tôi sẵn sàng hỗ trợ bạn về các vấn đề liên quan đến việc làm và phát triển sự nghiệp trong lĩnh vực IT.' }],
+          parts: [
+            {
+              text: 'Đã nhận thông tin ngữ cảnh. Tôi sẵn sàng hỗ trợ bạn về các vấn đề liên quan đến việc làm và phát triển sự nghiệp trong lĩnh vực IT.',
+            },
+          ],
         },
       ];
 
@@ -304,7 +305,7 @@ public isRateLimitError(error: any): boolean {
 
       const response = result.response.text();
       this.logger.log('AI chat response generated successfully');
-      
+
       return response;
     } catch (error) {
       this.logger.error('Error in chatWithContext:', error);
@@ -365,13 +366,9 @@ Remember: You are helping Vietnamese IT professionals advance their careers.`;
   /**
    * Summarize conversation history (for future use when history gets too long)
    */
-  async summarizeConversation(
-    messages: Array<{ role: string; content: string }>,
-  ): Promise<string> {
+  async summarizeConversation(messages: Array<{ role: string; content: string }>): Promise<string> {
     try {
-      const conversationText = messages
-        .map((m) => `${m.role}: ${m.content}`)
-        .join('\n\n');
+      const conversationText = messages.map(m => `${m.role}: ${m.content}`).join('\n\n');
 
       const prompt = `Summarize this conversation in 2-3 sentences, focusing on key topics discussed and user's main concerns:
 

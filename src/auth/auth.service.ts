@@ -31,7 +31,7 @@ export class AuthService {
     private rolesService: RolesService,
     private sessionsService: SessionsService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
-    private mailerService: MailerService, 
+    private mailerService: MailerService,
   ) {
     // Initialize Google OAuth2 Client
     const googleClientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
@@ -51,7 +51,7 @@ export class AuthService {
       const isValid = this.usersService.isValidPassword(password, user.password);
       if (isValid) {
         if (!user.isActive) {
-             throw new BadRequestException("Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email.");
+          throw new BadRequestException('Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email.');
         }
         // get user role casting data (ObjectId -> {_id: string, name: string})
         const userRole = user.role as unknown as { _id: string; name: string };
@@ -65,8 +65,6 @@ export class AuthService {
     }
     return null;
   }
-
-  
 
   async register(registerUserDto: AuthRegisterDto) {
     // Check email exist
@@ -84,7 +82,7 @@ export class AuthService {
     return {
       _id: newUser?._id,
       createdAt: newUser?.createdAt,
-      message: "Vui lòng kiểm tra email để kích hoạt tài khoản" // Trả về ID để FE điều hướng
+      message: 'Vui lòng kiểm tra email để kích hoạt tài khoản', // Trả về ID để FE điều hướng
     };
   }
 
@@ -110,7 +108,7 @@ export class AuthService {
 
   async verifyEmail(dto: VerifyAuthDto) {
     const { _id, code } = dto;
-    
+
     // Lấy code từ Redis
     const codeStored = await this.cacheManager.get(`verify_user:${_id}`);
 
@@ -128,17 +126,17 @@ export class AuthService {
     // Xóa Redis key
     await this.cacheManager.del(`verify_user:${_id}`);
 
-    return { message: "Kích hoạt tài khoản thành công. Bạn có thể đăng nhập ngay bây giờ." };
+    return { message: 'Kích hoạt tài khoản thành công. Bạn có thể đăng nhập ngay bây giờ.' };
   }
 
   // 4. Gửi lại mã (Resend)
   async resendCode(id: string) {
     const user = await this.usersService.findOne(id);
-    if (!user) throw new BadRequestException("User not found");
-    if (user.isActive) throw new BadRequestException("Tài khoản đã được kích hoạt rồi");
+    if (!user) throw new BadRequestException('User not found');
+    if (user.isActive) throw new BadRequestException('Tài khoản đã được kích hoạt rồi');
 
     await this.sendVerificationCode(user);
-    return { message: "Đã gửi lại mã xác thực mới" };
+    return { message: 'Đã gửi lại mã xác thực mới' };
   }
 
   /**
@@ -219,7 +217,7 @@ export class AuthService {
   /**
    * Refresh Access Token - Token Rotation Pattern
    * Luồng: Xóa session cũ -> Tạo session mới -> Trả về access token + refresh token mới
-   * 
+   *
    * @param oldRefreshToken - Refresh token hiện tại từ cookie
    * @param response - Express response để set cookie mới
    * @param user - User object từ JwtRefreshStrategy (đã được hydrate)
@@ -262,12 +260,7 @@ export class AuthService {
       const newRefreshToken = this.createRefreshToken(refreshPayload);
 
       // BƯỚC 5: Tạo session MỚI trong DB
-      await this.sessionsService.createSession(
-        user._id,
-        newRefreshToken,
-        userAgent,
-        ipAddress,
-      );
+      await this.sessionsService.createSession(user._id, newRefreshToken, userAgent, ipAddress);
 
       // BƯỚC 6: Xóa cookie cũ và set cookie mới
       response.clearCookie('refresh_token');
@@ -338,9 +331,9 @@ export class AuthService {
    */
   async getActiveSessions(userId: string) {
     const sessions = await this.sessionsService.getActiveSessions(userId);
-    
+
     // Format response để ẩn refresh token (bảo mật)
-    return sessions.map((session) => ({
+    return sessions.map(session => ({
       _id: session._id,
       userAgent: session.userAgent,
       ipAddress: session.ipAddress,
@@ -390,13 +383,14 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: userRole,
-        permissions: tempRole?.permissions?.map((perm: any) => ({
-          _id: perm._id?.toString() || '',
-          name: perm.name || '',
-          method: perm.method || '',
-          apiPath: perm.apiPath || '',
-          module: perm.module || '',
-        })) ?? [],
+        permissions:
+          tempRole?.permissions?.map((perm: any) => ({
+            _id: perm._id?.toString() || '',
+            name: perm.name || '',
+            method: perm.method || '',
+            apiPath: perm.apiPath || '',
+            module: perm.module || '',
+          })) ?? [],
         company: user.company
           ? {
               _id: user.company._id?.toString() || '',
@@ -464,7 +458,7 @@ export class AuthService {
   // Change Password
   async changePassword(user: IUser, changePasswordDto: ChangePasswordDto) {
     const { currentPassword, newPassword } = changePasswordDto;
-    
+
     // Lấy thông tin user mới nhất từ DB (bao gồm password hash)
     const userInDb = await this.usersService.findOneByUserEmail(user.email);
     if (!userInDb) throw new BadRequestException('User not found');
@@ -486,20 +480,21 @@ export class AuthService {
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
     const { email } = forgotPasswordDto;
     const user = await this.usersService.findByEmail(email);
-    
+
     // Bảo mật: Luôn trả về success dù email có tồn tại hay không để tránh dò user
-    if (!user) return { message: 'Nếu email tồn tại, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.' };
+    if (!user)
+      return { message: 'Nếu email tồn tại, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.' };
 
     // Tạo token ngẫu nhiên
     const token = uuidv4();
-    
+
     // Lưu vào Redis: key="reset_pass:email", value=token, TTL=10 phút (600s)
     // Lưu ý: Để an toàn hơn, nên lưu key là token, value là email.
     await this.cacheManager.set(`reset_password:${token}`, email, 600000); // TTL miliseconds
 
     // Gửi email (Tốt nhất là đẩy vào Queue, ở đây dùng mailerService trực tiếp làm ví dụ)
     const url = `${this.configService.get<string>('FE_URL')}/reset-password?token=${token}&email=${email}`;
-    
+
     this.mailerService.sendMail({
       to: email,
       subject: 'Reset Password Request',

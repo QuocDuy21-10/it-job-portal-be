@@ -1,7 +1,14 @@
 import { Res } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 import { ResumeStatus } from '../enums/resume-status.enum';
 import { ResumePriority } from '../enums/resume-priority.enum';
 import { ParsedDataDto } from './parsed-data.dto';

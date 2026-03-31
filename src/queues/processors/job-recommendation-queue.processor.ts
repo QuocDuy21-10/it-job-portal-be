@@ -5,14 +5,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { MailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
-import {
-  Subscriber,
-  SubscriberDocument,
-} from 'src/subscribers/schemas/subscriber.schema';
-import {
-  Job as JobEntity,
-  JobDocument,
-} from 'src/jobs/schemas/job.schema';
+import { Subscriber, SubscriberDocument } from 'src/subscribers/schemas/subscriber.schema';
+import { Job as JobEntity, JobDocument } from 'src/jobs/schemas/job.schema';
 import { JOB_RECOMMENDATION_QUEUE } from '../queues.constants';
 import { JobRecommendationPayload } from '../services/job-recommendation-queue.service';
 
@@ -93,22 +87,16 @@ export class JobRecommendationQueueProcessor extends WorkerHost {
         .exec();
 
       if (!matchingJobs || matchingJobs.length === 0) {
-        this.logger.debug(
-          `No matching jobs found for subscriber ${subscriberId}`,
-        );
+        this.logger.debug(`No matching jobs found for subscriber ${subscriberId}`);
         return;
       }
 
-      this.logger.log(
-        `Found ${matchingJobs.length} matching jobs for subscriber ${subscriberId}`,
-      );
+      this.logger.log(`Found ${matchingJobs.length} matching jobs for subscriber ${subscriberId}`);
 
       // 4. Format job data for email template
-      const frontendUrl =
-        this.configService.get<string>('FRONTEND_URL') ||
-        'http://localhost:3000';
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
 
-      const jobs: JobRecommendationData[] = matchingJobs.map((jobDoc) => ({
+      const jobs: JobRecommendationData[] = matchingJobs.map(jobDoc => ({
         name: jobDoc.name,
         company: jobDoc.company?.name || 'N/A',
         salary: this.formatSalary(jobDoc.salary),
@@ -122,7 +110,7 @@ export class JobRecommendationQueueProcessor extends WorkerHost {
         to: subscriber.email,
         from: '"Job Portal Team" <support@example.com>',
         subject: `🎯 ${matchingJobs.length} việc làm phù hợp với bạn!`,
-        template: 'job-recommendation', 
+        template: 'job-recommendation',
         context: {
           receiver: subscriber.name || 'Bạn',
           jobs,
@@ -131,9 +119,7 @@ export class JobRecommendationQueueProcessor extends WorkerHost {
         },
       });
 
-      this.logger.log(
-        `Successfully sent job recommendations to ${subscriber.email}`,
-      );
+      this.logger.log(`Successfully sent job recommendations to ${subscriber.email}`);
     } catch (error) {
       this.logger.error(
         `Error processing job recommendation for subscriber ${subscriberId}: ${error.message}`,

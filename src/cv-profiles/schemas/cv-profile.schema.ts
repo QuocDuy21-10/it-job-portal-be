@@ -137,6 +137,9 @@ export class Project {
   @Prop({ required: true })
   name: string;
 
+  @Prop({ required: true })
+  position: string;
+
   @Prop()
   description: string;
 

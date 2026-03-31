@@ -13,10 +13,10 @@ import { Cache } from 'cache-manager';
 import { getModelToken } from '@nestjs/mongoose';
 import { Resume } from 'src/resumes/schemas/resume.schema';
 import { Model } from 'mongoose';
-import { InjectQueue } from '@nestjs/bullmq'; 
+import { InjectQueue } from '@nestjs/bullmq';
 
 @Processor(RESUME_QUEUE, {
-  concurrency: 1, 
+  concurrency: 1,
   limiter: {
     max: 10, // Gemini 2.5 Flash FREE tier: 10 RPM
     duration: 60000, // per 60 seconds
@@ -55,8 +55,8 @@ export class ResumeQueueProcessor extends WorkerHost {
    * Handle CV parsing job
    */
   private async handleParseResume(job: Job<ParseResumeJobData>) {
-   const { resumeId, filePath, jobId } = job.data;
-    
+    const { resumeId, filePath, jobId } = job.data;
+
     try {
       this.logger.log(`[Parse Job ${job.id}] Starting CV parsing for resume ${resumeId}`);
       await job.updateProgress(10);
@@ -73,10 +73,10 @@ export class ResumeQueueProcessor extends WorkerHost {
       // Step 1: Extract text from file
       this.logger.log(`[Parse Job ${job.id}] Extracting text from: ${filePath}`);
       await job.updateProgress(20);
-      
+
       const cvText = await this.cvParserService.extractTextFromCV(filePath);
       this.logger.log(`[Parse Job ${job.id}] Extracted ${cvText.length} characters`);
-      
+
       // Step 2: Validate extracted text
       await job.updateProgress(30);
       const validation = this.cvParserService.validateExtractedText(cvText);
@@ -87,15 +87,15 @@ export class ResumeQueueProcessor extends WorkerHost {
       // Step 3: Clean text
       await job.updateProgress(40);
       const cleanedText = this.cvParserService.cleanText(cvText);
-      this.logger.log("cleanedText:", cleanedText);
+      this.logger.log('cleanedText:', cleanedText);
       this.logger.log(`[Parse Job ${job.id}] Cleaned text length: ${cleanedText.length}`);
-      
+
       this.logger.log(`[Parse Job ${job.id}] Text cleaned and validated`);
 
       // Step 4: Parse CV using Gemini AI
       this.logger.log(`[Parse Job ${job.id}] Calling Gemini AI for parsing...`);
       await job.updateProgress(50);
-      
+
       const parsedData = await this.geminiService.parseCV(cleanedText);
       this.logger.log(`[Parse Job ${job.id}] AI parsing completed`);
       await job.updateProgress(80);
@@ -106,7 +106,7 @@ export class ResumeQueueProcessor extends WorkerHost {
         isParsed: true,
         parseError: null,
       });
-      
+
       this.logger.log(`[Parse Job ${job.id}] Resume updated with parsed data`);
       await job.updateProgress(90);
 
@@ -115,31 +115,38 @@ export class ResumeQueueProcessor extends WorkerHost {
       await job.updateProgress(100);
 
       this.logger.log(`[Parse Job ${job.id}] Successfully parsed CV for resume ${resumeId}`);
-      
+
       try {
-        await this.resumeQueue.add('analyze-resume', {
-          resumeId: resumeId,
-          jobId: jobId,
-        }, {
-          priority: 2, // Ưu tiên thấp hơn parse
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 2000 },
-        });
+        await this.resumeQueue.add(
+          'analyze-resume',
+          {
+            resumeId: resumeId,
+            jobId: jobId,
+          },
+          {
+            priority: 2, // Ưu tiên thấp hơn parse
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 2000 },
+          },
+        );
         this.logger.log(`[Parse Job ${job.id}] Queued analysis job for resume ${resumeId}`);
       } catch (queueError) {
         this.logger.error(`[Parse Job ${job.id}] Failed to queue analysis job:`, queueError);
         // Bạn có thể throw lỗi ở đây nếu muốn job parse này bị coi là failed
       }
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         parsedData,
         extractedLength: cvText.length,
-        parsedFields: Object.keys(parsedData).length 
+        parsedFields: Object.keys(parsedData).length,
       };
     } catch (error) {
-      this.logger.error(`[Parse Job ${job.id}] ❌ Failed to parse CV for resume ${resumeId}:`, error.message);
-      
+      this.logger.error(
+        `[Parse Job ${job.id}] ❌ Failed to parse CV for resume ${resumeId}:`,
+        error.message,
+      );
+
       // Update resume with error
       await this.resumeModel.findByIdAndUpdate(resumeId, {
         isParsed: false,
@@ -156,9 +163,11 @@ export class ResumeQueueProcessor extends WorkerHost {
    */
   private async handleAnalyzeResume(job: Job<AnalyzeResumeJobData>) {
     const { resumeId, jobId } = job.data;
-    
+
     try {
-      this.logger.log(`[Analysis Job ${job.id}] Starting hybrid analysis for resume ${resumeId} and job ${jobId}`);
+      this.logger.log(
+        `[Analysis Job ${job.id}] Starting hybrid analysis for resume ${resumeId} and job ${jobId}`,
+      );
       await job.updateProgress(10);
 
       // Step 1: Get resume and job data
@@ -182,13 +191,10 @@ export class ResumeQueueProcessor extends WorkerHost {
       // Step 2: Perform HYBRID matching (AI extract + Backend score)
       this.logger.log(`[Analysis Job ${job.id}] Running MatchingService calculation...`);
       await job.updateProgress(40);
-      
+
       // 🆕 Use MatchingService instead of AI
-      const matchResult = await this.matchingService.calculateMatch(
-        resume.parsedData,
-        jobData,
-      );
-      
+      const matchResult = await this.matchingService.calculateMatch(resume.parsedData, jobData);
+
       this.logger.log(
         `[Analysis Job ${job.id}] Matching completed - Score: ${matchResult.matchingScore}, Priority: ${matchResult.priority}`,
       );
@@ -216,31 +222,34 @@ export class ResumeQueueProcessor extends WorkerHost {
         isAnalyzed: true,
         analysisError: null,
       });
-      
+
       await job.updateProgress(100);
 
       this.logger.log(
-        `[Analysis Job ${job.id}] ✅ Successfully analyzed resume ${resumeId} - Score: ${matchResult.matchingScore}, Priority: ${matchResult.priority}}`
+        `[Analysis Job ${job.id}] ✅ Successfully analyzed resume ${resumeId} - Score: ${matchResult.matchingScore}, Priority: ${matchResult.priority}}`,
       );
-      
-      return { 
-        success: true, 
-        analysis, 
+
+      return {
+        success: true,
+        analysis,
         priority: matchResult.priority,
         // autoStatus: matchResult.autoStatus,
         matchingScore: matchResult.matchingScore,
         recommendation: matchResult.recommendation,
       };
     } catch (error) {
-      this.logger.error(`[Analysis Job ${job.id}] ❌ Failed to analyze resume ${resumeId}:`, error.message);
-      
+      this.logger.error(
+        `[Analysis Job ${job.id}] ❌ Failed to analyze resume ${resumeId}:`,
+        error.message,
+      );
+
       // Update resume with error
       await this.resumeModel.findByIdAndUpdate(resumeId, {
         isAnalyzed: false,
         analysisError: error.message,
       });
 
-     // 🚀 LOGIC SỬA LỖI:
+      // 🚀 LOGIC SỬA LỖI:
       // Nếu đây là lỗi Rate Limit (429), chúng ta KHÔNG throw error.
       // Việc không throw sẽ khiến BullMQ hiểu là job đã "hoàn thành" (dù là fail)
       // và sẽ KHÔNG retry.

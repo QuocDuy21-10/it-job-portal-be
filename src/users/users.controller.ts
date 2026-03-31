@@ -15,12 +15,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Public, ResponseMessage, SkipCheckPermission, User } from 'src/decorator/customize';
 import { IUser } from './users.interface';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiQuery,
-  ApiBody,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { SaveJobDto } from './dto/save-job.dto';
 import { FollowCompanyDto } from './dto/follow-company.dto';
 
@@ -84,7 +79,7 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Save a job to user profile',
-    description: 'Add a job to the user\'s saved jobs list. Duplicates are automatically prevented.',
+    description: "Add a job to the user's saved jobs list. Duplicates are automatically prevented.",
   })
   @ApiBody({ type: SaveJobDto })
   @ResponseMessage('Job saved successfully')
@@ -98,7 +93,7 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Unsave a job from user profile',
-    description: 'Remove a job from the user\'s saved jobs list.',
+    description: "Remove a job from the user's saved jobs list.",
   })
   @ApiBody({ type: SaveJobDto })
   @ResponseMessage('Job unsaved successfully')
@@ -110,7 +105,7 @@ export class UsersController {
   @SkipCheckPermission()
   @Get('saved-jobs')
   @ApiOperation({
-    summary: 'Get user\'s saved jobs',
+    summary: "Get user's saved jobs",
     description: 'Retrieve all jobs that the user has saved with pagination support.',
   })
   @ApiQuery({
@@ -142,7 +137,7 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Follow a company',
-    description: 'Add a company to the user\'s following list. Maximum 5 companies allowed.',
+    description: "Add a company to the user's following list. Maximum 5 companies allowed.",
   })
   @ApiBody({ type: FollowCompanyDto })
   @ResponseMessage('Company followed successfully')
@@ -156,7 +151,7 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Unfollow a company',
-    description: 'Remove a company from the user\'s following list.',
+    description: "Remove a company from the user's following list.",
   })
   @ApiBody({ type: FollowCompanyDto })
   @ResponseMessage('Company unfollowed successfully')
@@ -168,7 +163,7 @@ export class UsersController {
   @SkipCheckPermission()
   @Get('following-companies')
   @ApiOperation({
-    summary: 'Get user\'s following companies',
+    summary: "Get user's following companies",
     description: 'Retrieve all companies that the user is following.',
   })
   @ResponseMessage('Get following companies successfully')

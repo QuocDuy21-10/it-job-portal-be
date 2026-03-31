@@ -1,6 +1,6 @@
 /**
  * EXAMPLE: How to Use MatchingService
- * 
+ *
  * This file demonstrates various use cases of the MatchingService
  * in different scenarios.
  */
@@ -61,15 +61,12 @@ class ResumeQueueProcessorExample {
     } as Job;
 
     // 3. Calculate match
-    const matchResult = await this.matchingService.calculateMatch(
-      parsedCV,
-      job,
-    );
+    const matchResult = await this.matchingService.calculateMatch(parsedCV, job);
 
     // 4. Use the result
     console.log('Match Result:', {
-      score: matchResult.matchingScore,           // 85
-      priority: matchResult.priority,             // ResumePriority.EXCELLENT
+      score: matchResult.matchingScore, // 85
+      priority: matchResult.priority, // ResumePriority.EXCELLENT
       // autoStatus: matchResult.autoStatus,         // ResumeStatus.APPROVED
       recommendation: matchResult.recommendation, // "HIGHLY_RECOMMENDED"
       summary: matchResult.summary,
@@ -77,7 +74,7 @@ class ResumeQueueProcessorExample {
 
     // 5. Detailed skills analysis
     console.log('Skills Match:');
-    matchResult.skillsMatch.forEach((skillMatch) => {
+    matchResult.skillsMatch.forEach(skillMatch => {
       console.log(
         `  ${skillMatch.skill}: ${skillMatch.matched ? '✅' : '❌'} (${skillMatch.proficiencyLevel})`,
       );
@@ -107,7 +104,7 @@ class BatchMatchingExample {
   async findBestMatchingJobs(parsedCV: ParsedDataDto, jobs: Job[]) {
     // Match CV against all jobs
     const matchResults = await Promise.all(
-      jobs.map(async (job) => ({
+      jobs.map(async job => ({
         job,
         match: await this.matchingService.calculateMatch(parsedCV, job),
       })),
@@ -119,7 +116,7 @@ class BatchMatchingExample {
     );
 
     // Return top 5 matches
-    return sortedResults.slice(0, 5).map((result) => ({
+    return sortedResults.slice(0, 5).map(result => ({
       jobName: result.job.name,
       score: result.match.matchingScore,
       priority: result.match.priority,
@@ -136,25 +133,16 @@ class CustomAnalysisExample {
   constructor(private matchingService: MatchingService) {}
 
   async analyzeWithCustomRules(parsedCV: ParsedDataDto, job: Job) {
-    const matchResult = await this.matchingService.calculateMatch(
-      parsedCV,
-      job,
-    );
+    const matchResult = await this.matchingService.calculateMatch(parsedCV, job);
 
     // Custom business logic
     const customAnalysis = {
       isHireReady: matchResult.matchingScore >= 80,
       needsInterview: matchResult.matchingScore >= 60,
-      requiresTraining:
-        matchResult.skillsMatchPercentage < 70 &&
-        matchResult.experienceScore >= 70,
-      isOverqualified:
-        matchResult.experienceScore >= 95 &&
-        job.level === JobLevel.JUNIOR,
+      requiresTraining: matchResult.skillsMatchPercentage < 70 && matchResult.experienceScore >= 70,
+      isOverqualified: matchResult.experienceScore >= 95 && job.level === JobLevel.JUNIOR,
       hasCriticalSkillsGap: matchResult.skillsMatch.some(
-        (skill) =>
-          !skill.matched &&
-          this.isCriticalSkill(skill.skill, job.skills),
+        skill => !skill.matched && this.isCriticalSkill(skill.skill, job.skills),
       ),
     };
 
@@ -195,15 +183,9 @@ class ScoringScenarioTests {
     } as Job;
 
     const result = await this.matchingService.calculateMatch(parsedCV, job);
-    
-    console.assert(
-      result.matchingScore >= 90,
-      'Perfect match should score >= 90',
-    );
-    console.assert(
-      result.priority === 'EXCELLENT',
-      'Should have EXCELLENT priority',
-    );
+
+    console.assert(result.matchingScore >= 90, 'Perfect match should score >= 90');
+    console.assert(result.priority === 'EXCELLENT', 'Should have EXCELLENT priority');
   }
 
   // Test Scenario 2: Partial match
@@ -223,15 +205,12 @@ class ScoringScenarioTests {
     } as Job;
 
     const result = await this.matchingService.calculateMatch(parsedCV, job);
-    
+
     console.assert(
       result.matchingScore >= 40 && result.matchingScore <= 70,
       'Partial match should score 40-70',
     );
-    console.assert(
-      result.skillsMatchPercentage === 40,
-      'Should match 2/5 skills = 40%',
-    );
+    console.assert(result.skillsMatchPercentage === 40, 'Should match 2/5 skills = 40%');
   }
 
   // Test Scenario 3: Over-qualified
@@ -251,7 +230,7 @@ class ScoringScenarioTests {
     } as Job;
 
     const result = await this.matchingService.calculateMatch(parsedCV, job);
-    
+
     console.log('Over-qualified candidate:', {
       score: result.matchingScore,
       experienceScore: result.experienceScore, // Should be high but penalized
@@ -276,7 +255,7 @@ class ScoringScenarioTests {
     } as Job;
 
     const result = await this.matchingService.calculateMatch(parsedCV, job);
-    
+
     console.assert(
       result.experienceScore >= 70,
       'Fresh grad should score well for intern position',
@@ -296,38 +275,27 @@ class AdminDashboardExample {
     const resumes = await this.getResumesByIds(resumeIds);
 
     const matchResults = await Promise.all(
-      resumes.map((resume) =>
-        this.matchingService.calculateMatch(resume.parsedData, job),
-      ),
+      resumes.map(resume => this.matchingService.calculateMatch(resume.parsedData, job)),
     );
 
     // Calculate statistics
     const statistics = {
       totalCandidates: matchResults.length,
-      averageScore:
-        matchResults.reduce((sum, r) => sum + r.matchingScore, 0) /
-        matchResults.length,
-      excellentCount: matchResults.filter((r) => r.priority === 'EXCELLENT')
-        .length,
-      highCount: matchResults.filter((r) => r.priority === 'HIGH').length,
-      mediumCount: matchResults.filter((r) => r.priority === 'MEDIUM').length,
-      lowCount: matchResults.filter((r) => r.priority === 'LOW').length,
+      averageScore: matchResults.reduce((sum, r) => sum + r.matchingScore, 0) / matchResults.length,
+      excellentCount: matchResults.filter(r => r.priority === 'EXCELLENT').length,
+      highCount: matchResults.filter(r => r.priority === 'HIGH').length,
+      mediumCount: matchResults.filter(r => r.priority === 'MEDIUM').length,
+      lowCount: matchResults.filter(r => r.priority === 'LOW').length,
       // autoApproved: matchResults.filter((r) => r.autoStatus === 'APPROVED')
       //   .length,
       // autoRejected: matchResults.filter((r) => r.autoStatus === 'REJECTED')
       //   .length,
       scoreDistribution: {
-        '90-100': matchResults.filter((r) => r.matchingScore >= 90).length,
-        '80-89': matchResults.filter(
-          (r) => r.matchingScore >= 80 && r.matchingScore < 90,
-        ).length,
-        '70-79': matchResults.filter(
-          (r) => r.matchingScore >= 70 && r.matchingScore < 80,
-        ).length,
-        '60-69': matchResults.filter(
-          (r) => r.matchingScore >= 60 && r.matchingScore < 70,
-        ).length,
-        '0-59': matchResults.filter((r) => r.matchingScore < 60).length,
+        '90-100': matchResults.filter(r => r.matchingScore >= 90).length,
+        '80-89': matchResults.filter(r => r.matchingScore >= 80 && r.matchingScore < 90).length,
+        '70-79': matchResults.filter(r => r.matchingScore >= 70 && r.matchingScore < 80).length,
+        '60-69': matchResults.filter(r => r.matchingScore >= 60 && r.matchingScore < 70).length,
+        '0-59': matchResults.filter(r => r.matchingScore < 60).length,
       },
       topSkillsGaps: this.findCommonSkillGaps(matchResults),
     };
@@ -338,7 +306,7 @@ class AdminDashboardExample {
   private findCommonSkillGaps(matchResults: any[]) {
     const skillGaps = new Map<string, number>();
 
-    matchResults.forEach((result) => {
+    matchResults.forEach(result => {
       result.skillsMatch.forEach((skill: any) => {
         if (!skill.matched) {
           skillGaps.set(skill.skill, (skillGaps.get(skill.skill) || 0) + 1);

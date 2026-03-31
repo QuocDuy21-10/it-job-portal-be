@@ -41,13 +41,11 @@ export class CompanyFollowerQueueProcessor extends WorkerHost {
         return;
       }
 
-      this.logger.log(
-        `Found ${followers.length} followers for company ${companyId}`,
-      );
+      this.logger.log(`Found ${followers.length} followers for company ${companyId}`);
 
       // Send email to each follower
       // For production: consider batch sending or using a dedicated email service
-      const emailPromises = followers.map((follower) =>
+      const emailPromises = followers.map(follower =>
         this.mailService
           .sendNewJobNotificationToFollower({
             userName: follower.name,
@@ -56,10 +54,8 @@ export class CompanyFollowerQueueProcessor extends WorkerHost {
             companyName,
             jobId,
           })
-          .catch((error) => {
-            this.logger.error(
-              `Failed to send email to ${follower.email}: ${error.message}`,
-            );
+          .catch(error => {
+            this.logger.error(`Failed to send email to ${follower.email}: ${error.message}`);
             // Don't throw - continue sending to other users
           }),
       );
@@ -67,14 +63,9 @@ export class CompanyFollowerQueueProcessor extends WorkerHost {
       // Wait for all emails to be sent
       await Promise.allSettled(emailPromises);
 
-      this.logger.log(
-        `Successfully processed new job notification for job ${jobId}`,
-      );
+      this.logger.log(`Successfully processed new job notification for job ${jobId}`);
     } catch (error) {
-      this.logger.error(
-        `Error processing job ${job.id}: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Error processing job ${job.id}: ${error.message}`, error.stack);
       throw error; // Re-throw to trigger retry
     }
   }
