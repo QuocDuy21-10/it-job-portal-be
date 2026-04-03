@@ -310,6 +310,7 @@ export class ResumesService {
       _id: newResume._id,
       jobId: job._id,
       jobName: job.name,
+      companyId: job.company._id,
       companyName: job.company.name,
       status: newResume.status,
       priority: newResume.priority,
@@ -332,15 +333,27 @@ export class ResumesService {
     candidateName: string,
     candidateEmail: string,
   ) {
+    this.logger.log(
+      `Notifying HR for new application: resumeId=${resumeId}, companyId=${companyId}, jobName=${jobName}, candidate=${candidateName}`,
+    );
+
     // Find HR users who belong to this company
+    // Note: company._id is stored as String in the users collection, not ObjectId
     const hrUsers = await this.userModel
       .find({
-        'company._id': new mongoose.Types.ObjectId(companyId),
+        'company._id': companyId,
         isDeleted: { $ne: true },
         isActive: true,
       })
       .select('_id email name')
       .lean();
+
+    this.logger.log(`Found ${hrUsers.length} HR user(s) for company ${companyId}`);
+
+    if (hrUsers.length === 0) {
+      this.logger.warn(`No HR users found for company ${companyId} — no notifications sent`);
+      return;
+    }
 
     for (const hr of hrUsers) {
       // In-app notification via WebSocket
@@ -359,6 +372,21 @@ export class ResumesService {
           },
         })
         .catch(err => this.logger.error(`Failed to notify HR ${hr.email}: ${err.message}`));
+
+      // Email notification via queue
+      this.applicationNotificationQueueService
+        .addNewApplicationEmail({
+          hrEmail: hr.email,
+          hrName: hr.name || hr.email,
+          candidateName,
+          candidateEmail,
+          jobName,
+          companyName,
+          resumeId,
+        })
+        .catch(err =>
+          this.logger.error(`Failed to queue email for HR ${hr.email}: ${err.message}`),
+        );
     }
   }
 

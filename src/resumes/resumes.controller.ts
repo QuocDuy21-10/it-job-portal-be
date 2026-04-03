@@ -12,6 +12,7 @@ import {
   UploadedFile,
   BadRequestException,
   Inject,
+  Logger,
 } from '@nestjs/common';
 import { ResumesService } from './resumes.service';
 import { CreateResumeDto, CreateUserCvDto } from './dto/create-resume.dto';
@@ -31,6 +32,8 @@ import { SubmitCvOnlineDto } from './dto/submit-cv-online.dto';
 @ApiTags('Resume')
 @Controller('resumes')
 export class ResumesController {
+  private readonly logger = new Logger(ResumesController.name);
+
   constructor(
     private readonly resumesService: ResumesService,
     private readonly resumeProcessingService: ResumeProcessingService,
@@ -134,11 +137,15 @@ export class ResumesController {
         result._id.toString(),
         result.jobName,
         result.companyName,
-        (result as any).jobId?.toString(),
+        result.companyId?.toString(),
         user.name,
         user.email,
       )
-      .catch(() => {});
+      .catch(err =>
+        this.logger.error(
+          `Failed to notify HR for cv-online submission: resumeId=${result._id}, companyId=${result.companyId}, error=${err.message}`,
+        ),
+      );
 
     return result;
   }
@@ -275,7 +282,11 @@ export class ResumesController {
         user.name,
         user.email,
       )
-      .catch(() => {});
+      .catch(err =>
+        this.logger.error(
+          `Failed to notify HR for upload-cv submission: resumeId=${resume._id}, companyId=${job.company._id}, error=${err.message}`,
+        ),
+      );
 
     return result;
   }
