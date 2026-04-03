@@ -6,89 +6,89 @@
   <title>Application Status Update</title>
   <style>
     body {
-      font-family: 'Arial', sans-serif;
-      background-color: #f4f4f4;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f3f4f6;
       margin: 0;
       padding: 0;
     }
     .email-container {
       max-width: 600px;
-      margin: 40px auto;
+      margin: 32px auto;
       background-color: #ffffff;
       border-radius: 8px;
       overflow: hidden;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
     .email-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 30px 20px;
+      background-color: #2563eb;
+      padding: 28px 24px;
       text-align: center;
       color: #ffffff;
     }
     .email-header h1 {
       margin: 0;
-      font-size: 28px;
+      font-size: 24px;
       font-weight: bold;
     }
     .email-body {
-      padding: 40px 30px;
-      color: #333333;
+      padding: 32px 24px;
+      color: #374151;
       line-height: 1.6;
+      font-size: 15px;
     }
     .greeting {
-      font-size: 18px;
-      margin-bottom: 20px;
-      color: #555555;
+      font-size: 16px;
+      color: #374151;
+      margin-bottom: 16px;
     }
-    .status-info {
-      background-color: #f9f9f9;
-      border-left: 4px solid #667eea;
-      padding: 20px;
+    .info-box {
+      background-color: #f9fafb;
+      border-left: 4px solid #2563eb;
+      padding: 16px 20px;
       margin: 20px 0;
       border-radius: 4px;
     }
-    .status-info h2 {
-      margin: 0 0 10px 0;
-      color: #667eea;
-      font-size: 22px;
+    .info-box h2 {
+      margin: 0 0 8px 0;
+      color: #2563eb;
+      font-size: 20px;
     }
-    .status-info p {
-      margin: 5px 0;
-      color: #666666;
+    .info-box p {
+      margin: 4px 0;
+      color: #6b7280;
     }
     .status-badge {
       display: inline-block;
-      padding: 6px 16px;
+      padding: 5px 14px;
       border-radius: 20px;
-      font-weight: bold;
-      font-size: 14px;
+      font-weight: 600;
+      font-size: 13px;
       color: #ffffff;
     }
-    .status-PENDING { background-color: #f59e0b; }
-    .status-REVIEWING { background-color: #3b82f6; }
-    .status-INTERVIEWING { background-color: #8b5cf6; }
-    .status-APPROVED { background-color: #10b981; }
-    .status-REJECTED { background-color: #ef4444; }
+    .status-PENDING { background-color: #d97706; }
+    .status-REVIEWING { background-color: #2563eb; }
+    .status-INTERVIEWING { background-color: #7c3aed; }
+    .status-APPROVED { background-color: #059669; }
+    .status-REJECTED { background-color: #dc2626; }
     .cta-button {
       display: inline-block;
-      padding: 15px 40px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 12px 32px;
+      background-color: #2563eb;
       color: #ffffff;
       text-decoration: none;
-      border-radius: 5px;
-      font-weight: bold;
-      margin: 20px 0;
-      text-align: center;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 14px;
     }
-    .footer {
-      background-color: #f4f4f4;
-      padding: 20px;
+    .email-footer {
+      background-color: #f9fafb;
+      padding: 20px 24px;
       text-align: center;
-      color: #999999;
+      color: #9ca3af;
       font-size: 12px;
     }
-    .footer a {
-      color: #667eea;
+    .email-footer a {
+      color: #2563eb;
       text-decoration: none;
     }
   </style>
@@ -96,15 +96,15 @@
 <body>
   <div class="email-container">
     <div class="email-header">
-      <h1>Application Status Update</h1>
+      <h1>📋 Application Status Update</h1>
     </div>
 
     <div class="email-body">
-      <p class="greeting">Hi {{userName}},</p>
+      <p class="greeting">Hi <strong>{{userName}}</strong>,</p>
 
       <p>Your application status has been updated. Here are the details:</p>
 
-      <div class="status-info">
+      <div class="info-box">
         <h2>{{jobName}}</h2>
         <p><strong>Company:</strong> {{companyName}}</p>
         <p><strong>New Status:</strong> <span class="status-badge status-{{newStatus}}">{{newStatus}}</span></p>
@@ -116,19 +116,19 @@
 
       <p>Click below to view your application details:</p>
 
-      <div style="text-align: center;">
+      <div style="text-align: center; margin: 24px 0;">
         <a href="{{applicationUrl}}" class="cta-button">View Application</a>
       </div>
 
-      <p style="margin-top: 30px; color: #666;">
+      <p style="color: #6b7280;">
         <em>Keep checking your dashboard for further updates on your application.</em>
       </p>
     </div>
 
-    <div class="footer">
+    <div class="email-footer">
       <p>&copy; {{currentYear}} IT Job Portal. All rights reserved.</p>
       <p>
-        <a href="#">Privacy Policy</a> | 
+        <a href="#">Privacy Policy</a> |
         <a href="#">Contact Us</a>
       </p>
     </div>

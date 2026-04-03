@@ -6,97 +6,92 @@
   <title>New Job Notification</title>
   <style>
     body {
-      font-family: 'Arial', sans-serif;
-      background-color: #f4f4f4;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f3f4f6;
       margin: 0;
       padding: 0;
     }
     .email-container {
       max-width: 600px;
-      margin: 40px auto;
+      margin: 32px auto;
       background-color: #ffffff;
       border-radius: 8px;
       overflow: hidden;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
     .email-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 30px 20px;
+      background-color: #2563eb;
+      padding: 28px 24px;
       text-align: center;
       color: #ffffff;
     }
     .email-header h1 {
       margin: 0;
-      font-size: 28px;
+      font-size: 24px;
       font-weight: bold;
     }
     .email-body {
-      padding: 40px 30px;
-      color: #333333;
+      padding: 32px 24px;
+      color: #374151;
       line-height: 1.6;
+      font-size: 15px;
     }
     .greeting {
-      font-size: 18px;
-      margin-bottom: 20px;
-      color: #555555;
+      font-size: 16px;
+      color: #374151;
+      margin-bottom: 16px;
     }
-    .job-info {
-      background-color: #f9f9f9;
-      border-left: 4px solid #667eea;
-      padding: 20px;
+    .info-box {
+      background-color: #f9fafb;
+      border-left: 4px solid #2563eb;
+      padding: 16px 20px;
       margin: 20px 0;
       border-radius: 4px;
     }
-    .job-info h2 {
-      margin: 0 0 10px 0;
-      color: #667eea;
-      font-size: 22px;
+    .info-box h2 {
+      margin: 0 0 8px 0;
+      color: #2563eb;
+      font-size: 20px;
     }
-    .job-info p {
-      margin: 5px 0;
-      color: #666666;
+    .info-box p {
+      margin: 4px 0;
+      color: #6b7280;
     }
     .cta-button {
       display: inline-block;
-      padding: 15px 40px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 12px 32px;
+      background-color: #2563eb;
       color: #ffffff;
       text-decoration: none;
-      border-radius: 5px;
-      font-weight: bold;
-      margin: 20px 0;
-      text-align: center;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 14px;
     }
-    .cta-button:hover {
-      opacity: 0.9;
-    }
-    .footer {
-      background-color: #f4f4f4;
-      padding: 20px;
+    .email-footer {
+      background-color: #f9fafb;
+      padding: 20px 24px;
       text-align: center;
-      color: #999999;
+      color: #9ca3af;
       font-size: 12px;
     }
-    .footer a {
-      color: #667eea;
+    .email-footer a {
+      color: #2563eb;
       text-decoration: none;
     }
   </style>
 </head>
 <body>
   <div class="email-container">
-    <!-- Header -->
     <div class="email-header">
       <h1>🎉 New Job Alert!</h1>
     </div>
 
-    <!-- Body -->
     <div class="email-body">
-      <p class="greeting">Hi {{userName}},</p>
-      
+      <p class="greeting">Hi <strong>{{userName}}</strong>,</p>
+
       <p>Great news! <strong>{{companyName}}</strong>, a company you're following, has just posted a new job opening that might interest you.</p>
-      
-      <div class="job-info">
+
+      <div class="info-box">
         <h2>{{jobName}}</h2>
         <p><strong>Company:</strong> {{companyName}}</p>
         <p>This opportunity could be the perfect next step in your career journey!</p>
@@ -104,21 +99,20 @@
 
       <p>Don't miss out on this exciting opportunity. Click the button below to view the full job details and apply:</p>
 
-      <div style="text-align: center;">
+      <div style="text-align: center; margin: 24px 0;">
         <a href="{{jobDetailUrl}}" class="cta-button">View Job Details</a>
       </div>
 
-      <p style="margin-top: 30px; color: #666;">
+      <p style="color: #6b7280;">
         <em>This email was sent because you're following {{companyName}}. Want to manage your notifications? Log in to your account to update your preferences.</em>
       </p>
     </div>
 
-    <!-- Footer -->
-    <div class="footer">
+    <div class="email-footer">
       <p>&copy; {{currentYear}} IT Job Portal. All rights reserved.</p>
       <p>
-        <a href="#">Unsubscribe</a> | 
-        <a href="#">Privacy Policy</a> | 
+        <a href="#">Unsubscribe</a> |
+        <a href="#">Privacy Policy</a> |
         <a href="#">Contact Us</a>
       </p>
     </div>
