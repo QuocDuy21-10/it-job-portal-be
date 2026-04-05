@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { Company, CompanyDocument } from './schemas/company.schema';
@@ -8,12 +8,16 @@ import mongoose from 'mongoose';
 import { IUser } from 'src/users/users.interface';
 import aqp from 'api-query-params';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
+import { FilesService } from 'src/files/files.service';
 
 @Injectable()
 export class CompaniesService {
+  private readonly logger = new Logger(CompaniesService.name);
+
   constructor(
     @InjectModel(Company.name) private companyModel: SoftDeleteModel<CompanyDocument>,
     @InjectModel(Job.name) private jobModel: SoftDeleteModel<JobDocument>,
+    private readonly filesService: FilesService,
   ) {}
   async create(createCompanyDto: CreateCompanyDto, user: IUser) {
     const isExistName = await this.companyModel.find({
@@ -114,6 +118,19 @@ export class CompaniesService {
 
   async update(id: string, updateCompanyDto: UpdateCompanyDto, user: IUser) {
     this.validateObjectId(id);
+
+    // Delete the old logo file if a new logo is being set
+    if (updateCompanyDto.logo !== undefined) {
+      const currentCompany = await this.companyModel.findById(id).select('logo').lean();
+      if (currentCompany?.logo && currentCompany.logo !== updateCompanyDto.logo) {
+        try {
+          await this.filesService.deleteFile('company', currentCompany.logo);
+        } catch (error) {
+          this.logger.warn(`Could not delete old company logo: ${error.message}`);
+        }
+      }
+    }
+
     return await this.companyModel.updateOne(
       { _id: id },
       { ...updateCompanyDto, updatedBy: { _id: user._id, email: user.email } },

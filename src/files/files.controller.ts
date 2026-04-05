@@ -2,6 +2,8 @@ import {
   Controller,
   Headers,
   Post,
+  Delete,
+  Body,
   UploadedFile,
   UseFilters,
   UseInterceptors,
@@ -18,6 +20,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CreateFileDto } from './dto/create-file.dto';
+import { DeleteFileDto } from './dto/delete-file.dto';
 import { HttpExceptionFilter } from 'src/core/http-exception.filter';
 
 @ApiTags('File')
@@ -50,5 +53,15 @@ export class FilesController {
       fileNameOriginal: file.originalname,
       folderType: folderType || 'default',
     };
+  }
+
+  @Delete('remove')
+  @SkipCheckPermission()
+  @ApiOperation({ summary: 'Delete a previously uploaded file by name and folder type' })
+  @ResponseMessage('Delete file')
+  @ApiResponse({ status: 200, description: 'File deleted successfully.' })
+  async deleteFile(@Body() deleteFileDto: DeleteFileDto) {
+    await this.filesService.deleteFile(deleteFileDto.folderType, deleteFileDto.fileName);
+    return { deleted: true };
   }
 }
