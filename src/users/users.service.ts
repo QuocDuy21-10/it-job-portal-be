@@ -79,13 +79,27 @@ export class UsersService {
     const userRole = await this.roleModel.findOne({ name: USER_ROLE });
 
     const hashedPassword = this.hashPassword(password);
+    // verificationExpires: 15 minutes from now — MongoDB TTL index auto-deletes if not verified
+    const verificationExpires = new Date(Date.now() + 15 * 60 * 1000);
     const newUser = await this.userModel.create({
       name,
       email,
       password: hashedPassword,
       role: userRole?._id,
+      verificationExpires,
     });
     return newUser;
+  }
+
+  async updateUnverifiedUser(id: string, dto: AuthRegisterDto): Promise<any> {
+    this.validateObjectId(id);
+    const hashedPassword = this.hashPassword(dto.password);
+    const verificationExpires = new Date(Date.now() + 15 * 60 * 1000);
+    await this.userModel.updateOne(
+      { _id: id },
+      { name: dto.name, password: hashedPassword, verificationExpires },
+    );
+    return this.userModel.findById(id);
   }
 
   async findAll(page: number, limit: number, query: string) {
@@ -190,43 +204,24 @@ export class UsersService {
     return this.userModel.softDelete({ _id: id });
   }
 
-  /**
-   * Update user active status (for email verification)
-   */
+  async activateUser(id: string) {
+    this.validateObjectId(id);
+    return await this.userModel.updateOne(
+      { _id: id },
+      { $set: { isActive: true }, $unset: { verificationExpires: 1 } },
+    );
+  }
+
   async updateUserStatus(id: string, isActive: boolean) {
     this.validateObjectId(id);
     return await this.userModel.updateOne({ _id: id }, { isActive });
   }
 
-  /**
-   * Update user password
-   */
   async updatePassword(id: string, newPasswordHash: string) {
     this.validateObjectId(id);
     return await this.userModel.updateOne({ _id: id }, { password: newPasswordHash });
   }
 
-  /**
-   * MỤC ĐÍCH:
-   * - Lấy thông tin User Profile ĐẦY ĐỦ & MỚI NHẤT từ DB
-   * - Sử dụng cho API GET /auth/me
-   * - Đảm bảo Fresh Data (name, role, permissions có thể thay đổi)
-   *
-   * KIẾN TRÚC:
-   * - 1 query duy nhất với nested populate tối ưu
-   * - Populate: role → permissions, company, savedJobs IDs, companyFollowed IDs
-   * - Validate: isActive, isDeleted
-   * - Return: IUser interface chuẩn
-   *
-   * BEST PRACTICE:
-   * - Tách rõ logic Auth vs User Profile
-   * - JwtStrategy chỉ validate token → lightweight
-   * - Controller gọi method này để lấy fresh data
-   *
-   * @param userId - User ID từ JWT payload
-   * @returns Promise<IUser> - Complete user profile
-   * @throws BadRequestException - Nếu user không tồn tại hoặc bị vô hiệu hóa
-   */
   async findUserProfile(userId: string): Promise<IUser> {
     this.validateObjectId(userId);
     const user = await this.userModel
@@ -288,19 +283,13 @@ export class UsersService {
     };
   }
 
-  /**
-   * Validate MongoDB ObjectId format
-   */
   private validateObjectId(id: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid ID format');
     }
   }
 
-  /**
-   * Find user by Google ID
-   */
-  async findByGoogleId(googleId: string): Promise<UserDocument | null> {
+  async findUserByGoogleId(googleId: string): Promise<UserDocument | null> {
     return await this.userModel.findOne({ googleId, isDeleted: false }).populate({
       path: 'role',
       select: {
@@ -309,10 +298,7 @@ export class UsersService {
     });
   }
 
-  /**
-   * Find user by email (for Google login)
-   */
-  async findByEmail(email: string): Promise<UserDocument | null> {
+  async findUserByEmail(email: string): Promise<UserDocument | null> {
     return await this.userModel.findOne({ email, isDeleted: false }).populate({
       path: 'role',
       select: {
@@ -321,9 +307,6 @@ export class UsersService {
     });
   }
 
-  /**
-   * Create new user from Google authentication
-   */
   async createGoogleUser(googleProfile: {
     googleId: string;
     email: string;
@@ -339,18 +322,16 @@ export class UsersService {
       googleId,
       email,
       name,
-      password: null, // No password for Google users
+      password: null,
       authProvider: AuthProvider.GOOGLE,
       role: userRole?._id,
-      isActive: true, // Google users are auto-activated
+      isActive: true,
     });
 
     return newUser;
   }
 
-  /**
-   * Update existing user with Google ID (link Google account)
-   */
+  // Update existing user with Google ID (link Google account)
   async linkGoogleAccount(userId: string, googleId: string): Promise<void> {
     await this.userModel.updateOne(
       { _id: userId },

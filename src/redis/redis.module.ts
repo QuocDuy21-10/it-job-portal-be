@@ -4,6 +4,9 @@ import { BullModule } from '@nestjs/bullmq';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-store';
 import type { RedisClientOptions } from 'redis';
+import Redis from 'ioredis';
+
+export const REDIS_CLIENT = 'REDIS_CLIENT';
 
 @Global()
 @Module({
@@ -53,6 +56,19 @@ import type { RedisClientOptions } from 'redis';
       isGlobal: true,
     }),
   ],
-  exports: [BullModule, CacheModule],
+  providers: [
+    {
+      provide: REDIS_CLIENT,
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) =>
+        new Redis({
+          host: configService.get('REDIS_HOST', 'localhost'),
+          port: configService.get<number>('REDIS_PORT', 6379),
+          password: configService.get('REDIS_PASSWORD') || undefined,
+          db: configService.get<number>('REDIS_CACHE_DB', 1),
+        }),
+    },
+  ],
+  exports: [BullModule, CacheModule, REDIS_CLIENT],
 })
 export class RedisModule {}

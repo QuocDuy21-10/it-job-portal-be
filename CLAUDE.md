@@ -70,12 +70,18 @@ Swagger docs: `http://localhost:8081/api`
 - **Soft delete:** All models support soft delete (never hard-delete records)
 - **Hybrid AI:** Gemini extracts CV data, backend `MatchingService` does deterministic scoring
 
+## Rule
+Before writing code, ALWAYS read:
+
+- agent_docs/SENIOR_BACKEND_PRACTICES.md
+
 ## Agent Documentation
 
 Read these files before starting work on related areas. Pick only what's relevant to the current task.
 
 | File | Read when... |
 |------|-------------|
+| `agent_docs/SENIOR_BACKEND_PRACTICES.md` | Writing any new code, refactoring, or reviewing quality standards |
 | `agent_docs/building_and_running.md` | Setting up the project, running Docker, understanding env vars, or deploying |
 | `agent_docs/code_conventions.md` | Writing new endpoints, controllers, services, or understanding the guard chain |
 | `agent_docs/service_architecture.md` | Understanding module dependencies, request lifecycle, or async processing flows |

@@ -29,6 +29,7 @@
   "dependencies": {
     "@casl/ability": "^6.7.3",
     "@google/generative-ai": "^0.24.1",
+    "@nest-lab/throttler-storage-redis": "^1.2.0",
     "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/cache-manager": "^3.0.1",
@@ -119,6 +120,12 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!api-query-params)"
+    ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],

@@ -1,16 +1,16 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class VerifyAuthDto {
   @ApiProperty({
-    description: 'ID của user cần xác thực (ObjectId)',
-    example: '655a1b2c3d4e5f6a7b8c9d0e',
+    description: 'Email address of the user to verify',
+    example: 'user@example.com',
     type: String,
     required: true,
   })
   @IsNotEmpty()
-  @IsString()
-  _id: string;
+  @IsEmail()
+  email: string;
 
   @ApiProperty({
     description: 'Mã xác thực OTP được gửi qua email',

@@ -17,6 +17,8 @@ import { SubscribersModule } from './subscribers/subscribers.module';
 import { MailModule } from './mail/mail.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
+import Redis from 'ioredis';
 import { HealthModule } from './health/health.module';
 import { RedisModule } from './redis/redis.module';
 import { GeminiModule } from './gemini/gemini.module';
@@ -31,13 +33,24 @@ import { NotificationsModule } from './notifications/notifications.module';
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot({
-      throttlers: [
-        {
-          ttl: 60000, // 60 seconds
-          limit: 10, // 10 requests per ttl for general endpoints
-        },
-      ],
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        throttlers: [
+          { name: 'burst', ttl: 1000, limit: 5 },
+          { name: 'sustained', ttl: 10000, limit: 20 },
+          { name: 'default', ttl: 60000, limit: 60 },
+        ],
+        storage: new ThrottlerStorageRedisService(
+          new Redis({
+            host: configService.get('REDIS_HOST', 'localhost'),
+            port: configService.get<number>('REDIS_PORT', 6379),
+            password: configService.get('REDIS_PASSWORD') || undefined,
+            db: configService.get<number>('REDIS_CACHE_DB', 1),
+          }),
+        ),
+      }),
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],

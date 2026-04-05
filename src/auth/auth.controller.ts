@@ -5,7 +5,7 @@ import { LocalAuthGuard } from './guards/local-auth.guard';
 import { Request, Response } from 'express';
 import { IUser } from 'src/users/users.interface';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthRegisterDto } from './dto/auth-register.dto';
 import { AuthEmailLoginDto } from './dto/auth-email-login.dto';
 import { AuthGoogleLoginDto } from './dto/auth-google-login.dto';
@@ -51,6 +51,8 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 3600000, limit: 5 } })
   @ApiOperation({
     summary: 'Register a new user',
     description: 'Register a new user with email and password.',
@@ -63,6 +65,8 @@ export class AuthController {
 
   @Post('verify')
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 300000, limit: 10 } })
   @ApiOperation({
     summary: 'Verify account',
     description:
@@ -97,6 +101,8 @@ export class AuthController {
 
   @Post('resend-code')
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 300000, limit: 5 } })
   @ApiOperation({
     summary: 'Resend verification code',
     description:
@@ -106,10 +112,10 @@ export class AuthController {
     schema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: 'User ID to resend code for.' },
+        email: { type: 'string', description: 'Email address to resend code for.' },
       },
-      required: ['id'],
-      example: { id: 'userId123' },
+      required: ['email'],
+      example: { email: 'user@example.com' },
     },
   })
   @ApiResponse({
@@ -128,8 +134,8 @@ export class AuthController {
     description: 'User not found or already verified.',
   })
   @ResponseMessage('Resend code successfully')
-  handleResendCode(@Body('id') id: string) {
-    return this.authService.resendCode(id);
+  handleResendCode(@Body('email') email: string) {
+    return this.authService.resendCode(email);
   }
 
   @Public()
@@ -241,6 +247,8 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 300000, limit: 5 } })
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset Password (Confirm)' })
   @ResponseMessage('Reset password successfully')

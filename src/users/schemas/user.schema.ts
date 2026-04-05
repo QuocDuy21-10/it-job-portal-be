@@ -31,6 +31,9 @@ export class User {
   @Prop()
   codeExpired: Date;
 
+  @Prop({ type: Date, required: false })
+  verificationExpires?: Date;
+
   @Prop({ type: Object })
   company?: {
     _id?: mongoose.Schema.Types.ObjectId | null;
@@ -80,8 +83,6 @@ export class User {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
-// TẠO PARTIAL UNIQUE INDEX
-// Index này chỉ áp dụng cho documents có isDeleted = false
 UserSchema.index(
   { email: 1 },
   {
@@ -90,10 +91,15 @@ UserSchema.index(
   },
 );
 
-// Thêm index cho performance khi query
 UserSchema.index({ email: 1, isDeleted: 1 });
 UserSchema.index({ role: 1 });
-
-// Index cho reverse lookup - tìm users theo company hoặc job
 UserSchema.index({ companyFollowed: 1 });
 UserSchema.index({ savedJobs: 1 });
+
+UserSchema.index(
+  { verificationExpires: 1 },
+  {
+    expireAfterSeconds: 0,
+    partialFilterExpression: { isActive: false },
+  },
+);

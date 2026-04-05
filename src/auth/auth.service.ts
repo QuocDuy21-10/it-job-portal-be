@@ -1,4 +1,10 @@
-import { BadRequestException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import ms from 'ms';
@@ -19,6 +25,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { VerifyAuthDto } from './dto/verify-auth.dto';
 import { SessionsService } from 'src/sessions/sessions.service';
 import { JwtAccessPayload, JwtRefreshPayload } from './interfaces/jwt-payload.interface';
+import { REDIS_CLIENT } from 'src/redis/redis.module';
+import Redis from 'ioredis';
+import { generateOtp, hashOtp, verifyOtp } from './utils/otp.utils';
 
 @Injectable()
 export class AuthService {
@@ -31,6 +40,7 @@ export class AuthService {
     private rolesService: RolesService,
     private sessionsService: SessionsService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
     private mailerService: MailerService,
   ) {
     // Initialize Google OAuth2 Client
@@ -67,85 +77,118 @@ export class AuthService {
   }
 
   async register(registerUserDto: AuthRegisterDto) {
-    // Check email exist
-    const isExist = await this.usersService.findByEmail(registerUserDto.email);
-    if (isExist) {
+    const { email } = registerUserDto;
+
+    const existingUser = await this.usersService.findUserByEmail(email);
+    if (existingUser && existingUser.isActive) {
       throw new BadRequestException('Email đã tồn tại');
     }
 
-    // Tạo user mới (isActive: false mặc định trong schema)
-    const newUser = await this.usersService.register(registerUserDto);
+    let newUser: any;
+    if (existingUser && !existingUser.isActive) {
+      // Unverified account already exists — update it in-place and resend OTP
+      newUser = await this.usersService.updateUnverifiedUser(
+        existingUser._id.toString(),
+        registerUserDto,
+      );
+    } else {
+      newUser = await this.usersService.register(registerUserDto);
+    }
 
-    // Gửi mã xác thực
-    const code = await this.sendVerificationCode(newUser);
+    // Send OTP verification code
+    await this.sendVerificationCode(newUser);
 
     return {
       _id: newUser?._id,
       createdAt: newUser?.createdAt,
-      message: 'Vui lòng kiểm tra email để kích hoạt tài khoản', // Trả về ID để FE điều hướng
+      message: 'Vui lòng kiểm tra email để kích hoạt tài khoản',
     };
   }
 
-  async sendVerificationCode(user: any) {
-    const code = Math.floor(100000 + Math.random() * 900000).toString(); // Tạo mã 6 số: 123456
-    // Hoặc dùng UUID nếu muốn link: const code = uuidv4();
+  async sendVerificationCode(user: any): Promise<void> {
+    const otpSecret = this.configService.get<string>('OTP_SECRET');
+    const code = generateOtp();
+    const hash = hashOtp(code, otpSecret);
+    const email = user.email;
 
-    // Lưu vào Redis: key="verify_user:_id", value=code, TTL=5 phút
-    await this.cacheManager.set(`verify_user:${user._id}`, code, 300 * 1000);
+    // Use pipeline for atomic multi-key set
+    const pipeline = this.redisClient.pipeline();
+    pipeline.set(`otp:value:${email}`, hash, 'EX', 300);
+    pipeline.set(`otp:attempts:${email}`, '0', 'EX', 300);
+    // SET NX: only create cooldown key if it doesn't already exist
+    pipeline.set(`otp:cooldown:${email}`, '1', 'EX', 60, 'NX' as any);
+    await pipeline.exec();
 
-    // Gửi mail (Nên đẩy vào Queue như bạn đã làm với Job)
     this.mailerService.sendMail({
-      to: user.email,
+      to: email,
       subject: 'Activate your account at IT Job Portal',
-      template: 'verify-email', // Tạo file template mới
+      template: 'verify-email',
       context: {
         name: user.name,
-        code: code,
+        code,
+        currentYear: new Date().getFullYear(),
       },
     });
-    return code;
   }
 
   async verifyEmail(dto: VerifyAuthDto) {
-    const { _id, code } = dto;
+    const { email, code } = dto;
+    const otpSecret = this.configService.get<string>('OTP_SECRET');
 
-    // Lấy code từ Redis
-    const codeStored = await this.cacheManager.get(`verify_user:${_id}`);
+    // Check exceeded attempt limit 
+    const attemptsRaw = await this.redisClient.get(`otp:attempts:${email}`);
+    const attempts = attemptsRaw ? parseInt(attemptsRaw, 10) : 0;
+    if (attempts >= 5) {
+      throw new ForbiddenException(
+        'Quá nhiều lần thử không thành công. Vui lòng yêu cầu mã xác thực mới.',
+      );
+    }
 
-    if (!codeStored) {
+    // Get stored hash
+    const storedHash = await this.redisClient.get(`otp:value:${email}`);
+    if (!storedHash) {
       throw new BadRequestException('Mã xác thực đã hết hạn hoặc không tồn tại');
     }
 
-    if (codeStored.toString() !== code) {
-      throw new BadRequestException('Mã xác thực không chính xác');
+    // Verify OTP (timing-safe)
+    if (!verifyOtp(code, storedHash, otpSecret)) {
+      // Increment failed attempt counter
+      await this.redisClient.incr(`otp:attempts:${email}`);
+      const remaining = 4 - attempts;
+      throw new BadRequestException(`Mã xác thực không chính xác. Còn ${remaining} lần thử.`);
     }
 
-    // Update User status
-    await this.usersService.updateUserStatus(_id, true); // Cần viết hàm này bên UsersService
+    // OTP correct: clean up Redis keys and activate user
+    await this.redisClient.del(
+      `otp:value:${email}`,
+      `otp:attempts:${email}`,
+      `otp:cooldown:${email}`,
+    );
 
-    // Xóa Redis key
-    await this.cacheManager.del(`verify_user:${_id}`);
+    const user = await this.usersService.findUserByEmail(email);
+    if (!user) {
+      throw new BadRequestException('Người dùng không tồn tại');
+    }
+    await this.usersService.activateUser(user._id.toString());
 
     return { message: 'Kích hoạt tài khoản thành công. Bạn có thể đăng nhập ngay bây giờ.' };
   }
 
-  // 4. Gửi lại mã (Resend)
-  async resendCode(id: string) {
-    const user = await this.usersService.findOne(id);
-    if (!user) throw new BadRequestException('User not found');
+  async resendCode(email: string) {
+    const cooldown = await this.redisClient.get(`otp:cooldown:${email}`);
+    if (cooldown) {
+      const ttl = await this.redisClient.ttl(`otp:cooldown:${email}`);
+      throw new BadRequestException(`Vui lòng chờ ${ttl} giây trước khi yêu cầu mã mới.`);
+    }
+
+    const user = await this.usersService.findUserByEmail(email);
+    if (!user) throw new BadRequestException('Người dùng không tồn tại');
     if (user.isActive) throw new BadRequestException('Tài khoản đã được kích hoạt rồi');
 
     await this.sendVerificationCode(user);
     return { message: 'Đã gửi lại mã xác thực mới' };
   }
 
-  /**
-   * Login - Tạo access token và refresh token, lưu session vào DB
-   * @param user - User object từ validateUser
-   * @param response - Express response để set cookie
-   * @param ipAddress - IP address của client
-   * @param userAgent - User agent của client
-   */
   async login(user: IUser, response: Response, ipAddress: string, userAgent: string) {
     const { _id } = user;
 
@@ -178,7 +221,6 @@ export class AuthService {
       maxAge: ms(this.configService.get<string>('JWT_REFRESH_EXPIRES_IN')),
     });
 
-    // Trả về access token + user info (user đã được hydrate đầy đủ từ validateUser)
     return {
       access_token,
       user: {
@@ -192,10 +234,6 @@ export class AuthService {
     };
   }
 
-  /**
-   * Create Access Token - Token ngắn hạn (15 phút - 1 giờ)
-   * Payload tối ưu: chỉ chứa userId (sub) và type
-   */
   createAccessToken(payload: JwtAccessPayload): string {
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET'),
@@ -203,10 +241,6 @@ export class AuthService {
     });
   }
 
-  /**
-   * Create Refresh Token - Token dài hạn (7-30 ngày)
-   * Payload tối ưu: chỉ chứa userId (sub) và type
-   */
   createRefreshToken(payload: JwtRefreshPayload): string {
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
@@ -214,16 +248,6 @@ export class AuthService {
     });
   }
 
-  /**
-   * Refresh Access Token - Token Rotation Pattern
-   * Luồng: Xóa session cũ -> Tạo session mới -> Trả về access token + refresh token mới
-   *
-   * @param oldRefreshToken - Refresh token hiện tại từ cookie
-   * @param response - Express response để set cookie mới
-   * @param user - User object từ JwtRefreshStrategy (đã được hydrate)
-   * @param userAgent - User agent của client
-   * @param ipAddress - IP address của client
-   */
   async refreshAccessToken(
     oldRefreshToken: string,
     response: Response,
@@ -292,11 +316,6 @@ export class AuthService {
     }
   }
 
-  /**
-   * Logout - Xóa session hiện tại (single device logout)
-   * @param response - Express response để xóa cookie
-   * @param refreshToken - Refresh token từ cookie
-   */
   async logout(response: Response, refreshToken: string) {
     // Xóa session tương ứng với refresh token hiện tại
     await this.sessionsService.deleteSession(refreshToken);
@@ -307,11 +326,7 @@ export class AuthService {
     return { message: 'Logout successfully' };
   }
 
-  /**
-   * Logout All Devices - Xóa tất cả sessions của user
-   * @param response - Express response để xóa cookie
-   * @param userId - ID của user
-   */
+
   async logoutAllDevices(response: Response, userId: string) {
     // Xóa tất cả sessions của user
     const deletedCount = await this.sessionsService.deleteAllUserSessions(userId);
@@ -332,7 +347,6 @@ export class AuthService {
   async getActiveSessions(userId: string) {
     const sessions = await this.sessionsService.getActiveSessions(userId);
 
-    // Format response để ẩn refresh token (bảo mật)
     return sessions.map(session => ({
       _id: session._id,
       userAgent: session.userAgent,
@@ -355,21 +369,29 @@ export class AuthService {
       const googleUser = await this.verifyGoogleToken(idToken);
 
       // Step 2: Find or create user
-      let user = await this.usersService.findByGoogleId(googleUser.googleId);
+      let user = await this.usersService.findUserByGoogleId(googleUser.googleId);
 
       if (!user) {
         // Check if email already exists (user registered with email/password)
-        const existingUser = await this.usersService.findByEmail(googleUser.email);
+        const existingUser = await this.usersService.findUserByEmail(googleUser.email);
 
-        if (existingUser) {
-          // Link Google account to existing users
+        if (existingUser && existingUser.isActive) {
+          // Link Google account to verified existing user only
           await this.usersService.linkGoogleAccount(
             existingUser._id.toString(),
             googleUser.googleId,
           );
-          user = await this.usersService.findByGoogleId(googleUser.googleId);
+          user = await this.usersService.findUserByGoogleId(googleUser.googleId);
         } else {
-          // Create new user with Google profile
+          // Either no existing user, or existing user is unverified (security risk — do not link)
+          // If unverified account exists, delete it and create a fresh Google user
+          if (existingUser && !existingUser.isActive) {
+            await this.usersService.remove(existingUser._id.toString(), {
+              _id: existingUser._id.toString(),
+              email: existingUser.email,
+            } as IUser);
+          }
+          // Create new user with Google profile (auto-activated)
           user = await this.usersService.createGoogleUser(googleUser);
         }
       }
@@ -455,7 +477,6 @@ export class AuthService {
     }
   }
 
-  // Change Password
   async changePassword(user: IUser, changePasswordDto: ChangePasswordDto) {
     const { currentPassword, newPassword } = changePasswordDto;
 
@@ -476,10 +497,9 @@ export class AuthService {
     return { message: 'Đổi mật khẩu thành công' };
   }
 
-  // Forgot Password
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
     const { email } = forgotPasswordDto;
-    const user = await this.usersService.findByEmail(email);
+    const user = await this.usersService.findUserByEmail(email);
 
     // Bảo mật: Luôn trả về success dù email có tồn tại hay không để tránh dò user
     if (!user)
@@ -498,10 +518,11 @@ export class AuthService {
     this.mailerService.sendMail({
       to: email,
       subject: 'Reset Password Request',
-      template: 'forgot-password', // Tên file template .hbs
+      template: 'forgot-password',
       context: {
         name: user.name,
         url: url,
+        currentYear: new Date().getFullYear(),
       },
     });
 
@@ -520,7 +541,7 @@ export class AuthService {
     }
 
     // Tìm user và update password
-    const user = await this.usersService.findByEmail(email);
+    const user = await this.usersService.findUserByEmail(email);
     if (!user) throw new BadRequestException('User not found');
 
     const newPasswordHash = this.hashPassword(newPassword);
