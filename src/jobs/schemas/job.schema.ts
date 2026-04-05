@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
-import { JobLevel } from '../enums/job-level.enum';
-import { JobFormOfWork } from '../enums/job-formwork';
+import { EJobLevel } from '../enums/job-level.enum';
+import { EJobFormOfWork } from '../enums/job-form-of-work.enum';
 
 export type JobDocument = HydratedDocument<Job>;
 
@@ -29,10 +29,10 @@ export class Job {
   @Prop({ required: true })
   quantity: number;
 
-  @Prop({ required: true, trim: true, enum: JobLevel })
+  @Prop({ required: true, trim: true, enum: EJobLevel })
   level: string;
 
-  @Prop({ trim: true, enum: JobFormOfWork })
+  @Prop({ trim: true, enum: EJobFormOfWork })
   formOfWork: string;
 
   @Prop()

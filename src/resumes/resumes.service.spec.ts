@@ -7,7 +7,7 @@ import { CvProfilesService } from 'src/cv-profiles/cv-profiles.service';
 import { JobsService } from 'src/jobs/jobs.service';
 import { MatchingService } from 'src/matching/matching.service';
 import { NotificationsService } from 'src/notifications/notifications.service';
-import { NotificationType } from 'src/notifications/enums/notification-type.enum';
+import { ENotificationType } from 'src/notifications/enums/notification-type.enum';
 import { ApplicationNotificationQueueService } from 'src/queues/services/application-notification-queue.service';
 import mongoose from 'mongoose';
 
@@ -112,14 +112,14 @@ describe('ResumesService', () => {
       expect(mockNotificationsService.create).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: mockHrUsers[0]._id.toString(),
-          type: NotificationType.NEW_APPLICATION,
+          type: ENotificationType.NEW_APPLICATION,
           title: 'New Application Received',
         }),
       );
       expect(mockNotificationsService.create).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: mockHrUsers[1]._id.toString(),
-          type: NotificationType.NEW_APPLICATION,
+          type: ENotificationType.NEW_APPLICATION,
         }),
       );
     });

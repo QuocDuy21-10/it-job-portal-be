@@ -2,8 +2,8 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
 import { Company } from 'src/companies/schemas/company.schema';
 import { Job } from 'src/jobs/schemas/job.schema';
-import { ResumeStatus } from '../enums/resume-status.enum';
-import { ResumePriority } from '../enums/resume-priority.enum';
+import { EResumeStatus } from '../enums/resume-status.enum';
+import { EResumePriority } from '../enums/resume-priority.enum';
 
 export type ResumeDocument = HydratedDocument<Resume>;
 
@@ -111,7 +111,7 @@ export class Resume {
   @Prop()
   url: string;
 
-  @Prop({ required: true, enum: ResumeStatus, default: ResumeStatus.PENDING })
+  @Prop({ required: true, enum: EResumeStatus, default: EResumeStatus.PENDING })
   status: string;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Company.name })
@@ -128,7 +128,7 @@ export class Resume {
   @Prop({ type: AIAnalysis })
   aiAnalysis?: AIAnalysis;
 
-  @Prop({ enum: ResumePriority, default: ResumePriority.LOW, index: true })
+  @Prop({ enum: EResumePriority, default: EResumePriority.LOW, index: true })
   priority?: string;
 
   @Prop()

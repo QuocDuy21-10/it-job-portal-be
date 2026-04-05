@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsEmail, IsEnum, IsMongoId, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import mongoose from 'mongoose';
-import { ResumeStatus } from '../enums/resume-status.enum';
+import { EResumeStatus } from '../enums/resume-status.enum';
 
 export class CreateResumeDto {
   @IsNotEmpty({ message: 'Email is required' })
@@ -25,10 +25,10 @@ export class CreateResumeDto {
   @IsNotEmpty({ message: 'status is required' })
   @Type(() => String)
   @IsString({ message: 'Status must be a string' })
-  @IsEnum(ResumeStatus, {
-    message: `Status must be one of the following values: ${Object.values(ResumeStatus).join(', ')}`,
+  @IsEnum(EResumeStatus, {
+    message: `Status must be one of the following values: ${Object.values(EResumeStatus).join(', ')}`,
   })
-  @ApiProperty({ example: ResumeStatus.PENDING, description: 'Status of resume' })
+  @ApiProperty({ example: EResumeStatus.PENDING, description: 'Status of resume' })
   status: string;
 
   @IsOptional()

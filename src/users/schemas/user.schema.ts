@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
 import { Role } from 'src/roles/schemas/role.schema';
-import { AuthProvider } from 'src/auth/enums/auth-provider.enum';
+import { EAuthProvider } from 'src/auth/enums/auth-provider.enum';
 
 export type UserDocument = HydratedDocument<User>;
 
@@ -16,7 +16,7 @@ export class User {
   @Prop({ required: false })
   password: string;
 
-  @Prop({ type: String, enum: AuthProvider, default: AuthProvider.LOCAL })
+  @Prop({ type: String, enum: EAuthProvider, default: EAuthProvider.LOCAL })
   authProvider: string;
 
   @Prop({ unique: true, sparse: true })

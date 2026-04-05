@@ -9,18 +9,18 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { ResumeStatus } from '../enums/resume-status.enum';
-import { ResumePriority } from '../enums/resume-priority.enum';
+import { EResumeStatus } from '../enums/resume-status.enum';
+import { EResumePriority } from '../enums/resume-priority.enum';
 import { ParsedDataDto } from './parsed-data.dto';
 import { AIAnalysisDto } from './ai-analysis.dto';
 
 export class UpdateResumeDto {
   @IsNotEmpty({ message: 'Status should not be empty' })
   @Type(() => String)
-  @IsEnum(ResumeStatus, {
-    message: `Status must be one of the following values: ${Object.values(ResumeStatus).join(', ')}`,
+  @IsEnum(EResumeStatus, {
+    message: `Status must be one of the following values: ${Object.values(EResumeStatus).join(', ')}`,
   })
-  @ApiProperty({ example: ResumeStatus.PENDING, description: 'Status of resume' })
+  @ApiProperty({ example: EResumeStatus.PENDING, description: 'Status of resume' })
   @IsString({ message: 'Status must be a string' })
   @IsOptional()
   status?: string;
@@ -36,7 +36,7 @@ export class UpdateResumeDto {
   @IsOptional()
   aiAnalysis?: AIAnalysisDto;
 
-  @IsEnum(ResumePriority)
+  @IsEnum(EResumePriority)
   @IsOptional()
   priority?: string;
 

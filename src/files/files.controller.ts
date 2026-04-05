@@ -9,7 +9,9 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FilesService } from './files.service';
-import { Public, ResponseMessage, SkipCheckPermission } from 'src/decorator/customize';
+import { Public } from 'src/utils/decorators/public.decorator';
+import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
+import { SkipCheckPermission } from 'src/utils/decorators/skip-check-permission.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBody,
@@ -21,7 +23,7 @@ import {
 } from '@nestjs/swagger';
 import { CreateFileDto } from './dto/create-file.dto';
 import { DeleteFileDto } from './dto/delete-file.dto';
-import { HttpExceptionFilter } from 'src/core/http-exception.filter';
+import { HttpExceptionFilter } from 'src/utils/http-exception.filter';
 
 @ApiTags('File')
 @Controller('files')

@@ -1,9 +1,11 @@
 import { Body, Controller, Get, HttpStatus, Ip, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { Public, ResponseMessage, User } from 'src/decorator/customize';
+import { Public } from 'src/utils/decorators/public.decorator';
+import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
+import { User } from 'src/utils/decorators/user.decorator';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { Request, Response } from 'express';
-import { IUser } from 'src/users/users.interface';
+import { IUser } from 'src/users/user.interface';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthRegisterDto } from './dto/auth-register.dto';
@@ -153,12 +155,8 @@ export class AuthController {
   @Post('/google/login')
   handleGoogleLogin(
     @Body() authGoogleLoginDto: AuthGoogleLoginDto,
-    @Req() req: Request,
     @Res({ passthrough: true }) response: Response,
-    @Ip() ip: string,
   ) {
-    const userAgent = req.headers['user-agent'] || 'Google Login';
-    const ipAddress = ip || req.ip || 'Unknown IP';
     // Tạm thời chưa truyền userAgent và ip vào googleLogin, sẽ cần refactor tiếp
     return this.authService.googleLogin(authGoogleLoginDto.idToken, response);
   }

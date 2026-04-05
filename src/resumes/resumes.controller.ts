@@ -6,19 +6,19 @@ import {
   Patch,
   Param,
   Delete,
-  Res,
   Query,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
-  Inject,
   Logger,
 } from '@nestjs/common';
 import { ResumesService } from './resumes.service';
-import { CreateResumeDto, CreateUserCvDto } from './dto/create-resume.dto';
+import { CreateUserCvDto } from './dto/create-resume.dto';
 import { UpdateResumeDto } from './dto/update-resume.dto';
-import { Public, ResponseMessage, SkipCheckPermission, User } from 'src/decorator/customize';
-import { IUser } from 'src/users/users.interface';
+import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
+import { SkipCheckPermission } from 'src/utils/decorators/skip-check-permission.decorator';
+import { User } from 'src/utils/decorators/user.decorator';
+import { IUser } from 'src/users/user.interface';
 import { ApiOperation, ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadCvDto } from './dto/upload-cv.dto';

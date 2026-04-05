@@ -1,4 +1,4 @@
-export enum PermissionModule {
+export enum EPermissionModule {
   USER = 'USERS',
   ROLE = 'ROLES',
   STATISTIC = 'STATISTICS',

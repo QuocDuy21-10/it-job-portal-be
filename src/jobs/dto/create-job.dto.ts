@@ -19,9 +19,9 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { CompanyDto } from 'src/companies/dto/company.dto';
-import { IsAfter } from 'src/decorator/is-after.decorator';
-import { JobLevel } from '../enums/job-level.enum';
-import { JobFormOfWork } from '../enums/job-formwork';
+import { IsAfter } from 'src/utils/decorators/is-after.decorator';
+import { EJobLevel } from '../enums/job-level.enum';
+import { EJobFormOfWork } from '../enums/job-form-of-work.enum';
 
 export class CreateJobDto {
   @IsNotEmpty({ message: 'Name is required' })
@@ -76,23 +76,23 @@ export class CreateJobDto {
   quantity: number;
 
   @IsNotEmpty({ message: 'Level is required' })
-  @IsEnum(JobLevel, { message: 'Level must be a valid job level' })
+  @IsEnum(EJobLevel, { message: 'Level must be a valid job level' })
   @IsString({ message: 'Level must be a string' })
   @MaxLength(50, { message: 'Level is too long (max: 50 chars)' })
   @ApiProperty({
-    example: JobLevel.SENIOR,
+    example: EJobLevel.SENIOR,
     description: 'Experience level required for the job',
-    enum: JobLevel,
-    enumName: 'JobLevel',
+    enum: EJobLevel,
+    enumName: 'EJobLevel',
   })
-  level: JobLevel;
+  level: EJobLevel;
 
   @IsNotEmpty({ message: 'Form of work is required' })
   @IsString({ message: 'Form of work must be a string' })
-  @IsEnum(JobFormOfWork, {
-    message: `formOfWork must be one of the following values: ${Object.values(JobFormOfWork).join(', ')}`,
+  @IsEnum(EJobFormOfWork, {
+    message: `formOfWork must be one of the following values: ${Object.values(EJobFormOfWork).join(', ')}`,
   })
-  @ApiProperty({ example: JobFormOfWork.FULL_TIME, description: 'Job form of work' })
+  @ApiProperty({ example: EJobFormOfWork.FULL_TIME, description: 'Job form of work' })
   formOfWork: string;
 
   @IsNotEmpty({ message: 'Description is required' })

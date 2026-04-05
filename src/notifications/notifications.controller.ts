@@ -1,8 +1,10 @@
 import { Controller, Delete, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
-import { ResponseMessage, SkipCheckPermission, User } from 'src/decorator/customize';
-import { IUser } from 'src/users/users.interface';
+import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
+import { SkipCheckPermission } from 'src/utils/decorators/skip-check-permission.decorator';
+import { User } from 'src/utils/decorators/user.decorator';
+import { IUser } from 'src/users/user.interface';
 
 @ApiTags('Notifications')
 @Controller('notifications')

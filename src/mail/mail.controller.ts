@@ -1,6 +1,7 @@
 import { Controller, Get, Logger } from '@nestjs/common';
 import { MailService } from './mail.service';
-import { Public, ResponseMessage } from 'src/decorator/customize';
+import { Public } from 'src/utils/decorators/public.decorator';
+import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';

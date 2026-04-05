@@ -4,8 +4,8 @@ import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { Resume, ResumeDocument } from '../resumes/schemas/resume.schema';
 import { Job, JobDocument } from '../jobs/schemas/job.schema';
 import { Model } from 'mongoose';
-import { IUser } from 'src/users/users.interface';
-import { ResumeStatus } from '../resumes/enums/resume-status.enum';
+import { IUser } from 'src/users/user.interface';
+import { EResumeStatus } from '../resumes/enums/resume-status.enum';
 
 @Injectable()
 export class ResumeProcessingService {
@@ -115,12 +115,12 @@ export class ResumeProcessingService {
       jobId: jobId,
       companyId: job.company._id,
       url: `images/resumes/${file.filename}`, // Relative path
-      status: ResumeStatus.PENDING,
+      status: EResumeStatus.PENDING,
       isParsed: false,
       isAnalyzed: false,
       histories: [
         {
-          status: ResumeStatus.PENDING,
+          status: EResumeStatus.PENDING,
           updatedAt: new Date(),
           updatedBy: { _id: user._id, email: user.email },
         },

@@ -3,7 +3,7 @@ import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
-import { TransformInterceptor } from './core/transform.interceptor';
+import { TransformInterceptor } from './utils/transform.interceptor';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { join } from 'path';

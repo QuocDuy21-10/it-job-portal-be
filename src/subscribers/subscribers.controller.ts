@@ -2,8 +2,10 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestj
 import { SubscribersService } from './subscribers.service';
 import { CreateSubscriberDto } from './dto/create-subscriber.dto';
 import { UpdateSubscriberDto } from './dto/update-subscriber.dto';
-import { ResponseMessage, SkipCheckPermission, User } from 'src/decorator/customize';
-import { IUser } from 'src/users/users.interface';
+import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
+import { SkipCheckPermission } from 'src/utils/decorators/skip-check-permission.decorator';
+import { User } from 'src/utils/decorators/user.decorator';
+import { IUser } from 'src/users/user.interface';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Subscriber')

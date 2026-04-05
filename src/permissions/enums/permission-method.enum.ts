@@ -1,4 +1,4 @@
-export enum PermissionMethod {
+export enum EPermissionMethod {
   GET = 'GET',
   POST = 'POST',
   PUT = 'PUT',

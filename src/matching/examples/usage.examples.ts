@@ -8,7 +8,7 @@
 import { MatchingService } from '../matching.service';
 import { ParsedDataDto } from 'src/resumes/dto/parsed-data.dto';
 import { Job } from 'src/jobs/schemas/job.schema';
-import { JobLevel } from 'src/jobs/enums/job-level.enum';
+import { EJobLevel } from 'src/jobs/enums/job-level.enum';
 
 // ============================================
 // EXAMPLE 1: Basic Usage in Queue Processor
@@ -55,7 +55,7 @@ class ResumeQueueProcessorExample {
     const job = {
       name: 'Frontend Developer',
       skills: ['JavaScript', 'TypeScript', 'React', 'Redux', 'CSS'],
-      level: JobLevel.JUNIOR,
+      level: EJobLevel.JUNIOR,
       description: 'Looking for a frontend developer to join our team',
       // ... other job fields
     } as Job;
@@ -66,8 +66,8 @@ class ResumeQueueProcessorExample {
     // 4. Use the result
     console.log('Match Result:', {
       score: matchResult.matchingScore, // 85
-      priority: matchResult.priority, // ResumePriority.EXCELLENT
-      // autoStatus: matchResult.autoStatus,         // ResumeStatus.APPROVED
+      priority: matchResult.priority, // EResumePriority.EXCELLENT
+      // autoStatus: matchResult.autoStatus,         // EResumeStatus.APPROVED
       recommendation: matchResult.recommendation, // "HIGHLY_RECOMMENDED"
       summary: matchResult.summary,
     });
@@ -140,7 +140,7 @@ class CustomAnalysisExample {
       isHireReady: matchResult.matchingScore >= 80,
       needsInterview: matchResult.matchingScore >= 60,
       requiresTraining: matchResult.skillsMatchPercentage < 70 && matchResult.experienceScore >= 70,
-      isOverqualified: matchResult.experienceScore >= 95 && job.level === JobLevel.JUNIOR,
+      isOverqualified: matchResult.experienceScore >= 95 && job.level === EJobLevel.JUNIOR,
       hasCriticalSkillsGap: matchResult.skillsMatch.some(
         skill => !skill.matched && this.isCriticalSkill(skill.skill, job.skills),
       ),
@@ -179,7 +179,7 @@ class ScoringScenarioTests {
     const job = {
       name: 'Senior Developer',
       skills: ['JavaScript', 'TypeScript', 'React', 'Node.js', 'AWS'],
-      level: JobLevel.SENIOR,
+      level: EJobLevel.SENIOR,
     } as Job;
 
     const result = await this.matchingService.calculateMatch(parsedCV, job);
@@ -201,7 +201,7 @@ class ScoringScenarioTests {
     const job = {
       name: 'Frontend Developer',
       skills: ['JavaScript', 'TypeScript', 'React', 'Vue', 'Angular'],
-      level: JobLevel.JUNIOR,
+      level: EJobLevel.JUNIOR,
     } as Job;
 
     const result = await this.matchingService.calculateMatch(parsedCV, job);
@@ -226,7 +226,7 @@ class ScoringScenarioTests {
     const job = {
       name: 'Junior Developer',
       skills: ['JavaScript', 'React'],
-      level: JobLevel.JUNIOR,
+      level: EJobLevel.JUNIOR,
     } as Job;
 
     const result = await this.matchingService.calculateMatch(parsedCV, job);
@@ -251,7 +251,7 @@ class ScoringScenarioTests {
     const job = {
       name: 'Intern Developer',
       skills: ['JavaScript', 'HTML', 'CSS', 'Git'],
-      level: JobLevel.INTERN,
+      level: EJobLevel.INTERN,
     } as Job;
 
     const result = await this.matchingService.calculateMatch(parsedCV, job);

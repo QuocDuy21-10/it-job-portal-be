@@ -1,11 +1,11 @@
 import { SkillMatchDto } from './skill-match.dto';
-import { ResumePriority } from 'src/resumes/enums/resume-priority.enum';
-import { ResumeStatus } from 'src/resumes/enums/resume-status.enum';
+import { EResumePriority } from 'src/resumes/enums/resume-priority.enum';
+import { EResumeStatus } from 'src/resumes/enums/resume-status.enum';
 
 export class MatchResultDto {
   matchingScore: number;
   // Priority level (EXCELLENT, HIGH, MEDIUM, LOW)
-  priority: ResumePriority;
+  priority: EResumePriority;
 
   // Chi tiết matching từng skill
   skillsMatch: SkillMatchDto[];

@@ -4,9 +4,9 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { IUser } from 'src/users/users.interface';
+import { IUser } from 'src/users/user.interface';
 import { User, UserDocument } from 'src/users/schemas/user.schema';
-import { JwtAccessPayload } from '../interfaces/jwt-payload.interface';
+import { IJwtAccessPayload } from '../interfaces/jwt-payload.interface';
 
 /**
  * KIẾN TRÚC:
@@ -54,7 +54,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
    * - .lean() để convert sang plain JS object (faster)
    * - Select -password để không trả về sensitive data
    */
-  async validate(payload: JwtAccessPayload): Promise<IUser> {
+  async validate(payload: IJwtAccessPayload): Promise<IUser> {
     // BƯỚC 1: Validate payload structure
     if (!payload.sub || payload.type !== 'access') {
       throw new UnauthorizedException('Invalid token payload');

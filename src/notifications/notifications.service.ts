@@ -6,7 +6,7 @@ import aqp from 'api-query-params';
 import { Notification, NotificationDocument } from './schemas/notification.schema';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { NotificationsGateway } from './notifications.gateway';
-import { IUser } from 'src/users/users.interface';
+import { IUser } from 'src/users/user.interface';
 
 @Injectable()
 export class NotificationsService {

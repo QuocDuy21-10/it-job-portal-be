@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
-import { PermissionMethod } from '../enums/permission-method.enum';
-import { PermissionModule } from '../enums/permission-module.enum';
+import { EPermissionMethod } from '../enums/permission-method.enum';
+import { EPermissionModule } from '../enums/permission-module.enum';
 
 export type PermissionDocument = HydratedDocument<Permission>;
 
@@ -13,10 +13,10 @@ export class Permission {
   @Prop({ required: true })
   apiPath: string;
 
-  @Prop({ required: true, enum: PermissionMethod })
+  @Prop({ required: true, enum: EPermissionMethod })
   method: string;
 
-  @Prop({ required: true, enum: PermissionModule })
+  @Prop({ required: true, enum: EPermissionModule })
   module: string;
 
   @Prop({ type: Object })

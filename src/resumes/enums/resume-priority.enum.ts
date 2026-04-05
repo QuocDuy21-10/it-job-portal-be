@@ -1,4 +1,4 @@
-export enum ResumePriority {
+export enum EResumePriority {
   LOW = 'LOW',
   MEDIUM = 'MEDIUM',
   HIGH = 'HIGH',

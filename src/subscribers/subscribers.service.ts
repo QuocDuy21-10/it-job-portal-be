@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateSubscriberDto } from './dto/create-subscriber.dto';
 import { UpdateSubscriberDto } from './dto/update-subscriber.dto';
-import { IUser } from 'src/users/users.interface';
+import { IUser } from 'src/users/user.interface';
 import { InjectModel } from '@nestjs/mongoose';
 import { Subscriber, SubscriberDocument } from './schemas/subscriber.schema';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';

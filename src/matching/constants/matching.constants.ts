@@ -1,11 +1,4 @@
-import { JobLevel } from 'src/jobs/enums/job-level.enum';
-
-/**
- * MATCHING CONSTANTS
- *
- * Tất cả các hằng số, weights, thresholds cho matching logic
- * Dễ dàng điều chỉnh business rules mà không cần sửa code logic
- */
+import { EJobLevel } from 'src/jobs/enums/job-level.enum';
 
 // ===== SCORING WEIGHTS =====
 export const MATCHING_WEIGHTS = {
@@ -33,35 +26,35 @@ export const SKILL_PROFICIENCY_LEVELS = {
 
 // ===== EXPERIENCE SCORING BY JOB LEVEL =====
 export const EXPERIENCE_SCORING: Record<
-  JobLevel,
+  EJobLevel,
   { minYears: number; maxYears: number; idealYears: number }
 > = {
-  [JobLevel.INTERN]: {
+  [EJobLevel.INTERN]: {
     minYears: 0,
     maxYears: 1,
     idealYears: 0,
   },
-  [JobLevel.JUNIOR]: {
+  [EJobLevel.JUNIOR]: {
     minYears: 1,
     maxYears: 3,
     idealYears: 2,
   },
-  [JobLevel.MID_LEVEL]: {
+  [EJobLevel.MID_LEVEL]: {
     minYears: 2,
     maxYears: 5,
     idealYears: 3,
   },
-  [JobLevel.SENIOR]: {
+  [EJobLevel.SENIOR]: {
     minYears: 4,
     maxYears: 10,
     idealYears: 6,
   },
-  [JobLevel.LEAD]: {
+  [EJobLevel.LEAD]: {
     minYears: 5,
     maxYears: 15,
     idealYears: 8,
   },
-  [JobLevel.MANAGER]: {
+  [EJobLevel.MANAGER]: {
     minYears: 6,
     maxYears: 20,
     idealYears: 10,

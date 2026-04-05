@@ -88,3 +88,5 @@ Read these files before starting work on related areas. Pick only what's relevan
 | `agent_docs/database_schema.md` | Working with Mongoose schemas, adding fields, or understanding collection relationships |
 | `agent_docs/authentication_and_authorization.md` | Modifying auth flow, adding permissions, or working with JWT/OAuth |
 | `agent_docs/ai_and_matching.md` | Working on CV parsing, matching scores, chatbot, or BullMQ queues |
+| `NAMING_CONVENTIONS.md` | Creating enums, interfaces, DTOs, or any new TypeScript files |
+

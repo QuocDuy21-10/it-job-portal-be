@@ -1,4 +1,4 @@
-export enum ResumeStatus {
+export enum EResumeStatus {
   PENDING = 'PENDING',
   REVIEWING = 'REVIEWING',
   INTERVIEWING = 'INTERVIEWING',

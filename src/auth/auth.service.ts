@@ -8,7 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import ms from 'ms';
-import { IUser } from 'src/users/users.interface';
+import { IUser } from 'src/users/user.interface';
 import { UsersService } from 'src/users/users.service';
 import * as bcrypt from 'bcryptjs';
 import { Response } from 'express';
@@ -24,7 +24,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { v4 as uuidv4 } from 'uuid';
 import { VerifyAuthDto } from './dto/verify-auth.dto';
 import { SessionsService } from 'src/sessions/sessions.service';
-import { JwtAccessPayload, JwtRefreshPayload } from './interfaces/jwt-payload.interface';
+import { IJwtAccessPayload, IJwtRefreshPayload } from './interfaces/jwt-payload.interface';
 import { REDIS_CLIENT } from 'src/redis/redis.module';
 import Redis from 'ioredis';
 import { generateOtp, hashOtp, verifyOtp } from './utils/otp.utils';
@@ -135,7 +135,7 @@ export class AuthService {
     const { email, code } = dto;
     const otpSecret = this.configService.get<string>('OTP_SECRET');
 
-    // Check exceeded attempt limit 
+    // Check exceeded attempt limit
     const attemptsRaw = await this.redisClient.get(`otp:attempts:${email}`);
     const attempts = attemptsRaw ? parseInt(attemptsRaw, 10) : 0;
     if (attempts >= 5) {
@@ -193,12 +193,12 @@ export class AuthService {
     const { _id } = user;
 
     // Tạo payload tối ưu (chỉ chứa userId)
-    const accessPayload: JwtAccessPayload = {
+    const accessPayload: IJwtAccessPayload = {
       sub: _id,
       type: 'access',
     };
 
-    const refreshPayload: JwtRefreshPayload = {
+    const refreshPayload: IJwtRefreshPayload = {
       sub: _id,
       type: 'refresh',
     };
@@ -234,14 +234,14 @@ export class AuthService {
     };
   }
 
-  createAccessToken(payload: JwtAccessPayload): string {
+  createAccessToken(payload: IJwtAccessPayload): string {
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET'),
       expiresIn: ms(this.configService.get<string>('JWT_ACCESS_EXPIRES_IN')) / 1000,
     });
   }
 
-  createRefreshToken(payload: JwtRefreshPayload): string {
+  createRefreshToken(payload: IJwtRefreshPayload): string {
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
       expiresIn: ms(this.configService.get<string>('JWT_REFRESH_EXPIRES_IN')) / 1000,
@@ -269,12 +269,12 @@ export class AuthService {
       const tempRole = await this.rolesService.findOne(userRole._id);
 
       // BƯỚC 3: Tạo payload mới (tối ưu - chỉ chứa userId)
-      const accessPayload: JwtAccessPayload = {
+      const accessPayload: IJwtAccessPayload = {
         sub: user._id,
         type: 'access',
       };
 
-      const refreshPayload: JwtRefreshPayload = {
+      const refreshPayload: IJwtRefreshPayload = {
         sub: user._id,
         type: 'refresh',
       };
@@ -325,7 +325,6 @@ export class AuthService {
 
     return { message: 'Logout successfully' };
   }
-
 
   async logoutAllDevices(response: Response, userId: string) {
     // Xóa tất cả sessions của user

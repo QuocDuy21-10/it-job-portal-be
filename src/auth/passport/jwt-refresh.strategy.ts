@@ -7,8 +7,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { SessionsService } from 'src/sessions/sessions.service';
 import { User, UserDocument } from 'src/users/schemas/user.schema';
-import { JwtRefreshPayload } from '../interfaces/jwt-payload.interface';
-import { IUser } from 'src/users/users.interface';
+import { IJwtRefreshPayload } from '../interfaces/jwt-payload.interface';
+import { IUser } from 'src/users/user.interface';
 
 /**
  * JWT Refresh Strategy - Optimized Version
@@ -63,7 +63,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
    * sẽ tạo access token mới với payload minimal rồi client dùng access token
    * để gọi API (JwtStrategy sẽ hydrate đầy đủ)
    */
-  async validate(req: Request, payload: JwtRefreshPayload): Promise<IUser> {
+  async validate(req: Request, payload: IJwtRefreshPayload): Promise<IUser> {
     // BƯỚC 1: Validate payload structure
     if (!payload.sub || payload.type !== 'refresh') {
       throw new UnauthorizedException('Invalid refresh token payload');

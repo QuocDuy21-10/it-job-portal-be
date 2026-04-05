@@ -13,8 +13,10 @@ import {
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { Public, ResponseMessage, SkipCheckPermission, User } from 'src/decorator/customize';
-import { IUser } from './users.interface';
+import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
+import { SkipCheckPermission } from 'src/utils/decorators/skip-check-permission.decorator';
+import { User } from 'src/utils/decorators/user.decorator';
+import { IUser } from './user.interface';
 import { ApiTags, ApiOperation, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { SaveJobDto } from './dto/save-job.dto';
 import { FollowCompanyDto } from './dto/follow-company.dto';

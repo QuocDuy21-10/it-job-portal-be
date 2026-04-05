@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEnum, IsNotEmpty, IsString, MaxLength } from 'class-validator';
-import { PermissionMethod } from '../enums/permission-method.enum';
-import { PermissionModule } from '../enums/permission-module.enum';
+import { EPermissionMethod } from '../enums/permission-method.enum';
+import { EPermissionModule } from '../enums/permission-module.enum';
 
 export class CreatePermissionDto {
   @IsNotEmpty({ message: 'name is required' })
@@ -19,17 +19,17 @@ export class CreatePermissionDto {
 
   @IsNotEmpty({ message: 'method is required' })
   @IsString({ message: 'method must be a string' })
-  @IsEnum(PermissionMethod, {
-    message: `method must be one of the following values: ${Object.values(PermissionMethod).join(', ')}`,
+  @IsEnum(EPermissionMethod, {
+    message: `method must be one of the following values: ${Object.values(EPermissionMethod).join(', ')}`,
   })
-  @ApiProperty({ example: PermissionMethod.GET, description: 'HTTP method of permission' })
+  @ApiProperty({ example: EPermissionMethod.GET, description: 'HTTP method of permission' })
   method: string;
 
   @IsNotEmpty({ message: 'module is required' })
   @IsString({ message: 'module must be a string' })
-  @IsEnum(PermissionModule, {
-    message: `module must be one of the following values: ${Object.values(PermissionModule).join(', ')}`,
+  @IsEnum(EPermissionModule, {
+    message: `module must be one of the following values: ${Object.values(EPermissionModule).join(', ')}`,
   })
-  @ApiProperty({ example: PermissionModule.USER, description: 'Module of permission' })
+  @ApiProperty({ example: EPermissionModule.USER, description: 'Module of permission' })
   module: string;
 }

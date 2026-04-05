@@ -1,4 +1,4 @@
-export enum JobFormOfWork {
+export enum EJobFormOfWork {
   FULL_TIME = 'Full-time',
   PART_TIME = 'Part-time',
   FREELANCE = 'Freelance',

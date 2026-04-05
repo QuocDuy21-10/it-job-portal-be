@@ -3,7 +3,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { StatisticsService } from './statistics.service';
 import { DashboardStatsDto } from './dto/dashboard-stats.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { SkipCheckPermission } from 'src/decorator/customize';
+import { SkipCheckPermission } from 'src/utils/decorators/skip-check-permission.decorator';
 
 @ApiTags('Statistics')
 @Controller('statistics')

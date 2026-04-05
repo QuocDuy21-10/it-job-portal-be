@@ -1,13 +1,13 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateResumeDto, CreateUserCvDto } from './dto/create-resume.dto';
 import { UpdateResumeDto } from './dto/update-resume.dto';
-import { IUser } from 'src/users/users.interface';
+import { IUser } from 'src/users/user.interface';
 import { Resume, ResumeDocument } from './schemas/resume.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import aqp from 'api-query-params';
 import mongoose from 'mongoose';
-import { ResumeStatus } from './enums/resume-status.enum';
+import { EResumeStatus } from './enums/resume-status.enum';
 import { SubmitCvOnlineDto } from './dto/submit-cv-online.dto';
 import { CvProfilesService } from 'src/cv-profiles/cv-profiles.service';
 import { JobsService } from 'src/jobs/jobs.service';
@@ -16,7 +16,7 @@ import { ParsedDataDto } from './dto/parsed-data.dto';
 import { CvProfile } from 'src/cv-profiles/schemas/cv-profile.schema';
 import { User, UserDocument } from 'src/users/schemas/user.schema';
 import { NotificationsService } from 'src/notifications/notifications.service';
-import { NotificationType } from 'src/notifications/enums/notification-type.enum';
+import { ENotificationType } from 'src/notifications/enums/notification-type.enum';
 import { ApplicationNotificationQueueService } from 'src/queues/services/application-notification-queue.service';
 
 @Injectable()
@@ -36,10 +36,10 @@ export class ResumesService {
     const newResume = await this.resumeModel.create({
       email: user.email,
       userId: user._id,
-      status: ResumeStatus.PENDING,
+      status: EResumeStatus.PENDING,
       histories: [
         {
-          status: ResumeStatus.PENDING,
+          status: EResumeStatus.PENDING,
           updatedAt: new Date(),
           updatedBy: { _id: user._id, email: user.email },
         },
@@ -162,7 +162,7 @@ export class ResumesService {
     await this.notificationsService.create(
       {
         userId: resume.userId.toString(),
-        type: NotificationType.APPLICATION_STATUS_CHANGE,
+        type: ENotificationType.APPLICATION_STATUS_CHANGE,
         title: 'Application Status Updated',
         message: `Your application for "${jobName}" at ${companyName} has been updated to ${newStatus}.`,
         data: {
@@ -268,7 +268,7 @@ export class ResumesService {
       userId: user._id,
       jobId: new mongoose.Types.ObjectId(jobId),
       companyId: job.company._id,
-      status: ResumeStatus.PENDING,
+      status: EResumeStatus.PENDING,
 
       // Parsed data from CV profile (snapshot at application time)
       parsedData,
@@ -297,7 +297,7 @@ export class ResumesService {
       // History tracking
       histories: [
         {
-          status: ResumeStatus.PENDING,
+          status: EResumeStatus.PENDING,
           updatedAt: new Date(),
           updatedBy: { _id: user._id, email: user.email },
         },
@@ -360,7 +360,7 @@ export class ResumesService {
       this.notificationsService
         .create({
           userId: hr._id.toString(),
-          type: NotificationType.NEW_APPLICATION,
+          type: ENotificationType.NEW_APPLICATION,
           title: 'New Application Received',
           message: `${candidateName} (${candidateEmail}) has applied for "${jobName}".`,
           data: {

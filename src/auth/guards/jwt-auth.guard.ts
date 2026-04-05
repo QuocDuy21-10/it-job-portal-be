@@ -6,9 +6,10 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
-import { IS_OPTIONAL_AUTH, IS_PUBLIC_KEY, IS_PUBLIC_PERMISSION } from 'src/decorator/customize';
 import { Request } from 'express';
-import { log } from 'console';
+import { IS_OPTIONAL_AUTH } from 'src/utils/decorators/optional-auth.decorator';
+import { IS_PUBLIC_KEY } from 'src/utils/decorators/public.decorator';
+import { IS_PUBLIC_PERMISSION } from 'src/utils/decorators/skip-check-permission.decorator';
 
 /**
  * JWT Access Token Guard với Permission Checking

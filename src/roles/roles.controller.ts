@@ -2,8 +2,9 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestj
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
-import { ResponseMessage, User } from 'src/decorator/customize';
-import { IUser } from 'src/users/users.interface';
+import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
+import { User } from 'src/utils/decorators/user.decorator';
+import { IUser } from 'src/users/user.interface';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Role')

@@ -1,4 +1,4 @@
-export enum NotificationType {
+export enum ENotificationType {
   APPLICATION_STATUS_CHANGE = 'APPLICATION_STATUS_CHANGE',
   NEW_APPLICATION = 'NEW_APPLICATION',
 }

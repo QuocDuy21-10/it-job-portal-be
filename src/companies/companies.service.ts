@@ -5,7 +5,7 @@ import { Company, CompanyDocument } from './schemas/company.schema';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose from 'mongoose';
-import { IUser } from 'src/users/users.interface';
+import { IUser } from 'src/users/user.interface';
 import aqp from 'api-query-params';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 import { FilesService } from 'src/files/files.service';

@@ -7,7 +7,7 @@ import { GeminiService } from 'src/gemini/gemini.service';
 import { MatchingService } from 'src/matching/matching.service';
 import { JobsService } from 'src/jobs/jobs.service';
 import { ParseResumeJobData, AnalyzeResumeJobData } from '../services/resume-queue.service';
-import { ResumePriority } from 'src/resumes/enums/resume-priority.enum';
+import { EResumePriority } from 'src/resumes/enums/resume-priority.enum';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { getModelToken } from '@nestjs/mongoose';
@@ -267,11 +267,11 @@ export class ResumeQueueProcessor extends WorkerHost {
    * @deprecated - Priority now calculated by MatchingService
    * Calculate priority based on matching score
    */
-  private calculatePriority(matchingScore: number): ResumePriority {
-    if (matchingScore >= 85) return ResumePriority.EXCELLENT;
-    if (matchingScore >= 70) return ResumePriority.HIGH;
-    if (matchingScore >= 50) return ResumePriority.MEDIUM;
-    return ResumePriority.LOW;
+  private calculatePriority(matchingScore: number): EResumePriority {
+    if (matchingScore >= 85) return EResumePriority.EXCELLENT;
+    if (matchingScore >= 70) return EResumePriority.HIGH;
+    if (matchingScore >= 50) return EResumePriority.MEDIUM;
+    return EResumePriority.LOW;
   }
 
   @OnWorkerEvent('completed')

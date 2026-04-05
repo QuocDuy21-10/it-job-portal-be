@@ -9,33 +9,14 @@ import {
   SKILL_PROFICIENCY_LEVELS,
   MATCHING_RECOMMENDATIONS,
 } from './constants/matching.constants';
-import { ResumePriority } from 'src/resumes/enums/resume-priority.enum';
-import { ResumeStatus } from 'src/resumes/enums/resume-status.enum';
-import { JobLevel } from 'src/jobs/enums/job-level.enum';
+import { EResumePriority } from 'src/resumes/enums/resume-priority.enum';
+import { EResumeStatus } from 'src/resumes/enums/resume-status.enum';
+import { EJobLevel } from 'src/jobs/enums/job-level.enum';
 import { MatchResultDto } from './dto/match-result.dto';
 
-/**
- * MatchingService - Hybrid CV Matching Engine
- *
- * Trách nhiệm:
- * - Nhận parsedData từ AI (extracted JSON)
- * - Nhận jobInfo từ DB
- * - Tự tính toán matching score dựa trên business rules
- * - Không gọi AI để matching (chỉ AI extract data)
- *
- * @author Backend Team
- * @architecture Hybrid Parsing Pipeline (AI Extract + Backend Score)
- */
 @Injectable()
 export class MatchingService {
   private readonly logger = new Logger(MatchingService.name);
-
-  /**
-   * Main matching method - Tính toán tổng thể matching score
-   * @param parsedCV - Dữ liệu CV đã được AI parse
-   * @param job - Thông tin job từ database
-   * @returns Match result với score, priority, status, insights
-   */
   async calculateMatch(parsedCV: ParsedDataDto, job: Job): Promise<MatchResultDto> {
     try {
       this.logger.log(`Starting match calculation for job: ${job.name}`);
@@ -122,10 +103,6 @@ export class MatchingService {
     }
   }
 
-  /**
-   * Calculate skills matching score
-   * So sánh skills của CV với required skills của job
-   */
   private calculateSkillsMatch(
     candidateSkills: string[],
     requiredSkills: string[],
@@ -198,11 +175,9 @@ export class MatchingService {
     };
   }
 
-  /**
-   * Calculate experience score based on years and job level
-   */
+
   private calculateExperienceScore(yearsOfExperience: number, jobLevel: string): number {
-    const levelConfig = EXPERIENCE_SCORING[jobLevel as JobLevel];
+    const levelConfig = EXPERIENCE_SCORING[jobLevel as EJobLevel];
 
     if (!levelConfig) {
       this.logger.warn(`Unknown job level: ${jobLevel}, using default scoring`);
@@ -235,9 +210,6 @@ export class MatchingService {
     return Math.max(85, 100 - penalty);
   }
 
-  /**
-   * Calculate education score based on degree level and job requirements
-   */
   private calculateEducationScore(education: any[], jobLevel: string): number {
     if (!education || education.length === 0) {
       return 50; // Neutral score if no education data
@@ -253,20 +225,20 @@ export class MatchingService {
 
     // Score based on job level
     switch (jobLevel) {
-      case JobLevel.INTERN:
+      case EJobLevel.INTERN:
         return hasBachelor || hasMaster || hasPhd ? 100 : 75;
 
-      case JobLevel.JUNIOR:
+      case EJobLevel.JUNIOR:
         return hasBachelor ? 100 : hasMaster || hasPhd ? 100 : 60;
 
-      case JobLevel.MID_LEVEL:
+      case EJobLevel.MID_LEVEL:
         return hasBachelor ? 90 : hasMaster ? 100 : hasPhd ? 100 : 50;
 
-      case JobLevel.SENIOR:
+      case EJobLevel.SENIOR:
         return hasMaster || hasPhd ? 100 : hasBachelor ? 80 : 40;
 
-      case JobLevel.LEAD:
-      case JobLevel.MANAGER:
+      case EJobLevel.LEAD:
+      case EJobLevel.MANAGER:
         return hasPhd || hasMaster ? 100 : hasBachelor ? 70 : 30;
 
       default:
@@ -274,11 +246,6 @@ export class MatchingService {
     }
   }
 
-  /**
-   * Calculate weighted total score
-   * Formula: (Skills * 0.5) + (Experience * 0.3) + (Education * 0.2)
-   * FIXED: Added NaN protection and validation
-   */
   private calculateWeightedScore(
     skillsScore: number,
     experienceScore: number,
@@ -308,20 +275,17 @@ export class MatchingService {
     return Math.min(100, Math.max(0, totalScore)); // Clamp to 0-100
   }
 
-  /**
-   * Determine priority based on matching score
-   */
-  private determinePriority(matchingScore: number): ResumePriority {
+  private determinePriority(matchingScore: number): EResumePriority {
     if (matchingScore >= SCORE_THRESHOLDS.EXCELLENT) {
-      return ResumePriority.EXCELLENT;
+      return EResumePriority.EXCELLENT;
     }
     if (matchingScore >= SCORE_THRESHOLDS.HIGH) {
-      return ResumePriority.HIGH;
+      return EResumePriority.HIGH;
     }
     if (matchingScore >= SCORE_THRESHOLDS.MEDIUM) {
-      return ResumePriority.MEDIUM;
+      return EResumePriority.MEDIUM;
     }
-    return ResumePriority.LOW;
+    return EResumePriority.LOW;
   }
 
   /**
@@ -521,7 +485,7 @@ export class MatchingService {
     return {
       name: job?.name || 'Unknown Job',
       skills: Array.isArray(job?.skills) ? job.skills.filter(s => s && s.trim()) : [],
-      level: job?.level || JobLevel.JUNIOR,
+      level: job?.level || EJobLevel.JUNIOR,
     };
   }
 

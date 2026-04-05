@@ -7,8 +7,10 @@ import {
   ConversationHistoryQueryDto,
   ConversationHistoryResponseDto,
 } from './dto/conversation-history.dto';
-import { User, ResponseMessage, SkipCheckPermission } from '../decorator/customize';
-import { IUser } from '../users/users.interface';
+import { ResponseMessage } from '../utils/decorators/response-message.decorator';
+import { SkipCheckPermission } from '../utils/decorators/skip-check-permission.decorator';
+import { User } from '../utils/decorators/user.decorator';
+import { IUser } from '../users/user.interface';
 
 @ApiTags('Chat')
 @Controller('chat')

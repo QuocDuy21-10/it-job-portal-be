@@ -2,8 +2,9 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestj
 import { PermissionsService } from './permissions.service';
 import { CreatePermissionDto } from './dto/create-permission.dto';
 import { UpdatePermissionDto } from './dto/update-permission.dto';
-import { ResponseMessage, User } from 'src/decorator/customize';
-import { IUser } from 'src/users/users.interface';
+import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
+import { User } from 'src/utils/decorators/user.decorator';
+import { IUser } from 'src/users/user.interface';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Permission')

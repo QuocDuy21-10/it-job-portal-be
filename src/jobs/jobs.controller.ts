@@ -2,8 +2,10 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestj
 import { JobsService } from './jobs.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
-import { OptionalAuth, Public, ResponseMessage, User } from 'src/decorator/customize';
-import { IUser } from 'src/users/users.interface';
+import { OptionalAuth } from 'src/utils/decorators/optional-auth.decorator';
+import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
+import { User } from 'src/utils/decorators/user.decorator';
+import { IUser } from 'src/users/user.interface';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 @ApiTags('Job')
 @Controller('jobs')

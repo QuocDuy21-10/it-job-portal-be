@@ -6,14 +6,14 @@ import { User as UserModel, UserDocument } from './schemas/user.schema';
 import mongoose from 'mongoose';
 import { genSaltSync, hashSync, compareSync } from 'bcryptjs';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
-import { IUser } from './users.interface';
+import { IUser } from './user.interface';
 import aqp from 'api-query-params';
-import { User } from 'src/decorator/customize';
+import { User } from 'src/utils/decorators/user.decorator';
 import { ConfigService } from '@nestjs/config';
 import { Role, RoleDocument } from 'src/roles/schemas/role.schema';
 import { USER_ROLE } from 'src/databases/sample';
 import { AuthRegisterDto } from 'src/auth/dto/auth-register.dto';
-import { AuthProvider } from 'src/auth/enums/auth-provider.enum';
+import { EAuthProvider } from 'src/auth/enums/auth-provider.enum';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 import { Company, CompanyDocument } from 'src/companies/schemas/company.schema';
 
@@ -323,7 +323,7 @@ export class UsersService {
       email,
       name,
       password: null,
-      authProvider: AuthProvider.GOOGLE,
+      authProvider: EAuthProvider.GOOGLE,
       role: userRole?._id,
       isActive: true,
     });
@@ -335,7 +335,7 @@ export class UsersService {
   async linkGoogleAccount(userId: string, googleId: string): Promise<void> {
     await this.userModel.updateOne(
       { _id: userId },
-      { googleId, authProvider: AuthProvider.GOOGLE },
+      { googleId, authProvider: EAuthProvider.GOOGLE },
     );
   }
 
