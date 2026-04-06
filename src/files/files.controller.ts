@@ -9,9 +9,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FilesService } from './files.service';
-import { Public } from 'src/utils/decorators/public.decorator';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
-import { SkipCheckPermission } from 'src/utils/decorators/skip-check-permission.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBody,
@@ -30,9 +28,7 @@ import { HttpExceptionFilter } from 'src/utils/http-exception.filter';
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
-  @Public()
   @Post('upload')
-  @SkipCheckPermission()
   @UseInterceptors(FileInterceptor('file'))
   @UseFilters(new HttpExceptionFilter())
   @ApiOperation({ summary: 'Upload single file (optionally specify folder_type in headers)' })
@@ -58,7 +54,6 @@ export class FilesController {
   }
 
   @Delete('remove')
-  @SkipCheckPermission()
   @ApiOperation({ summary: 'Delete a previously uploaded file by name and folder type' })
   @ResponseMessage('Delete file')
   @ApiResponse({ status: 200, description: 'File deleted successfully.' })

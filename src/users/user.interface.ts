@@ -6,13 +6,6 @@ export interface IUser {
     _id: string;
     name: string;
   };
-  permissions?: {
-    _id: string;
-    name: string;
-    method: string;
-    apiPath: string;
-    module: string;
-  }[];
   company?: {
     _id: string;
     name: string;

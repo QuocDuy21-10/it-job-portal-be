@@ -8,7 +8,6 @@ import { CompaniesModule } from './companies/companies.module';
 import { JobsModule } from './jobs/jobs.module';
 import { FilesModule } from './files/files.module';
 import { ResumesModule } from './resumes/resumes.module';
-import { PermissionsModule } from './permissions/permissions.module';
 import { RolesModule } from './roles/roles.module';
 import { DatabasesModule } from './databases/databases.module';
 import { SubscribersModule } from './subscribers/subscribers.module';
@@ -27,6 +26,7 @@ import { SessionsModule } from './sessions/sessions.module';
 import { StatisticsModule } from './statistics/statistics.module';
 import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { CaslModule } from './casl';
 
 @Module({
   imports: [
@@ -78,7 +78,6 @@ import { NotificationsModule } from './notifications/notifications.module';
     FilesModule,
     ResumesModule,
     QueuesModule.forRoot(),
-    PermissionsModule,
     RolesModule,
     CvProfilesModule,
     DatabasesModule,
@@ -86,6 +85,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     MailModule,
     HealthModule,
     StatisticsModule,
+    CaslModule,
   ],
 })
 export class AppModule {}

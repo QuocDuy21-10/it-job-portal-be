@@ -8,7 +8,6 @@ import {
   ConversationHistoryResponseDto,
 } from './dto/conversation-history.dto';
 import { ResponseMessage } from '../utils/decorators/response-message.decorator';
-import { SkipCheckPermission } from '../utils/decorators/skip-check-permission.decorator';
 import { User } from '../utils/decorators/user.decorator';
 import { IUser } from '../users/user.interface';
 
@@ -18,7 +17,6 @@ export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   @Post('message')
-  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Send message to AI career advisor',
     description:
@@ -47,7 +45,6 @@ export class ChatController {
   }
 
   @Get('history')
-  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Get conversation history',
     description: 'Retrieve paginated conversation history for the current user',
@@ -78,7 +75,6 @@ export class ChatController {
   }
 
   @Delete('clear')
-  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Clear conversation',
     description: 'Clear current conversation history for the user',

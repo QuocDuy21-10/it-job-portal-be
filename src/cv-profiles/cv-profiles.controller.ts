@@ -19,7 +19,6 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiBearerAuth,
   ApiBody,
   ApiParam,
   ApiQuery,
@@ -31,7 +30,6 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { CvProfilesService } from './cv-profiles.service';
 import { CreateCvProfileDto } from './dto/create-cv-profile.dto';
-import { SkipCheckPermission } from '../utils/decorators/skip-check-permission.decorator';
 import { User } from '../utils/decorators/user.decorator';
 import { IUser } from '../users/user.interface';
 import { JwtAuthGuard } from 'src/auth/guards';
@@ -39,7 +37,6 @@ import { FilesService } from '../files/files.service';
 import { UpsertCvProfileDto } from './dto/upsert-cv-profile.dto';
 
 @ApiTags('CV Profiles')
-@SkipCheckPermission()
 @Controller('cv-profiles')
 @UseGuards(JwtAuthGuard)
 export class CvProfilesController {
@@ -48,11 +45,6 @@ export class CvProfilesController {
     private readonly filesService: FilesService,
   ) {}
 
-  /**
-   * POST /cv-profiles/upsert
-   * Upsert CV Profile for current user with optional avatar upload
-   * If exists -> update, else -> create
-   */
   @Post('upsert')
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(

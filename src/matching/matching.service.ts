@@ -175,7 +175,6 @@ export class MatchingService {
     };
   }
 
-
   private calculateExperienceScore(yearsOfExperience: number, jobLevel: string): number {
     const levelConfig = EXPERIENCE_SCORING[jobLevel as EJobLevel];
 

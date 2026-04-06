@@ -228,11 +228,7 @@ export class UsersService {
       .findById(userId)
       .populate({
         path: 'role',
-        select: '_id name permissions',
-        populate: {
-          path: 'permissions',
-          select: '_id name apiPath method module',
-        },
+        select: '_id name',
       })
       .populate({
         path: 'company',
@@ -263,14 +259,6 @@ export class UsersService {
         _id: userRole._id.toString(),
         name: userRole.name,
       },
-      permissions:
-        userRole.permissions?.map((perm: any) => ({
-          _id: perm._id?.toString() || '',
-          name: perm.name || '',
-          apiPath: perm.apiPath || '',
-          method: perm.method || '',
-          module: perm.module || '',
-        })) ?? [],
       company: user.company
         ? {
             _id: (user.company as any)._id?.toString() || '',

@@ -13,12 +13,12 @@ src/
 ├── main.ts                  # Bootstrap: guards, pipes, interceptors, CORS, Swagger
 ├── app.module.ts            # Root module (20 feature modules)
 ├── core/                    # Global exception filter + response interceptor
-├── decorator/               # @Public, @User, @ResponseMessage, @SkipCheckPermission, @OptionalAuth
+├── decorator/               # @Public, @User, @ResponseMessage, @OptionalAuth
+├── casl/                    # CASL ability factory, RolesGuard, PoliciesGuard, @Roles, @CheckPolicies
 │
 ├── auth/                    # JWT auth, Passport strategies, guards, Google OAuth
 ├── users/                   # User accounts and profiles
 ├── roles/                   # Role definitions (SUPER ADMIN, HR, NORMAL USER)
-├── permissions/             # RBAC permissions (apiPath + method tuples)
 ├── sessions/                # Multi-device session management
 │
 ├── companies/               # Company profiles and management
@@ -64,7 +64,7 @@ Swagger docs: `http://localhost:8081/api`
 ## Key Patterns
 
 - **Response format:** All responses wrapped as `{ statusCode, message, data }` via `TransformInterceptor`
-- **Auth decorators:** Use `@Public()` for unauthenticated routes, `@SkipCheckPermission()` for any-user routes
+- **Auth decorators:** Use `@Public()` for unauthenticated routes, `@Roles()` + `@CheckPolicies()` for CASL-guarded routes, `@OptionalAuth()` for optional-auth routes
 - **DTO validation:** Every endpoint uses `class-validator` DTOs with `whitelist: true`
 - **Module layout:** Each feature has `controller.ts`, `service.ts`, `module.ts`, `dto/`, `schemas/`
 - **Soft delete:** All models support soft delete (never hard-delete records)

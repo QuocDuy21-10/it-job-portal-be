@@ -2,8 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { StatisticsService } from './statistics.service';
 import { DashboardStatsDto } from './dto/dashboard-stats.dto';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { SkipCheckPermission } from 'src/utils/decorators/skip-check-permission.decorator';
+import { Roles, ERole } from 'src/casl';  
 
 @ApiTags('Statistics')
 @Controller('statistics')
@@ -11,7 +10,7 @@ export class StatisticsController {
   constructor(private readonly statisticsService: StatisticsService) {}
 
   @Get('dashboard')
-  // @SkipCheckPermission()
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
   @ApiOperation({
     summary: 'Get dashboard statistics',
     description:
@@ -31,7 +30,6 @@ export class StatisticsController {
   }
 
   @Get('dashboard/refresh')
-  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Clear dashboard cache',
     description:

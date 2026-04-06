@@ -12,7 +12,6 @@ import { IUser } from 'src/users/user.interface';
 import { UsersService } from 'src/users/users.service';
 import * as bcrypt from 'bcryptjs';
 import { Response } from 'express';
-import { RolesService } from 'src/roles/roles.service';
 import { AuthRegisterDto } from './dto/auth-register.dto';
 import { OAuth2Client } from 'google-auth-library';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -37,7 +36,6 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     private configService: ConfigService,
-    private rolesService: RolesService,
     private sessionsService: SessionsService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
@@ -64,11 +62,8 @@ export class AuthService {
           throw new BadRequestException('Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email.');
         }
         // get user role casting data (ObjectId -> {_id: string, name: string})
-        const userRole = user.role as unknown as { _id: string; name: string };
-        const tempRole = await this.rolesService.findOne(userRole._id);
         const objectUser = {
           ...user.toObject(),
-          permissions: tempRole.permissions ?? [],
         };
         return objectUser;
       }
@@ -228,7 +223,6 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
-        permissions: user.permissions,
         company: user.company,
       },
     };
@@ -264,9 +258,6 @@ export class AuthService {
       }
 
       // BƯỚC 2: User đã được hydrate đầy đủ từ JwtRefreshStrategy
-      // Lấy thêm permissions từ role (nếu cần)
-      const userRole = user.role as { _id: string; name: string };
-      const tempRole = await this.rolesService.findOne(userRole._id);
 
       // BƯỚC 3: Tạo payload mới (tối ưu - chỉ chứa userId)
       const accessPayload: IJwtAccessPayload = {
@@ -303,7 +294,6 @@ export class AuthService {
           name: user.name,
           email: user.email,
           role: user.role,
-          permissions: tempRole?.permissions ?? user.permissions ?? [],
           company: user.company,
         },
       };
@@ -395,23 +385,14 @@ export class AuthService {
         }
       }
 
-      // Step 3: Get user role and permissions
+      // Step 3: Get user role
       const userRole = user.role as unknown as { _id: string; name: string };
-      const tempRole = await this.rolesService.findOne(userRole._id);
 
       const userObject: IUser = {
         _id: user._id.toString(),
         name: user.name,
         email: user.email,
         role: userRole,
-        permissions:
-          tempRole?.permissions?.map((perm: any) => ({
-            _id: perm._id?.toString() || '',
-            name: perm.name || '',
-            method: perm.method || '',
-            apiPath: perm.apiPath || '',
-            module: perm.module || '',
-          })) ?? [],
         company: user.company
           ? {
               _id: user.company._id?.toString() || '',

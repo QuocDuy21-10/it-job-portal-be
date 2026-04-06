@@ -16,7 +16,6 @@ import { ResumesService } from './resumes.service';
 import { CreateUserCvDto } from './dto/create-resume.dto';
 import { UpdateResumeDto } from './dto/update-resume.dto';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
-import { SkipCheckPermission } from 'src/utils/decorators/skip-check-permission.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
 import { IUser } from 'src/users/user.interface';
 import { ApiOperation, ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
@@ -28,6 +27,7 @@ import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
 import { SubmitCvOnlineDto } from './dto/submit-cv-online.dto';
+import { Roles, ERole } from 'src/casl';
 
 @ApiTags('Resume')
 @Controller('resumes')
@@ -41,8 +41,8 @@ export class ResumesController {
   ) {}
 
   @Post()
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
   @ApiOperation({
-    summary: 'Create a new resume',
     description: 'Creates a new resume with the provided information. Requires authentication.',
   })
   @ResponseMessage('Resume created successfully')
@@ -51,6 +51,7 @@ export class ResumesController {
   }
 
   @Get()
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
   @ApiOperation({
     summary: 'Get all resumes',
     description: 'Retrieves a paginated list of all resumes. Supports filtering and sorting.',
@@ -66,6 +67,7 @@ export class ResumesController {
   }
 
   @Get(':id')
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
   @ApiOperation({
     summary: 'Get resume by ID',
     description: 'Retrieves detailed information about a specific resume by its ID',
@@ -76,6 +78,7 @@ export class ResumesController {
   }
 
   @Patch(':id')
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
   @ApiOperation({
     summary: 'Update resume by ID',
     description:
@@ -87,6 +90,7 @@ export class ResumesController {
   }
 
   @Delete(':id')
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
   @ApiOperation({
     summary: 'Delete resume by ID',
     description:
@@ -98,7 +102,6 @@ export class ResumesController {
   }
 
   @Post('by-user')
-  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Get resume by user',
     description: 'Retrieves resume associated with the authenticated user.',
@@ -109,7 +112,6 @@ export class ResumesController {
   }
 
   @Post('my-resumes')
-  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Get resume of user',
     description: 'Gets the resume associated with the authenticated user.',
@@ -121,7 +123,6 @@ export class ResumesController {
 
   // ========== NEW: CV ONLINE SUBMISSION (Structured CV) ==========
   @Post('cv-online')
-  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Submit CV Online - Apply using structured CV profile',
     description:
@@ -152,7 +153,6 @@ export class ResumesController {
 
   // ========== NEW: CV PARSER & AI MATCHING ENDPOINTS ==========
   @Post('upload-cv')
-  @SkipCheckPermission()
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -292,7 +292,6 @@ export class ResumesController {
   }
 
   @Get(':id/analysis')
-  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Get CV analysis results',
     description: 'Retrieve parsed data and AI matching analysis for a resume',
@@ -334,6 +333,7 @@ export class ResumesController {
   }
 
   @Get('queue/stats')
+  @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Get queue processing statistics',
     description: 'View current status of CV processing queue (Admin only)',
@@ -344,6 +344,7 @@ export class ResumesController {
   }
 
   @Post(':id/reparse')
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
   @ApiOperation({
     summary: 'Re-parse a CV',
     description: 'Trigger re-parsing of an already uploaded CV',
@@ -372,6 +373,7 @@ export class ResumesController {
   }
 
   @Post(':id/reanalyze')
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
   @ApiOperation({
     summary: 'Re-analyze a CV',
     description: 'Trigger re-analysis of a parsed CV against the job',

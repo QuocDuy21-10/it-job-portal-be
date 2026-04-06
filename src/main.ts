@@ -9,6 +9,7 @@ import cookieParser from 'cookie-parser';
 import { join } from 'path';
 import helmet from 'helmet';
 import { JwtAuthGuard } from './auth/guards';
+import { RolesGuard } from './casl';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -17,7 +18,7 @@ async function bootstrap() {
 
   // config jwt guard global
   const reflector = app.get(Reflector);
-  app.useGlobalGuards(new JwtAuthGuard(reflector));
+  app.useGlobalGuards(new JwtAuthGuard(reflector), new RolesGuard(reflector));
 
   // config transform interceptor global
   app.useGlobalInterceptors(new TransformInterceptor(reflector));

@@ -7,12 +7,15 @@ import { ResponseMessage } from 'src/utils/decorators/response-message.decorator
 import { User } from 'src/utils/decorators/user.decorator';
 import { IUser } from 'src/users/user.interface';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Roles } from 'src/casl';
+import { ERole } from 'src/casl';
 @ApiTags('Job')
 @Controller('jobs')
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
 
   @Post()
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
   @ApiOperation({
     summary: 'Create a new job posting',
     description:
@@ -66,6 +69,7 @@ export class JobsController {
   }
 
   @Patch(':id')
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
   @ApiOperation({
     summary: 'Update job by ID',
     description:
@@ -77,6 +81,7 @@ export class JobsController {
   }
 
   @Delete(':id')
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
   @ApiOperation({
     summary: 'Delete job by ID',
     description:

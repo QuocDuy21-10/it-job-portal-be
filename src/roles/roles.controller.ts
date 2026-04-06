@@ -6,9 +6,11 @@ import { ResponseMessage } from 'src/utils/decorators/response-message.decorator
 import { User } from 'src/utils/decorators/user.decorator';
 import { IUser } from 'src/users/user.interface';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Roles, ERole } from 'src/casl';
 
 @ApiTags('Role')
 @Controller('roles')
+@Roles(ERole.SUPER_ADMIN)
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 

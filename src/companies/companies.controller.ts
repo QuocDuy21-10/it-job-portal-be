@@ -7,12 +7,14 @@ import { OptionalAuth } from 'src/utils/decorators/optional-auth.decorator';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Roles, ERole } from 'src/casl';
 @ApiTags('Company')
 @Controller('companies')
 export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) {}
 
   @Post()
+  @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Create a new company',
     description:
@@ -67,6 +69,7 @@ export class CompaniesController {
   }
 
   @Patch(':id')
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
   @ApiOperation({
     summary: 'Update information of a company',
     description:
@@ -79,6 +82,7 @@ export class CompaniesController {
   }
 
   @Delete(':id')
+  @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Delete a company',
     description:

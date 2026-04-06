@@ -2,7 +2,6 @@ import { Controller, Delete, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
-import { SkipCheckPermission } from 'src/utils/decorators/skip-check-permission.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
 import { IUser } from 'src/users/user.interface';
 
@@ -12,7 +11,6 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
-  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Get my notifications',
     description: 'Retrieves paginated notifications for the authenticated user',
@@ -28,7 +26,6 @@ export class NotificationsController {
   }
 
   @Get('unread-count')
-  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Get unread notification count',
     description: 'Returns the number of unread notifications for the authenticated user',
@@ -39,7 +36,6 @@ export class NotificationsController {
   }
 
   @Patch(':id/read')
-  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Mark notification as read',
     description: 'Marks a specific notification as read',
@@ -50,7 +46,6 @@ export class NotificationsController {
   }
 
   @Patch('read-all')
-  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Mark all notifications as read',
     description: 'Marks all unread notifications as read for the authenticated user',
@@ -61,7 +56,6 @@ export class NotificationsController {
   }
 
   @Delete(':id')
-  @SkipCheckPermission()
   @ApiOperation({
     summary: 'Delete notification',
     description: 'Soft deletes a notification',

@@ -14,12 +14,12 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
-import { SkipCheckPermission } from 'src/utils/decorators/skip-check-permission.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
 import { IUser } from './user.interface';
 import { ApiTags, ApiOperation, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { SaveJobDto } from './dto/save-job.dto';
 import { FollowCompanyDto } from './dto/follow-company.dto';
+import { Roles, ERole } from 'src/casl';
 
 @ApiTags('User')
 @Controller('users')
@@ -27,6 +27,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
+  @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Create a new user',
     description:
@@ -39,6 +40,7 @@ export class UsersController {
   }
 
   @Get()
+  @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Get a list of users (with pagination)',
     description:
@@ -64,6 +66,7 @@ export class UsersController {
   }
 
   @Patch(':id')
+  @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Update information of a user by ID',
     description: 'API to update information of a user by ID.',
@@ -74,10 +77,7 @@ export class UsersController {
     return this.usersService.update(id, updateUserDto, user);
   }
 
-  // ==================== SAVED JOBS ENDPOINTS ====================
-
-  @SkipCheckPermission()
-  @Post('save-job')
+    @Post('save-job')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Save a job to user profile',
@@ -90,8 +90,7 @@ export class UsersController {
     return { message: 'Job saved successfully' };
   }
 
-  @SkipCheckPermission()
-  @Delete('save-job')
+    @Delete('save-job')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Unsave a job from user profile',
@@ -104,8 +103,7 @@ export class UsersController {
     return { message: 'Job unsaved successfully' };
   }
 
-  @SkipCheckPermission()
-  @Get('saved-jobs')
+    @Get('saved-jobs')
   @ApiOperation({
     summary: "Get user's saved jobs",
     description: 'Retrieve all jobs that the user has saved with pagination support.',
@@ -133,8 +131,6 @@ export class UsersController {
     return this.usersService.getSavedJobs(user._id, +page, +limit);
   }
 
-  // ==================== FOLLOW COMPANY ENDPOINTS ====================
-  @SkipCheckPermission()
   @Post('follow-company')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -148,7 +144,6 @@ export class UsersController {
     return { message: 'Company followed successfully' };
   }
 
-  @SkipCheckPermission()
   @Delete('follow-company')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -162,7 +157,6 @@ export class UsersController {
     return { message: 'Company unfollowed successfully' };
   }
 
-  @SkipCheckPermission()
   @Get('following-companies')
   @ApiOperation({
     summary: "Get user's following companies",
@@ -174,6 +168,7 @@ export class UsersController {
   }
 
   @Get(':id')
+  @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Get information of a user by ID',
     description: 'API to get information of a user by ID.',
@@ -184,6 +179,7 @@ export class UsersController {
   }
 
   @Delete(':id')
+  @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Delete a user by ID',
     description: 'API to delete a user by ID.',
