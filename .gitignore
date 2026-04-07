@@ -5,6 +5,7 @@
 /docs
 /scripts
 
+
 # Logs
 logs
 *.log
@@ -61,4 +62,5 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Others
 AGENTS.md
+.github/
 

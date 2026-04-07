@@ -7,13 +7,13 @@ import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose from 'mongoose';
 import aqp from 'api-query-params';
-import { ADMIN_ROLE } from 'src/databases/sample';
+import { ERole } from 'src/casl/enums/role.enum';
 
 @Injectable()
 export class RolesService {
   constructor(@InjectModel(Role.name) private roleModel: SoftDeleteModel<RoleDocument>) {}
   async create(createRoleDto: CreateRoleDto, user: IUser) {
-    const { name, description, isActive, permissions } = createRoleDto;
+    const { name, description, isActive } = createRoleDto;
     const existingName = await this.roleModel.findOne({
       name,
       isDeleted: false,
@@ -28,7 +28,6 @@ export class RolesService {
       name,
       description,
       isActive,
-      permissions,
       createdBy: {
         _id: user._id,
         email: user.email,
@@ -70,16 +69,7 @@ export class RolesService {
 
   async findOne(id: string) {
     this.validateObjectId;
-    return await this.roleModel.findById(id).populate({
-      path: 'permissions',
-      select: {
-        _id: 1,
-        name: 1,
-        apiPath: 1,
-        method: 1,
-        module: 1,
-      },
-    });
+    return await this.roleModel.findById(id);
   }
 
   async update(id: string, updateRoleDto: UpdateRoleDto, user: IUser) {
@@ -96,7 +86,7 @@ export class RolesService {
   async remove(id: string, user: IUser) {
     this.validateObjectId(id);
     const roleAdmin = await this.roleModel.findOne({ _id: id });
-    if (roleAdmin.name === ADMIN_ROLE) {
+    if (roleAdmin.name === ERole.SUPER_ADMIN) {
       throw new BadRequestException('Cannot delete admin role');
     }
     await this.roleModel.updateOne(

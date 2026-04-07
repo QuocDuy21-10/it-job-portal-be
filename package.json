@@ -24,7 +24,8 @@
     "docker:dev": "docker compose up -d",
     "docker:full": "docker compose --profile full up -d",
     "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f"
+    "docker:logs": "docker compose logs -f",
+    "seed": "ts-node -r tsconfig-paths/register src/databases/seeds/run-seed.ts"
   },
   "dependencies": {
     "@casl/ability": "^6.8.0",

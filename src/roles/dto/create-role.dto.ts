@@ -1,7 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsArray, IsBoolean, IsMongoId, IsNotEmpty, IsString, MaxLength } from 'class-validator';
-import mongoose from 'mongoose';
+import {IsBoolean, IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
 export class CreateRoleDto {
   @IsNotEmpty({ message: 'name is required' })
@@ -26,13 +25,4 @@ export class CreateRoleDto {
     default: true,
   })
   isActive: boolean;
-
-  @IsNotEmpty({ message: 'permissions are required' })
-  @IsMongoId({ each: true, message: 'each permission must be a valid Mongo ID' })
-  @IsArray({ message: 'permissions must be an array' })
-  @ApiProperty({
-    example: ['64a7f0c2e1b8c8b5d6f0a1b2'],
-    description: 'Array of permission IDs associated with the role',
-  })
-  permissions: mongoose.Schema.Types.ObjectId[];
 }

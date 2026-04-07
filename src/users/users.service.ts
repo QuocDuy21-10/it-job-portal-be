@@ -11,7 +11,7 @@ import aqp from 'api-query-params';
 import { User } from 'src/utils/decorators/user.decorator';
 import { ConfigService } from '@nestjs/config';
 import { Role, RoleDocument } from 'src/roles/schemas/role.schema';
-import { USER_ROLE } from 'src/databases/sample';
+import { ERole } from 'src/casl/enums/role.enum';
 import { AuthRegisterDto } from 'src/auth/dto/auth-register.dto';
 import { EAuthProvider } from 'src/auth/enums/auth-provider.enum';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
@@ -76,7 +76,7 @@ export class UsersService {
       );
     }
     // get user role
-    const userRole = await this.roleModel.findOne({ name: USER_ROLE });
+    const userRole = await this.roleModel.findOne({ name: ERole.NORMAL_USER });
 
     const hashedPassword = this.hashPassword(password);
     // verificationExpires: 15 minutes from now — MongoDB TTL index auto-deletes if not verified
@@ -304,7 +304,7 @@ export class UsersService {
     const { googleId, email, name, avatar } = googleProfile;
 
     // Get default user role
-    const userRole = await this.roleModel.findOne({ name: USER_ROLE });
+    const userRole = await this.roleModel.findOne({ name: ERole.NORMAL_USER });
 
     const newUser = await this.userModel.create({
       googleId,
