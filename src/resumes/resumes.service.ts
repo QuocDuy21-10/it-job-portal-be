@@ -18,6 +18,7 @@ import { User, UserDocument } from 'src/users/schemas/user.schema';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { ENotificationType } from 'src/notifications/enums/notification-type.enum';
 import { ApplicationNotificationQueueService } from 'src/queues/services/application-notification-queue.service';
+import { buildEmbeddedCompanyIdFilter } from 'src/companies/company-snapshot.util';
 
 @Injectable()
 export class ResumesService {
@@ -337,11 +338,9 @@ export class ResumesService {
       `Notifying HR for new application: resumeId=${resumeId}, companyId=${companyId}, jobName=${jobName}, candidate=${candidateName}`,
     );
 
-    // Find HR users who belong to this company
-    // Note: company._id is stored as String in the users collection, not ObjectId
     const hrUsers = await this.userModel
       .find({
-        'company._id': companyId,
+        ...buildEmbeddedCompanyIdFilter(companyId),
         isDeleted: { $ne: true },
         isActive: true,
       })

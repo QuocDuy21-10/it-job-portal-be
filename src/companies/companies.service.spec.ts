@@ -78,10 +78,15 @@ describe('CompaniesService', () => {
       const pipeline = mockJobModel.aggregate.mock.calls[0][0];
       const matchedCompanyIds = pipeline[0].$match['company._id'].$in;
 
-      expect(matchedCompanyIds).toEqual([companyOneId, companyTwoId]);
-      matchedCompanyIds.forEach((companyId: unknown) => {
-        expect(companyId).toBeInstanceOf(mongoose.Types.ObjectId);
-      });
+      expect(matchedCompanyIds).toEqual(
+        expect.arrayContaining([
+          companyOneId,
+          companyTwoId,
+          companyOneId.toString(),
+          companyTwoId.toString(),
+        ]),
+      );
+      expect(matchedCompanyIds).toHaveLength(4);
 
       expect(result.result).toEqual([
         {

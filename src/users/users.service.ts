@@ -16,6 +16,8 @@ import { AuthRegisterDto } from 'src/auth/dto/auth-register.dto';
 import { EAuthProvider } from 'src/auth/enums/auth-provider.enum';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 import { Company, CompanyDocument } from 'src/companies/schemas/company.schema';
+import { buildCanonicalCompanySnapshot, CompanySnapshotValue } from 'src/companies/company-snapshot.util';
+import { CompanyDto } from 'src/companies/dto/company.dto';
 
 @Injectable()
 export class UsersService {
@@ -40,13 +42,7 @@ export class UsersService {
       );
     }
 
-    // Validation: HR phải có company
-    const userRole = await this.roleModel.findById(role);
-    if (userRole && userRole.name === 'HR') {
-      if (!company || !company._id) {
-        throw new BadRequestException('HR user must be assigned to a company');
-      }
-    }
+    const normalizedCompany = await this.resolveCompanyAssignmentForRole(role, company);
 
     const hashedPassword = this.hashPassword(password);
     const newUser = await this.userModel.create({
@@ -54,7 +50,7 @@ export class UsersService {
       email,
       password: hashedPassword,
       role,
-      company,
+      company: normalizedCompany,
       createdBy: {
         _id: user._id,
         email: user.email,
@@ -163,30 +159,31 @@ export class UsersService {
   async update(id: string, updateUserDto: UpdateUserDto, user: IUser) {
     this.validateObjectId(id);
 
-    // Validation: Nếu update role thành HR hoặc user đã là HR, phải có company
-    if (updateUserDto.role || updateUserDto.company !== undefined) {
-      const existingUser = await this.userModel.findById(id);
-      const roleToCheck = updateUserDto.role || existingUser?.role;
+    const existingUser = await this.userModel.findById(id).select('role company');
+    if (!existingUser) {
+      throw new BadRequestException('User not found');
+    }
 
-      if (roleToCheck) {
-        const userRole = await this.roleModel.findById(roleToCheck);
-        if (userRole && userRole.name === 'HR') {
-          const companyToCheck =
-            updateUserDto.company !== undefined ? updateUserDto.company : existingUser?.company;
+    const roleToCheck = updateUserDto.role || existingUser.role;
+    const companyToCheck =
+      updateUserDto.company !== undefined ? updateUserDto.company : this.toCompanyDto(existingUser.company);
+    const normalizedCompany = await this.resolveCompanyAssignmentForRole(roleToCheck, companyToCheck);
+    const { company: _company, ...restUpdateUserDto } = updateUserDto;
 
-          if (!companyToCheck || !companyToCheck._id) {
-            throw new BadRequestException('HR user must be assigned to a company');
-          }
-        }
-      }
+    const updatePayload: Record<string, any> = {
+      ...restUpdateUserDto,
+      updatedBy: { _id: user._id, email: user.email },
+    };
+
+    if (normalizedCompany) {
+      updatePayload.company = normalizedCompany;
+    } else {
+      updatePayload.$unset = { company: 1 };
     }
 
     return await this.userModel.updateOne(
       { _id: id },
-      {
-        ...updateUserDto,
-        updatedBy: { _id: user._id, email: user.email },
-      },
+      updatePayload,
     );
   }
 
@@ -229,10 +226,6 @@ export class UsersService {
       .populate({
         path: 'role',
         select: '_id name',
-      })
-      .populate({
-        path: 'company',
-        select: '_id name logo address',
       })
       .select('-password')
       .lean() // Convert to plain JS object (performance boost)
@@ -389,11 +382,6 @@ export class UsersService {
         path: 'savedJobs',
         match: { isDeleted: false }, // Only get non-deleted jobs
         select: 'name skills company location salary level formOfWork startDate endDate',
-        populate: {
-          path: 'company',
-          select: 'name logo',
-          model: 'Company',
-        },
       });
 
     if (!user) {
@@ -505,6 +493,54 @@ export class UsersService {
     return {
       result: user.companyFollowed || [],
       total: user.companyFollowed?.length || 0,
+    };
+  }
+
+  private async resolveCompanyAssignmentForRole(
+    roleId: string | mongoose.Schema.Types.ObjectId,
+    company?: CompanyDto | null,
+  ): Promise<CompanySnapshotValue | undefined> {
+    const userRole = await this.roleModel.findById(roleId).select('name');
+
+    if (!userRole) {
+      throw new BadRequestException('Role not found');
+    }
+
+    if (userRole.name !== ERole.HR) {
+      return undefined;
+    }
+
+    const companyId = company?._id?.toString();
+    if (!companyId) {
+      throw new BadRequestException('HR user must be assigned to a company');
+    }
+
+    return this.getCanonicalCompanySnapshot(companyId);
+  }
+
+  private async getCanonicalCompanySnapshot(companyId: string): Promise<CompanySnapshotValue> {
+    this.validateObjectId(companyId);
+
+    const company = await this.companyModel
+      .findOne({ _id: companyId, isDeleted: false })
+      .select('_id name logo');
+
+    if (!company) {
+      throw new BadRequestException('Company not found or has been deleted');
+    }
+
+    return buildCanonicalCompanySnapshot(company);
+  }
+
+  private toCompanyDto(company?: { _id?: unknown; name?: string; logo?: string | null } | null): CompanyDto | undefined {
+    if (!company?._id) {
+      return undefined;
+    }
+
+    return {
+      _id: company._id.toString(),
+      name: company.name,
+      logo: company.logo ?? null,
     };
   }
 }

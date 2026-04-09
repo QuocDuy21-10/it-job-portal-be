@@ -11,7 +11,6 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
-import mongoose from 'mongoose';
 import { CompanyDto } from 'src/companies/dto/company.dto';
 
 export class CreateUserDto {
@@ -42,5 +41,5 @@ export class CreateUserDto {
   @IsString({ message: 'Role must be a string' })
   @IsMongoId({ message: 'Role must be a valid MongoDB ObjectId' })
   @ApiProperty({ example: '68fde8987e1103e9e88e0e4e', description: 'Role of user' })
-  role: mongoose.Schema.Types.ObjectId;
+  role: string;
 }

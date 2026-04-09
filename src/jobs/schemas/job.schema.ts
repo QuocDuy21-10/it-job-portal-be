@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
 import { EJobLevel } from '../enums/job-level.enum';
 import { EJobFormOfWork } from '../enums/job-form-of-work.enum';
+import { CompanySnapshot, CompanySnapshotSchema } from 'src/companies/schemas/company-snapshot.schema';
 
 export type JobDocument = HydratedDocument<Job>;
 
@@ -13,12 +14,8 @@ export class Job {
   @Prop({ required: true })
   skills: string[];
 
-  @Prop({ type: Object, required: true })
-  company: {
-    _id: mongoose.Schema.Types.ObjectId;
-    name: string;
-    logo?: string;
-  };
+  @Prop({ type: CompanySnapshotSchema, required: true })
+  company: CompanySnapshot;
 
   @Prop({ required: true, trim: true })
   location: string;

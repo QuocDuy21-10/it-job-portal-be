@@ -71,10 +71,10 @@ Swagger docs: `http://localhost:8081/api`
 - **Hybrid AI:** Gemini extracts CV data, backend `MatchingService` does deterministic scoring
 
 ## Rule
-Before writing code, ALWAYS read:
+Before writing code, YOU MUST read:
 
 - agent_docs/SENIOR_BACKEND_PRACTICES.md
-
+- After you've finished coding, create documentation describing the process and workflow.
 ## Agent Documentation
 
 Read these files before starting work on related areas. Pick only what's relevant to the current task.

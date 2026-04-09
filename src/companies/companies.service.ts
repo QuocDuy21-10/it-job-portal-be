@@ -9,6 +9,7 @@ import { IUser } from 'src/users/user.interface';
 import aqp from 'api-query-params';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 import { FilesService } from 'src/files/files.service';
+import { buildEmbeddedCompanyIdsInCondition } from './company-snapshot.util';
 
 @Injectable()
 export class CompaniesService {
@@ -69,7 +70,7 @@ export class CompaniesService {
     }>([
       {
         $match: {
-          'company._id': { $in: companyIds },
+          'company._id': buildEmbeddedCompanyIdsInCondition(companyIds),
           isActive: true,
           isDeleted: { $ne: true },
         },

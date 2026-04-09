@@ -8,16 +8,27 @@ import { Job, JobDocument } from './schemas/job.schema';
 import mongoose from 'mongoose';
 import aqp from 'api-query-params';
 import { CompanyFollowerQueueService } from 'src/queues/services/company-follower-queue.service';
+import { Company, CompanyDocument } from 'src/companies/schemas/company.schema';
+import {
+  buildCanonicalCompanySnapshot,
+  buildEmbeddedCompanyIdCandidates,
+  buildEmbeddedCompanyIdFilter,
+  CompanySnapshotValue,
+} from 'src/companies/company-snapshot.util';
 
 @Injectable()
 export class JobsService {
   constructor(
     @InjectModel(Job.name) private jobModel: SoftDeleteModel<JobDocument>,
+    @InjectModel(Company.name) private companyModel: SoftDeleteModel<CompanyDocument>,
     private readonly companyFollowerQueueService: CompanyFollowerQueueService,
   ) {}
   async create(createJobDto: CreateJobDto, user: IUser) {
+    const normalizedCompany = await this.getCanonicalCompanySnapshot(createJobDto.company._id);
+
     const newJob = await this.jobModel.create({
       ...createJobDto,
+      company: normalizedCompany,
       createdBy: { _id: user._id, email: user.email },
     });
 
@@ -43,9 +54,15 @@ export class JobsService {
     delete filter.page;
     delete filter.limit;
 
+    if (typeof filter['company._id'] === 'string') {
+      filter['company._id'] = {
+        $in: buildEmbeddedCompanyIdCandidates(filter['company._id']),
+      };
+    }
+
     // Filter theo companyId nếu user là HR
     if (user && user.role?.name === 'HR' && user.company?._id) {
-      filter['company._id'] = user.company._id;
+      Object.assign(filter, buildEmbeddedCompanyIdFilter(user.company._id));
     }
 
     const offset = (page - 1) * limit;
@@ -77,19 +94,7 @@ export class JobsService {
   async findOne(id: string, user?: IUser) {
     this.validateObjectId(id);
 
-    // Lấy job theo id và populate thông tin công ty (name, numberOfEmployees, address)
-    const job = await this.jobModel
-      .findById(id)
-      .populate({
-        path: 'company',
-        select: {
-          name: 1,
-          numberOfEmployees: 1,
-          address: 1,
-        },
-        model: 'Company',
-      })
-      .exec();
+    const job = await this.jobModel.findById(id).exec();
 
     // Nếu user là HR, chỉ cho phép xem job của công ty họ
     if (user && user.role?.name === 'HR' && user.company?._id) {
@@ -103,9 +108,19 @@ export class JobsService {
 
   async update(id: string, updateJobDto: UpdateJobDto, user: IUser) {
     this.validateObjectId(id);
+    const { company: _company, ...restUpdateJobDto } = updateJobDto;
+    const updatePayload: Record<string, any> = {
+      ...restUpdateJobDto,
+      updatedBy: { _id: user._id, email: user.email },
+    };
+
+    if (updateJobDto.company?._id) {
+      updatePayload.company = await this.getCanonicalCompanySnapshot(updateJobDto.company._id);
+    }
+
     return await this.jobModel.updateOne(
       { _id: id },
-      { ...updateJobDto, updatedBy: { _id: user._id, email: user.email } },
+      updatePayload,
     );
   }
   /**
@@ -133,7 +148,6 @@ export class JobsService {
         $or: [{ endDate: { $gte: new Date() } }, { endDate: null }],
       })
       .select('name company location skills level') // Select only necessary fields to reduce token usage
-      .populate('company', 'name') // Populate company name
       .sort({ createdAt: -1 }) // Prioritize newest jobs
       .limit(limit)
       .lean()
@@ -150,5 +164,19 @@ export class JobsService {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid ID format');
     }
+  }
+
+  private async getCanonicalCompanySnapshot(companyId: string): Promise<CompanySnapshotValue> {
+    this.validateObjectId(companyId);
+
+    const company = await this.companyModel
+      .findOne({ _id: companyId, isDeleted: false })
+      .select('_id name logo');
+
+    if (!company) {
+      throw new BadRequestException('Company not found or has been deleted');
+    }
+
+    return buildCanonicalCompanySnapshot(company);
   }
 }

@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
 import { Role } from 'src/roles/schemas/role.schema';
 import { EAuthProvider } from 'src/auth/enums/auth-provider.enum';
+import { CompanySnapshot, CompanySnapshotSchema } from 'src/companies/schemas/company-snapshot.schema';
 
 export type UserDocument = HydratedDocument<User>;
 
@@ -34,12 +35,8 @@ export class User {
   @Prop({ type: Date, required: false })
   verificationExpires?: Date;
 
-  @Prop({ type: Object })
-  company?: {
-    _id?: mongoose.Schema.Types.ObjectId | null;
-    name?: string | null;
-    logo?: string | null;
-  };
+  @Prop({ type: CompanySnapshotSchema, required: false })
+  company?: CompanySnapshot;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Role.name, required: true })
   role: mongoose.Schema.Types.ObjectId;

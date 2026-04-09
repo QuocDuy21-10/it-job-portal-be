@@ -113,10 +113,6 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
         path: 'role',
         select: '_id name',
       })
-      .populate({
-        path: 'company',
-        select: '_id name logo',
-      })
       .select('-password -refreshToken') // Không lấy sensitive data
       .lean()
       .exec();

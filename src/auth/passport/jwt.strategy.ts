@@ -40,10 +40,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         path: 'role',
         select: '_id name',
       })
-      .populate({
-        path: 'company',
-        select: '_id name logo address',
-      })
       .select('-password')
       .lean()
       .exec();

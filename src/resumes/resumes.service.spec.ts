@@ -102,7 +102,9 @@ describe('ResumesService', () => {
 
       // Verify user query uses correct companyId (as string, not ObjectId)
       expect(mockUserModel.find).toHaveBeenCalledWith({
-        'company._id': companyId,
+        'company._id': {
+          $in: [companyId, expect.any(mongoose.Types.ObjectId)],
+        },
         isDeleted: { $ne: true },
         isActive: true,
       });

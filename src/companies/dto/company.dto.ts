@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsMongoId, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
-import mongoose from 'mongoose';
 
 export class CompanyDto {
   @IsOptional()
@@ -10,7 +9,7 @@ export class CompanyDto {
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',
   })
-  _id?: mongoose.Schema.Types.ObjectId;
+  _id?: string;
 
   @IsOptional()
   @IsNotEmpty({ message: 'Company name is required' })
