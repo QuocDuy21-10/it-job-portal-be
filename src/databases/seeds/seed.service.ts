@@ -44,7 +44,7 @@ export class SeedService {
       const roleCount = await this.roleModel.countDocuments();
       if (roleCount === 0) {
         const inserted = await this.roleModel.insertMany(ROLES_SEED_DATA);
-        inserted.forEach((doc) => seededRoleIds.push(doc._id as Types.ObjectId));
+        inserted.forEach(doc => seededRoleIds.push(doc._id as Types.ObjectId));
         this.logger.log(`Roles seeded: ${seededRoleIds.length} records`);
       } else {
         this.logger.log('Roles already seeded, skipping');
@@ -65,7 +65,7 @@ export class SeedService {
       const companyCount = await this.companyModel.countDocuments();
       if (companyCount === 0) {
         const inserted = await this.companyModel.insertMany(COMPANIES_SEED_DATA);
-        inserted.forEach((doc) => seededCompanyIds.push(doc._id as Types.ObjectId));
+        inserted.forEach(doc => seededCompanyIds.push(doc._id as Types.ObjectId));
         this.logger.log(`Companies seeded: ${seededCompanyIds.length} records`);
       } else {
         this.logger.log('Companies already seeded, skipping');
@@ -91,7 +91,7 @@ export class SeedService {
           hashedPassword,
         );
         const inserted = await this.userModel.insertMany(usersData);
-        inserted.forEach((doc) => seededUserIds.push(doc._id as Types.ObjectId));
+        inserted.forEach(doc => seededUserIds.push(doc._id as Types.ObjectId));
         this.logger.log(`Users seeded: ${seededUserIds.length} records`);
       } else {
         this.logger.log('Users already seeded, skipping');
@@ -108,7 +108,7 @@ export class SeedService {
       if (jobCount === 0) {
         const jobsData = createJobsSeedData(companies);
         const inserted = await this.jobModel.insertMany(jobsData);
-        inserted.forEach((doc) => seededJobIds.push(doc._id as Types.ObjectId));
+        inserted.forEach(doc => seededJobIds.push(doc._id as Types.ObjectId));
         this.logger.log(`Jobs seeded: ${seededJobIds.length} records`);
       } else {
         this.logger.log('Jobs already seeded, skipping');
@@ -126,7 +126,7 @@ export class SeedService {
 
   private validateEnv(): void {
     const required = ['MONGO_URL', 'EMAIL_ADMIN', 'INIT_PASSWORD'];
-    const missing = required.filter((key) => !this.configService.get<string>(key));
+    const missing = required.filter(key => !this.configService.get<string>(key));
     if (missing.length > 0) {
       throw new Error(
         `Missing required environment variables for seeding: ${missing.join(', ')}. Check your .env file.`,
@@ -134,10 +134,7 @@ export class SeedService {
     }
   }
 
-  private async cleanup(
-    ids: Types.ObjectId[],
-    model: SoftDeleteModel<any>,
-  ): Promise<void> {
+  private async cleanup(ids: Types.ObjectId[], model: SoftDeleteModel<any>): Promise<void> {
     if (ids.length === 0) return;
     await model.deleteMany({ _id: { $in: ids } });
     this.logger.warn(`Cleaned up ${ids.length} partially-seeded records from ${model.modelName}`);

@@ -12,7 +12,7 @@ export const COMPANIES_SEED_DATA = [
     name: 'VNG Corporation',
     address: '182 Le Dai Hanh, Ward 15, District 11, Ho Chi Minh City',
     description:
-      'VNG Corporation is Vietnam\'s first unicorn tech company, operating Zalo, ZaloPay, and game platforms serving over 100 million users across Southeast Asia.',
+      "VNG Corporation is Vietnam's first unicorn tech company, operating Zalo, ZaloPay, and game platforms serving over 100 million users across Southeast Asia.",
     website: 'https://vng.com.vn',
     numberOfEmployees: 4000,
     logo: null,
@@ -21,7 +21,7 @@ export const COMPANIES_SEED_DATA = [
     name: 'Vingroup Technology',
     address: 'No.7, Bang Lang 1, Vinhomes Riverside, Long Bien, Ha Noi',
     description:
-      'Vingroup Technology (VinTech) drives digital innovation across Vingroup\'s ecosystem, developing AI, smart city solutions, VinFast connected vehicle systems, and enterprise software.',
+      "Vingroup Technology (VinTech) drives digital innovation across Vingroup's ecosystem, developing AI, smart city solutions, VinFast connected vehicle systems, and enterprise software.",
     website: 'https://vingroup.net',
     numberOfEmployees: 5000,
     logo: null,
@@ -30,7 +30,7 @@ export const COMPANIES_SEED_DATA = [
     name: 'Tiki Corporation',
     address: '52 Ut Tich, Ward 4, Tan Binh District, Ho Chi Minh City',
     description:
-      'Tiki is one of Vietnam\'s leading e-commerce platforms, offering online retail, logistics (TikiNOW), and fintech services (TikiPay) to millions of customers.',
+      "Tiki is one of Vietnam's leading e-commerce platforms, offering online retail, logistics (TikiNOW), and fintech services (TikiPay) to millions of customers.",
     website: 'https://tiki.vn',
     numberOfEmployees: 3000,
     logo: null,
@@ -39,7 +39,7 @@ export const COMPANIES_SEED_DATA = [
     name: 'MoMo',
     address: '136 Le Thi Hong Gam, Nguyen Thai Binh Ward, District 1, Ho Chi Minh City',
     description:
-      'MoMo is Vietnam\'s leading mobile payment and fintech super-app with over 31 million users, providing digital wallet, lending, insurance, and investment services.',
+      "MoMo is Vietnam's leading mobile payment and fintech super-app with over 31 million users, providing digital wallet, lending, insurance, and investment services.",
     website: 'https://momo.vn',
     numberOfEmployees: 2000,
     logo: null,
@@ -48,7 +48,7 @@ export const COMPANIES_SEED_DATA = [
     name: 'Shopee Vietnam',
     address: '14 Ly Tu Trong, Ben Nghe Ward, District 1, Ho Chi Minh City',
     description:
-      'Shopee Vietnam is the local branch of Sea Limited\'s e-commerce platform, providing marketplace technology, logistics, and digital payment infrastructure.',
+      "Shopee Vietnam is the local branch of Sea Limited's e-commerce platform, providing marketplace technology, logistics, and digital payment infrastructure.",
     website: 'https://shopee.vn',
     numberOfEmployees: 5000,
     logo: null,
@@ -57,7 +57,7 @@ export const COMPANIES_SEED_DATA = [
     name: 'Grab Vietnam',
     address: '71 Nguyen Chi Thanh, Dong Da, Ha Noi',
     description:
-      'Grab Vietnam powers the engineering and product teams for Grab\'s super-app across transport, food delivery, payments, and financial services in Southeast Asia.',
+      "Grab Vietnam powers the engineering and product teams for Grab's super-app across transport, food delivery, payments, and financial services in Southeast Asia.",
     website: 'https://grab.com',
     numberOfEmployees: 1500,
     logo: null,
@@ -66,7 +66,7 @@ export const COMPANIES_SEED_DATA = [
     name: 'Topica Edtech Group',
     address: 'Tầng 14, Tòa nhà Machinco, 444 Hoang Hoa Tham, Ba Dinh, Ha Noi',
     description:
-      'Topica is Vietnam\'s largest online education platform, delivering technology-powered learning experiences for professionals and universities across Southeast Asia.',
+      "Topica is Vietnam's largest online education platform, delivering technology-powered learning experiences for professionals and universities across Southeast Asia.",
     website: 'https://topica.net',
     numberOfEmployees: 1200,
     logo: null,
@@ -120,7 +120,7 @@ export const COMPANIES_SEED_DATA = [
     name: 'TMA Solutions',
     address: 'TMA Technology Park, Binh Chanh, Ho Chi Minh City',
     description:
-      'TMA Solutions is one of Vietnam\'s largest software outsourcing companies, delivering embedded systems, cloud, and enterprise software projects for global technology firms.',
+      "TMA Solutions is one of Vietnam's largest software outsourcing companies, delivering embedded systems, cloud, and enterprise software projects for global technology firms.",
     website: 'https://tmasolutions.com',
     numberOfEmployees: 3000,
     logo: null,
@@ -156,7 +156,7 @@ export const COMPANIES_SEED_DATA = [
     name: 'Sky Mavis',
     address: 'Ho Chi Minh City, Vietnam',
     description:
-      'Sky Mavis is the creator of Axie Infinity, Vietnam\'s pioneering blockchain gaming and NFT platform, building the next generation of play-to-earn digital economies.',
+      "Sky Mavis is the creator of Axie Infinity, Vietnam's pioneering blockchain gaming and NFT platform, building the next generation of play-to-earn digital economies.",
     website: 'https://skymavis.com',
     numberOfEmployees: 250,
     logo: null,

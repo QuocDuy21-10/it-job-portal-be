@@ -19,7 +19,7 @@ export function createUsersSeedData(
       name: 'Normal User',
       email: 'user@gmail.com',
       password: hashedPassword,
-        authProvider: 'local',
+      authProvider: 'local',
       role: userRoleId,
       isActive: true,
     },
