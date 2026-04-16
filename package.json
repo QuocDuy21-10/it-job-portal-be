@@ -125,7 +125,7 @@
       "^src/(.*)$": "<rootDir>/$1"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!api-query-params)"
+      "node_modules/(?!(api-query-params|uuid)/)"
     ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"

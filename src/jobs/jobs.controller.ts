@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestj
 import { JobsService } from './jobs.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
+import { ApproveJobDto } from './dto/approve-job.dto';
 import { OptionalAuth } from 'src/utils/decorators/optional-auth.decorator';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
@@ -90,5 +91,17 @@ export class JobsController {
   @ResponseMessage('Delete job by id')
   remove(@Param('id') id: string, @User() user: IUser) {
     return this.jobsService.remove(id, user);
+  }
+
+  @Patch(':id/approve')
+  @Roles(ERole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Approve or reject a job posting (Admin only)',
+    description:
+      'Allows SUPER ADMIN to approve or reject a job posting. Approved jobs become visible to the public.',
+  })
+  @ResponseMessage('Job approval status updated')
+  approveJob(@Param('id') id: string, @Body() approveJobDto: ApproveJobDto, @User() user: IUser) {
+    return this.jobsService.approveJob(id, approveJobDto, user);
   }
 }

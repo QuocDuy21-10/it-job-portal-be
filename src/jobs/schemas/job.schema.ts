@@ -2,7 +2,11 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
 import { EJobLevel } from '../enums/job-level.enum';
 import { EJobFormOfWork } from '../enums/job-form-of-work.enum';
-import { CompanySnapshot, CompanySnapshotSchema } from 'src/companies/schemas/company-snapshot.schema';
+import { EJobApprovalStatus } from '../enums/job-approval-status.enum';
+import {
+  CompanySnapshot,
+  CompanySnapshotSchema,
+} from 'src/companies/schemas/company-snapshot.schema';
 
 export type JobDocument = HydratedDocument<Job>;
 
@@ -43,6 +47,25 @@ export class Job {
 
   @Prop({ default: true, required: true })
   isActive: boolean;
+
+  @Prop({
+    required: true,
+    enum: EJobApprovalStatus,
+    default: EJobApprovalStatus.PENDING,
+  })
+  approvalStatus: string;
+
+  @Prop()
+  approvalNote?: string;
+
+  @Prop({ type: Object })
+  approvedBy?: {
+    _id: mongoose.Schema.Types.ObjectId;
+    email: string;
+  };
+
+  @Prop()
+  approvedAt?: Date;
 
   @Prop({ type: Object })
   createdBy?: {
@@ -87,6 +110,8 @@ JobSchema.index({ skills: 1 });
 JobSchema.index({ level: 1 });
 JobSchema.index({ location: 1 });
 JobSchema.index({ createdAt: -1 });
+JobSchema.index({ approvalStatus: 1 });
+JobSchema.index({ approvalStatus: 1, isActive: 1, isDeleted: 1 });
 
 // Text index for search functionality
 JobSchema.index({ name: 'text', description: 'text' });

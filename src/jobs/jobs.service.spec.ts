@@ -50,6 +50,8 @@ describe('JobsService', () => {
         _id: '507f1f77bcf86cd799439042',
         name: 'Henry HR',
         email: 'henry@example.com',
+        authProvider: 'local',
+        hasPassword: true,
         role: {
           _id: '507f1f77bcf86cd799439043',
           name: 'HR',

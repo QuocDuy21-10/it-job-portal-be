@@ -13,7 +13,9 @@ export type CompanySnapshotValue = {
   logo?: string | null;
 };
 
-export function buildCanonicalCompanySnapshot(company: CompanySnapshotSource): CompanySnapshotValue {
+export function buildCanonicalCompanySnapshot(
+  company: CompanySnapshotSource,
+): CompanySnapshotValue {
   return {
     _id: new mongoose.Types.ObjectId(company._id.toString()),
     name: company.name,
@@ -21,7 +23,9 @@ export function buildCanonicalCompanySnapshot(company: CompanySnapshotSource): C
   };
 }
 
-export function buildEmbeddedCompanyIdCandidates(companyId: CompanyIdInput): Array<string | mongoose.Types.ObjectId> {
+export function buildEmbeddedCompanyIdCandidates(
+  companyId: CompanyIdInput,
+): Array<string | mongoose.Types.ObjectId> {
   const normalizedCompanyId = companyId.toString();
 
   if (!mongoose.Types.ObjectId.isValid(normalizedCompanyId)) {

@@ -2,7 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { StatisticsService } from './statistics.service';
 import { DashboardStatsDto } from './dto/dashboard-stats.dto';
-import { Roles, ERole } from 'src/casl';  
+import { Roles, ERole } from 'src/casl';
 
 @ApiTags('Statistics')
 @Controller('statistics')

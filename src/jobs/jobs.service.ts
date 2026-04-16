@@ -1,6 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
+import { ApproveJobDto } from './dto/approve-job.dto';
+import { EJobApprovalStatus } from './enums/job-approval-status.enum';
 import { IUser } from 'src/users/user.interface';
 import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
@@ -63,6 +65,9 @@ export class JobsService {
     // Filter theo companyId nếu user là HR
     if (user && user.role?.name === 'HR' && user.company?._id) {
       Object.assign(filter, buildEmbeddedCompanyIdFilter(user.company._id));
+    } else if (!user || user.role?.name !== 'SUPER ADMIN') {
+      // Public users and NORMAL_USER only see APPROVED jobs
+      filter.approvalStatus = EJobApprovalStatus.APPROVED;
     }
 
     const offset = (page - 1) * limit;
@@ -101,6 +106,14 @@ export class JobsService {
       if (job && job.company && job.company._id.toString() !== user.company._id.toString()) {
         throw new BadRequestException('You can only view jobs of your own company');
       }
+      return job;
+    }
+
+    // Public users and NORMAL_USER can only view APPROVED jobs
+    if (!user || user.role?.name !== 'SUPER ADMIN') {
+      if (job && job.approvalStatus !== EJobApprovalStatus.APPROVED) {
+        return null;
+      }
     }
 
     return job;
@@ -118,10 +131,7 @@ export class JobsService {
       updatePayload.company = await this.getCanonicalCompanySnapshot(updateJobDto.company._id);
     }
 
-    return await this.jobModel.updateOne(
-      { _id: id },
-      updatePayload,
-    );
+    return await this.jobModel.updateOne({ _id: id }, updatePayload);
   }
   /**
    * Find matching jobs based on user skills
@@ -142,6 +152,7 @@ export class JobsService {
       .find({
         isActive: true,
         isDeleted: false,
+        approvalStatus: EJobApprovalStatus.APPROVED,
         // Find jobs that have at least one matching skill
         skills: { $in: skillRegexes },
         // Filter out expired jobs
@@ -152,6 +163,28 @@ export class JobsService {
       .limit(limit)
       .lean()
       .exec();
+  }
+
+  async approveJob(id: string, dto: ApproveJobDto, user: IUser) {
+    this.validateObjectId(id);
+
+    const job = await this.jobModel.findById(id).exec();
+    if (!job) {
+      throw new NotFoundException(`Job with ID ${id} not found`);
+    }
+
+    await this.jobModel.updateOne(
+      { _id: id },
+      {
+        approvalStatus: dto.status,
+        approvalNote: dto.approvalNote ?? null,
+        approvedBy: { _id: user._id, email: user.email },
+        approvedAt: new Date(),
+        updatedBy: { _id: user._id, email: user.email },
+      },
+    );
+
+    return { _id: id, approvalStatus: dto.status };
   }
 
   async remove(id: string, user: IUser) {

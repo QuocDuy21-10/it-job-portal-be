@@ -54,15 +54,13 @@ describe('CompaniesService', () => {
         },
       ];
 
-      mockCompanyModel.find
-        .mockReturnValueOnce(Promise.resolve(companies))
-        .mockReturnValueOnce({
-          skip: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockReturnThis(),
-          sort: jest.fn().mockReturnThis(),
-          populate: jest.fn().mockReturnThis(),
-          exec: jest.fn().mockResolvedValue(companies),
-        });
+      mockCompanyModel.find.mockReturnValueOnce(Promise.resolve(companies)).mockReturnValueOnce({
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        populate: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue(companies),
+      });
 
       mockJobModel.aggregate.mockResolvedValue([
         {
