@@ -7,6 +7,7 @@ import { Role, RoleSchema } from 'src/roles/schemas/role.schema';
 import { Session, SessionSchema } from 'src/sessions/schemas/session.schema';
 import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
 import { Company, CompanySchema } from 'src/companies/schemas/company.schema';
+import { SessionsModule } from 'src/sessions/sessions.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { Company, CompanySchema } from 'src/companies/schemas/company.schema';
       { name: Job.name, schema: JobSchema },
       { name: Company.name, schema: CompanySchema },
     ]),
+    SessionsModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],

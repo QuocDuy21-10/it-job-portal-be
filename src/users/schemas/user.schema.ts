@@ -2,7 +2,10 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
 import { Role } from 'src/roles/schemas/role.schema';
 import { EAuthProvider } from 'src/auth/enums/auth-provider.enum';
-import { CompanySnapshot, CompanySnapshotSchema } from 'src/companies/schemas/company-snapshot.schema';
+import {
+  CompanySnapshot,
+  CompanySnapshotSchema,
+} from 'src/companies/schemas/company-snapshot.schema';
 
 export type UserDocument = HydratedDocument<User>;
 
@@ -28,6 +31,21 @@ export class User {
 
   @Prop({ default: false })
   isActive: boolean;
+
+  @Prop({ default: false })
+  isLocked: boolean;
+
+  @Prop({ type: String, required: false })
+  lockReason?: string;
+
+  @Prop({ type: Object, required: false })
+  lockedBy?: {
+    _id: mongoose.Schema.Types.ObjectId;
+    email: string;
+  };
+
+  @Prop({ type: Date, required: false })
+  lockedAt?: Date;
 
   @Prop()
   codeExpired: Date;

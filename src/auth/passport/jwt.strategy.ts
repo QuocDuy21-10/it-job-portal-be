@@ -52,6 +52,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ admin.');
     }
 
+    if (user.isLocked) {
+      throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
+    }
+
     if (user.isDeleted) {
       throw new UnauthorizedException('Tài khoản đã bị xóa. Token không hợp lệ.');
     }
@@ -65,6 +69,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       _id: user._id.toString(),
       name: user.name,
       email: user.email,
+      authProvider: user.authProvider,
+      hasPassword: !!user.password,
       role: {
         _id: userRole._id.toString(),
         name: userRole.name,

@@ -127,6 +127,11 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
       throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa. Không thể refresh token.');
     }
 
+    // BƯỚC 10.5: Validate user chưa bị khóa
+    if (user.isLocked) {
+      throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
+    }
+
     // BƯỚC 11: Validate user chưa bị soft delete
     if (user.isDeleted) {
       throw new UnauthorizedException('Tài khoản đã bị xóa. Token không hợp lệ.');
@@ -138,6 +143,8 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
       _id: user._id.toString(),
       name: user.name,
       email: user.email,
+      authProvider: user.authProvider,
+      hasPassword: !!user.password,
       role: {
         _id: userRole?._id?.toString() || '',
         name: userRole?.name || '',

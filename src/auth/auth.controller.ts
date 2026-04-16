@@ -12,6 +12,7 @@ import { AuthRegisterDto } from './dto/auth-register.dto';
 import { AuthEmailLoginDto } from './dto/auth-email-login.dto';
 import { AuthGoogleLoginDto } from './dto/auth-google-login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { SetPasswordDto } from './dto/set-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyAuthDto } from './dto/verify-auth.dto';
@@ -229,10 +230,33 @@ export class AuthController {
   }
 
   @Post('change-password')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 300000, limit: 5 } })
   @ApiOperation({ summary: 'Change Password' })
   @ResponseMessage('Change password successfully')
-  async changePassword(@User() user: IUser, @Body() changePasswordDto: ChangePasswordDto) {
-    return this.authService.changePassword(user, changePasswordDto);
+  async changePassword(
+    @User() user: IUser,
+    @Body() changePasswordDto: ChangePasswordDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.changePassword(user, changePasswordDto);
+    response.clearCookie('refresh_token');
+    return result;
+  }
+
+  @Post('set-password')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 300000, limit: 5 } })
+  @ApiOperation({ summary: 'Set Password (for OAuth users without a password)' })
+  @ResponseMessage('Set password successfully')
+  async setPassword(
+    @User() user: IUser,
+    @Body() setPasswordDto: SetPasswordDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.setPassword(user, setPasswordDto);
+    response.clearCookie('refresh_token');
+    return result;
   }
 
   @Public()

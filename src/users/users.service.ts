@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -16,8 +16,13 @@ import { AuthRegisterDto } from 'src/auth/dto/auth-register.dto';
 import { EAuthProvider } from 'src/auth/enums/auth-provider.enum';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 import { Company, CompanyDocument } from 'src/companies/schemas/company.schema';
-import { buildCanonicalCompanySnapshot, CompanySnapshotValue } from 'src/companies/company-snapshot.util';
+import {
+  buildCanonicalCompanySnapshot,
+  CompanySnapshotValue,
+} from 'src/companies/company-snapshot.util';
 import { CompanyDto } from 'src/companies/dto/company.dto';
+import { SessionsService } from 'src/sessions/sessions.service';
+import { LockUserDto } from './dto/lock-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -27,6 +32,7 @@ export class UsersService {
     @InjectModel(Job.name) private jobModel: SoftDeleteModel<JobDocument>,
     @InjectModel(Company.name) private companyModel: SoftDeleteModel<CompanyDocument>,
     private configService: ConfigService,
+    private sessionsService: SessionsService,
   ) {}
   hashPassword(password: string) {
     const salt = genSaltSync(10);
@@ -152,7 +158,8 @@ export class UsersService {
     });
   }
 
-  isValidPassword(password: string, hash: string) {
+  isValidPassword(password: string, hash: string | null | undefined) {
+    if (!hash) return false;
     return compareSync(password, hash);
   }
 
@@ -166,8 +173,13 @@ export class UsersService {
 
     const roleToCheck = updateUserDto.role || existingUser.role;
     const companyToCheck =
-      updateUserDto.company !== undefined ? updateUserDto.company : this.toCompanyDto(existingUser.company);
-    const normalizedCompany = await this.resolveCompanyAssignmentForRole(roleToCheck, companyToCheck);
+      updateUserDto.company !== undefined
+        ? updateUserDto.company
+        : this.toCompanyDto(existingUser.company);
+    const normalizedCompany = await this.resolveCompanyAssignmentForRole(
+      roleToCheck,
+      companyToCheck,
+    );
     const { company: _company, ...restUpdateUserDto } = updateUserDto;
 
     const updatePayload: Record<string, any> = {
@@ -181,10 +193,7 @@ export class UsersService {
       updatePayload.$unset = { company: 1 };
     }
 
-    return await this.userModel.updateOne(
-      { _id: id },
-      updatePayload,
-    );
+    return await this.userModel.updateOne({ _id: id }, updatePayload);
   }
 
   async remove(id: string, user: IUser) {
@@ -221,13 +230,13 @@ export class UsersService {
 
   async findUserProfile(userId: string): Promise<IUser> {
     this.validateObjectId(userId);
+    // Fetch password field to compute hasPassword, then strip it from the returned shape
     const user = await this.userModel
       .findById(userId)
       .populate({
         path: 'role',
         select: '_id name',
       })
-      .select('-password')
       .lean() // Convert to plain JS object (performance boost)
       .exec();
 
@@ -248,6 +257,8 @@ export class UsersService {
       _id: user._id.toString(),
       name: user.name,
       email: user.email,
+      authProvider: user.authProvider,
+      hasPassword: !!user.password,
       role: {
         _id: userRole._id.toString(),
         name: userRole.name,
@@ -496,6 +507,70 @@ export class UsersService {
     };
   }
 
+  // ==================== LOCK / UNLOCK FEATURE ====================
+
+  async lockUser(id: string, dto: LockUserDto, adminUser: IUser) {
+    this.validateObjectId(id);
+
+    if (id === adminUser._id.toString()) {
+      throw new BadRequestException('You cannot lock your own account');
+    }
+
+    const user = await this.userModel
+      .findOne({ _id: id, isDeleted: false })
+      .select('_id email isLocked')
+      .lean();
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    if (user.isLocked) {
+      throw new BadRequestException('User account is already locked');
+    }
+
+    await this.userModel.updateOne(
+      { _id: id },
+      {
+        isLocked: true,
+        lockReason: dto.reason ?? null,
+        lockedBy: { _id: adminUser._id, email: adminUser.email },
+        lockedAt: new Date(),
+        updatedBy: { _id: adminUser._id, email: adminUser.email },
+      },
+    );
+
+    await this.sessionsService.deactivateAllUserSessions(id);
+
+    return { _id: id, email: user.email, isLocked: true, lockReason: dto.reason ?? null };
+  }
+
+  async unlockUser(id: string, adminUser: IUser) {
+    this.validateObjectId(id);
+
+    const user = await this.userModel
+      .findOne({ _id: id, isDeleted: false })
+      .select('_id email isLocked')
+      .lean();
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    if (!user.isLocked) {
+      throw new BadRequestException('User account is not locked');
+    }
+
+    await this.userModel.updateOne(
+      { _id: id },
+      {
+        isLocked: false,
+        $unset: { lockReason: '', lockedBy: '', lockedAt: '' },
+        updatedBy: { _id: adminUser._id, email: adminUser.email },
+      },
+    );
+
+    return { _id: id, email: user.email, isLocked: false };
+  }
+
   private async resolveCompanyAssignmentForRole(
     roleId: string | mongoose.Schema.Types.ObjectId,
     company?: CompanyDto | null,
@@ -532,7 +607,9 @@ export class UsersService {
     return buildCanonicalCompanySnapshot(company);
   }
 
-  private toCompanyDto(company?: { _id?: unknown; name?: string; logo?: string | null } | null): CompanyDto | undefined {
+  private toCompanyDto(
+    company?: { _id?: unknown; name?: string; logo?: string | null } | null,
+  ): CompanyDto | undefined {
     if (!company?._id) {
       return undefined;
     }

@@ -13,6 +13,7 @@ import {
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { LockUserDto } from './dto/lock-user.dto';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
 import { IUser } from './user.interface';
@@ -77,7 +78,7 @@ export class UsersController {
     return this.usersService.update(id, updateUserDto, user);
   }
 
-    @Post('save-job')
+  @Post('save-job')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Save a job to user profile',
@@ -90,7 +91,7 @@ export class UsersController {
     return { message: 'Job saved successfully' };
   }
 
-    @Delete('save-job')
+  @Delete('save-job')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Unsave a job from user profile',
@@ -103,7 +104,7 @@ export class UsersController {
     return { message: 'Job unsaved successfully' };
   }
 
-    @Get('saved-jobs')
+  @Get('saved-jobs')
   @ApiOperation({
     summary: "Get user's saved jobs",
     description: 'Retrieve all jobs that the user has saved with pagination support.',
@@ -176,6 +177,30 @@ export class UsersController {
   @ResponseMessage('Get user by id')
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
+  }
+
+  @Patch(':id/lock')
+  @Roles(ERole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Lock a user account',
+    description:
+      'Lock a user account that violates rules. All active sessions will be revoked immediately.',
+  })
+  @ApiBody({ type: LockUserDto })
+  @ResponseMessage('User account locked successfully')
+  lockUser(@Param('id') id: string, @Body() lockUserDto: LockUserDto, @User() user: IUser) {
+    return this.usersService.lockUser(id, lockUserDto, user);
+  }
+
+  @Patch(':id/unlock')
+  @Roles(ERole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Unlock a user account',
+    description: 'Restore access to a previously locked user account.',
+  })
+  @ResponseMessage('User account unlocked successfully')
+  unlockUser(@Param('id') id: string, @User() user: IUser) {
+    return this.usersService.unlockUser(id, user);
   }
 
   @Delete(':id')

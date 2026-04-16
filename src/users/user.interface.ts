@@ -2,6 +2,8 @@ export interface IUser {
   _id: string;
   name: string;
   email: string;
+  authProvider: string;
+  hasPassword: boolean;
   role: {
     _id: string;
     name: string;

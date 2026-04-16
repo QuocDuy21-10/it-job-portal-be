@@ -18,6 +18,8 @@ describe('UsersService', () => {
     _id: '507f1f77bcf86cd799439001',
     email: 'admin@example.com',
     name: 'Admin',
+    authProvider: 'local',
+    hasPassword: true,
     role: { _id: '507f1f77bcf86cd799439002', name: 'SUPER_ADMIN' },
     savedJobs: [],
     companyFollowed: [],

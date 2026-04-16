@@ -18,6 +18,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { MailerService } from '@nestjs-modules/mailer';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { SetPasswordDto } from './dto/set-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { v4 as uuidv4 } from 'uuid';
@@ -56,10 +57,18 @@ export class AuthService {
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.usersService.findOneByUserEmail(email);
     if (user) {
+      if (!user.password) {
+        throw new BadRequestException(
+          'Tài khoản này đăng ký qua Google. Vui lòng đăng nhập bằng Google hoặc thiết lập mật khẩu.',
+        );
+      }
       const isValid = this.usersService.isValidPassword(password, user.password);
       if (isValid) {
         if (!user.isActive) {
           throw new BadRequestException('Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email.');
+        }
+        if (user.isLocked) {
+          throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
         }
         // get user role casting data (ObjectId -> {_id: string, name: string})
         const objectUser = {
@@ -385,13 +394,20 @@ export class AuthService {
         }
       }
 
-      // Step 3: Get user role
+      // Step 3: Check account is not locked
+      if (user.isLocked) {
+        throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
+      }
+
+      // Step 4: Get user role
       const userRole = user.role as unknown as { _id: string; name: string };
 
       const userObject: IUser = {
         _id: user._id.toString(),
         name: user.name,
         email: user.email,
+        authProvider: user.authProvider,
+        hasPassword: !!user.password,
         role: userRole,
         company: user.company
           ? {
@@ -464,6 +480,13 @@ export class AuthService {
     const userInDb = await this.usersService.findOneByUserEmail(user.email);
     if (!userInDb) throw new BadRequestException('User not found');
 
+    // Guard: tài khoản chưa có mật khẩu (ví dụ: đăng nhập bằng Google lần đầu)
+    if (!userInDb.password) {
+      throw new BadRequestException(
+        'Tài khoản này chưa có mật khẩu. Vui lòng sử dụng chức năng tạo mật khẩu.',
+      );
+    }
+
     // Check password cũ
     const isValid = this.usersService.isValidPassword(currentPassword, userInDb.password);
     if (!isValid) {
@@ -474,7 +497,34 @@ export class AuthService {
     const newPasswordHash = this.hashPassword(newPassword);
     await this.usersService.updatePassword(userInDb._id.toString(), newPasswordHash);
 
-    return { message: 'Đổi mật khẩu thành công' };
+    // Thu hồi tất cả sessions để buộc đăng nhập lại trên mọi thiết bị
+    await this.sessionsService.deleteAllUserSessions(userInDb._id.toString());
+
+    return { message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.' };
+  }
+
+  async setPassword(user: IUser, setPasswordDto: SetPasswordDto) {
+    const { newPassword } = setPasswordDto;
+
+    // Lấy thông tin user mới nhất từ DB
+    const userInDb = await this.usersService.findOneByUserEmail(user.email);
+    if (!userInDb) throw new BadRequestException('User not found');
+
+    // Guard: tài khoản đã có mật khẩu thì phải dùng đổi mật khẩu
+    if (userInDb.password) {
+      throw new BadRequestException(
+        'Tài khoản đã có mật khẩu. Vui lòng sử dụng chức năng đổi mật khẩu.',
+      );
+    }
+
+    // Hash và lưu mật khẩu mới
+    const newPasswordHash = this.hashPassword(newPassword);
+    await this.usersService.updatePassword(userInDb._id.toString(), newPasswordHash);
+
+    // Thu hồi tất cả sessions để buộc đăng nhập lại trên mọi thiết bị
+    await this.sessionsService.deleteAllUserSessions(userInDb._id.toString());
+
+    return { message: 'Tạo mật khẩu thành công. Vui lòng đăng nhập lại.' };
   }
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
