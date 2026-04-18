@@ -40,6 +40,12 @@ export class Conversation {
   @Prop({ default: true, type: Boolean })
   isActive: boolean;
 
+  @Prop({ type: String })
+  title: string;
+
+  @Prop({ type: String })
+  summary: string;
+
   @Prop({ type: Date })
   createdAt: Date;
 
@@ -49,5 +55,14 @@ export class Conversation {
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);
 
-// Add compound index for efficient queries
+// Compound index for efficient active conversation lookup
 ConversationSchema.index({ userId: 1, isActive: 1 });
+
+// TTL index: auto-delete archived conversations after 90 days
+ConversationSchema.index(
+  { updatedAt: 1 },
+  {
+    expireAfterSeconds: 90 * 86400,
+    partialFilterExpression: { isActive: false },
+  },
+);
