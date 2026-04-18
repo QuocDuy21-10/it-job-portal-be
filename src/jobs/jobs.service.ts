@@ -242,6 +242,98 @@ export class JobsService {
     }
   }
 
+  async getPlatformJobStats(): Promise<{
+    activeJobCount: number;
+    hiringCompaniesCount: number;
+    topSkills: Array<{ name: string; count: number }>;
+    topCompanies: Array<{ _id: string; name: string; jobCount: number }>;
+    jobsByLevel: Array<{ level: string; count: number }>;
+  }> {
+    const activeFilter = {
+      isActive: true,
+      isDeleted: { $ne: true },
+      approvalStatus: EJobApprovalStatus.APPROVED,
+      $or: [{ endDate: { $gte: new Date() } }, { endDate: null }],
+    };
+
+    const [result] = await this.jobModel.aggregate([
+      { $match: activeFilter },
+      {
+        $facet: {
+          activeJobCount: [{ $count: 'total' }],
+          hiringCompaniesCount: [{ $group: { _id: '$company._id' } }, { $count: 'total' }],
+          topSkills: [
+            { $unwind: '$skills' },
+            { $group: { _id: { $toLower: '$skills' }, count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 15 },
+            { $project: { _id: 0, name: '$_id', count: 1 } },
+          ],
+          topCompanies: [
+            {
+              $group: {
+                _id: '$company._id',
+                name: { $first: '$company.name' },
+                jobCount: { $sum: 1 },
+              },
+            },
+            { $sort: { jobCount: -1 } },
+            { $limit: 10 },
+          ],
+          jobsByLevel: [
+            { $group: { _id: '$level', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $project: { _id: 0, level: '$_id', count: 1 } },
+          ],
+        },
+      },
+    ]);
+
+    return {
+      activeJobCount: result.activeJobCount[0]?.total || 0,
+      hiringCompaniesCount: result.hiringCompaniesCount[0]?.total || 0,
+      topSkills: result.topSkills || [],
+      topCompanies: (result.topCompanies || []).map((c: any) => ({
+        _id: c._id?.toString() || '',
+        name: c.name || 'N/A',
+        jobCount: c.jobCount,
+      })),
+      jobsByLevel: result.jobsByLevel || [],
+    };
+  }
+
+  async searchJobs(
+    skills?: string[],
+    level?: string,
+    location?: string,
+    limit: number = 10,
+  ): Promise<Job[]> {
+    const filter: Record<string, any> = {
+      ...this.buildActiveJobFilter(),
+      isDeleted: false,
+    };
+
+    if (skills && skills.length > 0) {
+      filter.skills = { $in: skills.map(s => new RegExp(s, 'i')) };
+    }
+
+    if (level) {
+      filter.level = level.toUpperCase();
+    }
+
+    if (location) {
+      filter.location = { $regex: location, $options: 'i' };
+    }
+
+    return await this.jobModel
+      .find(filter)
+      .select('name company location skills level salary')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean()
+      .exec();
+  }
+
   private buildActiveJobFilter(): Record<string, unknown> {
     return {
       isActive: true,

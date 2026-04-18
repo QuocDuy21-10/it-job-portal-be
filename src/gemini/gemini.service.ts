@@ -1,23 +1,69 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { ParsedDataDto } from 'src/resumes/dto/parsed-data.dto';
-import { log } from 'console';
 
 @Injectable()
 export class GeminiService {
   private readonly logger = new Logger(GeminiService.name);
-  private readonly genAI: GoogleGenerativeAI;
-  private readonly model: GenerativeModel;
+  private readonly ai: GoogleGenAI;
 
   // Model configuration
   private readonly MODEL_NAME = 'gemini-2.5-flash-lite';
   private readonly PARSE_MAX_TOKENS = 5000;
   private readonly PARSE_TEMPERATURE = 0.3;
-  private readonly PARSE_TOP_P = 1;
-  private readonly PARSE_TOP_K = 50;
 
-  // Rate limiting configuration (Gemini 2.5 Flash FREE tier: RPM=10, TPM=250K, RPD=250)
+  // Chat response JSON schema — enforced at API level
+  private readonly CHAT_RESPONSE_SCHEMA = {
+    type: Type.OBJECT,
+    properties: {
+      text: { type: Type.STRING, description: 'Conversational response with Markdown formatting' },
+      recommendedJobIds: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+        description: 'Array of job IDs from provided context to recommend',
+      },
+    },
+    required: ['text', 'recommendedJobIds'],
+    propertyOrdering: ['text', 'recommendedJobIds'],
+  };
+
+  // CV parsing JSON schema — enforced at API level
+  private readonly CV_PARSE_SCHEMA = {
+    type: Type.OBJECT,
+    properties: {
+      skills: { type: Type.ARRAY, items: { type: Type.STRING } },
+      experience: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            company: { type: Type.STRING },
+            position: { type: Type.STRING },
+            duration: { type: Type.STRING },
+            description: { type: Type.STRING },
+          },
+        },
+      },
+      education: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            school: { type: Type.STRING },
+            degree: { type: Type.STRING },
+            major: { type: Type.STRING },
+            duration: { type: Type.STRING },
+            gpa: { type: Type.STRING },
+          },
+        },
+      },
+      summary: { type: Type.STRING },
+      yearsOfExperience: { type: Type.NUMBER },
+    },
+    required: ['skills'],
+  };
+
   // Rate limiting configuration (Gemini 2.5 Flash FREE tier: RPM=10, TPM=250K, RPD=20)
   private readonly MAX_RETRIES = 3;
   private readonly INITIAL_RETRY_DELAY = 5000; // 5 seconds
@@ -33,46 +79,31 @@ export class GeminiService {
       throw new Error('Gemini API key is required');
     }
 
-    this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({
-      model: this.MODEL_NAME,
-    });
-
+    this.ai = new GoogleGenAI({ apiKey });
     this.logger.log(`Gemini AI Service initialized with model: ${this.MODEL_NAME}`);
   }
 
   /**
-   * Parse CV text and extract structured information
-   * @param cvText - Raw text extracted from CV
-   * @returns Parsed data structure
+   * Parse CV text and extract structured information using native JSON mode
    */
   async parseCV(cvText: string): Promise<ParsedDataDto> {
     try {
       const prompt = this.buildCVParsingPrompt(cvText);
 
-      // Make request with rate limiting and retry logic
-      const result = await this.makeRequestWithRetry(async () => {
-        return await this.model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
+      const response = await this.makeRequestWithRetry(async () => {
+        return await this.ai.models.generateContent({
+          model: this.MODEL_NAME,
+          contents: prompt,
+          config: {
             temperature: this.PARSE_TEMPERATURE,
-            topP: this.PARSE_TOP_P,
-            topK: this.PARSE_TOP_K,
             maxOutputTokens: this.PARSE_MAX_TOKENS,
+            responseMimeType: 'application/json',
+            responseJsonSchema: this.CV_PARSE_SCHEMA,
           },
         });
       });
 
-      const response = result.response;
-      log(response);
-      const text = response.text();
-      console.log(text);
-      console.log('EXtractJSON');
-
-      // Parse JSON response
-      const parsedData = this.extractJSON<ParsedDataDto>(text);
-      console.log('parsedData: ', parsedData);
-
+      const parsedData = JSON.parse(response.text) as ParsedDataDto;
       this.logger.log('CV parsed successfully');
       return parsedData;
     } catch (error) {
@@ -81,34 +112,8 @@ export class GeminiService {
     }
   }
 
-  //  Build prompt for CV parsing
   private buildCVParsingPrompt(cvText: string): string {
-    return `
-You are an expert CV parser. Extract information from the CV text below.
-Return ONLY a valid JSON object matching this structure:
-
-{
-  "skills": ["skill1", "skill2", ...],
-  "experience": [
-    {
-      "company": "string | null",
-      "position": "string | null",
-      "duration": "string (e.g., Jan 2020 - Present) | null",
-      "description": "string | null"
-    }
-  ],
-  "education": [
-    {
-      "school": "string | null",
-      "degree": "string | null",
-      "major": "string | null",
-      "duration": "string (e.g., 2016-2020) | null",
-      "gpa": "string | null"
-    }
-  ],
-  "summary": "string | null",
-  "yearsOfExperience": "number | null"
-}
+    return `You are an expert CV parser. Extract information from the CV text below.
 
 RULES:
 - Extract all relevant soft and technical skills (skills are in uppercase).
@@ -116,47 +121,16 @@ RULES:
 - If info is missing, use null or empty array [].
 
 CV TEXT:
-${cvText}
-
-Return ONLY the valid JSON object.
-`;
+${cvText}`;
   }
 
-  //  Extract JSON from AI response
-  private extractJSON<T>(text: string): T {
-    try {
-      console.log('EXtractJSON');
-
-      // Remove markdown code blocks if present
-      let cleanedText = text.trim();
-
-      // Remove ```json and ``` markers
-      cleanedText = cleanedText.replace(/```json\s*/gi, '');
-      cleanedText = cleanedText.replace(/```\s*/g, '');
-
-      // Find JSON object
-      const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No JSON object found in response');
-      }
-
-      return JSON.parse(jsonMatch[0]);
-    } catch (error) {
-      this.logger.error('Failed to extract JSON:', error);
-      throw new Error(`JSON extraction failed: ${error.message}`);
-    }
-  }
-
-  //  Make API request with rate limiting and exponential backoff retry
+  // Make API request with rate limiting and exponential backoff retry
   private async makeRequestWithRetry<T>(
     requestFn: () => Promise<T>,
     retryCount: number = 0,
   ): Promise<T> {
     try {
-      // Rate limiting: Ensure minimum interval between requests
       await this.enforceRateLimit();
-
-      // Execute request
       return await requestFn();
     } catch (error) {
       const isRateLimitError = this.isRateLimitError(error);
@@ -164,24 +138,17 @@ Return ONLY the valid JSON object.
 
       if (shouldRetry) {
         const retryDelay = this.calculateRetryDelay(error, retryCount);
-
         this.logger.warn(
           `Rate limit hit. Retrying in ${retryDelay}ms (attempt ${retryCount + 1}/${this.MAX_RETRIES})`,
         );
-
-        // Wait before retry
         await this.sleep(retryDelay);
-
-        // Retry request
         return this.makeRequestWithRetry(requestFn, retryCount + 1);
       }
 
-      // Max retries exceeded or non-rate-limit error
       throw error;
     }
   }
 
-  // Enforce rate limiting by waiting if needed
   private async enforceRateLimit(): Promise<void> {
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
@@ -195,7 +162,6 @@ Return ONLY the valid JSON object.
     this.lastRequestTime = Date.now();
   }
 
-  //  Check if error is a rate limit error
   public isRateLimitError(error: any): boolean {
     const errorMessage = error?.message || '';
     return (
@@ -206,9 +172,7 @@ Return ONLY the valid JSON object.
     );
   }
 
-  //  Calculate retry delay with exponential backoff
   private calculateRetryDelay(error: any, retryCount: number): number {
-    // Try to extract suggested retry delay from error
     const errorMessage = error?.message || '';
     const retryMatch = errorMessage.match(/retry in ([\d.]+)s/i);
 
@@ -218,53 +182,35 @@ Return ONLY the valid JSON object.
       return Math.min(suggestedDelay, this.MAX_RETRY_DELAY);
     }
 
-    // Exponential backoff: initialDelay * (2 ^ retryCount)
     const exponentialDelay = this.INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
-    const delayWithJitter = exponentialDelay + Math.random() * 1000; // Add jitter
-
+    const delayWithJitter = exponentialDelay + Math.random() * 1000;
     return Math.min(delayWithJitter, this.MAX_RETRY_DELAY);
   }
 
-  //  Sleep for specified milliseconds
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  //  Get token usage estimation
-  //  Average tokens: 1 token ≈ 4 characters
   estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);
   }
 
   /**
-   * Chat with context - AI Career Advisor with Guardrails
-   * @param message - User message
-   * @param conversationHistory - Previous messages in conversation
-   * @param systemPrompt - System instruction with context and guardrails (can be string or object for backward compatibility)
-   * @returns AI response
+   * Chat with context — AI Career Advisor with native JSON structured output
+   * Returns guaranteed-valid JSON matching { text, recommendedJobIds }
    */
   async chatWithContext(
     message: string,
     conversationHistory: Array<{ role: string; content: string }>,
-    systemPrompt: string | any,
-  ): Promise<string> {
+    systemPrompt: string,
+  ): Promise<{ text: string; recommendedJobIds: string[] }> {
     try {
-      // Handle both string prompt (new) and object context (old) for backward compatibility
-      let finalSystemInstruction = '';
+      // Build multi-turn contents array
+      const contents = [];
 
-      if (typeof systemPrompt === 'string') {
-        finalSystemInstruction = systemPrompt;
-      } else {
-        // Fallback for old code that passes object context
-        finalSystemInstruction = this.buildCareerAdvisorPrompt(systemPrompt);
-      }
-
-      // Build conversation with system instruction as first exchange
-      const contents = [
-        {
-          role: 'user',
-          parts: [{ text: finalSystemInstruction }],
-        },
+      // System instruction injected as first user/model exchange
+      contents.push(
+        { role: 'user', parts: [{ text: systemPrompt }] },
         {
           role: 'model',
           parts: [
@@ -273,11 +219,10 @@ Return ONLY the valid JSON object.
             },
           ],
         },
-      ];
+      );
 
-      // Add conversation history (limit to last 10 messages for token efficiency)
-      const recentHistory = conversationHistory.slice(-10);
-      for (const msg of recentHistory) {
+      // Add conversation history (already limited by caller)
+      for (const msg of conversationHistory) {
         contents.push({
           role: msg.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: msg.content }],
@@ -285,28 +230,24 @@ Return ONLY the valid JSON object.
       }
 
       // Add new user message
-      contents.push({
-        role: 'user',
-        parts: [{ text: message }],
-      });
+      contents.push({ role: 'user', parts: [{ text: message }] });
 
-      // Make request with rate limiting
-      const result = await this.makeRequestWithRetry(async () => {
-        return await this.model.generateContent({
+      const response = await this.makeRequestWithRetry(async () => {
+        return await this.ai.models.generateContent({
+          model: this.MODEL_NAME,
           contents,
-          generationConfig: {
-            temperature: 0.7, // Creative but controlled
-            topP: 0.9,
-            topK: 40,
-            maxOutputTokens: 2000, // Increased for detailed job recommendations
+          config: {
+            temperature: 0.7,
+            maxOutputTokens: 2000,
+            responseMimeType: 'application/json',
+            responseJsonSchema: this.CHAT_RESPONSE_SCHEMA,
           },
         });
       });
 
-      const response = result.response.text();
+      const parsed = JSON.parse(response.text) as { text: string; recommendedJobIds: string[] };
       this.logger.log('AI chat response generated successfully');
-
-      return response;
+      return parsed;
     } catch (error) {
       this.logger.error('Error in chatWithContext:', error);
       throw new Error(`AI chat failed: ${error.message}`);
@@ -314,81 +255,76 @@ Return ONLY the valid JSON object.
   }
 
   /**
-   * Build system prompt for AI Career Advisor
+   * Streaming chat with context — yields text chunks as they are generated
+   * Does NOT use JSON mode (streaming requires plain text for incremental tokens)
    */
-  private buildCareerAdvisorPrompt(userContext: any): string {
-    const hasCV = !!userContext.cvProfile;
-    const skills = hasCV
-      ? userContext.cvProfile.skills?.map((s: any) => s.name || s).join(', ')
-      : 'Unknown';
-    const experience = hasCV ? userContext.cvProfile.experience?.length || 0 : 0;
-    const yearsOfExp = hasCV ? userContext.cvProfile.yearsOfExperience || 0 : 0;
-    const savedJobsCount = userContext.savedJobs?.length || 0;
-    const appliedJobsCount = userContext.appliedJobs?.length || 0;
+  async *chatWithContextStream(
+    message: string,
+    conversationHistory: Array<{ role: string; content: string }>,
+    systemPrompt: string,
+  ): AsyncGenerator<string> {
+    const contents = [];
 
-    return `You are an AI Career Advisor for an IT job portal in Vietnam.
+    contents.push(
+      { role: 'user', parts: [{ text: systemPrompt }] },
+      {
+        role: 'model',
+        parts: [
+          {
+            text: 'Đã nhận thông tin ngữ cảnh. Tôi sẵn sàng hỗ trợ bạn về các vấn đề liên quan đến việc làm và phát triển sự nghiệp trong lĩnh vực IT.',
+          },
+        ],
+      },
+    );
 
-USER CONTEXT:
-- Name: ${userContext.user?.name || 'User'}
-- Has CV Profile: ${hasCV ? 'Yes' : 'No'}
-- Skills: ${skills}
-- Work Experience: ${experience} positions (${yearsOfExp} years)
-- Saved Jobs: ${savedJobsCount}
-- Applied Jobs: ${appliedJobsCount}
+    for (const msg of conversationHistory) {
+      contents.push({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }],
+      });
+    }
 
-YOUR CAPABILITIES:
-1. Answer questions about job market, career development, and IT skills
-2. Provide CV improvement suggestions based on user profile
-3. Recommend skills to learn for career advancement
-4. Give interview preparation tips
-5. Provide salary insights and negotiation advice
-6. Suggest relevant job positions based on user's experience
+    contents.push({ role: 'user', parts: [{ text: message }] });
 
-RESPONSE RULES:
-- Be friendly, professional, and encouraging
-- Provide actionable, specific advice
-- Use Vietnamese when user speaks Vietnamese, English when user speaks English
-- Keep responses concise (under 300 words)
-- Use bullet points for lists
-- If you don't have enough information, politely ask for clarification
-- Never make up job listings or specific company information
-- End with a helpful follow-up question or suggestion
+    await this.enforceRateLimit();
 
-RESPONSE FORMAT:
-- Start with a brief acknowledgment
-- Provide main advice/answer
-- Use bullet points for multiple items
-- End with next steps or a question
+    const response = await this.ai.models.generateContentStream({
+      model: this.MODEL_NAME,
+      contents,
+      config: {
+        temperature: 0.7,
+        maxOutputTokens: 2000,
+      },
+    });
 
-Remember: You are helping Vietnamese IT professionals advance their careers.`;
+    for await (const chunk of response) {
+      if (chunk.text) {
+        yield chunk.text;
+      }
+    }
   }
 
   /**
-   * Summarize conversation history (for future use when history gets too long)
+   * Summarize conversation history for context preservation across archives
    */
   async summarizeConversation(messages: Array<{ role: string; content: string }>): Promise<string> {
     try {
       const conversationText = messages.map(m => `${m.role}: ${m.content}`).join('\n\n');
 
-      const prompt = `Summarize this conversation in 2-3 sentences, focusing on key topics discussed and user's main concerns:
+      const prompt = `Summarize this conversation in 2-3 sentences, focusing on key topics discussed and user's main concerns:\n\n${conversationText}`;
 
-${conversationText}
-
-Summary:`;
-
-      const result = await this.makeRequestWithRetry(async () => {
-        return await this.model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
+      const response = await this.makeRequestWithRetry(async () => {
+        return await this.ai.models.generateContent({
+          model: this.MODEL_NAME,
+          contents: prompt,
+          config: {
             temperature: 0.3,
-            topP: 1,
-            topK: 50,
             maxOutputTokens: 200,
           },
         });
       });
 
-      return result.response.text();
+      return response.text;
     } catch (error) {
       this.logger.error('Error summarizing conversation:', error);
       return 'Previous conversation context';
