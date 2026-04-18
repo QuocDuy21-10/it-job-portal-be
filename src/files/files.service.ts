@@ -97,4 +97,72 @@ export class FilesService {
       url: this.buildFileUrl(folderType, file.filename),
     };
   }
+
+  async listFilesWithAge(
+    folderType: string,
+  ): Promise<Array<{ fileName: string; ageInMs: number }>> {
+    const safeFolderPattern = /^[a-zA-Z0-9_-]+$/;
+    if (!safeFolderPattern.test(folderType)) {
+      throw new BadRequestException('Invalid folder type');
+    }
+
+    const dirPath = path.resolve(process.cwd(), 'public', 'images', folderType);
+
+    try {
+      const entries = await fs.promises.readdir(dirPath);
+      const now = Date.now();
+      const results: Array<{ fileName: string; ageInMs: number }> = [];
+
+      for (const entry of entries) {
+        try {
+          const filePath = path.resolve(dirPath, entry);
+          // Skip if resolved path escapes the directory
+          if (!filePath.startsWith(dirPath + path.sep)) continue;
+
+          const stat = await fs.promises.stat(filePath);
+          if (stat.isFile()) {
+            results.push({ fileName: entry, ageInMs: now - stat.mtimeMs });
+          }
+        } catch {
+        }
+      }
+
+      return results;
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        return []; 
+      }
+      throw error;
+    }
+  }
+
+  async cleanupOrphanedFiles(
+    folderType: string,
+    referencedFileNames: Set<string>,
+    maxAgeMs: number = 24 * 60 * 60 * 1000,
+  ): Promise<{ scanned: number; deleted: number; errors: number }> {
+    const files = await this.listFilesWithAge(folderType);
+    let deleted = 0;
+    let errors = 0;
+
+    for (const file of files) {
+      // Skip files still in use or younger than the grace period
+      if (referencedFileNames.has(file.fileName) || file.ageInMs < maxAgeMs) {
+        continue;
+      }
+
+      try {
+        await this.deleteFile(folderType, file.fileName);
+        deleted++;
+      } catch {
+        errors++;
+      }
+    }
+
+    this.logger.log(
+      `Orphaned file cleanup [${folderType}]: scanned=${files.length}, deleted=${deleted}, errors=${errors}`,
+    );
+
+    return { scanned: files.length, deleted, errors };
+  }
 }

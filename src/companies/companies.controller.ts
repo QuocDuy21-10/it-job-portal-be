@@ -25,6 +25,18 @@ export class CompaniesController {
     return this.companiesService.create(createCompanyDto, user);
   }
 
+  @Get('cleanup-orphaned-logos')
+  @Roles(ERole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Trigger orphaned logo cleanup manually',
+    description:
+      'Manually trigger cleanup of orphaned company logo files from disk. Deletes files older than 24h that are not referenced by any company. Requires admin privileges.',
+  })
+  @ResponseMessage('Orphaned logo cleanup completed')
+  cleanupOrphanedLogos() {
+    return this.companiesService.cleanupOrphanedLogos();
+  }
+
   @OptionalAuth()
   @Get()
   @ApiOperation({

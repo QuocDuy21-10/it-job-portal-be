@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { Company, CompanyDocument } from './schemas/company.schema';
@@ -148,6 +149,46 @@ export class CompaniesService {
       { deletedBy: { _id: user._id, email: user.email } },
     );
     return this.companyModel.softDelete({ _id: id });
+  }
+
+  @Cron('0 2 * * *', {
+    name: 'cleanup-orphaned-company-logos',
+    timeZone: 'Asia/Ho_Chi_Minh',
+  })
+  async cleanupOrphanedLogos(): Promise<{ scanned: number; deleted: number; errors: number }> {
+    this.logger.log('Starting orphaned company logo cleanup');
+
+    try {
+      // Collect logos from active companies
+      const activeCompanies = await this.companyModel
+        .find({ logo: { $ne: null } })
+        .select('logo')
+        .lean();
+
+      // Collect logos from soft-deleted companies (plugin auto-filters; pass isDeleted: true)
+      const deletedCompanies = await this.companyModel
+        .find({ isDeleted: true, logo: { $ne: null } })
+        .select('logo')
+        .lean();
+
+      const referencedLogos = new Set<string>();
+      for (const company of [...activeCompanies, ...deletedCompanies]) {
+        if (company.logo) {
+          referencedLogos.add(company.logo);
+        }
+      }
+
+      const stats = await this.filesService.cleanupOrphanedFiles('company', referencedLogos);
+
+      this.logger.log(
+        `Orphaned logo cleanup complete: scanned=${stats.scanned}, deleted=${stats.deleted}, errors=${stats.errors}`,
+      );
+
+      return stats;
+    } catch (error) {
+      this.logger.error(`Orphaned logo cleanup failed: ${error.message}`, error.stack);
+      return { scanned: 0, deleted: 0, errors: 1 };
+    }
   }
 
   private validateObjectId(id: string): void {
