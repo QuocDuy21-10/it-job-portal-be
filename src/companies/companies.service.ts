@@ -191,6 +191,56 @@ export class CompaniesService {
     }
   }
 
+  async findByName(
+    name: string,
+    limit: number = 5,
+  ): Promise<
+    Array<{ _id: string; name: string; address: string; description: string; jobCount: number }>
+  > {
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const companies = await this.companyModel
+      .find({
+        name: { $regex: escapedName, $options: 'i' },
+        isDeleted: { $ne: true },
+      })
+      .select('_id name address description website numberOfEmployees')
+      .limit(limit)
+      .lean()
+      .exec();
+
+    if (companies.length === 0) return [];
+
+    const companyIds = companies.map(c => c._id);
+
+    const jobCounts = await this.jobModel.aggregate<{
+      _id: mongoose.Types.ObjectId;
+      totalJobs: number;
+    }>([
+      {
+        $match: {
+          'company._id': buildEmbeddedCompanyIdsInCondition(companyIds),
+          isActive: true,
+          isDeleted: { $ne: true },
+        },
+      },
+      { $group: { _id: '$company._id', totalJobs: { $sum: 1 } } },
+    ]);
+
+    const jobCountMap = new Map<string, number>();
+    jobCounts.forEach(item => {
+      jobCountMap.set(item._id.toString(), item.totalJobs);
+    });
+
+    return companies.map(c => ({
+      _id: c._id.toString(),
+      name: c.name,
+      address: c.address,
+      description: c.description?.slice(0, 200) || '',
+      jobCount: jobCountMap.get(c._id.toString()) || 0,
+    }));
+  }
+
   private validateObjectId(id: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new BadRequestException(`Not found Company with id = ${id}`);

@@ -5,6 +5,7 @@ import { GeminiModule } from '../gemini/gemini.module';
 import { CvProfilesModule } from '../cv-profiles/cv-profiles.module';
 import { JobsModule } from '../jobs/jobs.module';
 import { UsersModule } from '../users/users.module';
+import { CompaniesModule } from '../companies/companies.module';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 
@@ -15,6 +16,7 @@ import { ChatService } from './chat.service';
     CvProfilesModule,
     JobsModule,
     UsersModule,
+    CompaniesModule,
   ],
   controllers: [ChatController],
   providers: [ChatService],
