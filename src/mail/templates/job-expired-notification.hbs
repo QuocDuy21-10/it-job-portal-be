@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Posting Expired</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f3f4f6;
+      margin: 0;
+      padding: 0;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 32px auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    .email-header {
+      background-color: #dc2626;
+      padding: 28px 24px;
+      text-align: center;
+      color: #ffffff;
+    }
+    .email-header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: bold;
+    }
+    .email-body {
+      padding: 32px 24px;
+      color: #374151;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    .greeting {
+      font-size: 16px;
+      color: #374151;
+      margin-bottom: 16px;
+    }
+    .info-box {
+      background-color: #fef2f2;
+      border-left: 4px solid #dc2626;
+      padding: 16px 20px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .info-box h2 {
+      margin: 0 0 8px 0;
+      color: #dc2626;
+      font-size: 20px;
+    }
+    .info-box p {
+      margin: 4px 0;
+      color: #6b7280;
+    }
+    .cta-button {
+      display: inline-block;
+      padding: 12px 32px;
+      background-color: #2563eb;
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .email-footer {
+      background-color: #f9fafb;
+      padding: 20px 24px;
+      text-align: center;
+      color: #9ca3af;
+      font-size: 12px;
+    }
+    .email-footer a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <h1>Job Posting Expired</h1>
+    </div>
+
+    <div class="email-body">
+      <p class="greeting">Hello,</p>
+
+      <p>Your job posting has reached its end date and is no longer visible to candidates.</p>
+
+      <div class="info-box">
+        <h2>{{jobName}}</h2>
+        <p><strong>Company:</strong> {{companyName}}</p>
+        <p>This listing has been automatically deactivated because its end date has passed.</p>
+      </div>
+
+      <p>If you would like to continue receiving applications, you can renew this job posting by extending the end date and reactivating it from your HR dashboard.</p>
+
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="{{jobManageUrl}}" class="cta-button">Manage Job Posting</a>
+      </div>
+
+      <p style="color: #6b7280;">
+        <em>This is an automated notification from IT Job Portal. If you have any questions, please contact our support team.</em>
+      </p>
+    </div>
+
+    <div class="email-footer">
+      <p>&copy; {{currentYear}} IT Job Portal. All rights reserved.</p>
+      <p>
+        <a href="#">Privacy Policy</a> |
+        <a href="#">Contact Us</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>

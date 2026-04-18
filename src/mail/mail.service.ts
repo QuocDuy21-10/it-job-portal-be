@@ -19,6 +19,13 @@ export interface ApplicationStatusUpdateData {
   resumeId: string;
 }
 
+export interface JobExpiredNotificationData {
+  hrEmail: string;
+  jobName: string;
+  companyName: string;
+  jobId: string;
+}
+
 @Injectable()
 export class MailService {
   constructor(
@@ -80,6 +87,28 @@ export class MailService {
         newStatus,
         statusMessage: statusMessages[newStatus] || '',
         applicationUrl,
+        currentYear: new Date().getFullYear(),
+      },
+    });
+  }
+
+  /**
+   * Send job expiration notification to HR who created the job
+   */
+  async sendJobExpiredNotification(data: JobExpiredNotificationData): Promise<void> {
+    const { hrEmail, jobName, companyName, jobId } = data;
+
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const jobManageUrl = `${frontendUrl}/hr/jobs/${jobId}`;
+
+    await this.mailerService.sendMail({
+      to: hrEmail,
+      subject: `Job Posting Expired: ${jobName}`,
+      template: 'job-expired-notification',
+      context: {
+        jobName,
+        companyName,
+        jobManageUrl,
         currentYear: new Date().getFullYear(),
       },
     });

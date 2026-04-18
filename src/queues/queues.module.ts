@@ -8,6 +8,8 @@ import { JobRecommendationQueueProcessor } from './processors/job-recommendation
 import { JobRecommendationQueueService } from './services/job-recommendation-queue.service';
 import { ApplicationNotificationQueueProcessor } from './processors/application-notification-queue.processor';
 import { ApplicationNotificationQueueService } from './services/application-notification-queue.service';
+import { JobExpirationQueueProcessor } from './processors/job-expiration-queue.processor';
+import { JobExpirationQueueService } from './services/job-expiration-queue.service';
 import { CvParserModule } from 'src/cv-parser/cv-parser.module';
 import { GeminiModule } from 'src/gemini/gemini.module';
 import { MatchingModule } from 'src/matching/matching.module';
@@ -23,6 +25,7 @@ import {
   COMPANY_FOLLOWER_NOTIFICATION_QUEUE,
   JOB_RECOMMENDATION_QUEUE,
   APPLICATION_NOTIFICATION_QUEUE,
+  JOB_EXPIRATION_NOTIFICATION_QUEUE,
 } from './queues.constants';
 
 export {
@@ -30,6 +33,7 @@ export {
   COMPANY_FOLLOWER_NOTIFICATION_QUEUE,
   JOB_RECOMMENDATION_QUEUE,
   APPLICATION_NOTIFICATION_QUEUE,
+  JOB_EXPIRATION_NOTIFICATION_QUEUE,
 };
 
 @Global()
@@ -53,6 +57,9 @@ export class QueuesModule {
           {
             name: APPLICATION_NOTIFICATION_QUEUE,
           },
+          {
+            name: JOB_EXPIRATION_NOTIFICATION_QUEUE,
+          },
         ),
         MongooseModule.forFeature([
           { name: Resume.name, schema: ResumeSchema },
@@ -75,12 +82,15 @@ export class QueuesModule {
         JobRecommendationQueueService,
         ApplicationNotificationQueueProcessor,
         ApplicationNotificationQueueService,
+        JobExpirationQueueProcessor,
+        JobExpirationQueueService,
       ],
       exports: [
         ResumeQueueService,
         CompanyFollowerQueueService,
         JobRecommendationQueueService,
         ApplicationNotificationQueueService,
+        JobExpirationQueueService,
       ],
     };
   }

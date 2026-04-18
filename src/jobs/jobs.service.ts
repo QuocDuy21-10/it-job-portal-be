@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { ApproveJobDto } from './dto/approve-job.dto';
@@ -9,7 +9,9 @@ import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { Job, JobDocument } from './schemas/job.schema';
 import mongoose from 'mongoose';
 import aqp from 'api-query-params';
+import { Cron } from '@nestjs/schedule';
 import { CompanyFollowerQueueService } from 'src/queues/services/company-follower-queue.service';
+import { JobExpirationQueueService } from 'src/queues/services/job-expiration-queue.service';
 import { Company, CompanyDocument } from 'src/companies/schemas/company.schema';
 import {
   buildCanonicalCompanySnapshot,
@@ -20,10 +22,13 @@ import {
 
 @Injectable()
 export class JobsService {
+  private readonly logger = new Logger(JobsService.name);
+
   constructor(
     @InjectModel(Job.name) private jobModel: SoftDeleteModel<JobDocument>,
     @InjectModel(Company.name) private companyModel: SoftDeleteModel<CompanyDocument>,
     private readonly companyFollowerQueueService: CompanyFollowerQueueService,
+    private readonly jobExpirationQueueService: JobExpirationQueueService,
   ) {}
   async create(createJobDto: CreateJobDto, user: IUser) {
     const normalizedCompany = await this.getCanonicalCompanySnapshot(createJobDto.company._id);
@@ -66,8 +71,8 @@ export class JobsService {
     if (user && user.role?.name === 'HR' && user.company?._id) {
       Object.assign(filter, buildEmbeddedCompanyIdFilter(user.company._id));
     } else if (!user || user.role?.name !== 'SUPER ADMIN') {
-      // Public users and NORMAL_USER only see APPROVED jobs
-      filter.approvalStatus = EJobApprovalStatus.APPROVED;
+      // Public users and NORMAL_USER only see APPROVED, active, non-expired jobs
+      Object.assign(filter, this.buildActiveJobFilter());
     }
 
     const offset = (page - 1) * limit;
@@ -109,9 +114,14 @@ export class JobsService {
       return job;
     }
 
-    // Public users and NORMAL_USER can only view APPROVED jobs
+    // Public users and NORMAL_USER can only view APPROVED, active, non-expired jobs
     if (!user || user.role?.name !== 'SUPER ADMIN') {
-      if (job && job.approvalStatus !== EJobApprovalStatus.APPROVED) {
+      if (
+        job &&
+        (job.approvalStatus !== EJobApprovalStatus.APPROVED ||
+          !job.isActive ||
+          (job.endDate && new Date(job.endDate) < new Date()))
+      ) {
         return null;
       }
     }
@@ -145,18 +155,13 @@ export class JobsService {
       return [];
     }
 
-    // Create case-insensitive regex for each skill
     const skillRegexes = skills.map(skill => new RegExp(skill, 'i'));
 
     return await this.jobModel
       .find({
-        isActive: true,
+        ...this.buildActiveJobFilter(),
         isDeleted: false,
-        approvalStatus: EJobApprovalStatus.APPROVED,
-        // Find jobs that have at least one matching skill
         skills: { $in: skillRegexes },
-        // Filter out expired jobs
-        $or: [{ endDate: { $gte: new Date() } }, { endDate: null }],
       })
       .select('name company location skills level') // Select only necessary fields to reduce token usage
       .sort({ createdAt: -1 }) // Prioritize newest jobs
@@ -191,6 +196,58 @@ export class JobsService {
     this.validateObjectId(id);
     await this.jobModel.updateOne({ _id: id }, { deletedBy: { _id: user._id, email: user.email } });
     return this.jobModel.softDelete({ _id: id });
+  }
+
+  @Cron('0 * * * *', {
+    name: 'deactivate-expired-jobs',
+    timeZone: 'Asia/Ho_Chi_Minh',
+  })
+  async handleExpiredJobs(): Promise<void> {
+    const now = new Date();
+
+    const expiredJobs = await this.jobModel
+      .find({
+        isActive: true,
+        endDate: { $ne: null, $lte: now },
+      })
+      .select('_id name company createdBy')
+      .lean()
+      .exec();
+
+    if (expiredJobs.length === 0) {
+      return;
+    }
+
+    const expiredIds = expiredJobs.map(job => job._id);
+    await this.jobModel.updateMany({ _id: { $in: expiredIds } }, { isActive: false });
+
+    this.logger.log(`Deactivated ${expiredJobs.length} expired job(s)`);
+
+    for (const job of expiredJobs) {
+      if (job.createdBy?.email) {
+        try {
+          await this.jobExpirationQueueService.addExpiredJobNotification({
+            jobId: job._id.toString(),
+            jobName: job.name,
+            companyName: job.company?.name ?? 'Unknown Company',
+            hrEmail: job.createdBy.email,
+          });
+        } catch (error) {
+          this.logger.error(
+            `Failed to queue expiration notification for job ${job._id}: ${error.message}`,
+            error.stack,
+          );
+        }
+      }
+    }
+  }
+
+  private buildActiveJobFilter(): Record<string, unknown> {
+    return {
+      isActive: true,
+      approvalStatus: EJobApprovalStatus.APPROVED,
+      $or: [{ endDate: { $gte: new Date() } }, { endDate: null }],
+    };
   }
 
   private validateObjectId(id: string): void {
