@@ -1,161 +1,262 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, Logger, BadRequestException, MessageEvent } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { Model, Types } from 'mongoose';
+import { Subject, Observable } from 'rxjs';
+import { randomUUID } from 'crypto';
 import { Conversation, ConversationDocument, Message } from './schemas/conversation.schema';
 import { GeminiService } from '../gemini/gemini.service';
 import { CvProfilesService } from '../cv-profiles/cv-profiles.service';
 import { UsersService } from '../users/users.service';
 import { JobsService } from '../jobs/jobs.service';
+import { CompaniesService } from '../companies/companies.service';
 import { ChatResponseDto } from './dto/chat-response.dto';
 import { ConversationHistoryResponseDto } from './dto/conversation-history.dto';
+import {
+  PlatformContext,
+  UserContext,
+  QueryAwareContext,
+  FullChatContext,
+} from './interfaces/chat-context.interface';
+import { SKILL_VARIATIONS } from '../matching/constants/matching.constants';
 
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
 
   // Constants
-  private readonly MAX_HISTORY_MESSAGES = 10; // Keep last 10 messages for context
-  private readonly MAX_CONVERSATION_LENGTH = 100; // Archive after 100 messages
+  private readonly MAX_HISTORY_MESSAGES = 10;
+  private readonly MAX_CONVERSATION_LENGTH = 100;
+  private readonly CACHE_TTL_USER_CONTEXT = 300000; // 5 minutes
+  private readonly CACHE_TTL_PLATFORM_CONTEXT = 1800000; // 30 minutes
+  private readonly CACHE_PREFIX_CTX = 'chat_ctx:';
+  private readonly CACHE_PREFIX_CONV = 'chat_conv:';
+  private readonly CACHE_KEY_PLATFORM = 'chat_platform_ctx';
+  private readonly STREAM_TIMEOUT = 60000; // 60s auto-cleanup
+
+  // Stats keywords for Vietnamese + English
+  private readonly STATS_KEYWORDS = [
+    'how many',
+    'bao nhiêu',
+    'statistics',
+    'thống kê',
+    'tổng số',
+    'total',
+    'count',
+    'số lượng',
+  ];
+
+  // Active SSE streams keyed by streamId
+  private readonly streams = new Map<string, Subject<MessageEvent>>();
+
+  // Precomputed skill lookup set (built once from SKILL_VARIATIONS)
+  private readonly knownSkills: Set<string>;
 
   constructor(
     @InjectModel(Conversation.name)
     private conversationModel: Model<ConversationDocument>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private geminiService: GeminiService,
     private cvProfilesService: CvProfilesService,
     private usersService: UsersService,
     private jobsService: JobsService,
-  ) {}
+    private companiesService: CompaniesService,
+  ) {
+    // Build the known skills set from skill variations for fast lookup
+    this.knownSkills = new Set<string>();
+    for (const [key, aliases] of Object.entries(SKILL_VARIATIONS)) {
+      this.knownSkills.add(key.toLowerCase());
+      aliases.forEach(alias => this.knownSkills.add(alias.toLowerCase()));
+    }
+  }
 
-  /**
-   * Send message to AI and get response
-   */
   async sendMessage(userId: string, message: string): Promise<ChatResponseDto> {
     try {
       this.validateUserId(userId);
       this.logger.log(`Processing message from user ${userId}`);
 
-      // 1. Get or create conversation
+      // 1. Sanitize user input (prompt injection defense)
+      const sanitizedMessage = this.sanitizeUserInput(message);
+
+      // 2. Get or create conversation
       const conversation = await this.getOrCreateConversation(userId);
 
-      // 2. Build user context (includes matching jobs from database)
-      const userContext = await this.buildUserContext(userId);
+      // 3. Build full context (platform + user + query-aware)
+      const fullContext = await this.buildFullContext(userId, sanitizedMessage);
 
-      // 3. Get conversation history (last N messages for context)
+      // 4. Get conversation history (last N messages for context)
       const history = conversation.messages.slice(-this.MAX_HISTORY_MESSAGES);
 
-      // 4. Build system prompt with guardrails and job data
-      const systemPrompt = this.buildSystemPrompt(userContext);
+      // 5. Build system prompt with guardrails and all context layers
+      const systemPrompt = this.buildSystemPrompt(fullContext, (conversation as any).summary);
 
-      // 5. Call Gemini AI with context and strict guidelines (returns JSON)
-      const rawAiResponse = await this.geminiService.chatWithContext(
-        message,
+      // 6. Call Gemini AI — returns guaranteed-valid JSON via native JSON mode
+      const parsedResponse = await this.geminiService.chatWithContext(
+        sanitizedMessage,
         history,
         systemPrompt,
       );
 
-      // 6. Parse JSON response (Structured Output)
-      let parsedResponse: { text: string; recommendedJobIds: string[] };
-      try {
-        // Clean response - AI might wrap JSON in markdown code blocks
-        const cleanJson = rawAiResponse
-          .replace(/```json\n?/g, '')
-          .replace(/```\n?/g, '')
-          .trim();
+      // 7. Validate recommended job IDs against all known jobs in context
+      const allContextJobs = [
+        ...fullContext.user.matchingJobs,
+        ...fullContext.queryAware.detectedJobs,
+      ];
+      const validJobIds = new Set(allContextJobs.map((job: any) => job._id.toString()));
+      const validatedJobIds = parsedResponse.recommendedJobIds.filter(id => validJobIds.has(id));
 
-        parsedResponse = JSON.parse(cleanJson);
-
-        // Validate structure
-        if (!parsedResponse.text || !Array.isArray(parsedResponse.recommendedJobIds)) {
-          throw new Error('Invalid JSON structure');
+      // 8. Map validated job IDs to full job objects (deduplicated)
+      const seenIds = new Set<string>();
+      const recommendedJobs = allContextJobs.filter((job: any) => {
+        const jobId = job._id.toString();
+        if (validatedJobIds.includes(jobId) && !seenIds.has(jobId)) {
+          seenIds.add(jobId);
+          return true;
         }
-      } catch (error) {
-        this.logger.warn(
-          `Failed to parse AI JSON response: ${error.message}. Falling back to plain text.`,
-        );
-        // Fallback: treat entire response as text if JSON parsing fails
-        parsedResponse = {
-          text: rawAiResponse,
-          recommendedJobIds: [],
-        };
-      }
+        return false;
+      });
 
-      // 7. Map job IDs to full job objects (for frontend to render as cards)
-      const recommendedJobs = userContext.matchingJobs.filter((job: any) =>
-        parsedResponse.recommendedJobIds.includes(job._id.toString()),
-      );
-
-      // 8. Save both user message and AI response (only save text, not job data)
+      // 9. Save both user message and AI response
       const userMessage: Message = {
         role: 'user',
-        content: message,
+        content: sanitizedMessage,
         timestamp: new Date(),
       };
 
       const assistantMessage: Message = {
         role: 'assistant',
-        content: parsedResponse.text, // Save only conversational text
+        content: parsedResponse.text,
         timestamp: new Date(),
       };
 
       conversation.messages.push(userMessage, assistantMessage);
 
-      // 9. Check if conversation is getting too long
+      // 10. Auto-generate title from first user message
+      if (!(conversation as any).title) {
+        (conversation as any).title = sanitizedMessage.slice(0, 80);
+      }
+
+      // 11. Check if conversation is getting too long
       if (conversation.messages.length > this.MAX_CONVERSATION_LENGTH) {
         await this.archiveLongConversation(conversation);
       } else {
         await conversation.save();
       }
 
-      // 10. Extract suggested actions (optional enhancement)
-      const suggestedActions = this.extractSuggestedActions(parsedResponse.text, userContext);
+      // 11. Extract suggested actions
+      const suggestedActions = this.extractSuggestedActions(parsedResponse.text, fullContext.user);
 
       this.logger.log(`Successfully generated AI response for user ${userId}`);
 
       return {
         conversationId: conversation._id.toString(),
-        response: parsedResponse.text, // Return only conversational text
+        response: parsedResponse.text,
         timestamp: new Date(),
         suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
-        recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined, // Structured Output: job cards data
+        recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined,
       };
     } catch (error) {
-      this.logger.error(`Error sending message for user ${userId}:`, error);
+      this.logger.error(`Error sending message for user ${userId}:`, error.stack || error);
 
-      if (error.message?.includes('rate limit') || error.message?.includes('429')) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      if (this.geminiService.isRateLimitError(error)) {
         throw new BadRequestException(
           'AI service is currently busy. Please try again in a few seconds.',
         );
       }
 
       throw new BadRequestException(
-        `Failed to process message: ${error.message || 'Unknown error'}`,
+        'Unable to process your message at this time. Please try again later.',
       );
     }
   }
 
+  private sanitizeUserInput(message: string): string {
+    let sanitized = message;
+
+    // Strip control characters (keep newlines and tabs for readability)
+    sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+
+    // Neutralize instruction-like prefixes that attempt to override system prompt
+    const injectionPatterns = [
+      /^(SYSTEM|ROLE|INSTRUCTION|CONTEXT|PROMPT)\s*:/gi,
+      /IGNORE\s+(ALL\s+)?PREVIOUS\s+(INSTRUCTIONS?|PROMPTS?|RULES?)/gi,
+      /YOU\s+ARE\s+NOW\s+/gi,
+      /DISREGARD\s+(ALL\s+)?(ABOVE|PREVIOUS)/gi,
+      /NEW\s+INSTRUCTIONS?\s*:/gi,
+      /OVERRIDE\s+(SYSTEM|RULES?|INSTRUCTIONS?)/gi,
+    ];
+
+    for (const pattern of injectionPatterns) {
+      sanitized = sanitized.replace(pattern, '[filtered] ');
+    }
+
+    return sanitized.trim();
+  }
+
+  //  Build full context merging platform, user, and query-aware layers
+  private async buildFullContext(userId: string, message: string): Promise<FullChatContext> {
+    const [platform, user] = await Promise.all([
+      this.buildPlatformContext(),
+      this.buildUserContext(userId),
+    ]);
+
+    const queryAware = await this.buildQueryAwareContext(message, platform);
+
+    return { platform, user, queryAware };
+  }
+
   /**
-   * Build user context for AI (includes matching jobs from database)
+   * Build platform-wide context (shared across all users, 30-min cache)
    */
-  private async buildUserContext(userId: string): Promise<any> {
+  private async buildPlatformContext(): Promise<PlatformContext> {
+    const cached = await this.cacheManager.get<PlatformContext>(this.CACHE_KEY_PLATFORM);
+    if (cached) return cached;
+
+    try {
+      const stats = await this.jobsService.getPlatformJobStats();
+      await this.cacheManager.set(this.CACHE_KEY_PLATFORM, stats, this.CACHE_TTL_PLATFORM_CONTEXT);
+      return stats;
+    } catch (error) {
+      this.logger.warn('Error building platform context:', error);
+      return {
+        activeJobCount: 0,
+        hiringCompaniesCount: 0,
+        topSkills: [],
+        topCompanies: [],
+        jobsByLevel: [],
+      };
+    }
+  }
+
+  //  Build user-specific context with Redis caching (5-minute TTL)
+  private async buildUserContext(userId: string): Promise<UserContext> {
+    const cacheKey = `${this.CACHE_PREFIX_CTX}${userId}`;
+
+    const cached = await this.cacheManager.get<UserContext>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     try {
       const [user, cvProfile] = await Promise.all([
         this.usersService.findOne(userId).catch(() => null),
         this.cvProfilesService.findByUserId(userId).catch(() => null),
       ]);
 
-      // Extract user skills from CV profile
       const userSkills = cvProfile?.skills?.map(s => s.name || s) || [];
-
-      // Find matching jobs based on user skills from database
       const matchingJobs = await this.jobsService.findMatchingJobs(userSkills, 5);
 
-      // Get applied jobs count
       let appliedJobsCount = 0;
       if (cvProfile && cvProfile.appliedJobs) {
         appliedJobsCount = cvProfile.appliedJobs.length;
       }
 
-      return {
+      const context: UserContext = {
         user: user
           ? {
               name: user.name,
@@ -171,12 +272,14 @@ export class ChatService {
               yearsOfExperience: cvProfile.yearsOfExperience,
             }
           : null,
-        matchingJobs: matchingJobs, // Real job data from database
-        appliedJobsCount: appliedJobsCount,
+        matchingJobs,
+        appliedJobsCount,
       };
+
+      await this.cacheManager.set(cacheKey, context, this.CACHE_TTL_USER_CONTEXT);
+      return context;
     } catch (error) {
       this.logger.warn(`Error building user context for ${userId}:`, error);
-      // Return minimal context if error
       return {
         user: null,
         profile: null,
@@ -186,15 +289,119 @@ export class ChatService {
     }
   }
 
-  /**
-   * Build system prompt with strict guardrails and JSON output format
-   * This prevents AI from answering off-topic questions and enforces Structured Output
-   */
-  private buildSystemPrompt(context: any): string {
-    // Format matching jobs for AI context - include _id for job card mapping
+  private async buildQueryAwareContext(
+    message: string,
+    platform: PlatformContext,
+  ): Promise<QueryAwareContext> {
+    const result: QueryAwareContext = {
+      detectedJobs: [],
+      detectedCompanies: [],
+      includeStats: false,
+    };
+
+    const lowerMessage = message.toLowerCase();
+
+    // 1. Detect stats keywords
+    result.includeStats = this.STATS_KEYWORDS.some(kw => lowerMessage.includes(kw));
+
+    // 2. Detect skill names from message
+    const detectedSkills = this.detectSkillsInMessage(lowerMessage, platform);
+
+    // 3. Detect company names from message
+    const detectedCompanyNames = this.detectCompaniesInMessage(lowerMessage, platform);
+
+    // Fetch data in parallel
+    const promises: Promise<void>[] = [];
+
+    if (detectedSkills.length > 0) {
+      promises.push(
+        this.jobsService
+          .searchJobs(detectedSkills, undefined, undefined, 10)
+          .then(jobs => {
+            result.detectedJobs = jobs;
+          })
+          .catch(err => {
+            this.logger.warn('Error fetching jobs for detected skills:', err);
+          }),
+      );
+    }
+
+    if (detectedCompanyNames.length > 0) {
+      for (const name of detectedCompanyNames.slice(0, 3)) {
+        promises.push(
+          this.companiesService
+            .findByName(name, 2)
+            .then(companies => {
+              result.detectedCompanies.push(...companies);
+            })
+            .catch(err => {
+              this.logger.warn(`Error fetching company "${name}":`, err);
+            }),
+        );
+      }
+    }
+
+    await Promise.all(promises);
+    return result;
+  }
+
+  private detectSkillsInMessage(lowerMessage: string, platform: PlatformContext): string[] {
+    const detected = new Set<string>();
+
+    // Check against platform top skills
+    for (const skill of platform.topSkills) {
+      if (lowerMessage.includes(skill.name.toLowerCase())) {
+        detected.add(skill.name);
+      }
+    }
+
+    // Check against known skills from SKILL_VARIATIONS
+    // Use word boundary matching for short skill names to avoid false positives
+    const words = lowerMessage.split(/[\s,;.!?]+/).filter(w => w.length >= 1);
+    for (const word of words) {
+      if (this.knownSkills.has(word)) {
+        detected.add(word);
+      }
+    }
+
+    // Also check multi-word patterns (e.g., "react native", "node.js", "machine learning")
+    for (const [key, aliases] of Object.entries(SKILL_VARIATIONS)) {
+      if (lowerMessage.includes(key)) {
+        detected.add(key);
+      }
+      for (const alias of aliases) {
+        if (lowerMessage.includes(alias)) {
+          detected.add(key); // Normalize to canonical name
+        }
+      }
+    }
+
+    return [...detected];
+  }
+
+  private detectCompaniesInMessage(lowerMessage: string, platform: PlatformContext): string[] {
+    const detected: string[] = [];
+
+    for (const company of platform.topCompanies) {
+      if (company.name && lowerMessage.includes(company.name.toLowerCase())) {
+        detected.push(company.name);
+      }
+    }
+
+    return detected;
+  }
+
+  async invalidateUserContext(userId: string): Promise<void> {
+    await this.cacheManager.del(`${this.CACHE_PREFIX_CTX}${userId}`);
+  }
+
+  private buildSystemPrompt(context: FullChatContext, conversationSummary?: string): string {
+    const { platform, user: userCtx, queryAware } = context;
+
+    // Personal matching jobs
     const jobsData =
-      context.matchingJobs?.map((job: any) => ({
-        id: job._id.toString(), // CRITICAL: AI needs ID to recommend specific jobs
+      userCtx.matchingJobs?.map((job: any) => ({
+        id: job._id.toString(),
         name: job.name,
         company: job.company?.name || 'N/A',
         location: job.location || 'N/A',
@@ -202,79 +409,72 @@ export class ChatService {
         skills: job.skills || [],
       })) || [];
 
-    const profileData = context.profile || {};
-    const userData = context.user || {};
+    const profileData = userCtx.profile || {};
+    const userName = userCtx.user?.name || 'User';
 
-    return `
-ROLE:
-You are an expert AI Career Advisor for "IT Job Portal" (Vietnam). 
-Your goal is to help IT professionals find jobs, improve their CVs, and prepare for interviews.
+    // --- Build prompt ---
 
-CONTEXT DATA:
-- User Name: ${userData.name || 'User'}
-- User Profile: ${JSON.stringify(profileData)}
-- Recommended Jobs from Database: ${JSON.stringify(jobsData)}
-- Applied Jobs Count: ${context.appliedJobsCount || 0}
+    let prompt = `ROLE: Expert AI Career Advisor for IT Job Portal (Vietnam).
 
-STRICT RULES (GUARDRAILS):
-1. **SCOPE RESTRICTION**: You must ONLY answer questions related to:
-   - Job searching and career advice in IT field
-   - Analyzing the user's CV/Profile and suggesting improvements
-   - Suggesting jobs from the "Recommended Jobs" list provided above
-   - Interview preparation tips for IT positions
-   - Salary insights and negotiation for IT jobs in Vietnam
-   - Technical skills and learning paths for IT careers
-   - Company culture and work environment in IT industry
+USER: ${userName}
+PROFILE: ${JSON.stringify(profileData)}`;
 
-2. **REFUSAL POLICY**: If the user asks about anything NOT related to careers, jobs, CVs, interviews, or IT skills, you MUST politely refuse.
-   - Example off-topic questions: cooking, politics, general knowledge, weather, creative stories, health advice, etc.
-   - Refusal template (Vietnamese): "Xin lỗi, tôi là trợ lý tư vấn nghề nghiệp IT và chỉ có thể hỗ trợ bạn các vấn đề liên quan đến tìm việc, CV, phỏng vấn và phát triển sự nghiệp trong lĩnh vực công nghệ thông tin. Bạn có câu hỏi nào về nghề nghiệp không?"
-   - Refusal template (English): "I'm sorry, I'm an IT career advisor and can only help with job searching, CV improvement, interviews, and IT career development. Do you have any career-related questions?"
+    // Layer 1: Platform context (always included)
+    prompt += `
 
-3. **JOB SUGGESTION PRIORITY**: 
-   - When user asks for job recommendations, ALWAYS prioritize jobs from "Recommended Jobs" list
-   - Include the job IDs in the "recommendedJobIds" array (see OUTPUT FORMAT below)
-   - Mention specific details: company name, job title, location, required skills
-   - Explain why the job matches their profile (based on their skills)
-   - If no matching jobs available, suggest updating skills or expanding search criteria
+PLATFORM:
+- Active jobs: ${platform.activeJobCount}
+- Hiring companies: ${platform.hiringCompaniesCount}
+- Top skills: ${platform.topSkills.map(s => `${s.name} (${s.count})`).join(', ') || 'N/A'}
+- Top companies: ${platform.topCompanies.map(c => `${c.name} (${c.jobCount} jobs)`).join(', ') || 'N/A'}
+- Jobs by level: ${platform.jobsByLevel.map(l => `${l.level}: ${l.count}`).join(', ') || 'N/A'}`;
 
-4. **OUTPUT FORMAT (JSON ONLY - CRITICAL)**:
-   You MUST output a valid JSON object in this exact format:
-   {
-     "text": "Your response in Vietnamese/English with Markdown formatting",
-     "recommendedJobIds": ["job_id_1", "job_id_2"]
-   }
-   
-   IMPORTANT: 
-   - DO NOT output plain text or Markdown outside this JSON structure
-   - DO NOT wrap JSON in markdown code blocks
-   - The "text" field should contain your conversational response
-   - The "recommendedJobIds" array should contain IDs from "Recommended Jobs from Database" context
-   - If user does not ask for jobs, set recommendedJobIds to empty array []
+    // Layer 2: Personal matching jobs
+    if (jobsData.length > 0) {
+      prompt += `\nYOUR MATCHING JOBS: ${JSON.stringify(jobsData)}`;
+    }
+    prompt += `\nAPPLIED: ${userCtx.appliedJobsCount || 0}`;
 
-5. **DATA ACCURACY**: 
-   - NEVER make up or fabricate job listings
-   - Only refer to jobs in the "Recommended Jobs" data
-   - If data is missing (N/A), acknowledge it honestly
-   - Use real data from user's profile when giving advice
+    // Layer 3: Query-aware context
+    if (queryAware.detectedJobs.length > 0) {
+      const searchJobs = queryAware.detectedJobs.map((job: any) => ({
+        id: job._id.toString(),
+        name: job.name,
+        company: job.company?.name || 'N/A',
+        location: job.location || 'N/A',
+        level: job.level || 'N/A',
+        skills: job.skills || [],
+        salary: job.salary || 'N/A',
+      }));
+      prompt += `\nSEARCH RESULTS: ${JSON.stringify(searchJobs)}`;
+    }
 
-5. **TONE & LANGUAGE**: 
-   - Professional, encouraging, and concise
-   - Use Vietnamese when user speaks Vietnamese
-   - Use English when user speaks English
-   - Be supportive and motivational
+    if (queryAware.detectedCompanies.length > 0) {
+      const companyInfo = queryAware.detectedCompanies.map(c => ({
+        name: c.name,
+        address: c.address,
+        description: c.description,
+        activeJobs: c.jobCount,
+      }));
+      prompt += `\nCOMPANY INFO: ${JSON.stringify(companyInfo)}`;
+    }
 
-6. **FORMATTING**: 
-   - Use Markdown formatting (bold, bullet points, headings)
-   - Keep responses under 300 words unless detailed analysis is requested
-   - Structure answers clearly with sections
+    if (conversationSummary) {
+      prompt += `\nPREVIOUS CONTEXT: ${conversationSummary}`;
+    }
 
-7. **PRIVACY**: 
-   - Never share or discuss other users' data
-   - Focus only on the current user's context
+    prompt += `
 
-REMEMBER: Your purpose is ONLY career counseling for IT professionals. Stay within this scope at all times.
-`;
+RULES:
+1. SCOPE: Only answer about IT careers, jobs, CVs, interviews, skills, salary in Vietnam IT market. Politely refuse off-topic requests.
+2. JOBS: Recommend jobs from YOUR MATCHING JOBS and SEARCH RESULTS. Include matching job IDs in recommendedJobIds. Never fabricate job listings.
+3. PLATFORM: Use PLATFORM data to answer general questions about job market stats, available skills, hiring trends, and company counts.
+4. COMPANIES: Use COMPANY INFO to answer questions about specific companies. If company data is available, reference it. If not, acknowledge you don't have info about that company.
+5. ACCURACY: Only reference real data from user profile, provided jobs, and platform data. Acknowledge missing data honestly.
+6. TONE: Professional, encouraging, concise. Match user's language (Vietnamese/English). Use Markdown. Keep under 300 words unless detailed analysis requested.
+7. PRIVACY: Never discuss other users' data.`;
+
+    return prompt;
   }
 
   /**
@@ -314,9 +514,9 @@ REMEMBER: Your purpose is ONLY career counseling for IT professionals. Stay with
 
       const total = sortedMessages.length;
 
-      // Calculate pagination - get most recent messages
-      const startIndex = Math.max(0, total - page * limit);
-      const endIndex = total;
+      // Calculate pagination - most recent messages first (page 1 = newest)
+      const endIndex = Math.max(0, total - (page - 1) * limit);
+      const startIndex = Math.max(0, endIndex - limit);
 
       const messages = sortedMessages.slice(startIndex, endIndex);
 
@@ -325,6 +525,7 @@ REMEMBER: Your purpose is ONLY career counseling for IT professionals. Stay with
         total,
         page,
         limit,
+        title: (conversation as any).title || undefined,
       };
     } catch (error) {
       this.logger.error(`Error fetching conversation history for user ${userId}:`, error);
@@ -349,6 +550,9 @@ REMEMBER: Your purpose is ONLY career counseling for IT professionals. Stay with
         },
       );
 
+      // Invalidate cached conversation ID
+      await this.cacheManager.del(`${this.CACHE_PREFIX_CONV}${userId}`);
+
       if (result.modifiedCount > 0) {
         this.logger.log(`Conversation cleared for user ${userId}`);
       }
@@ -361,9 +565,22 @@ REMEMBER: Your purpose is ONLY career counseling for IT professionals. Stay with
   }
 
   /**
-   * Get or create active conversation for user
+   * Get or create active conversation for user (with Redis-cached conversation ID)
    */
   private async getOrCreateConversation(userId: string): Promise<ConversationDocument> {
+    const cacheKey = `${this.CACHE_PREFIX_CONV}${userId}`;
+
+    // Check cache for active conversation ID
+    const cachedId = await this.cacheManager.get<string>(cacheKey);
+    if (cachedId) {
+      const conversation = await this.conversationModel.findById(cachedId).exec();
+      if (conversation && conversation.isActive) {
+        return conversation;
+      }
+      // Cached ID is stale, clear it
+      await this.cacheManager.del(cacheKey);
+    }
+
     let conversation = await this.conversationModel
       .findOne({
         userId: new Types.ObjectId(userId),
@@ -377,26 +594,57 @@ REMEMBER: Your purpose is ONLY career counseling for IT professionals. Stay with
         messages: [],
         isActive: true,
       });
-
       this.logger.log(`Created new conversation for user ${userId}`);
     }
+
+    // Cache the active conversation ID (no expiry — invalidated on clear/archive)
+    await this.cacheManager.set(cacheKey, conversation._id.toString(), 0);
 
     return conversation;
   }
 
   /**
-   * Archive long conversation and create new one
+   * Archive long conversation: generate summary, carry over last 5 messages to new conversation
    */
   private async archiveLongConversation(conversation: ConversationDocument): Promise<void> {
     try {
-      // Mark current conversation as inactive
+      // Generate summary of the conversation for long-term context
+      const summaryMessages = conversation.messages.map(m => ({
+        role: m.role,
+        content: m.content,
+      }));
+      const summary = await this.geminiService
+        .summarizeConversation(summaryMessages)
+        .catch(() => 'Previous conversation context');
+
+      // Archive the old conversation
       conversation.isActive = false;
       await conversation.save();
 
-      this.logger.log(`Archived long conversation ${conversation._id}`);
+      // Carry over last 5 messages for immediate context continuity
+      const carryOverMessages = conversation.messages.slice(-5);
+
+      // Create new conversation with summary and carried-over messages
+      const newConversation = await this.conversationModel.create({
+        userId: conversation.userId,
+        messages: carryOverMessages,
+        isActive: true,
+        summary,
+        title: (conversation as any).title || undefined,
+      });
+
+      // Update cached conversation ID to point to the new one
+      await this.cacheManager.set(
+        `${this.CACHE_PREFIX_CONV}${conversation.userId.toString()}`,
+        newConversation._id.toString(),
+        0,
+      );
+
+      this.logger.log(
+        `Archived conversation ${conversation._id}, created ${newConversation._id} with summary`,
+      );
     } catch (error) {
       this.logger.error('Error archiving conversation:', error);
-      // Still save the conversation even if archiving fails
       await conversation.save();
     }
   }
@@ -448,5 +696,125 @@ REMEMBER: Your purpose is ONLY career counseling for IT professionals. Stay with
     if (limit < 1 || limit > 100) {
       throw new BadRequestException('Limit must be between 1 and 100');
     }
+  }
+
+  // SSE Streaming
+
+  async initiateStream(userId: string, message: string): Promise<string> {
+    this.validateUserId(userId);
+
+    const streamId = randomUUID();
+    const subject = new Subject<MessageEvent>();
+    this.streams.set(streamId, subject);
+
+    // Start streaming in background (fire-and-forget)
+    this.processStream(userId, message, subject, streamId).catch(err => {
+      this.logger.error(`Stream ${streamId} failed:`, err.stack || err);
+      subject.next({ data: 'Stream processing failed' } as MessageEvent);
+      subject.complete();
+      this.streams.delete(streamId);
+    });
+
+    // Auto-cleanup after timeout (prevents memory leaks from abandoned streams)
+    setTimeout(() => {
+      if (this.streams.has(streamId)) {
+        this.streams.delete(streamId);
+        if (!subject.closed) subject.complete();
+      }
+    }, this.STREAM_TIMEOUT);
+
+    return streamId;
+  }
+
+  /**
+   * Get the Observable for an active stream (used by SSE GET endpoint)
+   */
+  getStream(streamId: string): Observable<MessageEvent> | null {
+    const subject = this.streams.get(streamId);
+    return subject ? subject.asObservable() : null;
+  }
+
+  /**
+   * Process the streaming chat response in the background
+   */
+  private async processStream(
+    userId: string,
+    message: string,
+    subject: Subject<MessageEvent>,
+    streamId: string,
+  ): Promise<void> {
+    const sanitizedMessage = this.sanitizeUserInput(message);
+    const conversation = await this.getOrCreateConversation(userId);
+    const fullContext = await this.buildFullContext(userId, sanitizedMessage);
+    const history = conversation.messages.slice(-this.MAX_HISTORY_MESSAGES);
+    const systemPrompt = this.buildSystemPrompt(fullContext, (conversation as any).summary);
+
+    let fullText = '';
+    let eventId = 0;
+
+    // Stream text chunks
+    for await (const chunk of this.geminiService.chatWithContextStream(
+      sanitizedMessage,
+      history,
+      systemPrompt,
+    )) {
+      fullText += chunk;
+      subject.next({ data: chunk, type: 'token', id: String(++eventId) } as MessageEvent);
+    }
+
+    // Match recommended jobs from response text against all context jobs
+    const allContextJobs = [
+      ...fullContext.user.matchingJobs,
+      ...fullContext.queryAware.detectedJobs,
+    ];
+    const seenIds = new Set<string>();
+    const recommendedJobs = allContextJobs.filter((job: any) => {
+      const jobId = job._id.toString();
+      if (seenIds.has(jobId)) return false;
+      const matches =
+        fullText.toLowerCase().includes(job.name.toLowerCase()) || fullText.includes(jobId);
+      if (matches) seenIds.add(jobId);
+      return matches;
+    });
+
+    // Save conversation
+    const userMessage: Message = {
+      role: 'user',
+      content: sanitizedMessage,
+      timestamp: new Date(),
+    };
+    const assistantMessage: Message = {
+      role: 'assistant',
+      content: fullText,
+      timestamp: new Date(),
+    };
+    conversation.messages.push(userMessage, assistantMessage);
+
+    // Auto-generate title from first user message
+    if (!(conversation as any).title) {
+      (conversation as any).title = sanitizedMessage.slice(0, 80);
+    }
+
+    if (conversation.messages.length > this.MAX_CONVERSATION_LENGTH) {
+      await this.archiveLongConversation(conversation);
+    } else {
+      await conversation.save();
+    }
+
+    // Send final "done" event with metadata
+    const donePayload = {
+      conversationId: conversation._id.toString(),
+      recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined,
+      suggestedActions: this.extractSuggestedActions(fullText, fullContext.user),
+    };
+    subject.next({
+      data: JSON.stringify(donePayload),
+      type: 'done',
+      id: String(++eventId),
+    } as MessageEvent);
+
+    subject.complete();
+    this.streams.delete(streamId);
+    this.logger.log(`Stream ${streamId} completed for user ${userId}`);
   }
 }

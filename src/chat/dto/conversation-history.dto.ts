@@ -77,4 +77,11 @@ export class ConversationHistoryResponseDto {
     example: 50,
   })
   limit: number;
+
+  @ApiProperty({
+    description: 'Conversation title (auto-generated from first message)',
+    example: 'How do I improve my React skills?',
+    required: false,
+  })
+  title?: string;
 }

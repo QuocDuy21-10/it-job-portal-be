@@ -1,10 +1,13 @@
 import {
   Injectable,
+  Inject,
   NotFoundException,
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { Model, Types } from 'mongoose';
 import { CvProfile, CvProfileDocument } from './schemas/cv-profile.schema';
 import { CreateCvProfileDto } from './dto/create-cv-profile.dto';
@@ -16,6 +19,7 @@ export class CvProfilesService {
   constructor(
     @InjectModel(CvProfile.name)
     private cvProfileModel: Model<CvProfileDocument>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly filesService: FilesService,
   ) {}
 
@@ -32,11 +36,14 @@ export class CvProfilesService {
 
     const existingCv = await this.findByUserId(userId);
 
-    if (existingCv) {
-      return this.updateCvProfile(userId, createCvProfileDto);
-    }
+    const result = existingCv
+      ? await this.updateCvProfile(userId, createCvProfileDto)
+      : await this.createCvProfile(userId, createCvProfileDto);
 
-    return this.createCvProfile(userId, createCvProfileDto);
+    // Invalidate chat user context cache so next chat message gets fresh profile data
+    await this.cacheManager.del(`chat_ctx:${userId}`);
+
+    return result;
   }
 
   /**
