@@ -123,14 +123,13 @@ export class FilesService {
           if (stat.isFile()) {
             results.push({ fileName: entry, ageInMs: now - stat.mtimeMs });
           }
-        } catch {
-        }
+        } catch {}
       }
 
       return results;
     } catch (error) {
       if (error.code === 'ENOENT') {
-        return []; 
+        return [];
       }
       throw error;
     }

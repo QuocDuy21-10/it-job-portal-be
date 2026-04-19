@@ -218,6 +218,16 @@ export class UsersService {
     );
   }
 
+  async scheduleAccountDeletion(id: string, scheduledDeletionAt: Date) {
+    this.validateObjectId(id);
+    return await this.userModel.updateOne({ _id: id }, { $set: { scheduledDeletionAt } });
+  }
+
+  async cancelAccountDeletion(id: string) {
+    this.validateObjectId(id);
+    return await this.userModel.updateOne({ _id: id }, { $unset: { scheduledDeletionAt: 1 } });
+  }
+
   async updateUserStatus(id: string, isActive: boolean) {
     this.validateObjectId(id);
     return await this.userModel.updateOne({ _id: id }, { isActive });

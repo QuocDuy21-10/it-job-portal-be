@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account Deleted</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f3f4f6;
+      margin: 0;
+      padding: 0;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 32px auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    .email-header {
+      background-color: #6b7280;
+      padding: 28px 24px;
+      text-align: center;
+      color: #ffffff;
+    }
+    .email-header h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: bold;
+    }
+    .email-body {
+      padding: 32px 24px;
+      color: #374151;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    .greeting {
+      font-size: 16px;
+      color: #374151;
+      margin-bottom: 16px;
+    }
+    .info-box {
+      background-color: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 24px 0;
+      font-size: 14px;
+      color: #6b7280;
+    }
+    .email-footer {
+      background-color: #f9fafb;
+      padding: 16px 24px;
+      text-align: center;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <h1>Account Permanently Deleted</h1>
+    </div>
+    <div class="email-body">
+      <p class="greeting">Hello <strong>{{userName}}</strong>,</p>
+      <p>Your IT Job Portal account has been permanently deleted as requested. All your personal data has been removed from our systems.</p>
+
+      <div class="info-box">
+        <strong>What was deleted:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Account credentials and personal information</li>
+          <li>CV profile and career data</li>
+          <li>Chat conversation history</li>
+          <li>Job subscriptions</li>
+        </ul>
+        <p style="margin: 8px 0 0 0;">Your job applications have been anonymised to preserve records for companies that reviewed them.</p>
+      </div>
+
+      <p>If you ever want to use IT Job Portal again in the future, you are welcome to create a new account.</p>
+      <p>We are sorry to see you go and wish you all the best in your career journey.</p>
+    </div>
+    <div class="email-footer">
+      &copy; {{currentYear}} IT Job Portal. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>

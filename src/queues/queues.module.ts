@@ -10,6 +10,8 @@ import { ApplicationNotificationQueueProcessor } from './processors/application-
 import { ApplicationNotificationQueueService } from './services/application-notification-queue.service';
 import { JobExpirationQueueProcessor } from './processors/job-expiration-queue.processor';
 import { JobExpirationQueueService } from './services/job-expiration-queue.service';
+import { AccountDeletionQueueProcessor } from './processors/account-deletion-queue.processor';
+import { AccountDeletionQueueService } from './services/account-deletion-queue.service';
 import { CvParserModule } from 'src/cv-parser/cv-parser.module';
 import { GeminiModule } from 'src/gemini/gemini.module';
 import { MatchingModule } from 'src/matching/matching.module';
@@ -20,12 +22,16 @@ import { Resume, ResumeSchema } from 'src/resumes/schemas/resume.schema';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
 import { Subscriber, SubscriberSchema } from 'src/subscribers/schemas/subscriber.schema';
 import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
+import { Session, SessionSchema } from 'src/sessions/schemas/session.schema';
+import { CvProfile, CvProfileSchema } from 'src/cv-profiles/schemas/cv-profile.schema';
+import { Conversation, ConversationSchema } from 'src/chat/schemas/conversation.schema';
 import {
   RESUME_QUEUE,
   COMPANY_FOLLOWER_NOTIFICATION_QUEUE,
   JOB_RECOMMENDATION_QUEUE,
   APPLICATION_NOTIFICATION_QUEUE,
   JOB_EXPIRATION_NOTIFICATION_QUEUE,
+  ACCOUNT_DELETION_QUEUE,
 } from './queues.constants';
 
 export {
@@ -34,6 +40,7 @@ export {
   JOB_RECOMMENDATION_QUEUE,
   APPLICATION_NOTIFICATION_QUEUE,
   JOB_EXPIRATION_NOTIFICATION_QUEUE,
+  ACCOUNT_DELETION_QUEUE,
 };
 
 @Global()
@@ -60,12 +67,18 @@ export class QueuesModule {
           {
             name: JOB_EXPIRATION_NOTIFICATION_QUEUE,
           },
+          {
+            name: ACCOUNT_DELETION_QUEUE,
+          },
         ),
         MongooseModule.forFeature([
           { name: Resume.name, schema: ResumeSchema },
           { name: User.name, schema: UserSchema },
           { name: Subscriber.name, schema: SubscriberSchema },
           { name: Job.name, schema: JobSchema },
+          { name: Session.name, schema: SessionSchema },
+          { name: CvProfile.name, schema: CvProfileSchema },
+          { name: Conversation.name, schema: ConversationSchema },
         ]),
         CvParserModule,
         GeminiModule,
@@ -84,6 +97,8 @@ export class QueuesModule {
         ApplicationNotificationQueueService,
         JobExpirationQueueProcessor,
         JobExpirationQueueService,
+        AccountDeletionQueueProcessor,
+        AccountDeletionQueueService,
       ],
       exports: [
         ResumeQueueService,
@@ -91,6 +106,7 @@ export class QueuesModule {
         JobRecommendationQueueService,
         ApplicationNotificationQueueService,
         JobExpirationQueueService,
+        AccountDeletionQueueService,
       ],
     };
   }

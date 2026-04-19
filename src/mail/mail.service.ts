@@ -26,6 +26,18 @@ export interface JobExpiredNotificationData {
   jobId: string;
 }
 
+export interface AccountDeletionScheduledData {
+  userName: string;
+  userEmail: string;
+  scheduledDeletionAt: Date;
+  cancelUrl: string;
+}
+
+export interface AccountDeletedData {
+  userName: string;
+  userEmail: string;
+}
+
 @Injectable()
 export class MailService {
   constructor(
@@ -109,6 +121,42 @@ export class MailService {
         jobName,
         companyName,
         jobManageUrl,
+        currentYear: new Date().getFullYear(),
+      },
+    });
+  }
+
+  //  Notify the user that their account deletion has been scheduled
+  async sendAccountDeletionScheduled(data: AccountDeletionScheduledData): Promise<void> {
+    const { userName, userEmail, scheduledDeletionAt, cancelUrl } = data;
+
+    await this.mailerService.sendMail({
+      to: userEmail,
+      subject: 'Your account is scheduled for deletion',
+      template: 'account-deletion-scheduled',
+      context: {
+        userName,
+        scheduledDeletionAt: scheduledDeletionAt.toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        }),
+        cancelUrl,
+        currentYear: new Date().getFullYear(),
+      },
+    });
+  }
+
+  //  Confirm to the user that their account has been permanently deleted
+  async sendAccountDeleted(data: AccountDeletedData): Promise<void> {
+    const { userName, userEmail } = data;
+
+    await this.mailerService.sendMail({
+      to: userEmail,
+      subject: 'Your account has been permanently deleted',
+      template: 'account-deleted',
+      context: {
+        userName,
         currentYear: new Date().getFullYear(),
       },
     });

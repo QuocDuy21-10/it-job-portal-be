@@ -89,6 +89,9 @@ export class User {
   @Prop()
   updatedAt?: Date;
 
+  @Prop({ type: Date, required: false })
+  scheduledDeletionAt?: Date;
+
   @Prop()
   isDeleted?: boolean;
 

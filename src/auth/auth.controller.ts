@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpStatus, Ip, Post, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpStatus,
+  Ip,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Public } from 'src/utils/decorators/public.decorator';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
@@ -18,6 +29,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyAuthDto } from './dto/verify-auth.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from 'src/users/users.service';
+import { RequestAccountDeletionDto } from './dto/request-account-deletion.dto';
+import { CancelDeletionByTokenDto } from './dto/cancel-deletion-by-token.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -276,5 +289,82 @@ export class AuthController {
   @ResponseMessage('Reset password successfully')
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
+  }
+
+  @Delete('account')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 3600000, limit: 3 } })
+  @ApiOperation({
+    summary: 'Request Account Deletion',
+    description:
+      'Schedule permanent account deletion after a 30-day grace period. Revokes all sessions immediately. Local accounts must supply their current password for verification.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Deletion scheduled. Returns the scheduled deletion date.',
+    schema: {
+      example: {
+        statusCode: 200,
+        message: 'Account deletion scheduled successfully',
+        data: {
+          message: 'Your account has been scheduled for deletion on ...',
+          scheduledDeletionAt: '2026-05-19T00:00:00.000Z',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'A deletion is already pending.',
+  })
+  @ResponseMessage('Account deletion scheduled successfully')
+  async requestAccountDeletion(
+    @User() user: IUser,
+    @Body() dto: RequestAccountDeletionDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    return this.authService.requestAccountDeletion(user, dto, response);
+  }
+
+  @Post('account/cancel-deletion')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 300000, limit: 5 } })
+  @ApiOperation({
+    summary: 'Cancel Account Deletion',
+    description: 'Cancel a pending account deletion request within the 30-day grace period.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Deletion cancelled. Account is fully active again.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'No pending deletion found, or grace period has expired.',
+  })
+  @ResponseMessage('Account deletion cancelled successfully')
+  async cancelAccountDeletion(@User() user: IUser) {
+    return this.authService.cancelAccountDeletion(user._id);
+  }
+
+  @Public()
+  @Post('account/cancel-deletion-by-token')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 300000, limit: 5 } })
+  @ApiOperation({
+    summary: 'Cancel Account Deletion by Token',
+    description:
+      'Cancel a pending account deletion using the magic-link token from the confirmation email. No authentication required.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Deletion cancelled. The user can now log in again.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid/expired token, no pending deletion, or grace period expired.',
+  })
+  @ResponseMessage('Account deletion cancelled successfully')
+  async cancelAccountDeletionByToken(@Body() dto: CancelDeletionByTokenDto) {
+    return this.authService.cancelAccountDeletionByToken(dto.token);
   }
 }

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account Scheduled for Deletion</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f3f4f6;
+      margin: 0;
+      padding: 0;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 32px auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    .email-header {
+      background-color: #dc2626;
+      padding: 28px 24px;
+      text-align: center;
+      color: #ffffff;
+    }
+    .email-header h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: bold;
+    }
+    .email-body {
+      padding: 32px 24px;
+      color: #374151;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    .greeting {
+      font-size: 16px;
+      color: #374151;
+      margin-bottom: 16px;
+    }
+    .info-box {
+      background-color: #fef2f2;
+      border: 2px solid #dc2626;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      margin: 24px 0;
+    }
+    .info-box .label {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+    .info-box .date {
+      font-size: 20px;
+      font-weight: bold;
+      color: #dc2626;
+    }
+    .cancel-btn {
+      display: inline-block;
+      background-color: #2563eb;
+      color: #ffffff !important;
+      text-decoration: none;
+      padding: 12px 28px;
+      border-radius: 6px;
+      font-size: 15px;
+      font-weight: bold;
+      margin: 16px 0;
+    }
+    .warning-box {
+      background-color: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      border-radius: 4px;
+      padding: 12px 16px;
+      margin: 16px 0;
+      font-size: 14px;
+      color: #92400e;
+    }
+    .email-footer {
+      background-color: #f9fafb;
+      padding: 16px 24px;
+      text-align: center;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <h1>Account Deletion Scheduled</h1>
+    </div>
+    <div class="email-body">
+      <p class="greeting">Hello <strong>{{userName}}</strong>,</p>
+      <p>We have received a request to permanently delete your IT Job Portal account. Your account will be deleted on:</p>
+
+      <div class="info-box">
+        <div class="label">Scheduled Deletion Date</div>
+        <div class="date">{{scheduledDeletionAt}}</div>
+      </div>
+
+      <p>If you changed your mind, you can cancel this request before the date above by clicking the button below:</p>
+
+      <div style="text-align: center;">
+        <a href="{{cancelUrl}}" class="cancel-btn">Cancel Deletion</a>
+      </div>
+
+      <div class="warning-box">
+        <strong>What will be deleted:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Your account and all personal information</li>
+          <li>Your CV profile</li>
+          <li>Your chat history</li>
+          <li>Your job subscriptions</li>
+        </ul>
+        <p style="margin: 8px 0 0 0;">Note: Your job applications will be anonymised, not deleted, to preserve the hiring process for companies.</p>
+      </div>
+
+      <p>If you did not make this request, please <a href="{{cancelUrl}}" style="color: #2563eb;">cancel immediately</a> and consider changing your password.</p>
+    </div>
+    <div class="email-footer">
+      &copy; {{currentYear}} IT Job Portal. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>

@@ -12,6 +12,7 @@ import ms from 'ms';
 import { SessionsModule } from 'src/sessions/sessions.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
+import { MailService } from 'src/mail/mail.service';
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { User, UserSchema } from 'src/users/schemas/user.schema';
       inject: [ConfigService],
     }),
   ],
-  providers: [AuthService, LocalStrategy, JwtStrategy, JwtRefreshStrategy],
+  providers: [AuthService, LocalStrategy, JwtStrategy, JwtRefreshStrategy, MailService],
   controllers: [AuthController],
   exports: [AuthService],
 })

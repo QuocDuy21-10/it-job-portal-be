@@ -28,6 +28,11 @@ import { IJwtAccessPayload, IJwtRefreshPayload } from './interfaces/jwt-payload.
 import { REDIS_CLIENT } from 'src/redis/redis.module';
 import Redis from 'ioredis';
 import { generateOtp, hashOtp, verifyOtp } from './utils/otp.utils';
+import { ConflictException } from '@nestjs/common';
+import { RequestAccountDeletionDto } from './dto/request-account-deletion.dto';
+import { EAuthProvider } from './enums/auth-provider.enum';
+import { AccountDeletionQueueService } from 'src/queues/services/account-deletion-queue.service';
+import { MailService } from 'src/mail/mail.service';
 
 @Injectable()
 export class AuthService {
@@ -41,6 +46,8 @@ export class AuthService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
     private mailerService: MailerService,
+    private accountDeletionQueueService: AccountDeletionQueueService,
+    private mailService: MailService,
   ) {
     // Initialize Google OAuth2 Client
     const googleClientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
@@ -581,5 +588,140 @@ export class AuthService {
     await this.cacheManager.del(`reset_password:${token}`);
 
     return { message: 'Đặt lại mật khẩu thành công' };
+  }
+
+  async requestAccountDeletion(
+    currentUser: IUser,
+    dto: RequestAccountDeletionDto,
+    response: Response,
+  ): Promise<{ message: string; scheduledDeletionAt: Date }> {
+    const GRACE_PERIOD_DAYS = 30;
+    const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+
+    // Fetch full user doc including password for validation
+    const user = await this.usersService.findOneByUserEmail(currentUser.email);
+    if (!user) throw new BadRequestException('User not found');
+
+    // Guard: deletion already pending
+    if (user.scheduledDeletionAt && user.scheduledDeletionAt > new Date()) {
+      throw new ConflictException(
+        'Account deletion is already pending. Check your email for the scheduled date.',
+      );
+    }
+
+    // Guard: local accounts must supply password for identity verification
+    if (user.authProvider === EAuthProvider.LOCAL) {
+      if (!dto.password) {
+        throw new BadRequestException('Password is required to delete a local account.');
+      }
+      const valid = this.usersService.isValidPassword(dto.password, user.password);
+      if (!valid) {
+        throw new UnauthorizedException('Incorrect password.');
+      }
+    }
+
+    const scheduledDeletionAt = new Date(Date.now() + GRACE_PERIOD_MS);
+    const userId = user._id.toString();
+
+    // Persist scheduled date
+    await this.usersService.scheduleAccountDeletion(userId, scheduledDeletionAt);
+
+    // Revoke all sessions immediately
+    await this.sessionsService.deleteAllUserSessions(userId);
+    response.clearCookie('refresh_token');
+
+    // Enqueue the delayed deletion job
+    await this.accountDeletionQueueService.addDeletionJob(userId, GRACE_PERIOD_MS);
+
+    // Generate a single-use cancellation token (magic link for email)
+    const cancelToken = uuidv4();
+    await this.cacheManager.set(`cancel_deletion:${cancelToken}`, userId, GRACE_PERIOD_MS);
+    await this.cacheManager.set(`cancel_deletion_user:${userId}`, cancelToken, GRACE_PERIOD_MS);
+
+    // Send confirmation email
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const cancelUrl = `${frontendUrl}/account/cancel-deletion?token=${cancelToken}`;
+    try {
+      await this.mailService.sendAccountDeletionScheduled({
+        userName: user.name,
+        userEmail: user.email,
+        scheduledDeletionAt,
+        cancelUrl,
+      });
+    } catch (mailError) {
+      // Non-fatal — deletion is already scheduled; log the error only
+      console.error('Failed to send account deletion scheduled email:', mailError?.message);
+    }
+
+    return {
+      message: `Your account has been scheduled for deletion on ${scheduledDeletionAt.toISOString()}. You can cancel within ${GRACE_PERIOD_DAYS} days.`,
+      scheduledDeletionAt,
+    };
+  }
+
+  async cancelAccountDeletion(userId: string): Promise<{ message: string }> {
+    const userDoc = await this.usersService.findOne(userId);
+    if (!userDoc) throw new BadRequestException('User not found');
+
+    if (!userDoc.scheduledDeletionAt) {
+      throw new BadRequestException('No pending account deletion found.');
+    }
+    if (userDoc.scheduledDeletionAt < new Date()) {
+      throw new BadRequestException(
+        'The grace period has expired. The account has already been permanently deleted.',
+      );
+    }
+
+    // Remove the BullMQ delayed job
+    await this.accountDeletionQueueService.cancelDeletionJob(userId);
+
+    // Clear the scheduled date from DB
+    await this.usersService.cancelAccountDeletion(userId);
+
+    // Invalidate the magic-link cancel token (if any)
+    await this.clearCancelDeletionToken(userId);
+
+    return { message: 'Account deletion cancelled successfully. Your account is now active.' };
+  }
+
+  async cancelAccountDeletionByToken(token: string): Promise<{ message: string }> {
+    const userId = await this.cacheManager.get<string>(`cancel_deletion:${token}`);
+    if (!userId) {
+      throw new BadRequestException('Invalid or expired cancellation token.');
+    }
+
+    const userDoc = await this.usersService.findOne(userId);
+    if (!userDoc) throw new BadRequestException('User not found.');
+
+    if (!userDoc.scheduledDeletionAt) {
+      // Deletion was already cancelled via another path — clean up the token
+      await this.clearCancelDeletionToken(userId);
+      throw new BadRequestException('No pending account deletion found.');
+    }
+    if (userDoc.scheduledDeletionAt < new Date()) {
+      await this.clearCancelDeletionToken(userId);
+      throw new BadRequestException(
+        'The grace period has expired. The account has already been permanently deleted.',
+      );
+    }
+
+    // Remove the BullMQ delayed job
+    await this.accountDeletionQueueService.cancelDeletionJob(userId);
+
+    // Clear the scheduled date from DB
+    await this.usersService.cancelAccountDeletion(userId);
+
+    // Invalidate token (single-use enforcement)
+    await this.clearCancelDeletionToken(userId);
+
+    return { message: 'Account deletion cancelled successfully. You can now log in.' };
+  }
+
+  private async clearCancelDeletionToken(userId: string): Promise<void> {
+    const token = await this.cacheManager.get<string>(`cancel_deletion_user:${userId}`);
+    if (token) {
+      await this.cacheManager.del(`cancel_deletion:${token}`);
+    }
+    await this.cacheManager.del(`cancel_deletion_user:${userId}`);
   }
 }
