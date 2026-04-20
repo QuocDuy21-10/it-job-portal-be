@@ -13,6 +13,11 @@ import { SessionsModule } from 'src/sessions/sessions.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
 import { MailService } from 'src/mail/mail.service';
+import { AuthAccountDeletionService } from './services/auth-account-deletion.service';
+import { AuthCredentialsService } from './services/auth-credentials.service';
+import { AuthGoogleService } from './services/auth-google.service';
+import { AuthSessionService } from './services/auth-session.service';
+import { AuthVerificationService } from './services/auth-verification.service';
 
 @Module({
   imports: [
@@ -28,7 +33,18 @@ import { MailService } from 'src/mail/mail.service';
       inject: [ConfigService],
     }),
   ],
-  providers: [AuthService, LocalStrategy, JwtStrategy, JwtRefreshStrategy, MailService],
+  providers: [
+    AuthService,
+    AuthCredentialsService,
+    AuthVerificationService,
+    AuthSessionService,
+    AuthGoogleService,
+    AuthAccountDeletionService,
+    LocalStrategy,
+    JwtStrategy,
+    JwtRefreshStrategy,
+    MailService,
+  ],
   controllers: [AuthController],
   exports: [AuthService],
 })
