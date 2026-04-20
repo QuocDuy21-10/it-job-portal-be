@@ -12,6 +12,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { BulkDeleteDto } from 'src/utils/dto/bulk-delete.dto';
 import { ResumesService } from './resumes.service';
 import { CreateUserCvDto } from './dto/create-resume.dto';
 import { UpdateResumeDto } from './dto/update-resume.dto';
@@ -87,6 +88,18 @@ export class ResumesController {
   @ResponseMessage('Resume updated status successfully')
   update(@Param('id') id: string, @Body() updateResumeDto: UpdateResumeDto, @User() user: IUser) {
     return this.resumesService.update(id, updateResumeDto, user);
+  }
+
+  @Delete('bulk')
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
+  @ApiOperation({
+    summary: 'Bulk delete resumes',
+    description:
+      'Soft deletes multiple resumes by IDs (max 100). HR can only delete resumes belonging to their own company.',
+  })
+  @ResponseMessage('Bulk delete resumes')
+  bulkRemove(@Body() bulkDeleteDto: BulkDeleteDto, @User() user: IUser) {
+    return this.resumesService.bulkRemove(bulkDeleteDto.ids, user);
   }
 
   @Delete(':id')

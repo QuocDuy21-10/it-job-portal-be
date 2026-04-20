@@ -10,6 +10,7 @@ import {
   HttpStatus,
   HttpCode,
 } from '@nestjs/common';
+import { BulkDeleteDto } from 'src/utils/dto/bulk-delete.dto';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -201,6 +202,18 @@ export class UsersController {
   @ResponseMessage('User account unlocked successfully')
   unlockUser(@Param('id') id: string, @User() user: IUser) {
     return this.usersService.unlockUser(id, user);
+  }
+
+  @Delete('bulk')
+  @Roles(ERole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Bulk delete users',
+    description:
+      'Soft deletes multiple users by IDs (max 100). The admin account and the requesting user cannot be deleted.',
+  })
+  @ResponseMessage('Bulk delete users')
+  bulkRemove(@Body() bulkDeleteDto: BulkDeleteDto, @User() user: IUser) {
+    return this.usersService.bulkRemove(bulkDeleteDto.ids, user);
   }
 
   @Delete(':id')

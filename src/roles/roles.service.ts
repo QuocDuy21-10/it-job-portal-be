@@ -8,10 +8,16 @@ import { InjectModel } from '@nestjs/mongoose';
 import mongoose from 'mongoose';
 import aqp from 'api-query-params';
 import { ERole } from 'src/casl/enums/role.enum';
+import { User, UserDocument } from 'src/users/schemas/user.schema';
+import { bulkSoftDelete } from 'src/utils/helpers/bulk-soft-delete.helper';
+import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
 
 @Injectable()
 export class RolesService {
-  constructor(@InjectModel(Role.name) private roleModel: SoftDeleteModel<RoleDocument>) {}
+  constructor(
+    @InjectModel(Role.name) private roleModel: SoftDeleteModel<RoleDocument>,
+    @InjectModel(User.name) private userModel: SoftDeleteModel<UserDocument>,
+  ) {}
   async create(createRoleDto: CreateRoleDto, user: IUser) {
     const { name, description, isActive } = createRoleDto;
     const existingName = await this.roleModel.findOne({
@@ -94,6 +100,34 @@ export class RolesService {
       { deletedBy: { _id: user._id, email: user.email } },
     );
     return this.roleModel.softDelete({ _id: id });
+  }
+
+  async bulkRemove(ids: string[], user: IUser): Promise<IBulkDeleteResult> {
+    const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
+
+    // Prevent deleting the SUPER_ADMIN role
+    const adminRole = await this.roleModel
+      .findOne({ name: ERole.SUPER_ADMIN, _id: { $in: objectIds } })
+      .select('_id')
+      .lean();
+
+    if (adminRole) {
+      throw new BadRequestException('Cannot delete the SUPER ADMIN role');
+    }
+
+    // Prevent deleting roles that still have active users assigned
+    const activeUserCount = await this.userModel.countDocuments({
+      role: { $in: objectIds },
+      isDeleted: { $ne: true },
+    });
+
+    if (activeUserCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete roles with active users assigned (${activeUserCount} user(s) affected). Reassign users first.`,
+      );
+    }
+
+    return bulkSoftDelete(this.roleModel, ids, user);
   }
 
   private validateObjectId(id: string): void {

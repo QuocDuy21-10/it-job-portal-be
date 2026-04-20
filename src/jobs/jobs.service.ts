@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { ApproveJobDto } from './dto/approve-job.dto';
@@ -8,6 +14,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { Job, JobDocument } from './schemas/job.schema';
 import mongoose from 'mongoose';
+import { bulkSoftDelete } from 'src/utils/helpers/bulk-soft-delete.helper';
+import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
+import { ERole } from 'src/casl';
 import aqp from 'api-query-params';
 import { Cron } from '@nestjs/schedule';
 import { CompanyFollowerQueueService } from 'src/queues/services/company-follower-queue.service';
@@ -196,6 +205,28 @@ export class JobsService {
     this.validateObjectId(id);
     await this.jobModel.updateOne({ _id: id }, { deletedBy: { _id: user._id, email: user.email } });
     return this.jobModel.softDelete({ _id: id });
+  }
+
+  async bulkRemove(ids: string[], user: IUser): Promise<IBulkDeleteResult> {
+    // HR can only delete jobs belonging to their own company
+    if (user.role?.name === ERole.HR) {
+      if (!user.company?._id) {
+        throw new ForbiddenException('HR user must be associated with a company');
+      }
+
+      const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
+      const ownedCount = await this.jobModel.countDocuments({
+        _id: { $in: objectIds },
+        'company._id': new mongoose.Types.ObjectId(user.company._id),
+        isDeleted: { $ne: true },
+      });
+
+      if (ownedCount !== ids.length) {
+        throw new ForbiddenException('You can only delete jobs that belong to your company');
+      }
+    }
+
+    return bulkSoftDelete(this.jobModel, ids, user);
   }
 
   @Cron('0 * * * *', {

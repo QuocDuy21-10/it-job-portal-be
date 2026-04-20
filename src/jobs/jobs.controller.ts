@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { BulkDeleteDto } from 'src/utils/dto/bulk-delete.dto';
 import { JobsService } from './jobs.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
@@ -79,6 +80,18 @@ export class JobsController {
   @ResponseMessage('Update job by id')
   update(@Param('id') id: string, @Body() updateJobDto: UpdateJobDto, @User() user: IUser) {
     return this.jobsService.update(id, updateJobDto, user);
+  }
+
+  @Delete('bulk')
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
+  @ApiOperation({
+    summary: 'Bulk delete jobs',
+    description:
+      'Soft deletes multiple job postings by IDs (max 100). HR can only delete jobs belonging to their own company.',
+  })
+  @ResponseMessage('Bulk delete jobs')
+  bulkRemove(@Body() bulkDeleteDto: BulkDeleteDto, @User() user: IUser) {
+    return this.jobsService.bulkRemove(bulkDeleteDto.ids, user);
   }
 
   @Delete(':id')

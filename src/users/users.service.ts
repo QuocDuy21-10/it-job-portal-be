@@ -23,6 +23,8 @@ import {
 import { CompanyDto } from 'src/companies/dto/company.dto';
 import { SessionsService } from 'src/sessions/sessions.service';
 import { LockUserDto } from './dto/lock-user.dto';
+import { bulkSoftDelete } from 'src/utils/helpers/bulk-soft-delete.helper';
+import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
 
 @Injectable()
 export class UsersService {
@@ -208,6 +210,26 @@ export class UsersService {
       { deletedBy: { _id: user._id, email: user.email } },
     );
     return this.userModel.softDelete({ _id: id });
+  }
+
+  async bulkRemove(ids: string[], user: IUser): Promise<IBulkDeleteResult> {
+    // Prevent self-deletion
+    if (ids.includes(user._id.toString())) {
+      throw new BadRequestException('You cannot delete your own account');
+    }
+
+    // Prevent deleting the admin account
+    const emailAdmin = this.configService.get<string>('EMAIL_ADMIN');
+    const adminUser = await this.userModel
+      .findOne({ email: emailAdmin, isDeleted: { $ne: true } })
+      .select('_id')
+      .lean();
+
+    if (adminUser && ids.includes(adminUser._id.toString())) {
+      throw new BadRequestException('Cannot delete the admin account');
+    }
+
+    return bulkSoftDelete(this.userModel, ids, user);
   }
 
   async activateUser(id: string) {

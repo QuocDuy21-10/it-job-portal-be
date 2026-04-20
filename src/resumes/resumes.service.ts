@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateResumeDto, CreateUserCvDto } from './dto/create-resume.dto';
 import { UpdateResumeDto } from './dto/update-resume.dto';
 import { IUser } from 'src/users/user.interface';
@@ -7,6 +13,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import aqp from 'api-query-params';
 import mongoose from 'mongoose';
+import { bulkSoftDelete } from 'src/utils/helpers/bulk-soft-delete.helper';
+import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
+import { ERole } from 'src/casl/enums/role.enum';
 import { EResumeStatus } from './enums/resume-status.enum';
 import { SubmitCvOnlineDto } from './dto/submit-cv-online.dto';
 import { CvProfilesService } from 'src/cv-profiles/cv-profiles.service';
@@ -196,6 +205,28 @@ export class ResumesService {
       { deletedBy: { _id: user._id, email: user.email } },
     );
     return this.resumeModel.softDelete({ _id: id });
+  }
+
+  async bulkRemove(ids: string[], user: IUser): Promise<IBulkDeleteResult> {
+    // HR can only delete resumes belonging to their own company
+    if (user.role?.name === ERole.HR) {
+      if (!user.company?._id) {
+        throw new ForbiddenException('HR user must be associated with a company');
+      }
+
+      const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
+      const ownedCount = await this.resumeModel.countDocuments({
+        _id: { $in: objectIds },
+        companyId: new mongoose.Types.ObjectId(user.company._id),
+        isDeleted: { $ne: true },
+      });
+
+      if (ownedCount !== ids.length) {
+        throw new ForbiddenException('You can only delete resumes that belong to your company');
+      }
+    }
+
+    return bulkSoftDelete(this.resumeModel, ids, user);
   }
 
   async getResumeByUser(user: IUser) {

@@ -43,9 +43,10 @@ export class CaslAbilityFactory {
         can(EAction.READ, 'Company');
         can(EAction.UPDATE, 'Company');
 
-        // Resumes: HR can read and update status (review applications)
+        // Resumes: HR can read, update status, and delete (review + manage applications)
         can(EAction.READ, 'Resume');
         can(EAction.UPDATE, 'Resume');
+        can(EAction.DELETE, 'Resume');
 
         // Chat, CvProfile, Subscriber, Notification, File
         can(EAction.MANAGE, 'Chat');

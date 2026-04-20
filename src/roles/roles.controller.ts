@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { BulkDeleteDto } from 'src/utils/dto/bulk-delete.dto';
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -53,6 +54,17 @@ export class RolesController {
   @ResponseMessage('Role updated successfully')
   update(@Param('id') id: string, @Body() updateRoleDto: UpdateRoleDto, @User() user: IUser) {
     return this.rolesService.update(id, updateRoleDto, user);
+  }
+
+  @Delete('bulk')
+  @ApiOperation({
+    summary: 'Bulk delete roles',
+    description:
+      'Soft deletes multiple roles by IDs (max 100). The SUPER ADMIN role cannot be deleted. Roles with active users assigned cannot be deleted.',
+  })
+  @ResponseMessage('Bulk delete roles')
+  bulkRemove(@Body() bulkDeleteDto: BulkDeleteDto, @User() user: IUser) {
+    return this.rolesService.bulkRemove(bulkDeleteDto.ids, user);
   }
 
   @Delete(':id')

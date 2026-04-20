@@ -11,6 +11,8 @@ import aqp from 'api-query-params';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 import { FilesService } from 'src/files/files.service';
 import { buildEmbeddedCompanyIdsInCondition } from './company-snapshot.util';
+import { bulkSoftDelete } from 'src/utils/helpers/bulk-soft-delete.helper';
+import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
 
 @Injectable()
 export class CompaniesService {
@@ -149,6 +151,30 @@ export class CompaniesService {
       { deletedBy: { _id: user._id, email: user.email } },
     );
     return this.companyModel.softDelete({ _id: id });
+  }
+
+  async bulkRemove(
+    ids: string[],
+    user: IUser,
+  ): Promise<IBulkDeleteResult & { deactivatedJobsCount: number }> {
+    const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
+
+    // Cascade: deactivate all active jobs belonging to these companies
+    const jobUpdateResult = await this.jobModel.updateMany(
+      {
+        'company._id': { $in: objectIds },
+        isActive: true,
+        isDeleted: { $ne: true },
+      },
+      { isActive: false },
+    );
+
+    const result = await bulkSoftDelete(this.companyModel, ids, user);
+
+    return {
+      ...result,
+      deactivatedJobsCount: jobUpdateResult.modifiedCount,
+    };
   }
 
   @Cron('0 2 * * *', {
