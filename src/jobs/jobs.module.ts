@@ -5,6 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Job, JobSchema } from './schemas/job.schema';
 import { QueuesModule } from 'src/queues/queues.module';
 import { Company, CompanySchema } from 'src/companies/schemas/company.schema';
+import { JobRepository } from './repositories/job.repository';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { Company, CompanySchema } from 'src/companies/schemas/company.schema';
     QueuesModule.forFeature(),
   ],
   controllers: [JobsController],
-  providers: [JobsService],
+  providers: [JobsService, JobRepository],
   exports: [JobsService],
 })
 export class JobsModule {}

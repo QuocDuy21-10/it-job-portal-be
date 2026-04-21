@@ -10,39 +10,66 @@ import { UpdateJobDto } from './dto/update-job.dto';
 import { ApproveJobDto } from './dto/approve-job.dto';
 import { EJobApprovalStatus } from './enums/job-approval-status.enum';
 import { IUser } from 'src/users/user.interface';
-import { InjectModel } from '@nestjs/mongoose';
-import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { Job, JobDocument } from './schemas/job.schema';
-import mongoose from 'mongoose';
-import { bulkSoftDelete } from 'src/utils/helpers/bulk-soft-delete.helper';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
 import { ERole } from 'src/casl';
 import aqp from 'api-query-params';
 import { Cron } from '@nestjs/schedule';
 import { CompanyFollowerQueueService } from 'src/queues/services/company-follower-queue.service';
 import { JobExpirationQueueService } from 'src/queues/services/job-expiration-queue.service';
-import { Company, CompanyDocument } from 'src/companies/schemas/company.schema';
 import {
-  buildCanonicalCompanySnapshot,
   buildEmbeddedCompanyIdCandidates,
   buildEmbeddedCompanyIdFilter,
-  CompanySnapshotValue,
 } from 'src/companies/company-snapshot.util';
+import { JobRepository } from './repositories/job.repository';
 
 @Injectable()
 export class JobsService {
   private readonly logger = new Logger(JobsService.name);
+  private readonly ALLOWED_FILTER_FIELDS = new Set([
+    'name',
+    'skills',
+    'location',
+    'salary',
+    'quantity',
+    'level',
+    'formOfWork',
+    'isActive',
+    'approvalStatus',
+    'company._id',
+    'startDate',
+    'endDate',
+    'createdAt',
+  ]);
+
+  private readonly DANGEROUS_OPERATORS = new Set([
+    '$where',
+    '$function',
+    '$expr',
+    '$accumulator',
+    '$jsReduce',
+  ]);
+
+  private readonly ALLOWED_SORT_FIELDS = new Set([
+    'name',
+    'salary',
+    'createdAt',
+    'updatedAt',
+    'level',
+    'location',
+    'startDate',
+    'endDate',
+  ]);
 
   constructor(
-    @InjectModel(Job.name) private jobModel: SoftDeleteModel<JobDocument>,
-    @InjectModel(Company.name) private companyModel: SoftDeleteModel<CompanyDocument>,
+    private readonly jobRepository: JobRepository,
     private readonly companyFollowerQueueService: CompanyFollowerQueueService,
     private readonly jobExpirationQueueService: JobExpirationQueueService,
   ) {}
   async create(createJobDto: CreateJobDto, user: IUser) {
-    const normalizedCompany = await this.getCanonicalCompanySnapshot(createJobDto.company._id);
+    const normalizedCompany = await this.jobRepository.getCompanySnapshot(createJobDto.company._id);
 
-    const newJob = await this.jobModel.create({
+    const newJob = await this.jobRepository.create({
       ...createJobDto,
       company: normalizedCompany,
       createdBy: { _id: user._id, email: user.email },
@@ -58,45 +85,48 @@ export class JobsService {
         companyName: newJob.company.name,
       });
     } catch (error) {
-      // Log error but don't fail the job creation
-      console.error('Failed to add notification to queue:', error);
+      this.logger.error(
+        `Failed to queue new-job notification for job ${newJob._id}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
     }
 
     return { _id: newJob._id, createdAt: newJob.createdAt };
   }
 
   async findAll(page?: number, limit?: number, query?: string, user?: IUser) {
-    const { filter, sort, population } = aqp(query);
-    delete filter.page;
-    delete filter.limit;
+    const { filter: rawFilter, sort: rawSort } = aqp(query);
 
+    // sanitizeAqpQuery strips dangerous operators and limits filter/sort to
+    // pre-approved fields, preventing NoSQL injection via the query string.
+    const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
+
+    // Expand a plain company._id string into the two ObjectId candidate formats
+    // used by the embedded snapshot (legacy string vs ObjectId).
     if (typeof filter['company._id'] === 'string') {
       filter['company._id'] = {
         $in: buildEmbeddedCompanyIdCandidates(filter['company._id']),
       };
     }
 
-    // Filter theo companyId nếu user là HR
-    if (user && user.role?.name === 'HR' && user.company?._id) {
+    // Role-based visibility overlay applied after sanitization so it cannot
+    // be overridden by user-supplied filter values.
+    if (user && user.role?.name === ERole.HR && user.company?._id) {
       Object.assign(filter, buildEmbeddedCompanyIdFilter(user.company._id));
-    } else if (!user || user.role?.name !== 'SUPER ADMIN') {
-      // Public users and NORMAL_USER only see APPROVED, active, non-expired jobs
+    } else if (!user || user.role?.name !== ERole.SUPER_ADMIN) {
       Object.assign(filter, this.buildActiveJobFilter());
     }
 
-    const offset = (page - 1) * limit;
-    const defaultLimit = limit ? limit : 10;
+    const safeLimit = limit > 0 ? limit : 10;
+    const safeOffset = ((page > 0 ? page : 1) - 1) * safeLimit;
 
-    const totalItems = (await this.jobModel.find(filter)).length;
-    const totalPages = Math.ceil(totalItems / defaultLimit);
+    const { result, totalItems, totalPages } = await this.jobRepository.findPaginated(
+      filter,
+      safeOffset,
+      safeLimit,
+      sort,
+    );
 
-    const result = await this.jobModel
-      .find(filter)
-      .skip(offset)
-      .limit(defaultLimit)
-      .sort(sort as any)
-      .populate(population)
-      .exec();
     return {
       result,
       meta: {
@@ -111,12 +141,12 @@ export class JobsService {
   }
 
   async findOne(id: string, user?: IUser) {
-    this.validateObjectId(id);
+    this.jobRepository.validateObjectId(id);
 
-    const job = await this.jobModel.findById(id).exec();
+    const job = await this.jobRepository.findById(id);
 
     // Nếu user là HR, chỉ cho phép xem job của công ty họ
-    if (user && user.role?.name === 'HR' && user.company?._id) {
+    if (user && user.role?.name === ERole.HR && user.company?._id) {
       if (job && job.company && job.company._id.toString() !== user.company._id.toString()) {
         throw new BadRequestException('You can only view jobs of your own company');
       }
@@ -124,7 +154,7 @@ export class JobsService {
     }
 
     // Public users and NORMAL_USER can only view APPROVED, active, non-expired jobs
-    if (!user || user.role?.name !== 'SUPER ADMIN') {
+    if (!user || user.role?.name !== ERole.SUPER_ADMIN) {
       if (
         job &&
         (job.approvalStatus !== EJobApprovalStatus.APPROVED ||
@@ -139,7 +169,15 @@ export class JobsService {
   }
 
   async update(id: string, updateJobDto: UpdateJobDto, user: IUser) {
-    this.validateObjectId(id);
+    this.jobRepository.validateObjectId(id);
+
+    // Load the job first so we can enforce HR company ownership before mutating.
+    const job = await this.jobRepository.findById(id);
+    await this.assertHrOwnership(job, id, user);
+
+    // Destructure company out so it is not included verbatim in the update
+    // payload; the snapshot is fetched below via getCompanySnapshot instead.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { company: _company, ...restUpdateJobDto } = updateJobDto;
     const updatePayload: Record<string, any> = {
       ...restUpdateJobDto,
@@ -147,10 +185,10 @@ export class JobsService {
     };
 
     if (updateJobDto.company?._id) {
-      updatePayload.company = await this.getCanonicalCompanySnapshot(updateJobDto.company._id);
+      updatePayload.company = await this.jobRepository.getCompanySnapshot(updateJobDto.company._id);
     }
 
-    return await this.jobModel.updateOne({ _id: id }, updatePayload);
+    return this.jobRepository.updateOne({ _id: id }, updatePayload);
   }
   /**
    * Find matching jobs based on user skills
@@ -166,28 +204,27 @@ export class JobsService {
 
     const skillRegexes = skills.map(skill => new RegExp(skill, 'i'));
 
-    return await this.jobModel
-      .find({
+    return this.jobRepository.findLean(
+      {
         ...this.buildActiveJobFilter(),
         isDeleted: false,
         skills: { $in: skillRegexes },
-      })
-      .select('name company location skills level') // Select only necessary fields to reduce token usage
-      .sort({ createdAt: -1 }) // Prioritize newest jobs
-      .limit(limit)
-      .lean()
-      .exec();
+      },
+      'name company location skills level',
+      { createdAt: -1 },
+      limit,
+    );
   }
 
   async approveJob(id: string, dto: ApproveJobDto, user: IUser) {
-    this.validateObjectId(id);
+    this.jobRepository.validateObjectId(id);
 
-    const job = await this.jobModel.findById(id).exec();
+    const job = await this.jobRepository.findById(id);
     if (!job) {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
 
-    await this.jobModel.updateOne(
+    await this.jobRepository.updateOne(
       { _id: id },
       {
         approvalStatus: dto.status,
@@ -202,9 +239,13 @@ export class JobsService {
   }
 
   async remove(id: string, user: IUser) {
-    this.validateObjectId(id);
-    await this.jobModel.updateOne({ _id: id }, { deletedBy: { _id: user._id, email: user.email } });
-    return this.jobModel.softDelete({ _id: id });
+    this.jobRepository.validateObjectId(id);
+
+    // Load the job first so we can enforce HR company ownership before deleting.
+    const job = await this.jobRepository.findById(id);
+    await this.assertHrOwnership(job, id, user);
+
+    return this.jobRepository.softDeleteById(id, { _id: user._id, email: user.email });
   }
 
   async bulkRemove(ids: string[], user: IUser): Promise<IBulkDeleteResult> {
@@ -214,19 +255,14 @@ export class JobsService {
         throw new ForbiddenException('HR user must be associated with a company');
       }
 
-      const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
-      const ownedCount = await this.jobModel.countDocuments({
-        _id: { $in: objectIds },
-        'company._id': new mongoose.Types.ObjectId(user.company._id),
-        isDeleted: { $ne: true },
-      });
+      const ownedCount = await this.jobRepository.countJobsOwnedByCompany(ids, user.company._id);
 
       if (ownedCount !== ids.length) {
         throw new ForbiddenException('You can only delete jobs that belong to your company');
       }
     }
 
-    return bulkSoftDelete(this.jobModel, ids, user);
+    return this.jobRepository.bulkSoftDelete(ids, user);
   }
 
   @Cron('0 * * * *', {
@@ -236,41 +272,43 @@ export class JobsService {
   async handleExpiredJobs(): Promise<void> {
     const now = new Date();
 
-    const expiredJobs = await this.jobModel
-      .find({
+    const expiredJobs = await this.jobRepository.findExpiredJobsLean(
+      {
         isActive: true,
         endDate: { $ne: null, $lte: now },
-      })
-      .select('_id name company createdBy')
-      .lean()
-      .exec();
+      },
+      '_id name company createdBy',
+    );
 
     if (expiredJobs.length === 0) {
       return;
     }
 
     const expiredIds = expiredJobs.map(job => job._id);
-    await this.jobModel.updateMany({ _id: { $in: expiredIds } }, { isActive: false });
+    await this.jobRepository.updateMany({ _id: { $in: expiredIds } }, { isActive: false });
 
     this.logger.log(`Deactivated ${expiredJobs.length} expired job(s)`);
 
-    for (const job of expiredJobs) {
-      if (job.createdBy?.email) {
-        try {
-          await this.jobExpirationQueueService.addExpiredJobNotification({
-            jobId: job._id.toString(),
-            jobName: job.name,
-            companyName: job.company?.name ?? 'Unknown Company',
-            hrEmail: job.createdBy.email,
-          });
-        } catch (error) {
-          this.logger.error(
-            `Failed to queue expiration notification for job ${job._id}: ${error.message}`,
-            error.stack,
-          );
-        }
-      }
-    }
+    // Dispatch notifications in parallel instead of sequentially
+    await Promise.allSettled(
+      expiredJobs
+        .filter(job => job.createdBy?.email)
+        .map(job =>
+          this.jobExpirationQueueService
+            .addExpiredJobNotification({
+              jobId: job._id.toString(),
+              jobName: job.name,
+              companyName: job.company?.name ?? 'Unknown Company',
+              hrEmail: job.createdBy.email,
+            })
+            .catch((error: unknown) => {
+              this.logger.error(
+                `Failed to queue expiration notification for job ${job._id}: ${error instanceof Error ? error.message : String(error)}`,
+                error instanceof Error ? error.stack : undefined,
+              );
+            }),
+        ),
+    );
   }
 
   async getPlatformJobStats(): Promise<{
@@ -287,7 +325,7 @@ export class JobsService {
       $or: [{ endDate: { $gte: new Date() } }, { endDate: null }],
     };
 
-    const [result] = await this.jobModel.aggregate([
+    const [result] = await this.jobRepository.aggregate([
       { $match: activeFilter },
       {
         $facet: {
@@ -356,13 +394,56 @@ export class JobsService {
       filter.location = { $regex: location, $options: 'i' };
     }
 
-    return await this.jobModel
-      .find(filter)
-      .select('name company location skills level salary')
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .lean()
-      .exec();
+    return this.jobRepository.findLean(
+      filter,
+      'name company location skills level salary',
+      { createdAt: -1 },
+      limit,
+    );
+  }
+
+  // Private helpers
+
+  private sanitizeAqpQuery(
+    rawFilter: Record<string, any>,
+    rawSort: Record<string, any>,
+  ): { filter: Record<string, any>; sort: Record<string, any> } {
+    const filter: Record<string, any> = {};
+    for (const [key, value] of Object.entries(rawFilter)) {
+      if (this.DANGEROUS_OPERATORS.has(key)) continue;
+      if (!this.ALLOWED_FILTER_FIELDS.has(key)) continue;
+      filter[key] = value;
+    }
+
+    const sort: Record<string, any> = {};
+    if (rawSort && typeof rawSort === 'object') {
+      for (const [key, value] of Object.entries(rawSort)) {
+        if (!this.ALLOWED_SORT_FIELDS.has(key)) continue;
+        if (value !== 1 && value !== -1) continue;
+        sort[key] = value;
+      }
+    }
+
+    return { filter, sort };
+  }
+
+  private async assertHrOwnership(
+    job: JobDocument | null,
+    jobId: string,
+    user: IUser,
+  ): Promise<void> {
+    if (!job) {
+      throw new NotFoundException(`Job with ID ${jobId} not found`);
+    }
+
+    if (user.role?.name === ERole.HR) {
+      if (!user.company?._id) {
+        throw new ForbiddenException('HR user must be associated with a company');
+      }
+      if (job.company._id.toString() !== user.company._id.toString()) {
+        throw new ForbiddenException('You can only modify jobs that belong to your company');
+      }
+    }
   }
 
   private buildActiveJobFilter(): Record<string, unknown> {
@@ -371,25 +452,5 @@ export class JobsService {
       approvalStatus: EJobApprovalStatus.APPROVED,
       $or: [{ endDate: { $gte: new Date() } }, { endDate: null }],
     };
-  }
-
-  private validateObjectId(id: string): void {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid ID format');
-    }
-  }
-
-  private async getCanonicalCompanySnapshot(companyId: string): Promise<CompanySnapshotValue> {
-    this.validateObjectId(companyId);
-
-    const company = await this.companyModel
-      .findOne({ _id: companyId, isDeleted: false })
-      .select('_id name logo');
-
-    if (!company) {
-      throw new BadRequestException('Company not found or has been deleted');
-    }
-
-    return buildCanonicalCompanySnapshot(company);
   }
 }
