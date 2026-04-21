@@ -32,9 +32,7 @@ describe('AuthGoogleService', () => {
 
     service = context.module.get(AuthGoogleService);
     usersService = context.usersService;
-    verifyIdTokenMock = jest.fn() as jest.MockedFunction<
-      (...args: unknown[]) => Promise<unknown>
-    >;
+    verifyIdTokenMock = jest.fn() as jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
 
     (service as any).googleClient = {
       verifyIdToken: verifyIdTokenMock,

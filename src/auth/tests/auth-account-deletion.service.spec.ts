@@ -7,7 +7,6 @@ import {
   createAuthTestingModule,
 } from '../testing/create-auth-testing-module';
 
-
 describe('AuthAccountDeletionService', () => {
   let service: AuthAccountDeletionService;
   let usersService: AuthTestingModuleContext['usersService'];

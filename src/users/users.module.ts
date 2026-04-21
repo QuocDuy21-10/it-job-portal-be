@@ -8,6 +8,9 @@ import { Session, SessionSchema } from 'src/sessions/schemas/session.schema';
 import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
 import { Company, CompanySchema } from 'src/companies/schemas/company.schema';
 import { SessionsModule } from 'src/sessions/sessions.module';
+import { UserRepository } from './repositories/user.repository';
+import { UserAccountService } from './services/user-account.service';
+import { UserPreferencesService } from './services/user-preferences.service';
 
 @Module({
   imports: [
@@ -21,7 +24,7 @@ import { SessionsModule } from 'src/sessions/sessions.module';
     SessionsModule,
   ],
   controllers: [UsersController],
-  providers: [UsersService],
+  providers: [UsersService, UserRepository, UserAccountService, UserPreferencesService],
   exports: [UsersService],
 })
 export class UsersModule {}

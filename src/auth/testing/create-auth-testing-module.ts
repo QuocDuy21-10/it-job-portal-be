@@ -79,9 +79,7 @@ export async function createAuthTestingModule(
   options: CreateAuthTestingModuleOptions = {},
 ): Promise<AuthTestingModuleContext> {
   const redisPipeline: MockRedisPipeline = {
-    set: jest
-      .fn<(...args: [string, string, ...unknown[]]) => MockRedisPipeline>()
-      .mockReturnThis(),
+    set: jest.fn<(...args: [string, string, ...unknown[]]) => MockRedisPipeline>().mockReturnThis(),
     exec: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
   };
 

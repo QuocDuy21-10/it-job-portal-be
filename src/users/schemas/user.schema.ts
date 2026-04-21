@@ -113,6 +113,7 @@ UserSchema.index({ email: 1, isDeleted: 1 });
 UserSchema.index({ role: 1 });
 UserSchema.index({ companyFollowed: 1 });
 UserSchema.index({ savedJobs: 1 });
+UserSchema.index({ googleId: 1, isDeleted: 1 }, { sparse: true });
 
 UserSchema.index(
   { verificationExpires: 1 },
