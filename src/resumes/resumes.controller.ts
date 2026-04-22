@@ -11,7 +11,9 @@ import {
   UploadedFile,
   BadRequestException,
   Logger,
+  UseGuards,
 } from '@nestjs/common';
+import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { BulkDeleteDto } from 'src/utils/dto/bulk-delete.dto';
 import { ResumesService } from './resumes.service';
 import { CreateUserCvDto } from './dto/create-resume.dto';
@@ -24,6 +26,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadCvDto } from './dto/upload-cv.dto';
 import { ResumeProcessingService } from './resume-processing.service';
 import { ResumeQueueService } from 'src/queues/services/resume-queue.service';
+import { ApplicationSubmissionService } from './services/application-submission.service';
 import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -39,6 +42,7 @@ export class ResumesController {
     private readonly resumesService: ResumesService,
     private readonly resumeProcessingService: ResumeProcessingService,
     private readonly resumeQueueService: ResumeQueueService,
+    private readonly applicationSubmissionService: ApplicationSubmissionService,
   ) {}
 
   @Post()
@@ -134,8 +138,11 @@ export class ResumesController {
     return this.resumesService.getResumeOfMe(user);
   }
 
-  // ========== NEW: CV ONLINE SUBMISSION (Structured CV) ==========
+  // CV Online Submission 
+
   @Post('cv-online')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 300000, limit: 10 } })
   @ApiOperation({
     summary: 'Submit CV Online - Apply using structured CV profile',
     description:
@@ -143,9 +150,9 @@ export class ResumesController {
   })
   @ResponseMessage('CV submitted successfully')
   async submitCvOnline(@Body() submitCvOnlineDto: SubmitCvOnlineDto, @User() user: IUser) {
-    const result = await this.resumesService.submitCvOnline(submitCvOnlineDto, user);
+    const result = await this.applicationSubmissionService.submitCvOnline(submitCvOnlineDto, user);
 
-    // Notify HR about the new application (fire-and-forget)
+    // Notify HR about the new application
     this.resumesService
       .notifyHrNewApplication(
         result._id.toString(),
@@ -157,21 +164,23 @@ export class ResumesController {
       )
       .catch(err =>
         this.logger.error(
-          `Failed to notify HR for cv-online submission: resumeId=${result._id}, companyId=${result.companyId}, error=${err.message}`,
+          `Failed to notify HR for cv-online submission: resumeId=${result._id}, error=${err.message}`,
         ),
       );
 
     return result;
   }
 
-  // ========== NEW: CV PARSER & AI MATCHING ENDPOINTS ==========
+  // CV File Upload
+
   @Post('upload-cv')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 3600000, limit: 20 } })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
         destination: (req, file, cb) => {
           const uploadPath = path.join(process.cwd(), 'public', 'images', 'resumes');
-          // Ensure directory exists
           if (!fs.existsSync(uploadPath)) {
             fs.mkdirSync(uploadPath, { recursive: true });
           }
@@ -198,9 +207,7 @@ export class ResumesController {
           cb(null, true);
         }
       },
-      limits: {
-        fileSize: 5 * 1024 * 1024, // 5 MB
-      },
+      limits: { fileSize: 5 * 1024 * 1024 },
     }),
   )
   @ApiConsumes('multipart/form-data')
@@ -217,10 +224,7 @@ export class ResumesController {
           format: 'binary',
           description: 'CV file (PDF, DOC, DOCX, TXT - Max 5MB)',
         },
-        jobId: {
-          type: 'string',
-          description: 'Job ID to apply for',
-        },
+        jobId: { type: 'string', description: 'Job ID to apply for' },
       },
       required: ['file', 'jobId'],
     },
@@ -231,78 +235,34 @@ export class ResumesController {
     @Body() uploadCvDto: UploadCvDto,
     @User() user: IUser,
   ) {
-    // Step 1: Validate file
-    this.resumeProcessingService.validateFile(file);
-
-    // Step 2: Validate job exists and is active
-    const job = await this.resumeProcessingService.validateJob(uploadCvDto.jobId);
-
-    // Step 3: Check duplicate application
-    await this.resumeProcessingService.checkDuplicateApplication(
-      user._id.toString(),
-      uploadCvDto.jobId,
+    // Delegate all orchestration to the processing service
+    const result = await this.resumeProcessingService.handleUploadAndQueue(
+      file,
+      uploadCvDto,
+      user,
+      this.resumeQueueService,
     );
 
-    // Step 4: Create resume record
-    const resume = await this.resumeProcessingService.createResume(file, uploadCvDto.jobId, user);
-
-    // Step 5: Get full file path
-    const fullFilePath = this.resumeProcessingService.getFullFilePath(resume.url);
-
-    // Step 5.1: Verify file exists before queuing
-    if (!fs.existsSync(fullFilePath)) {
-      throw new BadRequestException(
-        `File not found at path: ${fullFilePath}. Please try uploading again.`,
-      );
-    }
-
-    // Step 6: Queue parsing job
-    const parseJob = await this.resumeQueueService.addParseResumeJob({
-      resumeId: resume._id.toString(),
-      filePath: fullFilePath,
-      jobId: uploadCvDto.jobId,
-    });
-
-    // Step 7: Queue analysis job (will wait for parsing to complete)
-    const analysisJob = await this.resumeQueueService.addAnalyzeResumeJob({
-      resumeId: resume._id.toString(),
-      jobId: uploadCvDto.jobId,
-    });
-
-    const result = {
-      _id: resume._id,
-      jobId: uploadCvDto.jobId,
-      jobName: job.name,
-      companyName: job.company.name,
-      status: 'processing',
-      jobs: {
-        parseJobId: parseJob.id,
-        analysisJobId: analysisJob.id,
-      },
-      file: this.resumeProcessingService.getFileMetadata(file),
-      message:
-        'Your CV has been uploaded and is being processed. You will be notified when analysis is complete.',
-      estimatedTime: '30-60 seconds',
-    };
-
-    // Notify HR about the new application (fire-and-forget)
+    // Notify HR about the new application 
     this.resumesService
       .notifyHrNewApplication(
-        resume._id.toString(),
-        job.name,
-        job.company.name,
-        job.company._id?.toString(),
+        result.resumeId,
+        result.jobName,
+        result.companyName,
+        result.companyId,
         user.name,
         user.email,
       )
       .catch(err =>
         this.logger.error(
-          `Failed to notify HR for upload-cv submission: resumeId=${resume._id}, companyId=${job.company._id}, error=${err.message}`,
+          `Failed to notify HR for upload-cv submission: resumeId=${result.resumeId}, error=${err.message}`,
         ),
       );
 
-    return result;
+    return result.response;
   }
+
+  // Analysis & Queue Management
 
   @Get(':id/analysis')
   @ApiOperation({
@@ -317,8 +277,8 @@ export class ResumesController {
       throw new BadRequestException('Resume not found');
     }
 
-    // Check if user owns this resume
-    if (resume.userId.toString() !== user._id.toString() && user.role?.name !== 'ADMIN') {
+    // Candidates may only view their own analysis; SUPER_ADMIN sees all
+    if (resume.userId.toString() !== user._id.toString() && user.role?.name !== ERole.SUPER_ADMIN) {
       throw new BadRequestException('You do not have permission to view this resume');
     }
 
@@ -378,11 +338,7 @@ export class ResumesController {
       jobId: resume.jobId.toString(),
     });
 
-    return {
-      resumeId: id,
-      jobId: job.id,
-      message: 'CV re-parsing has been queued',
-    };
+    return { resumeId: id, jobId: job.id, message: 'CV re-parsing has been queued' };
   }
 
   @Post(':id/reanalyze')
@@ -392,7 +348,7 @@ export class ResumesController {
     description: 'Trigger re-analysis of a parsed CV against the job',
   })
   @ResponseMessage('Re-analysis queued successfully')
-  async reanalyzeCV(@Param('id') id: string, @User() user: IUser) {
+  async reanalyzeCV(@Param('id') id: string) {
     const resume = await this.resumeProcessingService.validateResumeForAnalysis(id);
 
     if (!resume.jobId) {
@@ -404,10 +360,6 @@ export class ResumesController {
       jobId: resume.jobId.toString(),
     });
 
-    return {
-      resumeId: id,
-      jobId: job.id,
-      message: 'CV re-analysis has been queued',
-    };
+    return { resumeId: id, jobId: job.id, message: 'CV re-analysis has been queued' };
   }
 }

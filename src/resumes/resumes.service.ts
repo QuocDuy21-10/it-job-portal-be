@@ -5,45 +5,57 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateResumeDto, CreateUserCvDto } from './dto/create-resume.dto';
+import { CreateUserCvDto } from './dto/create-resume.dto';
 import { UpdateResumeDto } from './dto/update-resume.dto';
 import { IUser } from 'src/users/user.interface';
-import { Resume, ResumeDocument } from './schemas/resume.schema';
-import { InjectModel } from '@nestjs/mongoose';
-import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
-import aqp from 'api-query-params';
-import mongoose from 'mongoose';
-import { bulkSoftDelete } from 'src/utils/helpers/bulk-soft-delete.helper';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
 import { ERole } from 'src/casl/enums/role.enum';
+import aqp from 'api-query-params';
+import mongoose from 'mongoose';
 import { EResumeStatus } from './enums/resume-status.enum';
-import { SubmitCvOnlineDto } from './dto/submit-cv-online.dto';
-import { CvProfilesService } from 'src/cv-profiles/cv-profiles.service';
-import { JobsService } from 'src/jobs/jobs.service';
-import { MatchingService } from 'src/matching/matching.service';
-import { ParsedDataDto } from './dto/parsed-data.dto';
-import { CvProfile } from 'src/cv-profiles/schemas/cv-profile.schema';
-import { User, UserDocument } from 'src/users/schemas/user.schema';
-import { NotificationsService } from 'src/notifications/notifications.service';
-import { ENotificationType } from 'src/notifications/enums/notification-type.enum';
-import { ApplicationNotificationQueueService } from 'src/queues/services/application-notification-queue.service';
-import { buildEmbeddedCompanyIdFilter } from 'src/companies/company-snapshot.util';
+import { ResumeRepository } from './repositories/resume.repository';
+import { ApplicationNotificationService } from './services/application-notification.service';
 
 @Injectable()
 export class ResumesService {
   private readonly logger = new Logger(ResumesService.name);
 
+  private readonly ALLOWED_FILTER_FIELDS = new Set([
+    'status',
+    'priority',
+    'companyId',
+    'jobId',
+    'userId',
+    'isParsed',
+    'isAnalyzed',
+    'email',
+    'createdAt',
+    'updatedAt',
+  ]);
+
+  private readonly DANGEROUS_OPERATORS = new Set([
+    '$where',
+    '$function',
+    '$expr',
+    '$accumulator',
+    '$jsReduce',
+  ]);
+
+  private readonly ALLOWED_SORT_FIELDS = new Set([
+    'status',
+    'priority',
+    'createdAt',
+    'updatedAt',
+    'aiAnalysis.matchingScore',
+  ]);
+
   constructor(
-    @InjectModel(Resume.name) private resumeModel: SoftDeleteModel<ResumeDocument>,
-    @InjectModel(User.name) private userModel: SoftDeleteModel<UserDocument>,
-    private readonly cvProfilesService: CvProfilesService,
-    private readonly jobsService: JobsService,
-    private readonly matchingService: MatchingService,
-    private readonly notificationsService: NotificationsService,
-    private readonly applicationNotificationQueueService: ApplicationNotificationQueueService,
+    private readonly resumeRepository: ResumeRepository,
+    private readonly applicationNotificationService: ApplicationNotificationService,
   ) {}
+
   async create(createUserCvDto: CreateUserCvDto, user: IUser) {
-    const newResume = await this.resumeModel.create({
+    const newResume = await this.resumeRepository.create({
       email: user.email,
       userId: user._id,
       status: EResumeStatus.PENDING,
@@ -61,35 +73,35 @@ export class ResumesService {
   }
 
   async findAll(page?: number, limit?: number, query?: string, user?: IUser) {
-    const { filter, sort, population, projection } = aqp(query);
-    delete filter.page;
-    delete filter.limit;
+    const { filter: rawFilter, sort: rawSort, population, projection } = aqp(query);
+    delete rawFilter.page;
+    delete rawFilter.limit;
 
-    // Filter theo companyId nếu user là HR
-    if (user && user.role?.name === 'HR' && user.company?._id) {
+    const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
+
+    // Role-based scope applied after sanitization — cannot be overridden by query string
+    if (user?.role?.name === ERole.HR && user.company?._id) {
       filter.companyId = user.company._id;
     }
 
-    const offset = (page - 1) * limit;
-    const defaultLimit = limit ? limit : 10;
+    const safeLimit = limit > 0 ? limit : 10;
+    const safeOffset = ((page > 0 ? page : 1) - 1) * safeLimit;
 
-    const totalItems = (await this.resumeModel.find(filter)).length;
-    const totalPages = Math.ceil(totalItems / defaultLimit);
+    const { result, totalItems, totalPages } = await this.resumeRepository.findPaginated(
+      filter,
+      safeOffset,
+      safeLimit,
+      sort,
+      population,
+      projection,
+    );
 
-    const result = await this.resumeModel
-      .find(filter)
-      .skip(offset)
-      .limit(defaultLimit)
-      .sort(sort as any)
-      .populate(population)
-      .select(projection as any)
-      .exec();
     return {
       result,
       meta: {
         pagination: {
           current_page: page,
-          per_page: limit,
+          per_page: safeLimit,
           total_pages: totalPages,
           total: totalItems,
         },
@@ -100,12 +112,16 @@ export class ResumesService {
   async findOne(id: string, user?: IUser) {
     this.validateObjectId(id);
 
-    const resume = await this.resumeModel.findById(id);
+    const resume = await this.resumeRepository.findById(id);
 
-    // Nếu user là HR, chỉ cho phép xem resume của công ty họ
-    if (user && user.role?.name === 'HR' && user.company?._id) {
-      if (resume && resume.companyId?.toString() !== user.company._id.toString()) {
-        throw new BadRequestException('You can only view resumes of your own company');
+    if (!resume) {
+      throw new NotFoundException(`Resume with ID ${id} not found`);
+    }
+
+    // HR users may only view resumes belonging to their company
+    if (user?.role?.name === ERole.HR && user.company?._id) {
+      if (resume.companyId?.toString() !== user.company._id.toString()) {
+        throw new ForbiddenException('You can only view resumes of your own company');
       }
     }
 
@@ -114,16 +130,24 @@ export class ResumesService {
 
   async update(id: string, updateResumeDto: UpdateResumeDto, user?: IUser) {
     this.validateObjectId(id);
+
+    // Verify the resume exists and that the HR user owns it before mutating
+    const existing = await this.resumeRepository.findById(id);
+    if (!existing) {
+      throw new NotFoundException(`Resume with ID ${id} not found`);
+    }
+
+    if (user?.role?.name === ERole.HR && user.company?._id) {
+      if (existing.companyId?.toString() !== user.company._id.toString()) {
+        throw new ForbiddenException('You can only update resumes that belong to your company');
+      }
+    }
+
     const { status } = updateResumeDto;
+    const updateData: any = { ...updateResumeDto };
 
-    const updateData: any = {
-      ...updateResumeDto,
-    };
-
-    // Only add status and history if status is provided
     if (status) {
       updateData.status = status;
-
       if (user) {
         updateData.updatedBy = { _id: user._id, email: user.email };
         updateData.$push = {
@@ -138,225 +162,62 @@ export class ResumesService {
       updateData.updatedBy = { _id: user._id, email: user.email };
     }
 
-    const result = await this.resumeModel.updateOne({ _id: id }, updateData);
+    const result = await this.resumeRepository.updateOne({ _id: id }, updateData);
 
-    // Send notification to candidate when status changes
     if (status && user) {
-      this.sendStatusChangeNotification(id, status, user).catch(err =>
-        this.logger.error(`Failed to send status change notification: ${err.message}`),
-      );
+      this.applicationNotificationService
+        .sendStatusChangeNotification(id, status, user)
+        .catch(err =>
+          this.logger.error(`Failed to send status change notification: ${err.message}`),
+        );
     }
 
     return result;
   }
 
-  /**
-   * Send notification to candidate when application status changes
-   */
-  private async sendStatusChangeNotification(
-    resumeId: string,
-    newStatus: string,
-    updatedBy: IUser,
-  ) {
-    const resume = await this.resumeModel
-      .findById(resumeId)
-      .populate('jobId', 'name')
-      .populate('companyId', 'name')
-      .lean();
-
-    if (!resume) return;
-
-    const jobName = (resume.jobId as any)?.name || 'Unknown Job';
-    const companyName = (resume.companyId as any)?.name || 'Unknown Company';
-
-    await this.notificationsService.create(
-      {
-        userId: resume.userId.toString(),
-        type: ENotificationType.APPLICATION_STATUS_CHANGE,
-        title: 'Application Status Updated',
-        message: `Your application for "${jobName}" at ${companyName} has been updated to ${newStatus}.`,
-        data: {
-          resumeId,
-          jobId: resume.jobId?.toString(),
-          companyId: resume.companyId?.toString(),
-          newStatus,
-          jobName,
-          companyName,
-        },
-      },
-      { _id: updatedBy._id, email: updatedBy.email },
-    );
-
-    // Queue email notification (async, non-blocking)
-    this.applicationNotificationQueueService.addStatusUpdateEmail({
-      userName: resume.email, // use email as fallback for name
-      userEmail: resume.email,
-      jobName,
-      companyName,
-      newStatus,
-      resumeId,
-    });
-  }
-
   async remove(id: string, user: IUser) {
     this.validateObjectId(id);
-    await this.resumeModel.updateOne(
-      { _id: id },
-      { deletedBy: { _id: user._id, email: user.email } },
-    );
-    return this.resumeModel.softDelete({ _id: id });
+
+    const existing = await this.resumeRepository.findById(id);
+    if (!existing) {
+      throw new NotFoundException(`Resume with ID ${id} not found`);
+    }
+
+    if (user?.role?.name === ERole.HR && user.company?._id) {
+      if (existing.companyId?.toString() !== user.company._id.toString()) {
+        throw new ForbiddenException('You can only delete resumes that belong to your company');
+      }
+    }
+
+    return this.resumeRepository.softDeleteById(id, { _id: user._id, email: user.email });
   }
 
   async bulkRemove(ids: string[], user: IUser): Promise<IBulkDeleteResult> {
-    // HR can only delete resumes belonging to their own company
     if (user.role?.name === ERole.HR) {
       if (!user.company?._id) {
         throw new ForbiddenException('HR user must be associated with a company');
       }
 
-      const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
-      const ownedCount = await this.resumeModel.countDocuments({
-        _id: { $in: objectIds },
-        companyId: new mongoose.Types.ObjectId(user.company._id),
-        isDeleted: { $ne: true },
-      });
-
+      const ownedCount = await this.resumeRepository.countOwnedByCompany(
+        ids,
+        user.company._id.toString(),
+      );
       if (ownedCount !== ids.length) {
         throw new ForbiddenException('You can only delete resumes that belong to your company');
       }
     }
 
-    return bulkSoftDelete(this.resumeModel, ids, user);
+    return this.resumeRepository.bulkSoftDelete(ids, user);
   }
 
   async getResumeByUser(user: IUser) {
-    return await this.resumeModel
-      .find({ userId: user._id })
-      .sort('-createdAt')
-      .populate([
-        {
-          path: 'companyId',
-          select: {
-            name: 1,
-          },
-        },
-        {
-          path: 'jobId',
-          select: {
-            name: 1,
-            location: 1,
-            salary: 1,
-          },
-        },
-      ]);
+    return this.resumeRepository.findByUserId(user._id.toString());
   }
 
   async getResumeOfMe(user: IUser) {
-    return await this.resumeModel.find({ userId: user._id }).select(['url']).sort('-createdAt');
+    return this.resumeRepository.findUrlsByUserId(user._id.toString());
   }
 
-  /**
-   * Submit CV Online - Apply for job using structured CV profile
-   *
-   * Flow:
-   * 1. Validate job exists and is active
-   * 2. Get user's CV profile
-   * 3. Check duplicate application
-   * 4. Map CV profile to parsedData format
-   * 5. Calculate match score using MatchingService
-   * 6. Create Resume with matched data
-   *
-   * @param submitCvOnlineDto - Contains jobId
-   * @param user - Current authenticated user
-   * @returns Created resume with matching analysis
-   */
-  async submitCvOnline(submitCvOnlineDto: SubmitCvOnlineDto, user: IUser) {
-    const { jobId } = submitCvOnlineDto;
-
-    // Step 1: Validate job exists and is active
-    const job = await this.validateJobForApplication(jobId);
-
-    // Step 2: Get user's CV profile
-    const cvProfile = await this.cvProfilesService.getCurrentUserCv(user._id.toString());
-
-    if (!cvProfile.isActive) {
-      throw new BadRequestException(
-        'Your CV profile is inactive. Please activate it before applying.',
-      );
-    }
-
-    // Step 3: Check duplicate application
-    await this.checkDuplicateApplication(user._id.toString(), jobId);
-
-    // Step 4: Map CV profile to parsedData format
-    const parsedData = this.mapCvProfileToParsedData(cvProfile);
-
-    // Step 5: Calculate match score using MatchingService
-    const matchResult = await this.matchingService.calculateMatch(parsedData, job);
-
-    // Step 6: Create Resume record
-    const newResume = await this.resumeModel.create({
-      email: user.email,
-      userId: user._id,
-      jobId: new mongoose.Types.ObjectId(jobId),
-      companyId: job.company._id,
-      status: EResumeStatus.PENDING,
-
-      // Parsed data from CV profile (snapshot at application time)
-      parsedData,
-
-      // AI Analysis (match score and insights)
-      aiAnalysis: {
-        matchingScore: matchResult.matchingScore,
-        skillsMatch: matchResult.skillsMatch,
-        strengths: matchResult.strengths,
-        weaknesses: matchResult.weaknesses,
-        summary: matchResult.summary,
-        recommendation: matchResult.recommendation,
-        analyzedAt: matchResult.analyzedAt,
-      },
-
-      // Priority based on match score
-      priority: matchResult.priority,
-
-      // Processing flags
-      isParsed: true, // No parsing needed, already structured
-      isAnalyzed: true, // Analysis completed synchronously
-
-      // Snapshot of structured CV at application time
-      cvStructuredData: cvProfile,
-
-      // History tracking
-      histories: [
-        {
-          status: EResumeStatus.PENDING,
-          updatedAt: new Date(),
-          updatedBy: { _id: user._id, email: user.email },
-        },
-      ],
-
-      createdBy: { _id: user._id, email: user.email },
-    });
-
-    return {
-      _id: newResume._id,
-      jobId: job._id,
-      jobName: job.name,
-      companyId: job.company._id,
-      companyName: job.company.name,
-      status: newResume.status,
-      priority: newResume.priority,
-      matchingScore: matchResult.matchingScore,
-      recommendation: matchResult.recommendation,
-      summary: matchResult.summary,
-      createdAt: newResume.createdAt,
-      message: 'Your CV has been successfully submitted. Match analysis completed.',
-    };
-  }
-
-  /**
-   * Notify HR users of the hiring company about a new application
-   */
   async notifyHrNewApplication(
     resumeId: string,
     jobName: string,
@@ -364,184 +225,40 @@ export class ResumesService {
     companyId: string,
     candidateName: string,
     candidateEmail: string,
-  ) {
-    this.logger.log(
-      `Notifying HR for new application: resumeId=${resumeId}, companyId=${companyId}, jobName=${jobName}, candidate=${candidateName}`,
+  ): Promise<void> {
+    return this.applicationNotificationService.notifyHrNewApplication(
+      resumeId,
+      jobName,
+      companyName,
+      companyId,
+      candidateName,
+      candidateEmail,
     );
-
-    const hrUsers = await this.userModel
-      .find({
-        ...buildEmbeddedCompanyIdFilter(companyId),
-        isDeleted: { $ne: true },
-        isActive: true,
-      })
-      .select('_id email name')
-      .lean();
-
-    this.logger.log(`Found ${hrUsers.length} HR user(s) for company ${companyId}`);
-
-    if (hrUsers.length === 0) {
-      this.logger.warn(`No HR users found for company ${companyId} — no notifications sent`);
-      return;
-    }
-
-    for (const hr of hrUsers) {
-      // In-app notification via WebSocket
-      this.notificationsService
-        .create({
-          userId: hr._id.toString(),
-          type: ENotificationType.NEW_APPLICATION,
-          title: 'New Application Received',
-          message: `${candidateName} (${candidateEmail}) has applied for "${jobName}".`,
-          data: {
-            resumeId,
-            jobName,
-            companyName,
-            candidateName,
-            candidateEmail,
-          },
-        })
-        .catch(err => this.logger.error(`Failed to notify HR ${hr.email}: ${err.message}`));
-
-      // Email notification via queue
-      this.applicationNotificationQueueService
-        .addNewApplicationEmail({
-          hrEmail: hr.email,
-          hrName: hr.name || hr.email,
-          candidateName,
-          candidateEmail,
-          jobName,
-          companyName,
-          resumeId,
-        })
-        .catch(err =>
-          this.logger.error(`Failed to queue email for HR ${hr.email}: ${err.message}`),
-        );
-    }
   }
 
-  /**
-   * Validate job for application
-   * Check if job exists, is active, and not expired
-   */
-  private async validateJobForApplication(jobId: string) {
-    this.validateObjectId(jobId);
+  // Private helpers
 
-    const job = await this.jobsService.findOne(jobId);
-
-    if (!job) {
-      throw new NotFoundException(`Job with ID ${jobId} not found`);
+  private sanitizeAqpQuery(
+    rawFilter: Record<string, any>,
+    rawSort: Record<string, any>,
+  ): { filter: Record<string, any>; sort: Record<string, any> } {
+    const filter: Record<string, any> = {};
+    for (const [key, value] of Object.entries(rawFilter)) {
+      if (this.DANGEROUS_OPERATORS.has(key)) continue;
+      if (!this.ALLOWED_FILTER_FIELDS.has(key)) continue;
+      filter[key] = value;
     }
 
-    if (!job.isActive) {
-      throw new BadRequestException('This job is no longer active');
-    }
-
-    if (job.endDate && new Date(job.endDate) < new Date()) {
-      throw new BadRequestException('This job posting has expired');
-    }
-
-    return job;
-  }
-
-  /**
-   * Check if user already applied to this job
-   */
-  private async checkDuplicateApplication(userId: string, jobId: string) {
-    const existingApplication = await this.resumeModel
-      .findOne({
-        userId: new mongoose.Types.ObjectId(userId),
-        jobId: new mongoose.Types.ObjectId(jobId),
-        isDeleted: { $ne: true },
-      })
-      .exec();
-
-    if (existingApplication) {
-      throw new BadRequestException(
-        'You have already applied to this job. Duplicate applications are not allowed.',
-      );
-    }
-  }
-
-  /**
-   * Map CvProfile to ParsedData format
-   * Transform structured CV data to match the parsedData schema
-   */
-  private mapCvProfileToParsedData(cvProfile: CvProfile): ParsedDataDto {
-    const { personalInfo, education, experience, skills } = cvProfile;
-
-    // Calculate years of experience from work history
-    const yearsOfExperience = this.calculateYearsOfExperience(experience || []);
-
-    return {
-      fullName: personalInfo.fullName,
-      email: personalInfo.email,
-      phone: personalInfo.phone,
-
-      // Extract skill names from structured skills
-      skills: skills?.map(skill => skill.name) || [],
-
-      // Map experience to parsedData format
-      experience:
-        experience?.map(exp => ({
-          company: exp.company,
-          position: exp.position,
-          duration: `${exp.startDate} - ${exp.endDate}`,
-          description: exp.description,
-        })) || [],
-
-      // Map education to parsedData format
-      education:
-        education?.map(edu => ({
-          school: edu.school,
-          degree: edu.degree,
-          major: edu.field,
-          duration: `${edu.startDate} - ${edu.endDate}`,
-          gpa: undefined, // Not available in CV profile schema
-        })) || [],
-
-      summary: personalInfo.bio || 'Professional with structured CV profile',
-      yearsOfExperience,
-    };
-  }
-
-  /**
-   * Calculate total years of experience from work history
-   * Simple calculation: count unique years between start and end dates
-   */
-  private calculateYearsOfExperience(experiences: any[]): number {
-    if (!experiences || experiences.length === 0) {
-      return 0;
-    }
-
-    let totalMonths = 0;
-
-    for (const exp of experiences) {
-      try {
-        const startDate = new Date(exp.startDate);
-        const endDate =
-          exp.endDate.toLowerCase() === 'present' ? new Date() : new Date(exp.endDate);
-
-        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-          const months = this.getMonthsDifference(startDate, endDate);
-          totalMonths += months;
-        }
-      } catch (error) {
-        // Skip invalid dates
-        continue;
+    const sort: Record<string, any> = {};
+    if (rawSort && typeof rawSort === 'object') {
+      for (const [key, value] of Object.entries(rawSort)) {
+        if (!this.ALLOWED_SORT_FIELDS.has(key)) continue;
+        if (value !== 1 && value !== -1) continue;
+        sort[key] = value;
       }
     }
 
-    return Math.max(0, Math.round(totalMonths / 12));
-  }
-
-  /**
-   * Helper: Calculate months between two dates
-   */
-  private getMonthsDifference(startDate: Date, endDate: Date): number {
-    const yearDiff = endDate.getFullYear() - startDate.getFullYear();
-    const monthDiff = endDate.getMonth() - startDate.getMonth();
-    return yearDiff * 12 + monthDiff;
+    return { filter, sort };
   }
 
   private validateObjectId(id: string): void {

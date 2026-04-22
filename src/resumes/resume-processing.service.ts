@@ -1,50 +1,96 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
-import { Resume, ResumeDocument } from '../resumes/schemas/resume.schema';
-import { Job, JobDocument } from '../jobs/schemas/job.schema';
-import { Model } from 'mongoose';
+import * as path from 'path';
+import * as fs from 'fs';
+import { Resume, ResumeDocument } from './schemas/resume.schema';
 import { IUser } from 'src/users/user.interface';
-import { EResumeStatus } from '../resumes/enums/resume-status.enum';
+import { EResumeStatus } from './enums/resume-status.enum';
+import { JobsService } from 'src/jobs/jobs.service';
+import { UploadCvDto } from './dto/upload-cv.dto';
+import { ResumeQueueService } from 'src/queues/services/resume-queue.service';
 
 @Injectable()
 export class ResumeProcessingService {
   private readonly logger = new Logger(ResumeProcessingService.name);
 
   constructor(
-    @InjectModel(Resume.name) private resumeModel: SoftDeleteModel<ResumeDocument>,
-    @InjectModel(Job.name) private jobModel: Model<JobDocument>,
+    @InjectModel(Resume.name) private readonly resumeModel: SoftDeleteModel<ResumeDocument>,
+    private readonly jobsService: JobsService,
   ) {}
 
-  /**
-   * Validate file upload
-   */
+  async handleUploadAndQueue(
+    file: Express.Multer.File,
+    uploadCvDto: UploadCvDto,
+    user: IUser,
+    resumeQueueService: ResumeQueueService,
+  ) {
+    this.validateFile(file);
+
+    const job = await this.validateJob(uploadCvDto.jobId);
+
+    await this.checkDuplicateApplication(user._id.toString(), uploadCvDto.jobId);
+
+    const resume = await this.createResume(file, uploadCvDto.jobId, user);
+
+    const fullFilePath = this.getFullFilePath(resume.url);
+    if (!fs.existsSync(fullFilePath)) {
+      throw new BadRequestException('File not found after upload. Please try again.');
+    }
+
+    const parseJob = await resumeQueueService.addParseResumeJob({
+      resumeId: resume._id.toString(),
+      filePath: fullFilePath,
+      jobId: uploadCvDto.jobId,
+    });
+
+    const analysisJob = await resumeQueueService.addAnalyzeResumeJob({
+      resumeId: resume._id.toString(),
+      jobId: uploadCvDto.jobId,
+    });
+
+    return {
+      resumeId: resume._id.toString(),
+      jobName: job.name,
+      companyName: job.company.name,
+      companyId: job.company._id?.toString(),
+      response: {
+        _id: resume._id,
+        jobId: uploadCvDto.jobId,
+        jobName: job.name,
+        companyName: job.company.name,
+        status: 'processing',
+        jobs: { parseJobId: parseJob.id, analysisJobId: analysisJob.id },
+        file: this.getFileMetadata(file),
+        message:
+          'Your CV has been uploaded and is being processed. You will be notified when analysis is complete.',
+        estimatedTime: '30-60 seconds',
+      },
+    };
+  }
+
+  // File validation helper method to keep the main flow clean
   validateFile(file: Express.Multer.File): void {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
-
-    // Check file exists
     if (!file.path || !file.filename) {
       throw new BadRequestException('Invalid file upload');
     }
 
-    // Validate mimetype
     const allowedMimeTypes = [
       'application/pdf',
-      'application/msword', // .doc
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-      'text/plain', // .txt
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
     ];
-
     if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException(
         `Invalid file type: ${file.mimetype}. Only PDF, DOC, DOCX, and TXT are allowed.`,
       );
     }
 
-    // Validate file size (5MB max - already handled by Multer but double-check)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
       throw new BadRequestException(
         `File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Maximum size is 5MB.`,
@@ -56,21 +102,15 @@ export class ResumeProcessingService {
     );
   }
 
-  /**
-   * Validate job exists and is active
-   */
-  async validateJob(jobId: string): Promise<JobDocument> {
-    const job = await this.jobModel.findById(jobId);
+  async validateJob(jobId: string) {
+    const job = await this.jobsService.findOne(jobId);
 
     if (!job) {
       throw new NotFoundException(`Job not found with id: ${jobId}`);
     }
-
     if (!job.isActive) {
       throw new BadRequestException('This job is no longer active');
     }
-
-    // Check if job has expired
     if (job.endDate && new Date(job.endDate) < new Date()) {
       throw new BadRequestException('This job posting has expired');
     }
@@ -79,42 +119,32 @@ export class ResumeProcessingService {
     return job;
   }
 
-  /**
-   * Check if user has already applied to this job
-   */
   async checkDuplicateApplication(userId: string, jobId: string): Promise<void> {
-    const existingResume = await this.resumeModel.findOne({
+    const existing = await this.resumeModel.findOne({
       userId: userId,
       jobId: jobId,
-      isDeleted: false,
+      isDeleted: { $ne: true },
     });
-
-    if (existingResume) {
+    if (existing) {
       throw new BadRequestException(
         'You have already applied to this job. Duplicate applications are not allowed.',
       );
     }
-
-    this.logger.log(`No duplicate application found for user ${userId} and job ${jobId}`);
   }
 
-  /**
-   * Create resume record
-   */
   async createResume(
     file: Express.Multer.File,
     jobId: string,
     user: IUser,
   ): Promise<ResumeDocument> {
-    // Get job to extract company info
-    const job = await this.jobModel.findById(jobId);
+    const job = await this.jobsService.findOne(jobId);
 
     const resume = await this.resumeModel.create({
       email: user.email,
       userId: user._id,
       jobId: jobId,
       companyId: job.company._id,
-      url: `images/resumes/${file.filename}`, // Relative path
+      url: `images/resumes/${file.filename}`,
       status: EResumeStatus.PENDING,
       isParsed: false,
       isAnalyzed: false,
@@ -132,33 +162,20 @@ export class ResumeProcessingService {
     return resume;
   }
 
-  /**
-   * Get full file path from relative path
-   * Handles both Docker and local environments
-   */
   getFullFilePath(relativeUrl: string): string {
-    const path = require('path');
-    const fs = require('fs');
-
-    // Remove 'images/resumes/' prefix if it exists since we'll add 'public' prefix
     const cleanPath = relativeUrl.replace(/^images\/resumes\//, '');
-
-    // Build full path
     const fullPath = path.join(process.cwd(), 'public', 'images', 'resumes', cleanPath);
 
-    this.logger.log(`Resolved file path: ${relativeUrl} -> ${fullPath}`);
-
-    // Verify path exists
-    if (!fs.existsSync(fullPath)) {
-      this.logger.warn(`File does not exist at: ${fullPath}`);
+    // Guard: resolved path must stay within the upload directory
+    const uploadDir = path.join(process.cwd(), 'public', 'images', 'resumes');
+    if (!fullPath.startsWith(uploadDir)) {
+      throw new BadRequestException('Invalid file path');
     }
 
+    this.logger.log(`Resolved file path: ${relativeUrl} -> ${fullPath}`);
     return fullPath;
   }
 
-  /**
-   * Extract metadata from file
-   */
   getFileMetadata(file: Express.Multer.File) {
     return {
       filename: file.filename,
@@ -170,22 +187,17 @@ export class ResumeProcessingService {
     };
   }
 
-  /**
-   * Validate resume processing status
-   */
   async validateResumeForAnalysis(resumeId: string): Promise<ResumeDocument> {
     const resume = await this.resumeModel.findById(resumeId);
 
     if (!resume) {
       throw new NotFoundException(`Resume not found with id: ${resumeId}`);
     }
-
     if (!resume.isParsed) {
       throw new BadRequestException(
         'Resume must be parsed before analysis. Please wait for parsing to complete.',
       );
     }
-
     if (!resume.parsedData) {
       throw new BadRequestException('No parsed data available. Please re-upload the CV.');
     }
