@@ -49,3 +49,8 @@ export class Subscriber {
 }
 
 export const SubscriberSchema = SchemaFactory.createForClass(Subscriber);
+
+// Active email-based operations: subscription limit check and account-deletion cleanup
+SubscriberSchema.index({ email: 1, isDeleted: 1 });
+// Owner-scoped list/detail reads sorted by creation time
+SubscriberSchema.index({ 'createdBy._id': 1, isDeleted: 1, createdAt: -1 });

@@ -1,34 +1,28 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateSubscriberDto } from './dto/create-subscriber.dto';
 import { UpdateSubscriberDto } from './dto/update-subscriber.dto';
+import { GetSubscribersQueryDto } from './dto/get-subscribers-query.dto';
 import { IUser } from 'src/users/user.interface';
-import { InjectModel } from '@nestjs/mongoose';
-import { Subscriber, SubscriberDocument } from './schemas/subscriber.schema';
-import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
-import aqp from 'api-query-params';
+import { SubscribersRepository } from './repositories/subscribers.repository';
 import mongoose from 'mongoose';
 
 @Injectable()
 export class SubscribersService {
-  constructor(
-    @InjectModel(Subscriber.name)
-    private subscriberModel: SoftDeleteModel<SubscriberDocument>,
-  ) {}
+  constructor(private readonly subscribersRepository: SubscribersRepository) {}
 
   async create(createSubscriberDto: CreateSubscriberDto, user: IUser) {
-    const { name, email, skills, location } = createSubscriberDto;
-    const existingSubscriptionsCount = await this.subscriberModel.countDocuments({
-      email,
-      isDeleted: false,
-    });
+    const { name, skills, location } = createSubscriberDto;
+    // Email is always derived from the authenticated user — never client-controlled
+    const email = user.email;
 
-    if (existingSubscriptionsCount >= 3) {
+    const existingCount = await this.subscribersRepository.countActiveByEmail(email);
+    if (existingCount >= 3) {
       throw new BadRequestException(
-        `Email: ${email} đã đạt giới hạn đăng ký nhận tin (tối đa 3 lần). Vui lòng quản lý các đăng ký cũ trước khi thêm mới.`,
+        'Subscription limit reached. You already have 3 active subscriptions. Please manage existing subscriptions before adding new ones.',
       );
     }
 
-    const newSubs = await this.subscriberModel.create({
+    const newSubs = await this.subscribersRepository.create({
       name,
       email,
       skills,
@@ -41,36 +35,44 @@ export class SubscribersService {
 
     return {
       _id: newSubs?._id,
-      createdBy: newSubs?.createdAt,
+      createdAt: newSubs?.createdAt,
     };
   }
 
-  async findAll(page?: number, limit?: number, query?: string) {
-    const { filter, sort, population, projection } = aqp(query);
-    delete filter.page;
-    delete filter.limit;
+  async findAll(page: number, limit: number, query: GetSubscribersQueryDto, user: IUser) {
+    const defaultPage = page >= 1 ? page : 1;
+    const defaultLimit = limit >= 1 ? Math.min(limit, 100) : 10;
+    const offset = (defaultPage - 1) * defaultLimit;
 
-    const offset = (+page - 1) * +limit;
-    const defaultLimit = +limit ? +limit : 10;
+    const filter: Record<string, any> = {
+      'createdBy._id': new mongoose.Types.ObjectId(user._id),
+      isDeleted: false,
+    };
 
-    const totalItems = (await this.subscriberModel.find(filter)).length;
-    const totalPages = Math.ceil(totalItems / defaultLimit);
+    if (query.location) {
+      filter.location = { $regex: this.escapeRegex(query.location), $options: 'i' };
+    }
+    if (query.skill) {
+      filter.skills = { $in: [query.skill] };
+    }
 
-    const result = await this.subscriberModel
-      .find(filter)
-      .skip(offset)
-      .limit(defaultLimit)
-      .sort(sort as any)
-      .select(projection as any)
-      .populate(population)
-      .exec();
+    const sortField = query.sortBy ?? 'createdAt';
+    const sortDir: 1 | -1 = query.sortOrder === 'asc' ? 1 : -1;
+    const sort: Record<string, 1 | -1> = { [sortField]: sortDir };
+
+    const { result, totalItems, totalPages } = await this.subscribersRepository.findOwned(
+      filter,
+      offset,
+      defaultLimit,
+      sort,
+    );
 
     return {
       result,
       meta: {
         pagination: {
-          current_page: page,
-          per_page: limit,
+          current_page: defaultPage,
+          per_page: defaultLimit,
           total_pages: totalPages,
           total: totalItems,
         },
@@ -78,69 +80,54 @@ export class SubscribersService {
     };
   }
 
-  async findOne(id: string) {
-    this.validateObjectId(id);
-
-    return await this.subscriberModel.findById({
-      _id: id,
-    });
+  async findOne(id: string, user: IUser) {
+    this.subscribersRepository.validateObjectId(id);
+    const subscriber = await this.subscribersRepository.findOneOwned(id, user._id);
+    if (!subscriber) {
+      throw new NotFoundException('Subscriber not found');
+    }
+    return subscriber;
   }
 
-  async update(updateSubscriberDto: UpdateSubscriberDto, user: IUser) {
-    const updated = await this.subscriberModel.updateOne(
-      { email: user.email },
-      {
-        ...updateSubscriberDto,
-        updatedBy: {
-          _id: user._id,
-          email: user.email,
-        },
+  async update(id: string, updateSubscriberDto: UpdateSubscriberDto, user: IUser) {
+    this.subscribersRepository.validateObjectId(id);
+
+    const existing = await this.subscribersRepository.findOneOwned(id, user._id);
+    if (!existing) {
+      throw new NotFoundException('Subscriber not found');
+    }
+
+    await this.subscribersRepository.updateOneOwned(id, user._id, {
+      ...updateSubscriberDto,
+      updatedBy: {
+        _id: user._id,
+        email: user.email,
       },
-      { upsert: true },
-    );
-    return updated;
+    });
+
+    return this.subscribersRepository.findOneOwned(id, user._id);
   }
 
   async remove(id: string, user: IUser) {
-    this.validateObjectId(id);
+    this.subscribersRepository.validateObjectId(id);
 
-    await this.subscriberModel.updateOne(
-      { _id: id },
-      {
-        deletedBy: {
-          _id: user._id,
-          email: user.email,
-        },
-      },
-    );
-    return this.subscriberModel.softDelete({
-      _id: id,
+    const existing = await this.subscribersRepository.findOneOwned(id, user._id);
+    if (!existing) {
+      throw new NotFoundException('Subscriber not found');
+    }
+
+    return this.subscribersRepository.softDeleteOwned(id, user._id, {
+      _id: user._id,
+      email: user.email,
     });
   }
 
   async getUserSkills(user: IUser) {
-    const { email } = user;
-    return await this.subscriberModel.findOne(
-      {
-        email,
-        isDeleted: false,
-      },
-      { skills: 1, createdAt: 1 },
-    );
+    return this.subscribersRepository.findSkillsByEmail(user.email);
   }
 
   async getMySubscriptions(user: IUser) {
-    const { email } = user;
-    const subscriptions = await this.subscriberModel
-      .find({
-        email,
-        isDeleted: false,
-      })
-      .select('name email skills location createdAt updatedAt')
-      .sort({ createdAt: -1 })
-      .lean()
-      .exec();
-
+    const subscriptions = await this.subscribersRepository.findActiveByEmail(user.email);
     return {
       subscriptions,
       total: subscriptions.length,
@@ -148,9 +135,7 @@ export class SubscribersService {
     };
   }
 
-  private validateObjectId(id: string): void {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestException(`Not found Subscriber with id = ${id}`);
-    }
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }

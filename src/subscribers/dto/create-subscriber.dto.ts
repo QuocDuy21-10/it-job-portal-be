@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   IsArray,
-  IsEmail,
   IsNotEmpty,
+  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -21,11 +21,9 @@ export class CreateSubscriberDto {
     message: 'Name can only contain letters and spaces',
   })
   @Transform(({ value }) => {
-    // FIX: Convert về string trước khi trim
     if (typeof value === 'number') {
       value = String(value);
     }
-    // Trim và loại bỏ multiple spaces
     return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value;
   })
   @ApiProperty({
@@ -33,18 +31,6 @@ export class CreateSubscriberDto {
     description: 'Name of subscriber (letters and spaces only)',
   })
   name: string;
-
-  @IsNotEmpty({ message: 'Email is required' })
-  @IsEmail({}, { message: 'Email is invalid' })
-  @MaxLength(255, { message: 'Email is too long (max: 255 chars)' })
-  @Transform(({ value }) => {
-    return typeof value === 'string' ? value.trim().toLowerCase() : value;
-  })
-  @ApiProperty({
-    example: 'user@gmail.com',
-    description: 'Email of subscriber',
-  })
-  email: string;
 
   @IsNotEmpty({ message: 'Skills is required' })
   @IsArray({ message: 'Skills must be an array' })
@@ -74,10 +60,10 @@ export class CreateSubscriberDto {
   })
   skills: string[];
 
+  @IsOptional()
   @IsString({ message: 'Location must be a string' })
   @MaxLength(100, { message: 'Location is too long (max: 100 chars)' })
   @Transform(({ value }) => {
-    // FIX: Convert về string trước khi trim
     if (typeof value === 'number') {
       value = String(value);
     }
