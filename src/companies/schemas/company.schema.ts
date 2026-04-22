@@ -55,3 +55,6 @@ export class Company {
 }
 
 export const CompanySchema = SchemaFactory.createForClass(Company);
+
+CompanySchema.index({ name: 1, isDeleted: 1 });
+CompanySchema.index({ createdAt: -1 });

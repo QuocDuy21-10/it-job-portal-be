@@ -5,6 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Company, CompanySchema } from './schemas/company.schema';
 import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
 import { FilesModule } from 'src/files/files.module';
+import { CompanyRepository } from './repositories/company.repository';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { FilesModule } from 'src/files/files.module';
     FilesModule,
   ],
   controllers: [CompaniesController],
-  providers: [CompaniesService],
+  providers: [CompaniesService, CompanyRepository],
   exports: [CompaniesService],
 })
 export class CompaniesModule {}

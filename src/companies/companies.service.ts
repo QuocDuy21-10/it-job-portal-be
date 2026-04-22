@@ -1,99 +1,94 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
-import { Company, CompanyDocument } from './schemas/company.schema';
-import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
-import { InjectModel } from '@nestjs/mongoose';
-import mongoose from 'mongoose';
 import { IUser } from 'src/users/user.interface';
 import aqp from 'api-query-params';
-import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 import { FilesService } from 'src/files/files.service';
-import { buildEmbeddedCompanyIdsInCondition } from './company-snapshot.util';
-import { bulkSoftDelete } from 'src/utils/helpers/bulk-soft-delete.helper';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
+import { ERole } from 'src/casl';
+import { CompanyRepository } from './repositories/company.repository';
+import { CompanyDocument } from './schemas/company.schema';
 
 @Injectable()
 export class CompaniesService {
   private readonly logger = new Logger(CompaniesService.name);
+  private readonly ALLOWED_FILTER_FIELDS = new Set([
+    'name',
+    'address',
+    'website',
+    'numberOfEmployees',
+  ]);
+
+  private readonly DANGEROUS_OPERATORS = new Set([
+    '$where',
+    '$function',
+    '$expr',
+    '$accumulator',
+    '$jsReduce',
+  ]);
+
+  private readonly ALLOWED_SORT_FIELDS = new Set([
+    'name',
+    'address',
+    'createdAt',
+    'updatedAt',
+    'numberOfEmployees',
+  ]);
 
   constructor(
-    @InjectModel(Company.name) private companyModel: SoftDeleteModel<CompanyDocument>,
-    @InjectModel(Job.name) private jobModel: SoftDeleteModel<JobDocument>,
+    private readonly companyRepository: CompanyRepository,
     private readonly filesService: FilesService,
   ) {}
-  async create(createCompanyDto: CreateCompanyDto, user: IUser) {
-    const isExistName = await this.companyModel.find({
-      name: createCompanyDto.name,
-      isDeleted: false,
-    });
 
-    if (isExistName && isExistName.length > 0) {
+  async create(createCompanyDto: CreateCompanyDto, user: IUser) {
+    const exists = await this.companyRepository.existsByName(createCompanyDto.name);
+    if (exists) {
       throw new BadRequestException(`Company with name = ${createCompanyDto.name} already exists`);
     }
 
-    return await this.companyModel.create({
+    return this.companyRepository.create({
       ...createCompanyDto,
       createdBy: { _id: user._id, email: user.email },
     });
   }
 
   async findAll(page?: number, limit?: number, query?: string, user?: IUser) {
-    const { filter, sort, population } = aqp(query);
-    delete filter.page;
-    delete filter.limit;
+    const { filter: rawFilter, sort: rawSort } = aqp(query);
+    delete rawFilter.page;
+    delete rawFilter.limit;
 
-    // Filter theo companyId nếu user là HR
-    if (user && user.role?.name === 'HR' && user.company?._id) {
+    // Sanitize: strip dangerous operators and unknown fields before hitting Mongoose
+    const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
+
+    // HR role restriction: restrict listing to the HR's own company
+    if (user && user.role?.name === ERole.HR && user.company?._id) {
       filter._id = user.company._id;
     }
 
-    const offset = (page - 1) * limit;
-    const defaultLimit = limit ? limit : 10;
+    // Guard against NaN / non-positive values coming from the controller's `+page` / `+limit`
+    const safeLimit = limit > 0 ? limit : 10;
+    const safePage = page > 0 ? page : 1;
+    const offset = (safePage - 1) * safeLimit;
 
-    const totalItems = (await this.companyModel.find(filter)).length;
-    const totalPages = Math.ceil(totalItems / defaultLimit);
+    const { result, totalItems, totalPages } = await this.companyRepository.findPaginated(
+      filter,
+      offset,
+      safeLimit,
+      sort,
+    );
 
-    const result = await this.companyModel
-      .find(filter)
-      .skip(offset)
-      .limit(defaultLimit)
-      .sort(sort as any)
-      .populate(population)
-      .exec();
+    const companyIds = result.map((company: any) => company._id);
+    const jobCountMap = await this.companyRepository.getJobCountsForCompanies(companyIds);
 
-    // OPTIMIZED: Batch query for job counts using aggregation
-    // Instead of N queries (one per company), use single aggregation query
-    const companyIds = result.map(company => company._id);
-
-    const jobCounts = await this.jobModel.aggregate<{
-      _id: mongoose.Types.ObjectId;
-      totalJobs: number;
-    }>([
-      {
-        $match: {
-          'company._id': buildEmbeddedCompanyIdsInCondition(companyIds),
-          isActive: true,
-          isDeleted: { $ne: true },
-        },
-      },
-      {
-        $group: {
-          _id: '$company._id',
-          totalJobs: { $sum: 1 },
-        },
-      },
-    ]);
-
-    // Create lookup map for O(1) access
-    const jobCountMap = new Map<string, number>();
-    jobCounts.forEach(item => {
-      jobCountMap.set(item._id.toString(), item.totalJobs);
-    });
-
-    const resultWithCount = result.map(company => ({
-      ...company.toObject(),
+    const resultWithCount = result.map((company: any) => ({
+      ...company,
       totalJobs: jobCountMap.get(company._id.toString()) || 0,
     }));
 
@@ -101,8 +96,8 @@ export class CompaniesService {
       result: resultWithCount,
       meta: {
         pagination: {
-          current_page: page,
-          per_page: limit,
+          current_page: safePage,
+          per_page: safeLimit,
           total_pages: totalPages,
           total: totalItems,
         },
@@ -111,69 +106,66 @@ export class CompaniesService {
   }
 
   async findOne(id: string, user?: IUser) {
-    this.validateObjectId(id);
+    this.companyRepository.validateObjectId(id);
 
-    // Nếu user là HR, chỉ cho phép xem company của chính họ
-    if (user && user.role?.name === 'HR' && user.company?._id) {
+    // HR can only view their own company
+    if (user && user.role?.name === ERole.HR && user.company?._id) {
       if (id !== user.company._id.toString()) {
         throw new BadRequestException('You can only view your own company');
       }
     }
 
-    return await this.companyModel.findById(id);
+    return this.companyRepository.findById(id);
   }
 
   async update(id: string, updateCompanyDto: UpdateCompanyDto, user: IUser) {
-    this.validateObjectId(id);
+    this.companyRepository.validateObjectId(id);
 
-    // Delete the old logo file if a new logo is being set
+    // Always fetch the company first so we can enforce HR ownership before mutating
+    const company = await this.companyRepository.findById(id);
+    await this.assertHrOwnership(company, id, user);
+
+    // Delete the old logo file only after ownership is confirmed
     if (updateCompanyDto.logo !== undefined) {
-      const currentCompany = await this.companyModel.findById(id).select('logo').lean();
-      if (currentCompany?.logo && currentCompany.logo !== updateCompanyDto.logo) {
+      if (company?.logo && company.logo !== updateCompanyDto.logo) {
         try {
-          await this.filesService.deleteFile('company', currentCompany.logo);
+          await this.filesService.deleteFile('company', company.logo);
         } catch (error) {
-          this.logger.warn(`Could not delete old company logo: ${error.message}`);
+          this.logger.warn(
+            `Could not delete old company logo: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       }
     }
 
-    return await this.companyModel.updateOne(
+    return this.companyRepository.updateOne(
       { _id: id },
       { ...updateCompanyDto, updatedBy: { _id: user._id, email: user.email } },
     );
   }
 
   async remove(id: string, user: IUser) {
-    this.validateObjectId(id);
-    await this.companyModel.updateOne(
-      { _id: id },
-      { deletedBy: { _id: user._id, email: user.email } },
-    );
-    return this.companyModel.softDelete({ _id: id });
+    this.companyRepository.validateObjectId(id);
+
+    const company = await this.companyRepository.findById(id);
+    if (!company) {
+      throw new NotFoundException(`Company with id = ${id} not found`);
+    }
+
+    return this.companyRepository.softDeleteById(id, { _id: user._id, email: user.email });
   }
 
   async bulkRemove(
     ids: string[],
     user: IUser,
   ): Promise<IBulkDeleteResult & { deactivatedJobsCount: number }> {
-    const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
-
-    // Cascade: deactivate all active jobs belonging to these companies
-    const jobUpdateResult = await this.jobModel.updateMany(
-      {
-        'company._id': { $in: objectIds },
-        isActive: true,
-        isDeleted: { $ne: true },
-      },
-      { isActive: false },
-    );
-
-    const result = await bulkSoftDelete(this.companyModel, ids, user);
+    // Cascade: deactivate all active jobs for the deleted companies before soft-deleting
+    const deactivatedJobsCount = await this.companyRepository.deactivateJobsForCompanies(ids);
+    const result = await this.companyRepository.bulkSoftDelete(ids, user);
 
     return {
       ...result,
-      deactivatedJobsCount: jobUpdateResult.modifiedCount,
+      deactivatedJobsCount,
     };
   }
 
@@ -185,24 +177,8 @@ export class CompaniesService {
     this.logger.log('Starting orphaned company logo cleanup');
 
     try {
-      // Collect logos from active companies
-      const activeCompanies = await this.companyModel
-        .find({ logo: { $ne: null } })
-        .select('logo')
-        .lean();
-
-      // Collect logos from soft-deleted companies (plugin auto-filters; pass isDeleted: true)
-      const deletedCompanies = await this.companyModel
-        .find({ isDeleted: true, logo: { $ne: null } })
-        .select('logo')
-        .lean();
-
-      const referencedLogos = new Set<string>();
-      for (const company of [...activeCompanies, ...deletedCompanies]) {
-        if (company.logo) {
-          referencedLogos.add(company.logo);
-        }
-      }
+      const allLogos = await this.companyRepository.findLogoReferences();
+      const referencedLogos = new Set<string>(allLogos);
 
       const stats = await this.filesService.cleanupOrphanedFiles('company', referencedLogos);
 
@@ -212,7 +188,10 @@ export class CompaniesService {
 
       return stats;
     } catch (error) {
-      this.logger.error(`Orphaned logo cleanup failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Orphaned logo cleanup failed: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       return { scanned: 0, deleted: 0, errors: 1 };
     }
   }
@@ -225,38 +204,11 @@ export class CompaniesService {
   > {
     const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    const companies = await this.companyModel
-      .find({
-        name: { $regex: escapedName, $options: 'i' },
-        isDeleted: { $ne: true },
-      })
-      .select('_id name address description website numberOfEmployees')
-      .limit(limit)
-      .lean()
-      .exec();
-
+    const companies = await this.companyRepository.findByNameRegex(escapedName, limit);
     if (companies.length === 0) return [];
 
     const companyIds = companies.map(c => c._id);
-
-    const jobCounts = await this.jobModel.aggregate<{
-      _id: mongoose.Types.ObjectId;
-      totalJobs: number;
-    }>([
-      {
-        $match: {
-          'company._id': buildEmbeddedCompanyIdsInCondition(companyIds),
-          isActive: true,
-          isDeleted: { $ne: true },
-        },
-      },
-      { $group: { _id: '$company._id', totalJobs: { $sum: 1 } } },
-    ]);
-
-    const jobCountMap = new Map<string, number>();
-    jobCounts.forEach(item => {
-      jobCountMap.set(item._id.toString(), item.totalJobs);
-    });
+    const jobCountMap = await this.companyRepository.getJobCountsForCompanies(companyIds);
 
     return companies.map(c => ({
       _id: c._id.toString(),
@@ -267,9 +219,46 @@ export class CompaniesService {
     }));
   }
 
-  private validateObjectId(id: string): void {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestException(`Not found Company with id = ${id}`);
+  // Private helpers
+  private sanitizeAqpQuery(
+    rawFilter: Record<string, any>,
+    rawSort: Record<string, any>,
+  ): { filter: Record<string, any>; sort: Record<string, any> } {
+    const filter: Record<string, any> = {};
+    for (const [key, value] of Object.entries(rawFilter)) {
+      if (this.DANGEROUS_OPERATORS.has(key)) continue;
+      if (!this.ALLOWED_FILTER_FIELDS.has(key)) continue;
+      filter[key] = value;
+    }
+
+    const sort: Record<string, any> = {};
+    if (rawSort && typeof rawSort === 'object') {
+      for (const [key, value] of Object.entries(rawSort)) {
+        if (!this.ALLOWED_SORT_FIELDS.has(key)) continue;
+        if (value !== 1 && value !== -1) continue;
+        sort[key] = value;
+      }
+    }
+
+    return { filter, sort };
+  }
+
+  private async assertHrOwnership(
+    company: CompanyDocument | null,
+    companyId: string,
+    user: IUser,
+  ): Promise<void> {
+    if (!company) {
+      throw new NotFoundException(`Company with id = ${companyId} not found`);
+    }
+
+    if (user.role?.name === ERole.HR) {
+      if (!user.company?._id) {
+        throw new ForbiddenException('HR user must be associated with a company');
+      }
+      if (company._id.toString() !== user.company._id.toString()) {
+        throw new ForbiddenException('You can only modify your own company');
+      }
     }
   }
 }
