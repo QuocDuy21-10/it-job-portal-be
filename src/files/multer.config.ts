@@ -1,69 +1,97 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { MulterModuleOptions, MulterOptionsFactory } from '@nestjs/platform-express';
-import fs from 'fs';
+import * as fs from 'fs';
 import { diskStorage } from 'multer';
-import path, { join } from 'path';
+import * as path from 'path';
+import { randomUUID } from 'crypto';
+import {
+  ALLOWED_FOLDER_TYPES,
+  MIME_TO_EXT,
+  UPLOAD_POLICIES,
+  UploadFolderType,
+} from './constants/upload-policy';
 
 @Injectable()
 export class MulterConfigService implements MulterOptionsFactory {
-  getRootPath = () => {
-    return process.cwd();
-  };
-
-  ensureExists(targetDirectory: string) {
-    fs.mkdir(targetDirectory, { recursive: true }, error => {
-      if (!error) {
-        console.log('Directory successfully created, or it already exists.');
-        return;
-      }
-      switch (error.code) {
-        case 'EEXIST':
-          // Error:
-          // Requested location already exists, but it's not a directory.
-          break;
-        case 'ENOTDIR':
-          // Error:
-          // The parent hierarchy contains a file with the same name as the dir
-          // you're trying to create.
-          break;
-        default:
-          // Some other error like permission denied.
-          console.error(error);
-          break;
-      }
-    });
-  }
+  private readonly logger = new Logger(MulterConfigService.name);
 
   createMulterOptions(): MulterModuleOptions {
     return {
       storage: diskStorage({
         destination: (req, file, cb) => {
-          const folder = req?.headers?.folder_type ?? 'default';
-          this.ensureExists(`public/images/${folder}`);
-          cb(null, join(this.getRootPath(), `public/images/${folder}`));
+          // folder_type has already been validated by UploadAuthGuard and fileFilter;
+          // validate here again as defense-in-depth before touching the filesystem.
+          const rawFolder = (req?.headers?.folder_type as string | undefined)?.toLowerCase() ?? '';
+
+          if (!rawFolder || !ALLOWED_FOLDER_TYPES.includes(rawFolder)) {
+            return cb(
+              new HttpException(
+                `Invalid folder_type. Allowed values: ${ALLOWED_FOLDER_TYPES.join(', ')}`,
+                HttpStatus.BAD_REQUEST,
+              ),
+              '',
+            );
+          }
+
+          const uploadPath = path.join(process.cwd(), 'public', 'images', rawFolder);
+
+          try {
+            fs.mkdirSync(uploadPath, { recursive: true });
+          } catch (err) {
+            this.logger.error(
+              `Failed to create upload directory '${uploadPath}': ${(err as Error).message}`,
+            );
+            return cb(
+              new HttpException(
+                'Upload directory could not be created',
+                HttpStatus.INTERNAL_SERVER_ERROR,
+              ),
+              '',
+            );
+          }
+
+          cb(null, uploadPath);
         },
-        filename: (req, file, cb) => {
-          //get image extension
-          const extName = path.extname(file.originalname);
 
-          //get image's name (without extension)
-          const baseName = path.basename(file.originalname, extName);
-
-          const finalName = `${baseName}-${Date.now()}${extName}`;
-          cb(null, finalName);
+        filename: (_req, file, cb) => {
+          const ext = MIME_TO_EXT[file.mimetype] ?? path.extname(file.originalname).toLowerCase();
+          cb(null, `${randomUUID()}${ext}`);
         },
       }),
-      fileFilter: (req, file, cb) => {
-        const allowedFileTypes = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx'];
-        const fileExtension = file.originalname.split('.').pop().toLowerCase();
-        const isValidFileType = allowedFileTypes.includes(fileExtension);
 
-        if (!isValidFileType) {
-          cb(new HttpException('Invalid file type', HttpStatus.UNPROCESSABLE_ENTITY), null);
-        } else cb(null, true);
+      fileFilter: (req, file, cb) => {
+        const rawFolder = (req?.headers?.folder_type as string | undefined)?.toLowerCase() ?? '';
+        const policy = rawFolder ? UPLOAD_POLICIES[rawFolder as UploadFolderType] : undefined;
+
+        if (!policy) {
+          return cb(
+            new HttpException(
+              `Invalid folder_type. Allowed values: ${ALLOWED_FOLDER_TYPES.join(', ')}`,
+              HttpStatus.BAD_REQUEST,
+            ),
+            false,
+          );
+        }
+
+        const fileExtension = (file.originalname.split('.').pop() ?? '').toLowerCase();
+        const isMimeAllowed = (policy.allowedMimeTypes as string[]).includes(file.mimetype);
+        const isExtAllowed = (policy.allowedExtensions as string[]).includes(fileExtension);
+
+        if (!isMimeAllowed || !isExtAllowed) {
+          return cb(
+            new HttpException(
+              `Invalid file type for '${rawFolder}'. Allowed extensions: ${policy.allowedExtensions.join(', ')}`,
+              HttpStatus.UNPROCESSABLE_ENTITY,
+            ),
+            false,
+          );
+        }
+
+        cb(null, true);
       },
+
       limits: {
-        fileSize: 1024 * 1024 * 5, // 5 MB
+        fileSize: 5 * 1024 * 1024, // 5 MB
       },
     };
   }

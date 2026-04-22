@@ -65,7 +65,7 @@ export class ApplicationNotificationService {
     );
   }
 
-    // Notify the candidate when an HR user changes their application status
+  // Notify the candidate when an HR user changes their application status
   async sendStatusChangeNotification(
     resumeId: string,
     newStatus: string,

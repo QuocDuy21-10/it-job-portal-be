@@ -3,6 +3,7 @@ import { FilesService } from './files.service';
 import { FilesController } from './files.controller';
 import { MulterModule } from '@nestjs/platform-express';
 import { MulterConfigService } from './multer.config';
+import { UploadAuthGuard } from './guards/upload-auth.guard';
 
 @Module({
   imports: [
@@ -11,7 +12,7 @@ import { MulterConfigService } from './multer.config';
     }),
   ],
   controllers: [FilesController],
-  providers: [FilesService, MulterConfigService],
+  providers: [FilesService, MulterConfigService, UploadAuthGuard],
   exports: [FilesService],
 })
 export class FilesModule {}

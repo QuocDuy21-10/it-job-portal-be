@@ -138,7 +138,7 @@ export class ResumesController {
     return this.resumesService.getResumeOfMe(user);
   }
 
-  // CV Online Submission 
+  // CV Online Submission
 
   @Post('cv-online')
   @UseGuards(ThrottlerGuard)
@@ -243,7 +243,7 @@ export class ResumesController {
       this.resumeQueueService,
     );
 
-    // Notify HR about the new application 
+    // Notify HR about the new application
     this.resumesService
       .notifyHrNewApplication(
         result.resumeId,
