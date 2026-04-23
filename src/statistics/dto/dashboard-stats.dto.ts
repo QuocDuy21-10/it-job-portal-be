@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-//  DTO for Salary Distribution Chart (Column Chart)
 export class SalaryDistributionDto {
   @ApiProperty({
     description: 'Salary range label',
@@ -15,7 +14,6 @@ export class SalaryDistributionDto {
   count: number;
 }
 
-//  DTO for Job Trend Chart (Line Chart - 7 days)
 export class JobTrendDto {
   @ApiProperty({
     description: 'Date in YYYY-MM-DD format',
@@ -30,7 +28,6 @@ export class JobTrendDto {
   count: number;
 }
 
-//  Main Dashboard Statistics Response DTO
 export class DashboardStatsDto {
   @ApiProperty({
     description: 'Total jobs created in last 24 hours',

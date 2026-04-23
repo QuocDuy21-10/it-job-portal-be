@@ -8,11 +8,6 @@ import { PDFParse } from 'pdf-parse';
 export class CvParserService {
   private readonly logger = new Logger(CvParserService.name);
 
-  /**
-   * Extract text from CV file based on file type
-   * @param filePath - Absolute path to CV file
-   * @returns Extracted text content
-   */
   async extractTextFromCV(filePath: string): Promise<string> {
     try {
       const ext = path.extname(filePath).toLowerCase();
@@ -34,9 +29,6 @@ export class CvParserService {
     }
   }
 
-  /**
-   * Extract text from PDF file
-   */
   private async extractFromPDF(filePath: string): Promise<string> {
     try {
       // Use PDFParse class (v2 API) with file path
@@ -51,9 +43,6 @@ export class CvParserService {
     }
   }
 
-  /**
-   * Extract text from DOCX file
-   */
   private async extractFromDOCX(filePath: string): Promise<string> {
     try {
       const result = await mammoth.extractRawText({ path: filePath });
@@ -66,9 +55,6 @@ export class CvParserService {
     }
   }
 
-  /**
-   * Extract text from TXT file
-   */
   private async extractFromTXT(filePath: string): Promise<string> {
     try {
       const text = fs.readFileSync(filePath, 'utf-8');
@@ -81,9 +67,6 @@ export class CvParserService {
     }
   }
 
-  /**
-   * Validate extracted text quality
-   */
   validateExtractedText(text: string): { valid: boolean; reason?: string } {
     // Minimum length check
     if (text.length < 100) {
@@ -104,10 +87,6 @@ export class CvParserService {
     return { valid: true };
   }
 
-  /**
-   * Clean and normalize extracted text
-   * Minify text by removing noise characters and converting multiline to single line with periods
-   */
   cleanText(text: string): string {
     return (
       text
@@ -140,9 +119,6 @@ export class CvParserService {
     );
   }
 
-  /**
-   * Get file size in bytes
-   */
   getFileSize(filePath: string): number {
     try {
       const stats = fs.statSync(filePath);
@@ -153,9 +129,6 @@ export class CvParserService {
     }
   }
 
-  /**
-   * Check if file exists and is accessible
-   */
   fileExists(filePath: string): boolean {
     try {
       return fs.existsSync(filePath);

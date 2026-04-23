@@ -242,10 +242,6 @@ export class StatisticsService {
     return result;
   }
 
-  /**
-   * Clear dashboard cache manually
-   * Useful for admin triggers or after bulk job updates
-   */
   async clearDashboardCache(): Promise<void> {
     await this.cacheManager.del(CACHE_KEYS.DASHBOARD_STATS);
     this.logger.log('Dashboard cache cleared');
