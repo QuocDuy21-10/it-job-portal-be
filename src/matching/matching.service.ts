@@ -1,90 +1,80 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ParsedDataDto } from 'src/resumes/dto/parsed-data.dto';
 import { Job } from 'src/jobs/schemas/job.schema';
-import { SkillMatchDto } from './dto/skill-match.dto';
-import {
-  MATCHING_WEIGHTS,
-  SCORE_THRESHOLDS,
-  EXPERIENCE_SCORING,
-  SKILL_PROFICIENCY_LEVELS,
-  MATCHING_RECOMMENDATIONS,
-} from './constants/matching.constants';
+import { MATCHING_WEIGHTS, SCORE_THRESHOLDS } from './constants/matching.constants';
 import { EResumePriority } from 'src/resumes/enums/resume-priority.enum';
-import { EResumeStatus } from 'src/resumes/enums/resume-status.enum';
-import { EJobLevel } from 'src/jobs/enums/job-level.enum';
 import { MatchResultDto } from './dto/match-result.dto';
+import {
+  validateAndNormalizeCV,
+  validateJob,
+  ensureValidScore,
+} from './utils/input-validation.util';
+import { calculateSkillsMatch } from './utils/skill-matching.util';
+import { calculateExperienceScore } from './utils/experience-scoring.util';
+import { calculateEducationScore } from './utils/education-scoring.util';
+import {
+  generateInsights,
+  generateRecommendation,
+  generateSummary,
+} from './utils/insight-generator.util';
+import { determineAutoStatus } from './utils/auto-status.util';
 
 @Injectable()
 export class MatchingService {
   private readonly logger = new Logger(MatchingService.name);
+
   async calculateMatch(parsedCV: ParsedDataDto, job: Job): Promise<MatchResultDto> {
     try {
       this.logger.log(`Starting match calculation for job: ${job.name}`);
 
-      // CRITICAL: Validate and normalize inputs to prevent NaN
-      const normalizedCV = this.validateAndNormalizeInputs(parsedCV);
-      const normalizedJob = this.validateJobInputs(job);
+      // 1. Validate and normalise inputs
+      const normalizedCV = validateAndNormalizeCV(parsedCV);
+      const normalizedJob = validateJob(job);
 
-      // 1. Skills Matching
-      const skillsMatchResult = this.calculateSkillsMatch(
-        normalizedCV.skills,
+      // 2. Score each dimension
+      const skillsMatchResult = calculateSkillsMatch(
+        normalizedCV.skills ?? [],
         normalizedJob.skills,
       );
-
-      // 2. Experience Matching
-      const experienceScore = this.calculateExperienceScore(
-        normalizedCV.yearsOfExperience,
+      const experienceScore = calculateExperienceScore(
+        normalizedCV.yearsOfExperience ?? 0,
         normalizedJob.level,
       );
+      const educationScore = calculateEducationScore(normalizedCV.education, normalizedJob.level);
 
-      // 3. Education Matching (if applicable)
-      const educationScore = this.calculateEducationScore(
-        normalizedCV.education,
-        normalizedJob.level,
+      // 3. Weighted total (NaN-safe via ensureValidScore)
+      const totalScore = Math.min(
+        100,
+        Math.max(
+          0,
+          ensureValidScore(skillsMatchResult.scorePercentage) * MATCHING_WEIGHTS.SKILLS +
+            ensureValidScore(experienceScore) * MATCHING_WEIGHTS.EXPERIENCE +
+            ensureValidScore(educationScore) * MATCHING_WEIGHTS.EDUCATION,
+        ),
       );
 
-      // 4. Calculate weighted total score (with NaN protection)
-      const totalScore = this.calculateWeightedScore(
-        skillsMatchResult.scorePercentage,
-        experienceScore,
-        educationScore,
-      );
-
-      // 5. Validate final score is not NaN
-      if (isNaN(totalScore)) {
-        this.logger.error('NaN detected in final score calculation', {
-          skillsMatchResult,
-          experienceScore,
-          educationScore,
-        });
-        throw new Error('Invalid score calculation resulted in NaN');
-      }
-
-      // 6. Determine priority
+      // 4. Derive priority, auto-status, insights
       const priority = this.determinePriority(totalScore);
-
-      // 7. Generate strengths and weaknesses
-      const { strengths, weaknesses } = this.generateInsights(
+      const autoStatus = determineAutoStatus(totalScore, skillsMatchResult.scorePercentage);
+      const { strengths, weaknesses } = generateInsights(
         normalizedCV,
         normalizedJob,
         skillsMatchResult,
         experienceScore,
       );
 
-      // 8. Generate recommendation
-      const recommendation = this.generateRecommendation(totalScore);
-
       const result: MatchResultDto = {
         matchingScore: Math.round(totalScore),
         priority,
+        autoStatus,
         skillsMatch: skillsMatchResult.matches,
         skillsMatchPercentage: skillsMatchResult.scorePercentage,
         experienceScore,
         educationScore,
         strengths,
         weaknesses,
-        recommendation,
-        summary: this.generateSummary(
+        recommendation: generateRecommendation(totalScore),
+        summary: generateSummary(
           totalScore,
           skillsMatchResult.matchedCount,
           skillsMatchResult.totalRequired,
@@ -103,410 +93,10 @@ export class MatchingService {
     }
   }
 
-  private calculateSkillsMatch(
-    candidateSkills: string[],
-    requiredSkills: string[],
-  ): {
-    matches: SkillMatchDto[];
-    matchedCount: number;
-    totalRequired: number;
-    scorePercentage: number;
-  } {
-    const matches: SkillMatchDto[] = [];
-    let totalScore = 0;
-    let matchedCount = 0;
-
-    // Normalize skills for better matching
-    const normalizedCandidateSkills = candidateSkills.map(s => this.normalizeSkill(s));
-
-    for (const requiredSkill of requiredSkills) {
-      const normalizedRequired = this.normalizeSkill(requiredSkill);
-
-      // Check if skill is matched
-      const isMatched = normalizedCandidateSkills.some(candidateSkill =>
-        this.isSkillMatch(candidateSkill, normalizedRequired),
-      );
-
-      if (isMatched) {
-        matchedCount++;
-
-        // Determine proficiency based on skill appearance
-        const proficiency = this.determineProficiency(requiredSkill, candidateSkills);
-
-        totalScore += SKILL_PROFICIENCY_LEVELS[proficiency];
-
-        matches.push({
-          skill: requiredSkill,
-          matched: true,
-          proficiencyLevel: proficiency,
-          score: SKILL_PROFICIENCY_LEVELS[proficiency],
-        });
-      } else {
-        matches.push({
-          skill: requiredSkill,
-          matched: false,
-          proficiencyLevel: 'none',
-          score: 0,
-        });
-      }
-    }
-
-    // FIXED: Tránh division by zero và NaN
-    let scorePercentage = 0;
-    if (requiredSkills.length > 0) {
-      const maxPossibleScore = requiredSkills.length * 100;
-      scorePercentage = (totalScore / maxPossibleScore) * 100;
-
-      // Safeguard: Ensure valid number
-      if (isNaN(scorePercentage) || !isFinite(scorePercentage)) {
-        this.logger.warn('Invalid scorePercentage calculated, defaulting to 0', {
-          totalScore,
-          requiredSkills: requiredSkills.length,
-        });
-        scorePercentage = 0;
-      }
-    }
-
-    return {
-      matches,
-      matchedCount,
-      totalRequired: requiredSkills.length,
-      scorePercentage: Math.round(Math.max(0, Math.min(100, scorePercentage))),
-    };
-  }
-
-  private calculateExperienceScore(yearsOfExperience: number, jobLevel: string): number {
-    const levelConfig = EXPERIENCE_SCORING[jobLevel as EJobLevel];
-
-    if (!levelConfig) {
-      this.logger.warn(`Unknown job level: ${jobLevel}, using default scoring`);
-      return 50; // Default middle score
-    }
-
-    const { minYears, maxYears, idealYears } = levelConfig;
-
-    // Below minimum
-    if (yearsOfExperience < minYears) {
-      const ratio = yearsOfExperience / minYears;
-      return Math.round(ratio * 50); // Max 50 points if below minimum
-    }
-
-    // Between min and ideal
-    if (yearsOfExperience <= idealYears) {
-      const range = idealYears - minYears;
-      const position = yearsOfExperience - minYears;
-      return Math.round(50 + (position / range) * 50); // 50-100 points
-    }
-
-    // Between ideal and max
-    if (yearsOfExperience <= maxYears) {
-      return 100; // Perfect match
-    }
-
-    // Over-qualified (slightly penalize)
-    const overYears = yearsOfExperience - maxYears;
-    const penalty = Math.min(overYears * 2, 15); // Max 15 point penalty
-    return Math.max(85, 100 - penalty);
-  }
-
-  private calculateEducationScore(education: any[], jobLevel: string): number {
-    if (!education || education.length === 0) {
-      return 50; // Neutral score if no education data
-    }
-
-    // Determine highest degree
-    const degrees = education.map(edu => edu.degree?.toLowerCase() || '');
-    const hasPhd = degrees.some(d => d.includes('phd') || d.includes('tiến sĩ'));
-    const hasMaster = degrees.some(d => d.includes('master') || d.includes('thạc sĩ'));
-    const hasBachelor = degrees.some(
-      d => d.includes('bachelor') || d.includes('cử nhân') || d.includes('đại học'),
-    );
-
-    // Score based on job level
-    switch (jobLevel) {
-      case EJobLevel.INTERN:
-        return hasBachelor || hasMaster || hasPhd ? 100 : 75;
-
-      case EJobLevel.JUNIOR:
-        return hasBachelor ? 100 : hasMaster || hasPhd ? 100 : 60;
-
-      case EJobLevel.MID_LEVEL:
-        return hasBachelor ? 90 : hasMaster ? 100 : hasPhd ? 100 : 50;
-
-      case EJobLevel.SENIOR:
-        return hasMaster || hasPhd ? 100 : hasBachelor ? 80 : 40;
-
-      case EJobLevel.LEAD:
-      case EJobLevel.MANAGER:
-        return hasPhd || hasMaster ? 100 : hasBachelor ? 70 : 30;
-
-      default:
-        return 50;
-    }
-  }
-
-  private calculateWeightedScore(
-    skillsScore: number,
-    experienceScore: number,
-    educationScore: number,
-  ): number {
-    // Validate inputs are valid numbers
-    const validSkills = this.ensureValidScore(skillsScore, 'skillsScore');
-    const validExperience = this.ensureValidScore(experienceScore, 'experienceScore');
-    const validEducation = this.ensureValidScore(educationScore, 'educationScore');
-
-    const totalScore =
-      validSkills * MATCHING_WEIGHTS.SKILLS +
-      validExperience * MATCHING_WEIGHTS.EXPERIENCE +
-      validEducation * MATCHING_WEIGHTS.EDUCATION;
-
-    // Final safeguard
-    if (isNaN(totalScore) || !isFinite(totalScore)) {
-      this.logger.error('NaN or Infinity in weighted score', {
-        validSkills,
-        validExperience,
-        validEducation,
-        totalScore,
-      });
-      return 0; // Default to 0 instead of throwing
-    }
-
-    return Math.min(100, Math.max(0, totalScore)); // Clamp to 0-100
-  }
-
   private determinePriority(matchingScore: number): EResumePriority {
-    if (matchingScore >= SCORE_THRESHOLDS.EXCELLENT) {
-      return EResumePriority.EXCELLENT;
-    }
-    if (matchingScore >= SCORE_THRESHOLDS.HIGH) {
-      return EResumePriority.HIGH;
-    }
-    if (matchingScore >= SCORE_THRESHOLDS.MEDIUM) {
-      return EResumePriority.MEDIUM;
-    }
+    if (matchingScore >= SCORE_THRESHOLDS.EXCELLENT) return EResumePriority.EXCELLENT;
+    if (matchingScore >= SCORE_THRESHOLDS.HIGH) return EResumePriority.HIGH;
+    if (matchingScore >= SCORE_THRESHOLDS.MEDIUM) return EResumePriority.MEDIUM;
     return EResumePriority.LOW;
-  }
-
-  /**
-   * Generate insights (strengths and weaknesses)
-   */
-  private generateInsights(
-    parsedCV: ParsedDataDto,
-    job: Job,
-    skillsMatchResult: any,
-    experienceScore: number,
-  ): { strengths: string[]; weaknesses: string[] } {
-    const strengths: string[] = [];
-    const weaknesses: string[] = [];
-
-    // Skills insights
-    if (skillsMatchResult.scorePercentage >= 80) {
-      strengths.push(
-        `Excellent skills match: ${skillsMatchResult.matchedCount}/${skillsMatchResult.totalRequired} required skills`,
-      );
-    } else if (skillsMatchResult.scorePercentage < 50) {
-      weaknesses.push(
-        `Limited skills match: Only ${skillsMatchResult.matchedCount}/${skillsMatchResult.totalRequired} required skills`,
-      );
-    }
-
-    // Experience insights
-    if (experienceScore >= 90) {
-      strengths.push(
-        `Strong experience: ${parsedCV.yearsOfExperience || 0} years matches ${job.level} level`,
-      );
-    } else if (experienceScore < 50) {
-      weaknesses.push(
-        `Experience gap: ${parsedCV.yearsOfExperience || 0} years may be insufficient for ${job.level} level`,
-      );
-    }
-
-    // Additional strengths from CV
-    if (parsedCV.education && parsedCV.education.length > 0) {
-      const hasAdvancedDegree = parsedCV.education.some(
-        edu =>
-          edu.degree?.toLowerCase().includes('master') || edu.degree?.toLowerCase().includes('phd'),
-      );
-      if (hasAdvancedDegree) {
-        strengths.push('Advanced degree (Master/PhD)');
-      }
-    }
-
-    return { strengths, weaknesses };
-  }
-
-  /**
-   * Generate recommendation based on score
-   */
-  private generateRecommendation(matchingScore: number): string {
-    if (matchingScore >= SCORE_THRESHOLDS.EXCELLENT) {
-      return MATCHING_RECOMMENDATIONS.HIGHLY_RECOMMENDED;
-    }
-    if (matchingScore >= SCORE_THRESHOLDS.HIGH) {
-      return MATCHING_RECOMMENDATIONS.RECOMMENDED;
-    }
-    if (matchingScore >= SCORE_THRESHOLDS.MEDIUM) {
-      return MATCHING_RECOMMENDATIONS.CONSIDER;
-    }
-    return MATCHING_RECOMMENDATIONS.NOT_RECOMMENDED;
-  }
-
-  /**
-   * Generate summary text
-   */
-  private generateSummary(
-    matchingScore: number,
-    matchedSkills: number,
-    totalSkills: number,
-  ): string {
-    const percentage = Math.round(matchingScore);
-    const skillMatch = `${matchedSkills}/${totalSkills}`;
-
-    if (percentage >= 85) {
-      return `Excellent match (${percentage}%) - Candidate meets ${skillMatch} required skills. Highly recommended for interview.`;
-    }
-    if (percentage >= 70) {
-      return `Good match (${percentage}%) - Candidate has ${skillMatch} required skills. Recommended for consideration.`;
-    }
-    if (percentage >= 50) {
-      return `Moderate match (${percentage}%) - Candidate has ${skillMatch} required skills. Review carefully before deciding.`;
-    }
-    return `Limited match (${percentage}%) - Candidate has only ${skillMatch} required skills. May not be suitable for this position.`;
-  }
-
-  /**
-   * Normalize skill name for better matching
-   */
-  private normalizeSkill(skill: string): string {
-    return skill
-      .toUpperCase()
-      .trim()
-      .replace(/[^\w\s+#]/g, '') // Keep alphanumeric, spaces, +, #
-      .replace(/\s+/g, ' ');
-  }
-
-  /**
-   * Check if two skills match (fuzzy matching)
-   */
-  private isSkillMatch(candidateSkill: string, requiredSkill: string): boolean {
-    // Exact match
-    if (candidateSkill === requiredSkill) {
-      return true;
-    }
-
-    // Contains match
-    if (candidateSkill.includes(requiredSkill) || requiredSkill.includes(candidateSkill)) {
-      return true;
-    }
-
-    // Common variations mapping
-    const variations: { [key: string]: string[] } = {
-      javascript: ['js', 'es6', 'ecmascript'],
-      typescript: ['ts'],
-      'react.js': ['react', 'reactjs'],
-      'node.js': ['node', 'nodejs'],
-      'vue.js': ['vue', 'vuejs'],
-      mongodb: ['mongo'],
-      postgresql: ['postgres', 'psql'],
-      kubernetes: ['k8s'],
-      docker: ['containerization'],
-    };
-
-    for (const [key, aliases] of Object.entries(variations)) {
-      if (
-        (candidateSkill === key && aliases.includes(requiredSkill)) ||
-        (requiredSkill === key && aliases.includes(candidateSkill))
-      ) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * Determine proficiency level based on skill context
-   */
-  private determineProficiency(requiredSkill: string, candidateSkills: string[]): string {
-    const skillText = candidateSkills.join(' ').toLowerCase();
-    const normalizedSkill = requiredSkill.toLowerCase();
-
-    // Check for proficiency indicators in CV text
-    if (
-      skillText.includes(`expert ${normalizedSkill}`) ||
-      skillText.includes(`${normalizedSkill} expert`)
-    ) {
-      return 'expert';
-    }
-
-    if (
-      skillText.includes(`advanced ${normalizedSkill}`) ||
-      skillText.includes(`${normalizedSkill} advanced`) ||
-      skillText.includes(`proficient ${normalizedSkill}`)
-    ) {
-      return 'advanced';
-    }
-
-    if (
-      skillText.includes(`intermediate ${normalizedSkill}`) ||
-      skillText.includes(`working knowledge ${normalizedSkill}`)
-    ) {
-      return 'intermediate';
-    }
-
-    // Default to intermediate if skill is present
-    return 'intermediate';
-  }
-
-  // ========== VALIDATION & NORMALIZATION HELPERS ==========
-
-  /**
-   * Validate and normalize CV inputs to prevent NaN
-   * Ensures all required fields have safe default values
-   */
-  private validateAndNormalizeInputs(parsedCV: ParsedDataDto): ParsedDataDto {
-    return {
-      fullName: parsedCV?.fullName || 'Unknown',
-      email: parsedCV?.email || '',
-      phone: parsedCV?.phone || '',
-      skills: Array.isArray(parsedCV?.skills) ? parsedCV.skills.filter(s => s && s.trim()) : [],
-      experience: Array.isArray(parsedCV?.experience) ? parsedCV.experience : [],
-      education: Array.isArray(parsedCV?.education) ? parsedCV.education : [],
-      summary: parsedCV?.summary || '',
-      yearsOfExperience: this.ensureValidNumber(parsedCV?.yearsOfExperience, 0),
-    };
-  }
-
-  /**
-   * Validate job inputs
-   */
-  private validateJobInputs(job: Job): any {
-    return {
-      name: job?.name || 'Unknown Job',
-      skills: Array.isArray(job?.skills) ? job.skills.filter(s => s && s.trim()) : [],
-      level: job?.level || EJobLevel.JUNIOR,
-    };
-  }
-
-  /**
-   * Ensure a number is valid, otherwise return default
-   */
-  private ensureValidNumber(value: any, defaultValue: number = 0): number {
-    const num = Number(value);
-    if (isNaN(num) || !isFinite(num)) {
-      return defaultValue;
-    }
-    return Math.max(0, num); // Không cho phép số âm
-  }
-
-  /**
-   * Ensure a score is valid (0-100 range)
-   */
-  private ensureValidScore(score: number, fieldName: string): number {
-    if (isNaN(score) || !isFinite(score)) {
-      this.logger.warn(`Invalid ${fieldName}: ${score}, defaulting to 0`);
-      return 0;
-    }
-    return Math.min(100, Math.max(0, score));
   }
 }
