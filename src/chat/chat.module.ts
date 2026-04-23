@@ -8,6 +8,8 @@ import { UsersModule } from '../users/users.module';
 import { CompaniesModule } from '../companies/companies.module';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
+import { ChatContextService } from './chat-context.service';
+import { ChatPromptBuilder } from './chat-prompt.builder';
 
 @Module({
   imports: [
@@ -19,7 +21,7 @@ import { ChatService } from './chat.service';
     CompaniesModule,
   ],
   controllers: [ChatController],
-  providers: [ChatService],
+  providers: [ChatService, ChatContextService, ChatPromptBuilder],
   exports: [ChatService],
 })
 export class ChatModule {}
