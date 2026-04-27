@@ -52,6 +52,12 @@ class ParsedData {
   @Prop({ type: [String] })
   skills?: string[];
 
+  @Prop({ type: [String] })
+  normalizedSkills?: string[];
+
+  @Prop({ type: [String] })
+  unmappedSkills?: string[];
+
   @Prop({ type: [ParsedExperience] })
   experience?: ParsedExperience[];
 

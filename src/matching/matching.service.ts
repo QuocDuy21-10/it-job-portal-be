@@ -18,10 +18,13 @@ import {
   generateSummary,
 } from './utils/insight-generator.util';
 import { determineAutoStatus } from './utils/auto-status.util';
+import { SkillsService } from 'src/skills/skills.service';
 
 @Injectable()
 export class MatchingService {
   private readonly logger = new Logger(MatchingService.name);
+
+  constructor(private readonly skillsService: SkillsService) {}
 
   async calculateMatch(parsedCV: ParsedDataDto, job: Job): Promise<MatchResultDto> {
     try {
@@ -30,11 +33,13 @@ export class MatchingService {
       // 1. Validate and normalise inputs
       const normalizedCV = validateAndNormalizeCV(parsedCV);
       const normalizedJob = validateJob(job);
+      const aliasMap = await this.skillsService.getAliasMap();
 
       // 2. Score each dimension
       const skillsMatchResult = calculateSkillsMatch(
         normalizedCV.skills ?? [],
         normalizedJob.skills,
+        aliasMap,
       );
       const experienceScore = calculateExperienceScore(
         normalizedCV.yearsOfExperience ?? 0,

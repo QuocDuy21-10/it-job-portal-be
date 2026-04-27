@@ -5,13 +5,17 @@ import { GetSubscribersQueryDto } from './dto/get-subscribers-query.dto';
 import { IUser } from 'src/users/user.interface';
 import { SubscribersRepository } from './repositories/subscribers.repository';
 import mongoose from 'mongoose';
+import { SkillsService } from 'src/skills/skills.service';
 
 @Injectable()
 export class SubscribersService {
-  constructor(private readonly subscribersRepository: SubscribersRepository) {}
+  constructor(
+    private readonly subscribersRepository: SubscribersRepository,
+    private readonly skillsService: SkillsService,
+  ) {}
 
   async create(createSubscriberDto: CreateSubscriberDto, user: IUser) {
-    const { name, skills, location } = createSubscriberDto;
+    const { name, location } = createSubscriberDto;
     // Email is always derived from the authenticated user — never client-controlled
     const email = user.email;
 
@@ -22,10 +26,14 @@ export class SubscribersService {
       );
     }
 
+    const normalizedSkills = await this.skillsService.normalizeControlledSkills(
+      createSubscriberDto.skills,
+    );
+
     const newSubs = await this.subscribersRepository.create({
       name,
       email,
-      skills,
+      skills: normalizedSkills,
       location,
       createdBy: {
         _id: user._id,
@@ -53,7 +61,8 @@ export class SubscribersService {
       filter.location = { $regex: this.escapeRegex(query.location), $options: 'i' };
     }
     if (query.skill) {
-      filter.skills = { $in: [query.skill] };
+      const [normalizedSkill] = await this.skillsService.normalizeControlledSkills([query.skill]);
+      filter.skills = { $in: [normalizedSkill] };
     }
 
     const sortField = query.sortBy ?? 'createdAt';
@@ -99,6 +108,11 @@ export class SubscribersService {
 
     await this.subscribersRepository.updateOneOwned(id, user._id, {
       ...updateSubscriberDto,
+      ...(updateSubscriberDto.skills
+        ? {
+            skills: await this.skillsService.normalizeControlledSkills(updateSubscriberDto.skills),
+          }
+        : {}),
       updatedBy: {
         _id: user._id,
         email: user.email,

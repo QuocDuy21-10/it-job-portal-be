@@ -3,10 +3,12 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import mongoose from 'mongoose';
 import { SubscribersService } from './subscribers.service';
 import { SubscribersRepository } from './repositories/subscribers.repository';
+import { SkillsService } from 'src/skills/skills.service';
 
 describe('SubscribersService', () => {
   let service: SubscribersService;
   let mockSubscribersRepository: jest.Mocked<SubscribersRepository>;
+  let mockSkillsService: jest.Mocked<Partial<SkillsService>>;
 
   const user = {
     _id: new mongoose.Types.ObjectId().toString(),
@@ -27,10 +29,15 @@ describe('SubscribersService', () => {
       findActiveByEmail: jest.fn(),
     } as any;
 
+    mockSkillsService = {
+      normalizeControlledSkills: jest.fn().mockImplementation(async skills => skills ?? []),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SubscribersService,
         { provide: SubscribersRepository, useValue: mockSubscribersRepository },
+        { provide: SkillsService, useValue: mockSkillsService },
       ],
     }).compile();
 
@@ -47,6 +54,7 @@ describe('SubscribersService', () => {
     it('should create a subscriber below the active subscription limit', async () => {
       const createdAt = new Date('2026-04-23T10:00:00.000Z');
       mockSubscribersRepository.countActiveByEmail.mockResolvedValue(2);
+      mockSkillsService.normalizeControlledSkills.mockResolvedValue(['TypeScript', 'NestJS']);
       mockSubscribersRepository.create.mockResolvedValue({
         _id: new mongoose.Types.ObjectId(),
         createdAt,
@@ -55,10 +63,11 @@ describe('SubscribersService', () => {
       const result = await service.create(dto, user);
 
       expect(mockSubscribersRepository.countActiveByEmail).toHaveBeenCalledWith(user.email);
+      expect(mockSkillsService.normalizeControlledSkills).toHaveBeenCalledWith(dto.skills);
       expect(mockSubscribersRepository.create).toHaveBeenCalledWith({
         name: dto.name,
         email: user.email,
-        skills: dto.skills,
+        skills: ['TypeScript', 'NestJS'],
         location: dto.location,
         createdBy: {
           _id: user._id,
@@ -86,6 +95,7 @@ describe('SubscribersService', () => {
         totalItems: 1,
         totalPages: 1,
       });
+      mockSkillsService.normalizeControlledSkills.mockResolvedValue(['TypeScript']);
 
       const result = await service.findAll(
         0,
@@ -114,6 +124,7 @@ describe('SubscribersService', () => {
       });
       expect(filter['createdBy._id']).toBeInstanceOf(mongoose.Types.ObjectId);
       expect(filter['createdBy._id'].toString()).toBe(user._id);
+      expect(mockSkillsService.normalizeControlledSkills).toHaveBeenCalledWith(['TypeScript']);
       expect(result.meta.pagination).toEqual({
         current_page: 1,
         per_page: 100,
@@ -169,12 +180,13 @@ describe('SubscribersService', () => {
       const id = new mongoose.Types.ObjectId().toString();
       const existing = { _id: id, name: 'Old Name' } as any;
       const updated = { _id: id, name: 'New Name' } as any;
+      mockSkillsService.normalizeControlledSkills.mockResolvedValue(['TypeScript']);
 
       mockSubscribersRepository.findOneOwned
         .mockResolvedValueOnce(existing)
         .mockResolvedValueOnce(updated);
 
-      const result = await service.update(id, { name: 'New Name' }, user);
+      const result = await service.update(id, { name: 'New Name', skills: ['typescript'] }, user);
 
       expect(mockSubscribersRepository.validateObjectId).toHaveBeenCalledWith(id);
       expect(mockSubscribersRepository.updateOneOwned).toHaveBeenCalledWith(
@@ -182,12 +194,14 @@ describe('SubscribersService', () => {
         user._id,
         expect.objectContaining({
           name: 'New Name',
+          skills: ['TypeScript'],
           updatedBy: {
             _id: user._id,
             email: user.email,
           },
         }),
       );
+      expect(mockSkillsService.normalizeControlledSkills).toHaveBeenCalledWith(['typescript']);
       expect(result).toBe(updated);
     });
 

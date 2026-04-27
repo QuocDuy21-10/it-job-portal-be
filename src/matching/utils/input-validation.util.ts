@@ -19,11 +19,22 @@ export function ensureValidScore(score: number): number {
 }
 
 export function validateAndNormalizeCV(parsedCV: ParsedDataDto): ParsedDataDto {
+  const preferredSkills =
+    Array.isArray(parsedCV?.normalizedSkills) && parsedCV.normalizedSkills.length > 0
+      ? parsedCV.normalizedSkills
+      : parsedCV?.skills;
+
   return {
     fullName: parsedCV?.fullName || 'Unknown',
     email: parsedCV?.email || '',
     phone: parsedCV?.phone || '',
-    skills: Array.isArray(parsedCV?.skills) ? parsedCV.skills.filter(s => s && s.trim()) : [],
+    skills: Array.isArray(preferredSkills) ? preferredSkills.filter(s => s && s.trim()) : [],
+    normalizedSkills: Array.isArray(parsedCV?.normalizedSkills)
+      ? parsedCV.normalizedSkills.filter(s => s && s.trim())
+      : [],
+    unmappedSkills: Array.isArray(parsedCV?.unmappedSkills)
+      ? parsedCV.unmappedSkills.filter(s => s && s.trim())
+      : [],
     experience: Array.isArray(parsedCV?.experience) ? parsedCV.experience : [],
     education: Array.isArray(parsedCV?.education) ? parsedCV.education : [],
     summary: parsedCV?.summary || '',

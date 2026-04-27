@@ -22,6 +22,7 @@ import {
   buildEmbeddedCompanyIdFilter,
 } from 'src/companies/company-snapshot.util';
 import { JobRepository } from './repositories/job.repository';
+import { SkillsService } from 'src/skills/skills.service';
 
 @Injectable()
 export class JobsService {
@@ -63,14 +64,19 @@ export class JobsService {
 
   constructor(
     private readonly jobRepository: JobRepository,
+    private readonly skillsService: SkillsService,
     private readonly companyFollowerQueueService: CompanyFollowerQueueService,
     private readonly jobExpirationQueueService: JobExpirationQueueService,
   ) {}
   async create(createJobDto: CreateJobDto, user: IUser) {
+    const normalizedSkills = await this.skillsService.normalizeControlledSkills(
+      createJobDto.skills ?? [],
+    );
     const normalizedCompany = await this.jobRepository.getCompanySnapshot(createJobDto.company._id);
 
     const newJob = await this.jobRepository.create({
       ...createJobDto,
+      skills: normalizedSkills,
       company: normalizedCompany,
       createdBy: { _id: user._id, email: user.email },
     });
@@ -100,6 +106,7 @@ export class JobsService {
     // sanitizeAqpQuery strips dangerous operators and limits filter/sort to
     // pre-approved fields, preventing NoSQL injection via the query string.
     const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
+    await this.normalizeSkillsFilter(filter);
 
     // Expand a plain company._id string into the two ObjectId candidate formats
     // used by the embedded snapshot (legacy string vs ObjectId).
@@ -184,6 +191,10 @@ export class JobsService {
       updatedBy: { _id: user._id, email: user.email },
     };
 
+    if (updateJobDto.skills) {
+      updatePayload.skills = await this.skillsService.normalizeControlledSkills(updateJobDto.skills);
+    }
+
     if (updateJobDto.company?._id) {
       updatePayload.company = await this.jobRepository.getCompanySnapshot(updateJobDto.company._id);
     }
@@ -202,7 +213,15 @@ export class JobsService {
       return [];
     }
 
-    const skillRegexes = skills.map(skill => new RegExp(skill, 'i'));
+    const { normalizedSkills, unmappedSkills } = await this.skillsService.normalizeExtractedSkills(
+      skills,
+    );
+    const searchTerms = [...normalizedSkills, ...unmappedSkills].filter(Boolean);
+    const skillRegexes = searchTerms.map(skill => new RegExp(this.escapeRegex(skill), 'i'));
+
+    if (skillRegexes.length === 0) {
+      return [];
+    }
 
     return this.jobRepository.findLean(
       {
@@ -383,7 +402,13 @@ export class JobsService {
     };
 
     if (skills && skills.length > 0) {
-      filter.skills = { $in: skills.map(s => new RegExp(s, 'i')) };
+      const { normalizedSkills, unmappedSkills } = await this.skillsService.normalizeExtractedSkills(
+        skills,
+      );
+      const searchTerms = [...normalizedSkills, ...unmappedSkills].filter(Boolean);
+      if (searchTerms.length > 0) {
+        filter.skills = { $in: searchTerms.map(s => new RegExp(this.escapeRegex(s), 'i')) };
+      }
     }
 
     if (level) {
@@ -427,6 +452,33 @@ export class JobsService {
     return { filter, sort };
   }
 
+  private async normalizeSkillsFilter(filter: Record<string, any>): Promise<void> {
+    if (typeof filter.skills === 'undefined') {
+      return;
+    }
+
+    const rawSkillsFilter = filter.skills;
+
+    if (typeof rawSkillsFilter === 'string') {
+      filter.skills = { $in: await this.skillsService.normalizeControlledSkills([rawSkillsFilter]) };
+      return;
+    }
+
+    if (Array.isArray(rawSkillsFilter)) {
+      filter.skills = { $in: await this.skillsService.normalizeControlledSkills(rawSkillsFilter) };
+      return;
+    }
+
+    if (rawSkillsFilter && Array.isArray(rawSkillsFilter.$in)) {
+      filter.skills = {
+        $in: await this.skillsService.normalizeControlledSkills(rawSkillsFilter.$in),
+      };
+      return;
+    }
+
+    throw new BadRequestException('Invalid skills filter format');
+  }
+
   private async assertHrOwnership(
     job: JobDocument | null,
     jobId: string,
@@ -452,5 +504,9 @@ export class JobsService {
       approvalStatus: EJobApprovalStatus.APPROVED,
       $or: [{ endDate: { $gte: new Date() } }, { endDate: null }],
     };
+  }
+
+  private escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }

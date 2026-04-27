@@ -1,5 +1,5 @@
 import { SkillMatchDto } from '../dto/skill-match.dto';
-import { SKILL_VARIATIONS, SKILL_PROFICIENCY_LEVELS } from '../constants/matching.constants';
+import { SKILL_PROFICIENCY_LEVELS } from '../constants/matching.constants';
 
 export interface SkillsMatchResult {
   matches: SkillMatchDto[];
@@ -16,21 +16,19 @@ export function normalizeSkill(skill: string): string {
     .replace(/\s+/g, ' ');
 }
 
+export function resolveCanonicalSkill(
+  skill: string,
+  aliasMap: Record<string, string> = {},
+): string {
+  const normalizedSkill = normalizeSkill(skill);
+  const canonicalSkill = aliasMap[normalizedSkill.toLowerCase()];
+
+  return canonicalSkill ? normalizeSkill(canonicalSkill) : normalizedSkill;
+}
+
 export function isSkillMatch(candidateSkill: string, requiredSkill: string): boolean {
   if (candidateSkill === requiredSkill) return true;
   if (candidateSkill.includes(requiredSkill) || requiredSkill.includes(candidateSkill)) return true;
-
-  const lowerCandidate = candidateSkill.toLowerCase();
-  const lowerRequired = requiredSkill.toLowerCase();
-
-  for (const [key, aliases] of Object.entries(SKILL_VARIATIONS)) {
-    if (
-      (lowerCandidate === key && aliases.includes(lowerRequired)) ||
-      (lowerRequired === key && aliases.includes(lowerCandidate))
-    ) {
-      return true;
-    }
-  }
 
   return false;
 }
@@ -67,15 +65,18 @@ export function determineProficiency(requiredSkill: string, candidateSkills: str
 export function calculateSkillsMatch(
   candidateSkills: string[],
   requiredSkills: string[],
+  aliasMap: Record<string, string> = {},
 ): SkillsMatchResult {
   const matches: SkillMatchDto[] = [];
   let totalScore = 0;
   let matchedCount = 0;
 
-  const normalizedCandidateSkills = candidateSkills.map(s => normalizeSkill(s));
+  const normalizedCandidateSkills = candidateSkills.map(skill =>
+    resolveCanonicalSkill(skill, aliasMap),
+  );
 
   for (const requiredSkill of requiredSkills) {
-    const normalizedRequired = normalizeSkill(requiredSkill);
+    const normalizedRequired = resolveCanonicalSkill(requiredSkill, aliasMap);
     const isMatched = normalizedCandidateSkills.some(cs => isSkillMatch(cs, normalizedRequired));
 
     if (isMatched) {

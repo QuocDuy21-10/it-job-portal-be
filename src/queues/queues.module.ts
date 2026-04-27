@@ -18,6 +18,7 @@ import { MatchingModule } from 'src/matching/matching.module';
 import { JobsModule } from 'src/jobs/jobs.module';
 import { MailModule } from 'src/mail/mail.module';
 import { MongooseModule } from '@nestjs/mongoose';
+import { SkillsModule } from 'src/skills/skills.module';
 import { Resume, ResumeSchema } from 'src/resumes/schemas/resume.schema';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
 import { Subscriber, SubscriberSchema } from 'src/subscribers/schemas/subscriber.schema';
@@ -85,6 +86,7 @@ export class QueuesModule {
         MatchingModule,
         JobsModule,
         MailModule,
+        SkillsModule,
       ],
       providers: [
         ResumeQueueProcessor,

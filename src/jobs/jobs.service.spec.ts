@@ -6,6 +6,7 @@ import { CompanyFollowerQueueService } from 'src/queues/services/company-followe
 import { JobExpirationQueueService } from 'src/queues/services/job-expiration-queue.service';
 import { EJobApprovalStatus } from './enums/job-approval-status.enum';
 import { IUser } from 'src/users/user.interface';
+import { SkillsService } from 'src/skills/skills.service';
 
 const hrUser = (companyId: string): IUser => ({
   _id: 'user-hr-1',
@@ -45,6 +46,7 @@ const activeApprovedJob = (companyId = 'company-1') => ({
 describe('JobsService', () => {
   let service: JobsService;
   let mockJobRepository: jest.Mocked<Partial<JobRepository>>;
+  let mockSkillsService: jest.Mocked<Partial<SkillsService>>;
   let mockCompanyFollowerQueueService: jest.Mocked<Partial<CompanyFollowerQueueService>>;
   let mockJobExpirationQueueService: jest.Mocked<Partial<JobExpirationQueueService>>;
 
@@ -70,6 +72,10 @@ describe('JobsService', () => {
       addNewJobNotification: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockSkillsService = {
+      normalizeControlledSkills: jest.fn().mockImplementation(async skills => skills ?? []),
+    };
+
     mockJobExpirationQueueService = {
       addExpiredJobNotification: jest.fn().mockResolvedValue(undefined),
     };
@@ -78,6 +84,7 @@ describe('JobsService', () => {
       providers: [
         JobsService,
         { provide: JobRepository, useValue: mockJobRepository },
+        { provide: SkillsService, useValue: mockSkillsService },
         { provide: CompanyFollowerQueueService, useValue: mockCompanyFollowerQueueService },
         { provide: JobExpirationQueueService, useValue: mockJobExpirationQueueService },
       ],
@@ -166,6 +173,17 @@ describe('JobsService', () => {
 
       expect(response.meta.pagination.total).toBe(25);
       expect(response.meta.pagination.total_pages).toBe(3);
+    });
+
+    it('normalizes skill filters through the catalog before querying', async () => {
+      mockJobRepository.findPaginated.mockResolvedValue(paginatedResponse([]));
+      mockSkillsService.normalizeControlledSkills.mockResolvedValue(['TypeScript']);
+
+      await service.findAll(1, 10, 'skills=typescript', publicUser());
+
+      expect(mockSkillsService.normalizeControlledSkills).toHaveBeenCalledWith(['typescript']);
+      const passedFilter = (mockJobRepository.findPaginated as jest.Mock).mock.calls[0][0];
+      expect(passedFilter.skills).toEqual({ $in: ['TypeScript'] });
     });
   });
 
@@ -321,11 +339,22 @@ describe('JobsService', () => {
   describe('create', () => {
     it('returns _id and createdAt on success', async () => {
       const fakeJob = { _id: 'new-job', createdAt: new Date(), company: { _id: 'c1', name: 'X' } };
+      mockSkillsService.normalizeControlledSkills.mockResolvedValue(['TypeScript', 'NestJS']);
       mockJobRepository.getCompanySnapshot.mockResolvedValue({ _id: 'c1', name: 'X' } as any);
       mockJobRepository.create.mockResolvedValue(fakeJob as any);
 
-      const result = await service.create({ company: { _id: 'c1' } } as any, hrUser('c1'));
+      const result = await service.create(
+        { company: { _id: 'c1' }, skills: ['typescript', 'nestjs'] } as any,
+        hrUser('c1'),
+      );
 
+      expect(mockSkillsService.normalizeControlledSkills).toHaveBeenCalledWith([
+        'typescript',
+        'nestjs',
+      ]);
+      expect(mockJobRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ skills: ['TypeScript', 'NestJS'] }),
+      );
       expect(result._id).toBe('new-job');
     });
 

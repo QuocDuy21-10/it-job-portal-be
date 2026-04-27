@@ -27,6 +27,7 @@ import { StatisticsModule } from './statistics/statistics.module';
 import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CaslModule } from './casl';
+import { SkillsModule } from './skills/skills.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { CaslModule } from './casl';
     SessionsModule,
     ChatModule,
     NotificationsModule,
+    SkillsModule,
     UsersModule,
     AuthModule,
     CompaniesModule,

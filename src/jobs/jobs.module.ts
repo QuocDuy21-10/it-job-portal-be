@@ -6,6 +6,7 @@ import { Job, JobSchema } from './schemas/job.schema';
 import { QueuesModule } from 'src/queues/queues.module';
 import { Company, CompanySchema } from 'src/companies/schemas/company.schema';
 import { JobRepository } from './repositories/job.repository';
+import { SkillsModule } from 'src/skills/skills.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { JobRepository } from './repositories/job.repository';
       { name: Company.name, schema: CompanySchema },
     ]),
     QueuesModule.forFeature(),
+    SkillsModule,
   ],
   controllers: [JobsController],
   providers: [JobsService, JobRepository],

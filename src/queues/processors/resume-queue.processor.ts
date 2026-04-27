@@ -14,6 +14,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Resume } from 'src/resumes/schemas/resume.schema';
 import { Model } from 'mongoose';
 import { InjectQueue } from '@nestjs/bullmq';
+import { SkillsService } from 'src/skills/skills.service';
 
 @Processor(RESUME_QUEUE, {
   concurrency: 1,
@@ -31,6 +32,7 @@ export class ResumeQueueProcessor extends WorkerHost {
     private readonly geminiService: GeminiService,
     private readonly matchingService: MatchingService,
     private readonly jobsService: JobsService,
+    private readonly skillsService: SkillsService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @InjectQueue(RESUME_QUEUE) private resumeQueue: Queue,
   ) {
@@ -97,12 +99,21 @@ export class ResumeQueueProcessor extends WorkerHost {
       await job.updateProgress(50);
 
       const parsedData = await this.geminiService.parseCV(cleanedText);
+      const normalizedSkills = await this.skillsService.normalizeExtractedSkills(
+        parsedData.skills ?? [],
+      );
+      const normalizedParsedData = {
+        ...parsedData,
+        normalizedSkills: normalizedSkills.normalizedSkills,
+        unmappedSkills: normalizedSkills.unmappedSkills,
+      };
+
       this.logger.log(`[Parse Job ${job.id}] AI parsing completed`);
       await job.updateProgress(80);
 
       // Step 5: Update resume with parsed data
       await this.resumeModel.findByIdAndUpdate(resumeId, {
-        parsedData,
+        parsedData: normalizedParsedData,
         isParsed: true,
         parseError: null,
       });
@@ -111,7 +122,7 @@ export class ResumeQueueProcessor extends WorkerHost {
       await job.updateProgress(90);
 
       // Cache the result for 1 hour
-      await this.cacheManager.set(cacheKey, parsedData, 3600);
+      await this.cacheManager.set(cacheKey, normalizedParsedData, 3600);
       await job.updateProgress(100);
 
       this.logger.log(`[Parse Job ${job.id}] Successfully parsed CV for resume ${resumeId}`);
@@ -137,9 +148,9 @@ export class ResumeQueueProcessor extends WorkerHost {
 
       return {
         success: true,
-        parsedData,
+        parsedData: normalizedParsedData,
         extractedLength: cvText.length,
-        parsedFields: Object.keys(parsedData).length,
+        parsedFields: Object.keys(normalizedParsedData).length,
       };
     } catch (error) {
       this.logger.error(

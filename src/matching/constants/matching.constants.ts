@@ -1,21 +1,18 @@
 import { EJobLevel } from 'src/jobs/enums/job-level.enum';
 
-// ===== SCORING WEIGHTS =====
 export const MATCHING_WEIGHTS = {
   SKILLS: 0.5, // 50% trọng số cho skills matching
   EXPERIENCE: 0.3, // 30% trọng số cho experience
   EDUCATION: 0.2, // 20% trọng số cho education
 } as const;
 
-// ===== SCORE THRESHOLDS =====
 export const SCORE_THRESHOLDS = {
-  EXCELLENT: 85, // >= 85: Excellent candidate
-  HIGH: 70, // >= 70: Good candidate
-  MEDIUM: 50, // >= 50: Consider candidate
-  LOW: 30, // < 30: Not recommended
+  EXCELLENT: 85, 
+  HIGH: 70, 
+  MEDIUM: 50, 
+  LOW: 30, 
 } as const;
 
-// ===== SKILL PROFICIENCY LEVELS =====
 export const SKILL_PROFICIENCY_LEVELS = {
   expert: 100,
   advanced: 85,
@@ -24,7 +21,6 @@ export const SKILL_PROFICIENCY_LEVELS = {
   none: 0,
 } as const;
 
-// ===== EXPERIENCE SCORING BY JOB LEVEL =====
 export const EXPERIENCE_SCORING: Record<
   EJobLevel,
   { minYears: number; maxYears: number; idealYears: number }
@@ -61,7 +57,6 @@ export const EXPERIENCE_SCORING: Record<
   },
 };
 
-// ===== MATCHING RECOMMENDATIONS =====
 export const MATCHING_RECOMMENDATIONS = {
   HIGHLY_RECOMMENDED: 'HIGHLY_RECOMMENDED',
   RECOMMENDED: 'RECOMMENDED',
@@ -69,7 +64,6 @@ export const MATCHING_RECOMMENDATIONS = {
   NOT_RECOMMENDED: 'NOT_RECOMMENDED',
 } as const;
 
-// ===== AUTO STATUS THRESHOLDS =====
 export const AUTO_STATUS_RULES = {
   AUTO_APPROVE: {
     MIN_SCORE: 85,
@@ -81,28 +75,3 @@ export const AUTO_STATUS_RULES = {
   },
 } as const;
 
-// ===== SKILL MATCHING ALIASES =====
-// Các biến thể skill name để fuzzy matching tốt hơn
-export const SKILL_VARIATIONS: Record<string, string[]> = {
-  javascript: ['js', 'es6', 'ecmascript', 'es2015', 'es2020'],
-  typescript: ['ts'],
-  'react.js': ['react', 'reactjs', 'react js'],
-  'react native': ['reactnative', 'rn'],
-  'node.js': ['node', 'nodejs', 'node js'],
-  'vue.js': ['vue', 'vuejs', 'vue js'],
-  angular: ['angularjs', 'angular.js'],
-  'next.js': ['next', 'nextjs'],
-  mongodb: ['mongo', 'mongo db'],
-  postgresql: ['postgres', 'psql', 'pg'],
-  mysql: ['my sql'],
-  kubernetes: ['k8s'],
-  docker: ['containerization', 'containers'],
-  'c#': ['csharp', 'c sharp'],
-  'c++': ['cpp', 'cplusplus'],
-  '.net': ['dotnet', 'asp.net', 'aspnet'],
-  'machine learning': ['ml', 'machinelearning'],
-  'artificial intelligence': ['ai'],
-  'natural language processing': ['nlp'],
-  tensorflow: ['tf'],
-  pytorch: ['torch'],
-};

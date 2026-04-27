@@ -9,11 +9,13 @@ import { ERole } from 'src/casl/enums/role.enum';
 import { Company, CompanyDocument } from 'src/companies/schemas/company.schema';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 import { Role, RoleDocument } from 'src/roles/schemas/role.schema';
+import { Skill, SkillDocument } from 'src/skills/schemas/skill.schema';
 import { User, UserDocument } from 'src/users/schemas/user.schema';
 
 import { COMPANIES_SEED_DATA } from './data/companies.data';
 import { createJobsSeedData } from './data/jobs.data';
 import { ROLES_SEED_DATA } from './data/roles.data';
+import { SKILLS_SEED_DATA } from './data/skills.data';
 import { createUsersSeedData } from './data/users.data';
 
 @Injectable()
@@ -22,6 +24,7 @@ export class SeedService {
 
   constructor(
     @InjectModel(Role.name) private readonly roleModel: SoftDeleteModel<RoleDocument>,
+    @InjectModel(Skill.name) private readonly skillModel: SoftDeleteModel<SkillDocument>,
     @InjectModel(Company.name) private readonly companyModel: SoftDeleteModel<CompanyDocument>,
     @InjectModel(User.name) private readonly userModel: SoftDeleteModel<UserDocument>,
     @InjectModel(Job.name) private readonly jobModel: SoftDeleteModel<JobDocument>,
@@ -36,6 +39,7 @@ export class SeedService {
     const hashedPassword = hashSync(initPassword, genSaltSync(10));
 
     const seededRoleIds: Types.ObjectId[] = [];
+    const seededSkillIds: Types.ObjectId[] = [];
     const seededCompanyIds: Types.ObjectId[] = [];
     const seededUserIds: Types.ObjectId[] = [];
     const seededJobIds: Types.ObjectId[] = [];
@@ -51,6 +55,21 @@ export class SeedService {
       }
     } catch (err) {
       this.logger.error('Failed to seed roles', (err as Error).stack);
+      throw err;
+    }
+
+    try {
+      const skillCount = await this.skillModel.countDocuments();
+      if (skillCount === 0) {
+        const inserted = await this.skillModel.insertMany(SKILLS_SEED_DATA);
+        inserted.forEach(doc => seededSkillIds.push(doc._id as Types.ObjectId));
+        this.logger.log(`Skills seeded: ${seededSkillIds.length} records`);
+      } else {
+        this.logger.log('Skills already seeded, skipping');
+      }
+    } catch (err) {
+      this.logger.error('Failed to seed skills', (err as Error).stack);
+      await this.cleanup(seededRoleIds, this.roleModel);
       throw err;
     }
 
@@ -72,6 +91,7 @@ export class SeedService {
       }
     } catch (err) {
       this.logger.error('Failed to seed companies', (err as Error).stack);
+      await this.cleanup(seededSkillIds, this.skillModel);
       await this.cleanup(seededRoleIds, this.roleModel);
       throw err;
     }
@@ -99,6 +119,7 @@ export class SeedService {
     } catch (err) {
       this.logger.error('Failed to seed users', (err as Error).stack);
       await this.cleanup(seededCompanyIds, this.companyModel);
+      await this.cleanup(seededSkillIds, this.skillModel);
       await this.cleanup(seededRoleIds, this.roleModel);
       throw err;
     }
@@ -117,6 +138,7 @@ export class SeedService {
       this.logger.error('Failed to seed jobs', (err as Error).stack);
       await this.cleanup(seededUserIds, this.userModel);
       await this.cleanup(seededCompanyIds, this.companyModel);
+      await this.cleanup(seededSkillIds, this.skillModel);
       await this.cleanup(seededRoleIds, this.roleModel);
       throw err;
     }

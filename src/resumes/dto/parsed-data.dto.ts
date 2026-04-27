@@ -60,6 +60,16 @@ export class ParsedDataDto {
   skills?: string[];
 
   @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  normalizedSkills?: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  unmappedSkills?: string[];
+
+  @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ParsedExperienceDto)
   @IsOptional()

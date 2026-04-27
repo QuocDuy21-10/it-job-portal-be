@@ -6,6 +6,7 @@ import { softDeletePlugin } from 'soft-delete-plugin-mongoose';
 import { Company, CompanySchema } from 'src/companies/schemas/company.schema';
 import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
 import { Role, RoleSchema } from 'src/roles/schemas/role.schema';
+import { Skill, SkillSchema } from 'src/skills/schemas/skill.schema';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
 
 import { SeedService } from './seed.service';
@@ -29,6 +30,7 @@ import { SeedService } from './seed.service';
     }),
     MongooseModule.forFeature([
       { name: Role.name, schema: RoleSchema },
+      { name: Skill.name, schema: SkillSchema },
       { name: Company.name, schema: CompanySchema },
       { name: User.name, schema: UserSchema },
       { name: Job.name, schema: JobSchema },

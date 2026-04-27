@@ -6,6 +6,7 @@ import { CvProfilesModule } from '../cv-profiles/cv-profiles.module';
 import { JobsModule } from '../jobs/jobs.module';
 import { UsersModule } from '../users/users.module';
 import { CompaniesModule } from '../companies/companies.module';
+import { SkillsModule } from '../skills/skills.module';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { ChatContextService } from './chat-context.service';
@@ -19,6 +20,7 @@ import { ChatPromptBuilder } from './chat-prompt.builder';
     JobsModule,
     UsersModule,
     CompaniesModule,
+    SkillsModule,
   ],
   controllers: [ChatController],
   providers: [ChatService, ChatContextService, ChatPromptBuilder],

@@ -11,7 +11,7 @@ import {
   QueryAwareContext,
   FullChatContext,
 } from './interfaces/chat-context.interface';
-import { SKILL_VARIATIONS } from '../matching/constants/matching.constants';
+import { SkillsService } from 'src/skills/skills.service';
 
 @Injectable()
 export class ChatContextService {
@@ -34,23 +34,14 @@ export class ChatContextService {
     'số lượng',
   ];
 
-  // Precomputed skill lookup set (built once from SKILL_VARIATIONS)
-  private readonly knownSkills: Set<string>;
-
   constructor(
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private jobsService: JobsService,
     private companiesService: CompaniesService,
     private cvProfilesService: CvProfilesService,
     private usersService: UsersService,
-  ) {
-    // Build the known skills set from skill variations for fast lookup
-    this.knownSkills = new Set<string>();
-    for (const [key, aliases] of Object.entries(SKILL_VARIATIONS)) {
-      this.knownSkills.add(key.toLowerCase());
-      aliases.forEach(alias => this.knownSkills.add(alias.toLowerCase()));
-    }
-  }
+    private skillsService: SkillsService,
+  ) {}
 
   async buildFullContext(userId: string, message: string): Promise<FullChatContext> {
     const [platform, user] = await Promise.all([
@@ -153,12 +144,16 @@ export class ChatContextService {
     };
 
     const lowerMessage = message.toLowerCase();
+    const aliasMap = await this.skillsService.getAliasMap().catch(error => {
+      this.logger.warn('Error loading skills alias map for chat context:', error);
+      return {} as Record<string, string>;
+    });
 
     // 1. Detect stats keywords
     result.includeStats = this.STATS_KEYWORDS.some(kw => lowerMessage.includes(kw));
 
     // 2. Detect skill names from message
-    const detectedSkills = this.detectSkillsInMessage(lowerMessage, platform);
+    const detectedSkills = this.detectSkillsInMessage(lowerMessage, platform, aliasMap);
 
     // 3. Detect company names from message
     const detectedCompanyNames = this.detectCompaniesInMessage(lowerMessage, platform);
@@ -198,38 +193,45 @@ export class ChatContextService {
     return result;
   }
 
-  private detectSkillsInMessage(lowerMessage: string, platform: PlatformContext): string[] {
+  private detectSkillsInMessage(
+    lowerMessage: string,
+    platform: PlatformContext,
+    aliasMap: Record<string, string>,
+  ): string[] {
     const detected = new Set<string>();
+    const normalizedMessage = this.normalizeSkillLookup(lowerMessage);
+    const words = normalizedMessage.split(/\s+/).filter(word => word.length >= 1);
 
     // Check against platform top skills
     for (const skill of platform.topSkills) {
-      if (lowerMessage.includes(skill.name.toLowerCase())) {
+      const normalizedSkillName = this.normalizeSkillLookup(skill.name);
+      if (
+        lowerMessage.includes(skill.name.toLowerCase()) ||
+        normalizedMessage.includes(normalizedSkillName)
+      ) {
         detected.add(skill.name);
       }
     }
 
-    // Check against known skills from SKILL_VARIATIONS
-    // Use word boundary matching for short skill names to avoid false positives
-    const words = lowerMessage.split(/[\s,;.!?]+/).filter(w => w.length >= 1);
+    // Check against single-token aliases for quick exact matches.
     for (const word of words) {
-      if (this.knownSkills.has(word)) {
-        detected.add(word);
+      if (aliasMap[word]) {
+        detected.add(aliasMap[word]);
       }
     }
 
-    // Also check multi-word patterns (e.g., "react native", "node.js", "machine learning")
-    for (const [key, aliases] of Object.entries(SKILL_VARIATIONS)) {
-      if (lowerMessage.includes(key)) {
-        detected.add(key);
-      }
-      for (const alias of aliases) {
-        if (lowerMessage.includes(alias)) {
-          detected.add(key); // Normalize to canonical name
-        }
+    // Also check phrase aliases such as "react native" or "machine learning".
+    for (const [alias, canonicalSkill] of Object.entries(aliasMap)) {
+      if (alias.includes(' ') && normalizedMessage.includes(alias)) {
+        detected.add(canonicalSkill);
       }
     }
 
     return [...detected];
+  }
+
+  private normalizeSkillLookup(value: string): string {
+    return value.toLowerCase().replace(/[^\w\s+#.]/g, '').replace(/\s+/g, ' ').trim();
   }
 
   private detectCompaniesInMessage(lowerMessage: string, platform: PlatformContext): string[] {
