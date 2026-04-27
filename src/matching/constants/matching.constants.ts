@@ -7,10 +7,10 @@ export const MATCHING_WEIGHTS = {
 } as const;
 
 export const SCORE_THRESHOLDS = {
-  EXCELLENT: 85, 
-  HIGH: 70, 
-  MEDIUM: 50, 
-  LOW: 30, 
+  EXCELLENT: 85,
+  HIGH: 70,
+  MEDIUM: 50,
+  LOW: 30,
 } as const;
 
 export const SKILL_PROFICIENCY_LEVELS = {
@@ -74,4 +74,3 @@ export const AUTO_STATUS_RULES = {
     MAX_CRITICAL_SKILLS_RATE: 30,
   },
 } as const;
-

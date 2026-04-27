@@ -1,11 +1,5 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import aqp from 'api-query-params';
 import { Cache } from 'cache-manager';
@@ -89,7 +83,10 @@ export class SkillsService {
   async findOne(id: string) {
     this.validateObjectId(id);
 
-    const skill = await this.skillModel.findOne({ _id: id, isDeleted: { $ne: true } }).lean().exec();
+    const skill = await this.skillModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .lean()
+      .exec();
     if (!skill) {
       throw new NotFoundException(`Skill with id ${id} not found`);
     }
@@ -100,7 +97,9 @@ export class SkillsService {
   async update(id: string, updateSkillDto: UpdateSkillDto, user: IUser) {
     this.validateObjectId(id);
 
-    const existingSkill = await this.skillModel.findOne({ _id: id, isDeleted: { $ne: true } }).exec();
+    const existingSkill = await this.skillModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .exec();
     if (!existingSkill) {
       throw new NotFoundException(`Skill with id ${id} not found`);
     }
@@ -130,7 +129,9 @@ export class SkillsService {
   async remove(id: string, user: IUser) {
     this.validateObjectId(id);
 
-    const existingSkill = await this.skillModel.findOne({ _id: id, isDeleted: { $ne: true } }).lean();
+    const existingSkill = await this.skillModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .lean();
     if (!existingSkill) {
       throw new NotFoundException(`Skill with id ${id} not found`);
     }

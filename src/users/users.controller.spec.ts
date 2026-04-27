@@ -111,10 +111,7 @@ describe('UsersController', () => {
 
     const result = await controller.followCompany({ companyId: followedCompanyId }, currentUser);
 
-    expect(mockUsersService.followCompany).toHaveBeenCalledWith(
-      currentUser._id,
-      followedCompanyId,
-    );
+    expect(mockUsersService.followCompany).toHaveBeenCalledWith(currentUser._id, followedCompanyId);
     expect(result).toEqual({ message: 'Company followed successfully' });
   });
 
@@ -175,7 +172,10 @@ describe('UsersController', () => {
   });
 
   it('should forward bulkRemove to the service', async () => {
-    const ids = [new mongoose.Types.ObjectId().toString(), new mongoose.Types.ObjectId().toString()];
+    const ids = [
+      new mongoose.Types.ObjectId().toString(),
+      new mongoose.Types.ObjectId().toString(),
+    ];
     mockUsersService.bulkRemove.mockResolvedValue({ deletedCount: 2 } as any);
 
     await controller.bulkRemove({ ids }, currentUser);

@@ -56,9 +56,9 @@ describe('SkillsService', () => {
     it('throws when an unknown skill is provided on a controlled write', async () => {
       cacheManager.get.mockResolvedValue({ typescript: 'TypeScript' });
 
-      await expect(service.normalizeControlledSkills(['TypeScript', 'UnknownSkill'])).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.normalizeControlledSkills(['TypeScript', 'UnknownSkill']),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

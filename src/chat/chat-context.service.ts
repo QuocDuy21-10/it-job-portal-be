@@ -231,7 +231,11 @@ export class ChatContextService {
   }
 
   private normalizeSkillLookup(value: string): string {
-    return value.toLowerCase().replace(/[^\w\s+#.]/g, '').replace(/\s+/g, ' ').trim();
+    return value
+      .toLowerCase()
+      .replace(/[^\w\s+#.]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private detectCompaniesInMessage(lowerMessage: string, platform: PlatformContext): string[] {

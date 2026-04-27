@@ -41,7 +41,7 @@ export class SessionsService {
         isActive: true,
         expiresAt: { $gt: new Date() },
       })
-      .populate('userId', 'name email role company') 
+      .populate('userId', 'name email role company')
       .exec();
   }
 
@@ -52,7 +52,7 @@ export class SessionsService {
         isActive: true,
         expiresAt: { $gt: new Date() },
       })
-      .sort({ lastUsedAt: -1 }) 
+      .sort({ lastUsedAt: -1 })
       .exec();
   }
 

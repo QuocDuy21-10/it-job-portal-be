@@ -80,7 +80,10 @@ describe('SubscribersController', () => {
   });
 
   it('should delegate getMySubscriptions to SubscribersService', async () => {
-    mockSubscribersService.getMySubscriptions.mockResolvedValue({ subscriptions: [], total: 0 } as any);
+    mockSubscribersService.getMySubscriptions.mockResolvedValue({
+      subscriptions: [],
+      total: 0,
+    } as any);
 
     const result = await controller.getMySubscriptions(user);
 

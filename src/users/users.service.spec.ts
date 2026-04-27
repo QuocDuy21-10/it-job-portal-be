@@ -118,7 +118,9 @@ describe('UsersService', () => {
       const createdUser = { _id: new mongoose.Types.ObjectId(), createdAt: new Date() };
 
       mockUserRepository.emailExists.mockResolvedValue(false);
-      mockUserRepository.resolveCompanyAssignmentForRole.mockResolvedValue(normalizedCompany as any);
+      mockUserRepository.resolveCompanyAssignmentForRole.mockResolvedValue(
+        normalizedCompany as any,
+      );
       mockUserRepository.create.mockResolvedValue(createdUser as any);
 
       const result = await service.create(
@@ -409,7 +411,9 @@ describe('UsersService', () => {
         role: new mongoose.Types.ObjectId(),
         company: null,
       } as any);
-      mockUserRepository.resolveCompanyAssignmentForRole.mockResolvedValue(normalizedCompany as any);
+      mockUserRepository.resolveCompanyAssignmentForRole.mockResolvedValue(
+        normalizedCompany as any,
+      );
       mockUserRepository.updateOne.mockResolvedValue({ matchedCount: 1 } as any);
 
       await service.update(
@@ -611,7 +615,9 @@ describe('UsersService', () => {
     });
 
     it('should reject deleted users', async () => {
-      mockUserRepository.findUserProfile.mockResolvedValue(makeProfileDoc({ isDeleted: true }) as any);
+      mockUserRepository.findUserProfile.mockResolvedValue(
+        makeProfileDoc({ isDeleted: true }) as any,
+      );
 
       await expect(service.findUserProfile(userId)).rejects.toThrow('Tài khoản đã bị xóa');
     });

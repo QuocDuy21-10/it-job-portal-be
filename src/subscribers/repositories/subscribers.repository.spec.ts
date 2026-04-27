@@ -33,7 +33,9 @@ describe('SubscribersRepository', () => {
 
   describe('validateObjectId', () => {
     it('should not throw for a valid object id', () => {
-      expect(() => repository.validateObjectId(new mongoose.Types.ObjectId().toString())).not.toThrow();
+      expect(() =>
+        repository.validateObjectId(new mongoose.Types.ObjectId().toString()),
+      ).not.toThrow();
     });
 
     it('should throw BadRequestException for an invalid object id', () => {
@@ -139,7 +141,9 @@ describe('SubscribersRepository', () => {
         },
         { deletedBy },
       );
-      expect(mockSubscriberModel.updateOne.mock.calls[0][0]['createdBy._id'].toString()).toBe(userId);
+      expect(mockSubscriberModel.updateOne.mock.calls[0][0]['createdBy._id'].toString()).toBe(
+        userId,
+      );
       expect(mockSubscriberModel.softDelete).toHaveBeenCalledWith({ _id: id });
       expect(result).toBe(softDeleteResult);
     });

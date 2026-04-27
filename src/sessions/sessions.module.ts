@@ -13,6 +13,6 @@ import { Session, SessionSchema } from './schemas/session.schema';
     ]),
   ],
   providers: [SessionsService],
-  exports: [SessionsService], 
+  exports: [SessionsService],
 })
 export class SessionsModule {}
