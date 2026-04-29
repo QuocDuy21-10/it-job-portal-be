@@ -49,14 +49,22 @@ export class JobsController {
     description: 'Number of items per page',
     example: 10,
   })
+  @ApiQuery({
+    name: 'keyword',
+    required: false,
+    type: String,
+    description: 'Search keyword — matches job title, skills, and company name',
+    example: 'React',
+  })
   @ResponseMessage('Get list jobs')
   findAll(
     @Query('page') page: string,
     @Query('limit') limit: string,
+    @Query('keyword') keyword: string,
     @Query() query: string,
     @User() user: IUser,
   ) {
-    return this.jobsService.findAll(+page, +limit, query, user);
+    return this.jobsService.findAll(+page, +limit, query, user, keyword);
   }
 
   @OptionalAuth()

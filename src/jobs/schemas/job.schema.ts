@@ -115,3 +115,6 @@ JobSchema.index({ approvalStatus: 1, isActive: 1, isDeleted: 1 });
 
 // Text index for search functionality
 JobSchema.index({ name: 'text', description: 'text' });
+
+JobSchema.index({ name: 1 });
+JobSchema.index({ 'company.name': 1 });

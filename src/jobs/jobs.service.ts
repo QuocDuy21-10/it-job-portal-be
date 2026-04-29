@@ -100,28 +100,31 @@ export class JobsService {
     return { _id: newJob._id, createdAt: newJob.createdAt };
   }
 
-  async findAll(page?: number, limit?: number, query?: string, user?: IUser) {
+  async findAll(page?: number, limit?: number, query?: string, user?: IUser, keyword?: string) {
     const { filter: rawFilter, sort: rawSort } = aqp(query);
-
-    // sanitizeAqpQuery strips dangerous operators and limits filter/sort to
-    // pre-approved fields, preventing NoSQL injection via the query string.
     const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
     await this.normalizeSkillsFilter(filter);
 
-    // Expand a plain company._id string into the two ObjectId candidate formats
-    // used by the embedded snapshot (legacy string vs ObjectId).
     if (typeof filter['company._id'] === 'string') {
       filter['company._id'] = {
         $in: buildEmbeddedCompanyIdCandidates(filter['company._id']),
       };
     }
 
-    // Role-based visibility overlay applied after sanitization so it cannot
-    // be overridden by user-supplied filter values.
     if (user && user.role?.name === ERole.HR && user.company?._id) {
       Object.assign(filter, buildEmbeddedCompanyIdFilter(user.company._id));
     } else if (!user || user.role?.name !== ERole.SUPER_ADMIN) {
       Object.assign(filter, this.buildActiveJobFilter());
+    }
+
+    const trimmedKeyword = keyword?.trim();
+    if (trimmedKeyword) {
+      const keywordFilter = this.buildKeywordFilter(trimmedKeyword);
+      if (Array.isArray(filter.$and)) {
+        filter.$and.push(keywordFilter);
+      } else {
+        filter.$and = [keywordFilter];
+      }
     }
 
     const safeLimit = limit > 0 ? limit : 10;
@@ -192,7 +195,9 @@ export class JobsService {
     };
 
     if (updateJobDto.skills) {
-      updatePayload.skills = await this.skillsService.normalizeControlledSkills(updateJobDto.skills);
+      updatePayload.skills = await this.skillsService.normalizeControlledSkills(
+        updateJobDto.skills,
+      );
     }
 
     if (updateJobDto.company?._id) {
@@ -213,9 +218,8 @@ export class JobsService {
       return [];
     }
 
-    const { normalizedSkills, unmappedSkills } = await this.skillsService.normalizeExtractedSkills(
-      skills,
-    );
+    const { normalizedSkills, unmappedSkills } =
+      await this.skillsService.normalizeExtractedSkills(skills);
     const searchTerms = [...normalizedSkills, ...unmappedSkills].filter(Boolean);
     const skillRegexes = searchTerms.map(skill => new RegExp(this.escapeRegex(skill), 'i'));
 
@@ -402,9 +406,8 @@ export class JobsService {
     };
 
     if (skills && skills.length > 0) {
-      const { normalizedSkills, unmappedSkills } = await this.skillsService.normalizeExtractedSkills(
-        skills,
-      );
+      const { normalizedSkills, unmappedSkills } =
+        await this.skillsService.normalizeExtractedSkills(skills);
       const searchTerms = [...normalizedSkills, ...unmappedSkills].filter(Boolean);
       if (searchTerms.length > 0) {
         filter.skills = { $in: searchTerms.map(s => new RegExp(this.escapeRegex(s), 'i')) };
@@ -460,7 +463,9 @@ export class JobsService {
     const rawSkillsFilter = filter.skills;
 
     if (typeof rawSkillsFilter === 'string') {
-      filter.skills = { $in: await this.skillsService.normalizeControlledSkills([rawSkillsFilter]) };
+      filter.skills = {
+        $in: await this.skillsService.normalizeControlledSkills([rawSkillsFilter]),
+      };
       return;
     }
 
@@ -504,6 +509,11 @@ export class JobsService {
       approvalStatus: EJobApprovalStatus.APPROVED,
       $or: [{ endDate: { $gte: new Date() } }, { endDate: null }],
     };
+  }
+
+  private buildKeywordFilter(keyword: string): Record<string, any> {
+    const regex = new RegExp(this.escapeRegex(keyword), 'i');
+    return { $or: [{ name: regex }, { skills: regex }, { 'company.name': regex }] };
   }
 
   private escapeRegex(value: string): string {
