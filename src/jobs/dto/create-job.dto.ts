@@ -11,6 +11,7 @@ import {
   IsNotEmptyObject,
   IsNumber,
   IsObject,
+  IsOptional,
   IsPositive,
   IsString,
   Max,
@@ -55,12 +56,25 @@ export class CreateJobDto {
   @ApiProperty({ type: CompanyDto, description: 'Company of job' })
   company: CompanyDto;
 
-  @IsNotEmpty({ message: 'Location is required' })
+  @IsOptional()
+  @IsString({ message: 'locationCode must be a string' })
+  @MaxLength(100, { message: 'locationCode is too long (max: 100 chars)' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @ApiPropertyOptional({
+    example: 'ha-noi',
+    description: 'Canonical location code used for exact filtering',
+  })
+  locationCode?: string;
+
+  @IsOptional()
   @IsString({ message: 'Location must be a string' })
   @MaxLength(200, { message: 'Location is too long (max: 200 chars)' })
-  @Transform(({ value }) => value.trim())
-  @ApiProperty({ example: 'Ha Noi, Vietnam', description: 'Job location/office address' })
-  location: string;
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @ApiPropertyOptional({
+    example: 'Hà Nội',
+    description: 'Legacy display location. Deprecated in favor of locationCode.',
+  })
+  location?: string;
 
   @IsNotEmpty({ message: 'Salary is required' })
   @IsNumber({}, { message: 'Salary must be a number' })

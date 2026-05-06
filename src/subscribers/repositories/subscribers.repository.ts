@@ -39,7 +39,7 @@ export class SubscribersRepository {
       .skip(offset)
       .limit(limit)
       .sort(sort as any)
-      .select('name email skills location createdAt updatedAt')
+      .select('name email skills location locationCode createdAt updatedAt')
       .lean()
       .exec();
 
@@ -90,7 +90,7 @@ export class SubscribersRepository {
   async findActiveByEmail(email: string): Promise<Subscriber[]> {
     return this.subscriberModel
       .find({ email, isDeleted: false })
-      .select('name email skills location createdAt updatedAt')
+      .select('name email skills location locationCode createdAt updatedAt')
       .sort({ createdAt: -1 })
       .lean()
       .exec() as unknown as Subscriber[];

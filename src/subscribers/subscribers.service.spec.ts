@@ -48,7 +48,7 @@ describe('SubscribersService', () => {
     const dto = {
       name: 'Nguyen Van Duy',
       skills: ['TypeScript', 'NestJS'],
-      location: 'Hanoi',
+      locationCode: 'ha-noi',
     };
 
     it('should create a subscriber below the active subscription limit', async () => {
@@ -68,7 +68,8 @@ describe('SubscribersService', () => {
         name: dto.name,
         email: user.email,
         skills: ['TypeScript', 'NestJS'],
-        location: dto.location,
+        location: 'Hà Nội',
+        locationCode: 'ha-noi',
         createdBy: {
           _id: user._id,
           email: user.email,
@@ -103,7 +104,7 @@ describe('SubscribersService', () => {
         {
           page: 0,
           limit: 500,
-          location: 'Hanoi (Remote)+',
+          location: 'Ha Noi',
           skill: 'TypeScript',
           sortBy: 'name',
           sortOrder: 'asc',
@@ -118,10 +119,7 @@ describe('SubscribersService', () => {
       expect(sort).toEqual({ name: 1 });
       expect(filter.isDeleted).toBe(false);
       expect(filter.skills).toEqual({ $in: ['TypeScript'] });
-      expect(filter.location).toEqual({
-        $regex: 'Hanoi \\(Remote\\)\\+',
-        $options: 'i',
-      });
+      expect(filter.locationCode).toBe('ha-noi');
       expect(filter['createdBy._id']).toBeInstanceOf(mongoose.Types.ObjectId);
       expect(filter['createdBy._id'].toString()).toBe(user._id);
       expect(mockSkillsService.normalizeControlledSkills).toHaveBeenCalledWith(['TypeScript']);
@@ -186,7 +184,11 @@ describe('SubscribersService', () => {
         .mockResolvedValueOnce(existing)
         .mockResolvedValueOnce(updated);
 
-      const result = await service.update(id, { name: 'New Name', skills: ['typescript'] }, user);
+      const result = await service.update(
+        id,
+        { name: 'New Name', skills: ['typescript'], location: 'Ho Chi Minh City' },
+        user,
+      );
 
       expect(mockSubscribersRepository.validateObjectId).toHaveBeenCalledWith(id);
       expect(mockSubscribersRepository.updateOneOwned).toHaveBeenCalledWith(
@@ -195,6 +197,8 @@ describe('SubscribersService', () => {
         expect.objectContaining({
           name: 'New Name',
           skills: ['TypeScript'],
+          location: 'TP. Hồ Chí Minh',
+          locationCode: 'ho-chi-minh',
           updatedBy: {
             _id: user._id,
             email: user.email,

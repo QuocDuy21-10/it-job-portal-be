@@ -185,6 +185,16 @@ describe('JobsService', () => {
       const passedFilter = (mockJobRepository.findPaginated as jest.Mock).mock.calls[0][0];
       expect(passedFilter.skills).toEqual({ $in: ['TypeScript'] });
     });
+
+    it('maps legacy location filters to canonical locationCode values', async () => {
+      mockJobRepository.findPaginated.mockResolvedValue(paginatedResponse([]));
+
+      await service.findAll(1, 10, 'location=/Ha%20Noi/i', publicUser());
+
+      const passedFilter = (mockJobRepository.findPaginated as jest.Mock).mock.calls[0][0];
+      expect(passedFilter.locationCode).toBe('ha-noi');
+      expect(passedFilter.location).toBeUndefined();
+    });
   });
 
   describe('findOne', () => {
@@ -344,7 +354,7 @@ describe('JobsService', () => {
       mockJobRepository.create.mockResolvedValue(fakeJob as any);
 
       const result = await service.create(
-        { company: { _id: 'c1' }, skills: ['typescript', 'nestjs'] } as any,
+        { company: { _id: 'c1' }, skills: ['typescript', 'nestjs'], locationCode: 'ha-noi' } as any,
         hrUser('c1'),
       );
 
@@ -353,7 +363,11 @@ describe('JobsService', () => {
         'nestjs',
       ]);
       expect(mockJobRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({ skills: ['TypeScript', 'NestJS'] }),
+        expect.objectContaining({
+          skills: ['TypeScript', 'NestJS'],
+          location: 'Hà Nội',
+          locationCode: 'ha-noi',
+        }),
       );
       expect(result._id).toBe('new-job');
     });
@@ -367,8 +381,25 @@ describe('JobsService', () => {
       );
 
       await expect(
-        service.create({ company: { _id: 'c1' } } as any, hrUser('c1')),
+        service.create({ company: { _id: 'c1' }, location: 'Ha Noi' } as any, hrUser('c1')),
       ).resolves.toBeDefined();
+    });
+  });
+
+  describe('searchJobs', () => {
+    it('normalizes legacy text locations to exact locationCode filters', async () => {
+      mockJobRepository.findLean.mockResolvedValue([]);
+
+      await service.searchJobs(undefined, undefined, 'Ho Chi Minh City');
+
+      expect(mockJobRepository.findLean).toHaveBeenCalledWith(
+        expect.objectContaining({
+          locationCode: 'ho-chi-minh',
+        }),
+        'name company location locationCode skills level salary',
+        { createdAt: -1 },
+        10,
+      );
     });
   });
 });

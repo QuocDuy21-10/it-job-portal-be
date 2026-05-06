@@ -6,6 +6,7 @@ import { IUser } from 'src/users/user.interface';
 import { SubscribersRepository } from './repositories/subscribers.repository';
 import mongoose from 'mongoose';
 import { SkillsService } from 'src/skills/skills.service';
+import { resolveLocationFromInput, resolveLocationPayload } from 'src/utils/location-catalog';
 
 @Injectable()
 export class SubscribersService {
@@ -15,7 +16,7 @@ export class SubscribersService {
   ) {}
 
   async create(createSubscriberDto: CreateSubscriberDto, user: IUser) {
-    const { name, location } = createSubscriberDto;
+    const { name } = createSubscriberDto;
     // Email is always derived from the authenticated user — never client-controlled
     const email = user.email;
 
@@ -29,12 +30,21 @@ export class SubscribersService {
     const normalizedSkills = await this.skillsService.normalizeControlledSkills(
       createSubscriberDto.skills,
     );
+    const resolvedLocation = this.resolveOptionalLocationPayload(
+      createSubscriberDto.locationCode,
+      createSubscriberDto.location,
+    );
 
     const newSubs = await this.subscribersRepository.create({
       name,
       email,
       skills: normalizedSkills,
-      location,
+      ...(resolvedLocation
+        ? {
+            location: resolvedLocation.location,
+            locationCode: resolvedLocation.locationCode,
+          }
+        : {}),
       createdBy: {
         _id: user._id,
         email: user.email,
@@ -57,8 +67,18 @@ export class SubscribersService {
       isDeleted: false,
     };
 
-    if (query.location) {
-      filter.location = { $regex: this.escapeRegex(query.location), $options: 'i' };
+    if (query.locationCode) {
+      const resolvedLocation = this.resolveOptionalLocationPayload(query.locationCode, undefined);
+      if (resolvedLocation) {
+        filter.locationCode = resolvedLocation.locationCode;
+      }
+    } else if (query.location) {
+      const resolvedLocation = resolveLocationFromInput(query.location);
+      if (resolvedLocation) {
+        filter.locationCode = resolvedLocation.code;
+      } else {
+        filter.location = { $regex: this.escapeRegex(query.location), $options: 'i' };
+      }
     }
     if (query.skill) {
       const [normalizedSkill] = await this.skillsService.normalizeControlledSkills([query.skill]);
@@ -106,7 +126,7 @@ export class SubscribersService {
       throw new NotFoundException('Subscriber not found');
     }
 
-    await this.subscribersRepository.updateOneOwned(id, user._id, {
+    const updatePayload: Record<string, any> = {
       ...updateSubscriberDto,
       ...(updateSubscriberDto.skills
         ? {
@@ -117,7 +137,24 @@ export class SubscribersService {
         _id: user._id,
         email: user.email,
       },
-    });
+    };
+
+    if (
+      Object.prototype.hasOwnProperty.call(updateSubscriberDto, 'location') ||
+      Object.prototype.hasOwnProperty.call(updateSubscriberDto, 'locationCode')
+    ) {
+      const resolvedLocation = this.resolveOptionalLocationPayload(
+        updateSubscriberDto.locationCode,
+        updateSubscriberDto.location,
+      );
+
+      if (resolvedLocation) {
+        updatePayload.location = resolvedLocation.location;
+        updatePayload.locationCode = resolvedLocation.locationCode;
+      }
+    }
+
+    await this.subscribersRepository.updateOneOwned(id, user._id, updatePayload);
 
     return this.subscribersRepository.findOneOwned(id, user._id);
   }
@@ -151,5 +188,19 @@ export class SubscribersService {
 
   private escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private resolveOptionalLocationPayload(locationCode?: string | null, location?: string | null) {
+    if (!locationCode && !location) {
+      return null;
+    }
+
+    const resolvedLocation = resolveLocationPayload({ location, locationCode });
+
+    if (!resolvedLocation) {
+      throw new BadRequestException('A valid locationCode or location is required');
+    }
+
+    return resolvedLocation;
   }
 }

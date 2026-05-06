@@ -32,8 +32,21 @@ export class GetSubscribersQueryDto {
   limit?: number = 10;
 
   @ApiProperty({
+    example: 'ha-noi',
+    description: 'Filter subscriptions by canonical location code',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
+  locationCode?: string;
+
+  @ApiProperty({
     example: 'Hà Nội',
-    description: 'Filter subscriptions by preferred location (partial, case-insensitive)',
+    description: 'Legacy location text filter. Deprecated in favor of locationCode.',
     required: false,
   })
   @IsOptional()

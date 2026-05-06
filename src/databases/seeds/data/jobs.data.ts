@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { EJobFormOfWork } from 'src/jobs/enums/job-form-of-work.enum';
 import { EJobLevel } from 'src/jobs/enums/job-level.enum';
+import { resolveLocationPayload } from 'src/utils/location-catalog';
 
 export function createJobsSeedData(
   companies: Array<{ _id: Types.ObjectId; name: string; logo?: string }>,
@@ -10,13 +11,25 @@ export function createJobsSeedData(
   sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
 
   const pick = (index: number) => companies[index % companies.length];
+  const locationFields = (value: string) => {
+    const resolvedLocation = resolveLocationPayload({ location: value });
+
+    if (!resolvedLocation) {
+      throw new Error(`Unsupported seed location: ${value}`);
+    }
+
+    return {
+      location: resolvedLocation.location,
+      locationCode: resolvedLocation.locationCode,
+    };
+  };
 
   return [
     {
       name: 'Senior Backend Engineer (Node.js/NestJS)',
       skills: ['Node.js', 'NestJS', 'TypeScript', 'MongoDB', 'Redis'],
       company: { _id: pick(0)._id, name: pick(0).name, logo: pick(0).logo ?? null },
-      location: 'Ha Noi',
+      ...locationFields('Ha Noi'),
       salary: 3500,
       quantity: 3,
       level: EJobLevel.SENIOR,
@@ -31,7 +44,7 @@ export function createJobsSeedData(
       name: 'Frontend Engineer (ReactJS)',
       skills: ['React', 'TypeScript', 'Redux', 'Tailwind CSS', 'REST API'],
       company: { _id: pick(1)._id, name: pick(1).name, logo: pick(1).logo ?? null },
-      location: 'Ho Chi Minh City',
+      ...locationFields('Ho Chi Minh City'),
       salary: 2800,
       quantity: 5,
       level: EJobLevel.MID_LEVEL,
@@ -46,7 +59,7 @@ export function createJobsSeedData(
       name: 'Mobile Developer (React Native)',
       skills: ['React Native', 'TypeScript', 'Redux', 'iOS', 'Android'],
       company: { _id: pick(2)._id, name: pick(2).name, logo: pick(2).logo ?? null },
-      location: 'Ha Noi',
+      ...locationFields('Ha Noi'),
       salary: 2500,
       quantity: 2,
       level: EJobLevel.MID_LEVEL,
@@ -61,7 +74,7 @@ export function createJobsSeedData(
       name: 'DevOps Engineer (AWS/Kubernetes)',
       skills: ['AWS', 'Kubernetes', 'Docker', 'Terraform', 'CI/CD', 'Linux'],
       company: { _id: pick(3)._id, name: pick(3).name, logo: pick(3).logo ?? null },
-      location: 'Ho Chi Minh City',
+      ...locationFields('Ho Chi Minh City'),
       salary: 3200,
       quantity: 2,
       level: EJobLevel.SENIOR,
@@ -76,7 +89,7 @@ export function createJobsSeedData(
       name: 'Data Engineer (Apache Spark)',
       skills: ['Python', 'Apache Spark', 'Kafka', 'SQL', 'Airflow', 'AWS S3'],
       company: { _id: pick(4)._id, name: pick(4).name, logo: pick(4).logo ?? null },
-      location: 'Ho Chi Minh City',
+      ...locationFields('Ho Chi Minh City'),
       salary: 3000,
       quantity: 2,
       level: EJobLevel.MID_LEVEL,
@@ -91,7 +104,7 @@ export function createJobsSeedData(
       name: 'Machine Learning Engineer',
       skills: ['Python', 'TensorFlow', 'PyTorch', 'scikit-learn', 'MLflow', 'Docker'],
       company: { _id: pick(5)._id, name: pick(5).name, logo: pick(5).logo ?? null },
-      location: 'Ho Chi Minh City',
+      ...locationFields('Ho Chi Minh City'),
       salary: 4000,
       quantity: 2,
       level: EJobLevel.SENIOR,
@@ -106,7 +119,7 @@ export function createJobsSeedData(
       name: 'Full Stack Developer (Next.js + Spring Boot)',
       skills: ['Next.js', 'React', 'Java', 'Spring Boot', 'PostgreSQL', 'Docker'],
       company: { _id: pick(6)._id, name: pick(6).name, logo: pick(6).logo ?? null },
-      location: 'Ha Noi',
+      ...locationFields('Ha Noi'),
       salary: 2200,
       quantity: 4,
       level: EJobLevel.JUNIOR,
@@ -121,7 +134,7 @@ export function createJobsSeedData(
       name: 'QA Automation Engineer',
       skills: ['Selenium', 'Cypress', 'Jest', 'Playwright', 'CI/CD', 'Python'],
       company: { _id: pick(7)._id, name: pick(7).name, logo: pick(7).logo ?? null },
-      location: 'Ho Chi Minh City',
+      ...locationFields('Ho Chi Minh City'),
       salary: 1800,
       quantity: 3,
       level: EJobLevel.MID_LEVEL,
@@ -136,7 +149,7 @@ export function createJobsSeedData(
       name: 'Cloud Solutions Architect',
       skills: ['AWS', 'GCP', 'Azure', 'Terraform', 'Solution Design', 'Microservices'],
       company: { _id: pick(8)._id, name: pick(8).name, logo: pick(8).logo ?? null },
-      location: 'Ho Chi Minh City',
+      ...locationFields('Ho Chi Minh City'),
       salary: 5000,
       quantity: 1,
       level: EJobLevel.LEAD,
@@ -151,7 +164,7 @@ export function createJobsSeedData(
       name: 'Backend Developer Intern (Go/Python)',
       skills: ['Go', 'Python', 'REST API', 'SQL', 'Git'],
       company: { _id: pick(9)._id, name: pick(9).name, logo: pick(9).logo ?? null },
-      location: 'Ha Noi',
+      ...locationFields('Ha Noi'),
       salary: 500,
       quantity: 6,
       level: EJobLevel.INTERN,
@@ -166,7 +179,7 @@ export function createJobsSeedData(
       name: 'iOS Developer (Swift)',
       skills: ['Swift', 'SwiftUI', 'Combine', 'CoreData', 'Xcode', 'REST API'],
       company: { _id: pick(10)._id, name: pick(10).name, logo: pick(10).logo ?? null },
-      location: 'Ho Chi Minh City',
+      ...locationFields('Ho Chi Minh City'),
       salary: 3000,
       quantity: 2,
       level: EJobLevel.MID_LEVEL,
@@ -181,7 +194,7 @@ export function createJobsSeedData(
       name: 'Android Developer (Kotlin)',
       skills: ['Kotlin', 'Jetpack Compose', 'Coroutines', 'MVVM', 'Android SDK'],
       company: { _id: pick(11)._id, name: pick(11).name, logo: pick(11).logo ?? null },
-      location: 'Ha Noi',
+      ...locationFields('Ha Noi'),
       salary: 2800,
       quantity: 2,
       level: EJobLevel.MID_LEVEL,
@@ -196,7 +209,7 @@ export function createJobsSeedData(
       name: 'Site Reliability Engineer (SRE)',
       skills: ['Linux', 'Prometheus', 'Grafana', 'Kubernetes', 'Python', 'Go'],
       company: { _id: pick(12)._id, name: pick(12).name, logo: pick(12).logo ?? null },
-      location: 'Ho Chi Minh City',
+      ...locationFields('Ho Chi Minh City'),
       salary: 3800,
       quantity: 2,
       level: EJobLevel.SENIOR,
@@ -211,7 +224,7 @@ export function createJobsSeedData(
       name: 'Technical Lead — Java/Spring Boot',
       skills: ['Java', 'Spring Boot', 'Microservices', 'Kafka', 'PostgreSQL', 'AWS'],
       company: { _id: pick(13)._id, name: pick(13).name, logo: pick(13).logo ?? null },
-      location: 'Ho Chi Minh City',
+      ...locationFields('Ho Chi Minh City'),
       salary: 4500,
       quantity: 1,
       level: EJobLevel.LEAD,
@@ -226,7 +239,7 @@ export function createJobsSeedData(
       name: 'Blockchain Developer (Solidity)',
       skills: ['Solidity', 'Hardhat', 'TypeScript', 'Ethers.js', 'Web3', 'Node.js'],
       company: { _id: pick(17)._id, name: pick(17).name, logo: pick(17).logo ?? null },
-      location: 'Ho Chi Minh City',
+      ...locationFields('Ho Chi Minh City'),
       salary: 4200,
       quantity: 3,
       level: EJobLevel.MID_LEVEL,
@@ -241,7 +254,7 @@ export function createJobsSeedData(
       name: 'AI/NLP Engineer (Python)',
       skills: ['Python', 'HuggingFace', 'LangChain', 'PyTorch', 'Transformers', 'FastAPI'],
       company: { _id: pick(19)._id, name: pick(19).name, logo: pick(19).logo ?? null },
-      location: 'Ho Chi Minh City',
+      ...locationFields('Ho Chi Minh City'),
       salary: 4000,
       quantity: 2,
       level: EJobLevel.SENIOR,
@@ -256,7 +269,7 @@ export function createJobsSeedData(
       name: 'Frontend Intern (Vue.js)',
       skills: ['Vue.js', 'HTML', 'CSS', 'JavaScript', 'Git'],
       company: { _id: pick(14)._id, name: pick(14).name, logo: pick(14).logo ?? null },
-      location: 'Ha Noi',
+      ...locationFields('Ha Noi'),
       salary: 450,
       quantity: 5,
       level: EJobLevel.INTERN,
@@ -271,7 +284,7 @@ export function createJobsSeedData(
       name: 'Security Engineer (AppSec)',
       skills: ['OWASP', 'Penetration Testing', 'Python', 'Burp Suite', 'SAST/DAST', 'AWS'],
       company: { _id: pick(15)._id, name: pick(15).name, logo: pick(15).logo ?? null },
-      location: 'Ha Noi',
+      ...locationFields('Ha Noi'),
       salary: 3500,
       quantity: 1,
       level: EJobLevel.SENIOR,
@@ -286,7 +299,7 @@ export function createJobsSeedData(
       name: 'Remote — Backend Engineer (Python/Django)',
       skills: ['Python', 'Django', 'Django REST Framework', 'PostgreSQL', 'Celery', 'Redis'],
       company: { _id: pick(16)._id, name: pick(16).name, logo: pick(16).logo ?? null },
-      location: 'Remote',
+      ...locationFields('Remote'),
       salary: 2600,
       quantity: 3,
       level: EJobLevel.MID_LEVEL,
@@ -301,7 +314,7 @@ export function createJobsSeedData(
       name: 'Engineering Manager',
       skills: ['Team Leadership', 'Agile', 'System Design', 'TypeScript', 'Node.js', 'OKRs'],
       company: { _id: pick(18)._id, name: pick(18).name, logo: pick(18).logo ?? null },
-      location: 'Ho Chi Minh City',
+      ...locationFields('Ho Chi Minh City'),
       salary: 5500,
       quantity: 1,
       level: EJobLevel.MANAGER,

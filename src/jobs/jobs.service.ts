@@ -23,6 +23,11 @@ import {
 } from 'src/companies/company-snapshot.util';
 import { JobRepository } from './repositories/job.repository';
 import { SkillsService } from 'src/skills/skills.service';
+import {
+  getLocationByCode,
+  resolveLocationFromInput,
+  resolveLocationPayload,
+} from 'src/utils/location-catalog';
 
 @Injectable()
 export class JobsService {
@@ -31,6 +36,7 @@ export class JobsService {
     'name',
     'skills',
     'location',
+    'locationCode',
     'salary',
     'quantity',
     'level',
@@ -73,9 +79,15 @@ export class JobsService {
       createJobDto.skills ?? [],
     );
     const normalizedCompany = await this.jobRepository.getCompanySnapshot(createJobDto.company._id);
+    const resolvedLocation = this.resolveLocationOrThrow(
+      createJobDto.locationCode,
+      createJobDto.location,
+    );
 
     const newJob = await this.jobRepository.create({
       ...createJobDto,
+      location: resolvedLocation.location,
+      locationCode: resolvedLocation.locationCode,
       skills: normalizedSkills,
       company: normalizedCompany,
       createdBy: { _id: user._id, email: user.email },
@@ -104,6 +116,7 @@ export class JobsService {
     const { filter: rawFilter, sort: rawSort } = aqp(query);
     const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
     await this.normalizeSkillsFilter(filter);
+    this.normalizeLocationFilter(filter);
 
     if (typeof filter['company._id'] === 'string') {
       filter['company._id'] = {
@@ -202,6 +215,18 @@ export class JobsService {
 
     if (updateJobDto.company?._id) {
       updatePayload.company = await this.jobRepository.getCompanySnapshot(updateJobDto.company._id);
+    }
+
+    if (
+      Object.prototype.hasOwnProperty.call(updateJobDto, 'location') ||
+      Object.prototype.hasOwnProperty.call(updateJobDto, 'locationCode')
+    ) {
+      const resolvedLocation = this.resolveLocationOrThrow(
+        updateJobDto.locationCode,
+        updateJobDto.location,
+      );
+      updatePayload.location = resolvedLocation.location;
+      updatePayload.locationCode = resolvedLocation.locationCode;
     }
 
     return this.jobRepository.updateOne({ _id: id }, updatePayload);
@@ -419,12 +444,21 @@ export class JobsService {
     }
 
     if (location) {
-      filter.location = { $regex: location, $options: 'i' };
+      const resolvedLocation = resolveLocationPayload({
+        location,
+        locationCode: location,
+      });
+
+      if (resolvedLocation) {
+        filter.locationCode = resolvedLocation.locationCode;
+      } else {
+        filter.location = { $regex: location, $options: 'i' };
+      }
     }
 
     return this.jobRepository.findLean(
       filter,
-      'name company location skills level salary',
+      'name company location locationCode skills level salary',
       { createdAt: -1 },
       limit,
     );
@@ -484,6 +518,30 @@ export class JobsService {
     throw new BadRequestException('Invalid skills filter format');
   }
 
+  private normalizeLocationFilter(filter: Record<string, any>): void {
+    if (typeof filter.locationCode === 'string') {
+      const resolvedCode =
+        getLocationByCode(filter.locationCode) ?? resolveLocationFromInput(filter.locationCode);
+
+      if (resolvedCode) {
+        filter.locationCode = resolvedCode.code;
+      }
+    }
+
+    if (typeof filter.location === 'undefined') {
+      return;
+    }
+
+    const resolvedLocation = resolveLocationFromInput(filter.location);
+
+    if (!resolvedLocation) {
+      return;
+    }
+
+    filter.locationCode = resolvedLocation.code;
+    delete filter.location;
+  }
+
   private async assertHrOwnership(
     job: JobDocument | null,
     jobId: string,
@@ -514,6 +572,16 @@ export class JobsService {
   private buildKeywordFilter(keyword: string): Record<string, any> {
     const regex = new RegExp(this.escapeRegex(keyword), 'i');
     return { $or: [{ name: regex }, { skills: regex }, { 'company.name': regex }] };
+  }
+
+  private resolveLocationOrThrow(locationCode?: string | null, location?: string | null) {
+    const resolvedLocation = resolveLocationPayload({ location, locationCode });
+
+    if (!resolvedLocation) {
+      throw new BadRequestException('A valid locationCode or location is required');
+    }
+
+    return resolvedLocation;
   }
 
   private escapeRegex(value: string): string {

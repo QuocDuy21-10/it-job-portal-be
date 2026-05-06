@@ -73,7 +73,9 @@ describe('SubscribersRepository', () => {
       expect(chain.skip).toHaveBeenCalledWith(10);
       expect(chain.limit).toHaveBeenCalledWith(2);
       expect(chain.sort).toHaveBeenCalledWith({ createdAt: -1 });
-      expect(chain.select).toHaveBeenCalledWith('name email skills location createdAt updatedAt');
+      expect(chain.select).toHaveBeenCalledWith(
+        'name email skills location locationCode createdAt updatedAt',
+      );
       expect(chain.lean).toHaveBeenCalled();
       expect(chain.exec).toHaveBeenCalled();
       expect(result).toEqual({

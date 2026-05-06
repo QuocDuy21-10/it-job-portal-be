@@ -61,6 +61,22 @@ export class CreateSubscriberDto {
   skills: string[];
 
   @IsOptional()
+  @IsString({ message: 'locationCode must be a string' })
+  @MaxLength(100, { message: 'locationCode is too long (max: 100 chars)' })
+  @Transform(({ value }) => {
+    if (typeof value === 'number') {
+      value = String(value);
+    }
+    return typeof value === 'string' ? value.trim().toLowerCase() : value;
+  })
+  @ApiProperty({
+    example: 'ha-noi',
+    description: 'Canonical location code used for exact matching',
+    required: false,
+  })
+  locationCode?: string;
+
+  @IsOptional()
   @IsString({ message: 'Location must be a string' })
   @MaxLength(100, { message: 'Location is too long (max: 100 chars)' })
   @Transform(({ value }) => {
@@ -71,7 +87,7 @@ export class CreateSubscriberDto {
   })
   @ApiProperty({
     example: 'Hà Nội',
-    description: 'Preferred location of subscriber',
+    description: 'Legacy display location. Deprecated in favor of locationCode.',
     required: false,
   })
   location?: string;

@@ -17,6 +17,9 @@ export class Subscriber {
   @Prop({ type: String, trim: true })
   location?: string;
 
+  @Prop({ type: String, trim: true, lowercase: true })
+  locationCode?: string;
+
   @Prop({ type: Object })
   createdBy?: {
     _id: mongoose.Schema.Types.ObjectId;
@@ -54,3 +57,4 @@ export const SubscriberSchema = SchemaFactory.createForClass(Subscriber);
 SubscriberSchema.index({ email: 1, isDeleted: 1 });
 // Owner-scoped list/detail reads sorted by creation time
 SubscriberSchema.index({ 'createdBy._id': 1, isDeleted: 1, createdAt: -1 });
+SubscriberSchema.index({ locationCode: 1, isDeleted: 1 });

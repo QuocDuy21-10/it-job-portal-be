@@ -138,7 +138,7 @@ export class AuthCredentialsService {
     }
 
     const token = uuidv4();
-    await this.cacheManager.set(`reset_password:${token}`, email, 600000);
+    await this.cacheManager.set(`reset_password:${token}`, email, 600000); // 10 minutes
 
     const url = `${this.configService.get<string>('FE_URL')}/reset-password?token=${token}&email=${email}`;
 

@@ -24,6 +24,9 @@ export class Job {
   @Prop({ required: true, trim: true })
   location: string;
 
+  @Prop({ required: true, trim: true, lowercase: true })
+  locationCode: string;
+
   @Prop({ required: true, trim: true })
   salary: number;
 
@@ -109,6 +112,7 @@ JobSchema.index({ isActive: 1, endDate: 1, isDeleted: 1 });
 JobSchema.index({ skills: 1 });
 JobSchema.index({ level: 1 });
 JobSchema.index({ location: 1 });
+JobSchema.index({ locationCode: 1 });
 JobSchema.index({ createdAt: -1 });
 JobSchema.index({ approvalStatus: 1 });
 JobSchema.index({ approvalStatus: 1, isActive: 1, isDeleted: 1 });

@@ -9,6 +9,7 @@ import { Subscriber, SubscriberDocument } from 'src/subscribers/schemas/subscrib
 import { Job as JobEntity, JobDocument } from 'src/jobs/schemas/job.schema';
 import { JOB_RECOMMENDATION_QUEUE } from '../queues.constants';
 import { JobRecommendationPayload } from '../services/job-recommendation-queue.service';
+import { resolveLocationPayload } from 'src/utils/location-catalog';
 
 interface JobRecommendationData {
   name: string;
@@ -44,7 +45,7 @@ export class JobRecommendationQueueProcessor extends WorkerHost {
       // 1. Fetch subscriber data
       const subscriber = await this.subscriberModel
         .findById(subscriberId)
-        .select('email name skills location')
+        .select('email name skills location locationCode')
         .lean()
         .exec();
 
@@ -68,13 +69,13 @@ export class JobRecommendationQueueProcessor extends WorkerHost {
       };
 
       // Add location matching if subscriber has location preference
-      if (subscriber.location && subscriber.location.trim()) {
-        // Use regex for flexible location matching
-        // e.g., "Hà Nội" matches "Cầu Giấy - Hà Nội"
-        matchQuery.location = {
-          $regex: this.escapeRegex(subscriber.location),
-          $options: 'i', // Case-insensitive
-        };
+      const resolvedLocation = resolveLocationPayload({
+        location: subscriber.location,
+        locationCode: subscriber.locationCode,
+      });
+
+      if (resolvedLocation) {
+        matchQuery.locationCode = resolvedLocation.locationCode;
       }
 
       // 3. Query matching jobs (limit to top 5)
@@ -137,10 +138,4 @@ export class JobRecommendationQueueProcessor extends WorkerHost {
     return `${salary.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')} đ`;
   }
 
-  /**
-   * Escape special regex characters for safe string matching
-   */
-  private escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
 }
