@@ -73,7 +73,17 @@ const LOCATION_SEEDS: LocationSeed[] = [
   { code: 'quang-ninh', label: 'Quảng Ninh' },
   { code: 'quang-tri', label: 'Quảng Trị' },
   {
-    aliases: ['HCM', 'HCMC', 'Ho Chi Minh', 'Ho Chi Minh City', 'Sai Gon', 'Sài Gòn', 'Thanh Pho Ho Chi Minh', 'TP HCM', 'TPHCM'],
+    aliases: [
+      'HCM',
+      'HCMC',
+      'Ho Chi Minh',
+      'Ho Chi Minh City',
+      'Sai Gon',
+      'Sài Gòn',
+      'Thanh Pho Ho Chi Minh',
+      'TP HCM',
+      'TPHCM',
+    ],
     code: 'ho-chi-minh',
     label: 'TP. Hồ Chí Minh',
   },

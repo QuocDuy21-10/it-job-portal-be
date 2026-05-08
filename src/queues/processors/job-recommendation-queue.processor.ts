@@ -137,5 +137,4 @@ export class JobRecommendationQueueProcessor extends WorkerHost {
     if (!salary) return 'Thỏa thuận';
     return `${salary.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')} đ`;
   }
-
 }

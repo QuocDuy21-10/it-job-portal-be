@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { AuthGoogleService } from '../services/auth-google.service';
 import { AuthSessionService } from '../services/auth-session.service';
 import {
@@ -75,6 +75,18 @@ describe('AuthGoogleService', () => {
 
       await expect(service.googleLogin('valid-id-token', makeResponse())).rejects.toThrow(
         UnauthorizedException,
+      );
+      expect(authSessionService.login).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException when an existing Google user has pending deletion', async () => {
+      verifyIdTokenMock.mockResolvedValue(mockGoogleTicket());
+      usersService.findUserByGoogleId.mockResolvedValue(
+        makeGoogleUser({ scheduledDeletionAt: new Date(Date.now() + 60_000) }),
+      );
+
+      await expect(service.googleLogin('valid-id-token', makeResponse())).rejects.toThrow(
+        ForbiddenException,
       );
       expect(authSessionService.login).not.toHaveBeenCalled();
     });

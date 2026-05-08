@@ -7,15 +7,8 @@ import { Model } from 'mongoose';
 import { IUser } from 'src/users/user.interface';
 import { User, UserDocument } from 'src/users/schemas/user.schema';
 import { IJwtAccessPayload } from '../interfaces/jwt-payload.interface';
+import { assertAuthenticatedAccountState } from '../utils/assert-authenticated-account-state.util';
 
-/**
- * JWT Access Token Strategy
- *
- * Hydrates user from DB on every authenticated request.
- * Populates: role (name only) + company — no permissions (handled by CASL).
- *
- * Flow: Bearer token → verify signature → validate() → attach IUser to req.user
- */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -48,17 +41,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User not found. Token không hợp lệ.');
     }
 
-    if (!user.isActive) {
-      throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ admin.');
-    }
-
-    if (user.isLocked) {
-      throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
-    }
-
-    if (user.isDeleted) {
-      throw new UnauthorizedException('Tài khoản đã bị xóa. Token không hợp lệ.');
-    }
+    assertAuthenticatedAccountState(user, 'access');
 
     const userRole = user.role as any;
     if (!userRole || !userRole._id) {

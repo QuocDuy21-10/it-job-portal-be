@@ -1,4 +1,4 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { AuthCredentialsService } from '../services/auth-credentials.service';
 import { AuthVerificationService } from '../services/auth-verification.service';
 import {
@@ -43,6 +43,7 @@ describe('AuthCredentialsService', () => {
     sessionsService = context.sessionsService;
     cacheManager = context.cacheManager;
     mailerService = context.mailerService;
+    mailerService.sendMail.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -113,6 +114,17 @@ describe('AuthCredentialsService', () => {
 
       await expect(service.validateUser('test@example.com', 'correct-password')).rejects.toThrow(
         UnauthorizedException,
+      );
+    });
+
+    it('should throw ForbiddenException when account deletion is pending', async () => {
+      usersService.findOneByUserEmail.mockResolvedValue(
+        makeUser({ scheduledDeletionAt: new Date(Date.now() + 60_000) }),
+      );
+      usersService.isValidPassword.mockReturnValue(true);
+
+      await expect(service.validateUser('test@example.com', 'correct-password')).rejects.toThrow(
+        ForbiddenException,
       );
     });
   });

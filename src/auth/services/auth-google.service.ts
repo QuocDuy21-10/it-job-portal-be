@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OAuth2Client } from 'google-auth-library';
 import { Response } from 'express';
@@ -6,6 +11,7 @@ import { AuthSessionService } from './auth-session.service';
 import { EAuthProvider } from '../enums/auth-provider.enum';
 import { IUser } from 'src/users/user.interface';
 import { UsersService } from 'src/users/users.service';
+import { assertAuthenticatedAccountState } from '../utils/assert-authenticated-account-state.util';
 
 @Injectable()
 export class AuthGoogleService {
@@ -50,9 +56,7 @@ export class AuthGoogleService {
         }
       }
 
-      if (user.isLocked) {
-        throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
-      }
+      assertAuthenticatedAccountState(user);
 
       const userRole = user.role as unknown as { _id: string; name: string };
 
@@ -76,7 +80,7 @@ export class AuthGoogleService {
 
       return this.authSessionService.login(userObject, response, 'unknown', 'google-login');
     } catch (error) {
-      if (error instanceof UnauthorizedException) {
+      if (error instanceof UnauthorizedException || error instanceof ForbiddenException) {
         throw error;
       }
 

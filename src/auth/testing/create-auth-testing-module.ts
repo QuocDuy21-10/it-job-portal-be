@@ -100,7 +100,7 @@ export async function createAuthTestingModule(
   };
 
   const mailerService = {
-    sendMail: jest.fn<(payload: unknown) => Promise<unknown>>(),
+    sendMail: jest.fn<(payload: unknown) => Promise<unknown>>().mockResolvedValue(undefined),
   };
 
   const commonProviders: Provider[] = [

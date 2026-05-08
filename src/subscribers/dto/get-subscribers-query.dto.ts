@@ -39,9 +39,7 @@ export class GetSubscribersQueryDto {
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim().toLowerCase() : value,
-  )
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
   locationCode?: string;
 
   @ApiProperty({

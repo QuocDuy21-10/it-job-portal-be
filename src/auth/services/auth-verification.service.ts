@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MailerService } from '@nestjs-modules/mailer';
 import Redis from 'ioredis';
@@ -9,6 +15,7 @@ import { generateOtp, hashOtp, verifyOtp } from '../utils/otp.utils';
 
 @Injectable()
 export class AuthVerificationService {
+  private readonly logger = new Logger(AuthVerificationService.name);
   constructor(
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
@@ -28,16 +35,18 @@ export class AuthVerificationService {
     pipeline.set(`otp:cooldown:${email}`, '1', 'EX', 60, 'NX' as any);
     await pipeline.exec();
 
-    this.mailerService.sendMail({
-      to: email,
-      subject: 'Activate your account at IT Job Portal',
-      template: 'verify-email',
-      context: {
-        name: user.name,
-        code,
-        currentYear: new Date().getFullYear(),
-      },
-    });
+    await this.mailerService
+      .sendMail({
+        to: email,
+        subject: 'Activate your account at IT Job Portal',
+        template: 'verify-email',
+        context: {
+          name: user.name,
+          code,
+          currentYear: new Date().getFullYear(),
+        },
+      })
+      .catch(err => this.logger.error('Failed to send verification email', err));
   }
 
   async verifyEmail(dto: VerifyAuthDto) {

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
 import { Cache } from 'cache-manager';
@@ -15,9 +15,13 @@ import { IUser } from 'src/users/user.interface';
 import { UsersService } from 'src/users/users.service';
 import { SessionsService } from 'src/sessions/sessions.service';
 import { AuthVerificationService } from './auth-verification.service';
+import { assertAuthenticatedAccountState } from '../utils/assert-authenticated-account-state.util';
+
+const RESET_PASSWORD_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 @Injectable()
 export class AuthCredentialsService {
+  private readonly logger = new Logger(AuthCredentialsService.name);
   constructor(
     private readonly usersService: UsersService,
     private readonly sessionsService: SessionsService,
@@ -43,12 +47,7 @@ export class AuthCredentialsService {
 
       const isValid = this.usersService.isValidPassword(password, user.password);
       if (isValid) {
-        if (!user.isActive) {
-          throw new BadRequestException('Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email.');
-        }
-        if (user.isLocked) {
-          throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
-        }
+        assertAuthenticatedAccountState(user);
 
         return {
           ...user.toObject(),
@@ -74,7 +73,14 @@ export class AuthCredentialsService {
         registerUserDto,
       );
     } else {
-      newUser = await this.usersService.register(registerUserDto);
+      try {
+        newUser = await this.usersService.register(registerUserDto);
+      } catch (err) {
+        if (err?.code === 11000) {
+          throw new BadRequestException('Email đã tồn tại');
+        }
+        throw err;
+      }
     }
 
     await this.authVerificationService.sendVerificationCode(newUser);
@@ -138,20 +144,22 @@ export class AuthCredentialsService {
     }
 
     const token = uuidv4();
-    await this.cacheManager.set(`reset_password:${token}`, email, 600000); // 10 minutes
+    await this.cacheManager.set(`reset_password:${token}`, email, RESET_PASSWORD_TTL_MS);
 
     const url = `${this.configService.get<string>('FE_URL')}/reset-password?token=${token}&email=${email}`;
 
-    this.mailerService.sendMail({
-      to: email,
-      subject: 'Reset Password Request',
-      template: 'forgot-password',
-      context: {
-        name: user.name,
-        url,
-        currentYear: new Date().getFullYear(),
-      },
-    });
+    await this.mailerService
+      .sendMail({
+        to: email,
+        subject: 'Reset Password Request',
+        template: 'forgot-password',
+        context: {
+          name: user.name,
+          url,
+          currentYear: new Date().getFullYear(),
+        },
+      })
+      .catch(err => this.logger.error('Failed to send reset-password email', err));
 
     return { message: 'Nếu email tồn tại, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.' };
   }

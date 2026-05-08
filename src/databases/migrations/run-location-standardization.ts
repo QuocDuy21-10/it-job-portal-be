@@ -40,10 +40,7 @@ const migrateCollection = async <T extends LocationLikeDocument>(
   collection: string,
   model: Model<T>,
 ): Promise<MigrationReport> => {
-  const documents = await model
-    .find({}, { location: 1, locationCode: 1 })
-    .lean()
-    .exec();
+  const documents = await model.find({}, { location: 1, locationCode: 1 }).lean().exec();
 
   const bulkOperations: Array<{
     updateOne: {
@@ -71,10 +68,7 @@ const migrateCollection = async <T extends LocationLikeDocument>(
       continue;
     }
 
-    if (
-      document.location === plan.location &&
-      document.locationCode === plan.locationCode
-    ) {
+    if (document.location === plan.location && document.locationCode === plan.locationCode) {
       continue;
     }
 
@@ -113,10 +107,7 @@ async function run() {
 
     const [jobsReport, subscribersReport] = await Promise.all([
       migrateCollection('jobs', jobModel as unknown as Model<LocationLikeDocument>),
-      migrateCollection(
-        'subscribers',
-        subscriberModel as unknown as Model<LocationLikeDocument>,
-      ),
+      migrateCollection('subscribers', subscriberModel as unknown as Model<LocationLikeDocument>),
     ]);
 
     for (const report of [jobsReport, subscribersReport]) {

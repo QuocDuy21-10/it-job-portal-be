@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { Session, SessionDocument } from './schemas/session.schema';
 import { ConfigService } from '@nestjs/config';
 import ms from 'ms';
+import { createHmac } from 'crypto';
 
 @Injectable()
 export class SessionsService {
@@ -20,10 +21,12 @@ export class SessionsService {
   ): Promise<SessionDocument> {
     const refreshTokenTTL = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN');
     const expiresAt = new Date(Date.now() + ms(refreshTokenTTL));
+    const refreshTokenHash = this.hashRefreshToken(refreshToken);
 
     const newSession = await this.sessionModel.create({
       userId,
-      refreshToken,
+      refreshToken: refreshTokenHash,
+      refreshTokenHash,
       userAgent,
       ipAddress,
       expiresAt,
@@ -35,9 +38,11 @@ export class SessionsService {
   }
 
   async findSessionByToken(refreshToken: string): Promise<SessionDocument | null> {
+    const refreshTokenHash = this.hashRefreshToken(refreshToken);
+
     return this.sessionModel
       .findOne({
-        refreshToken,
+        refreshTokenHash,
         isActive: true,
         expiresAt: { $gt: new Date() },
       })
@@ -57,7 +62,8 @@ export class SessionsService {
   }
 
   async deleteSession(refreshToken: string): Promise<boolean> {
-    const result = await this.sessionModel.deleteOne({ refreshToken });
+    const refreshTokenHash = this.hashRefreshToken(refreshToken);
+    const result = await this.sessionModel.deleteOne({ refreshTokenHash });
     return result.deletedCount > 0;
   }
 
@@ -67,8 +73,10 @@ export class SessionsService {
   }
 
   async deactivateSession(refreshToken: string): Promise<boolean> {
+    const refreshTokenHash = this.hashRefreshToken(refreshToken);
+
     const result = await this.sessionModel.updateOne(
-      { refreshToken },
+      { refreshTokenHash },
       { $set: { isActive: false } },
     );
     return result.modifiedCount > 0;
@@ -80,7 +88,9 @@ export class SessionsService {
   }
 
   async updateLastUsedAt(refreshToken: string): Promise<void> {
-    await this.sessionModel.updateOne({ refreshToken }, { $set: { lastUsedAt: new Date() } });
+    const refreshTokenHash = this.hashRefreshToken(refreshToken);
+
+    await this.sessionModel.updateOne({ refreshTokenHash }, { $set: { lastUsedAt: new Date() } });
   }
 
   async cleanupExpiredSessions(): Promise<number> {
@@ -110,8 +120,18 @@ export class SessionsService {
 
     if (sessions.length > maxSessions) {
       const sessionsToDelete = sessions.slice(0, sessions.length - maxSessions);
-      const tokensToDelete = sessionsToDelete.map(s => s.refreshToken);
-      await this.sessionModel.deleteMany({ refreshToken: { $in: tokensToDelete } });
+      const tokensToDelete = sessionsToDelete.map(s => s.refreshTokenHash);
+      await this.sessionModel.deleteMany({ refreshTokenHash: { $in: tokensToDelete } });
     }
+  }
+
+  private hashRefreshToken(refreshToken: string): string {
+    const refreshTokenSecret = this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET');
+
+    if (!refreshTokenSecret) {
+      throw new BadRequestException('JWT refresh token secret is not configured.');
+    }
+
+    return createHmac('sha256', refreshTokenSecret).update(refreshToken).digest('hex');
   }
 }

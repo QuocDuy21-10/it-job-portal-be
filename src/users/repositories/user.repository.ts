@@ -39,7 +39,9 @@ export class UserRepository {
   }
 
   async findOneByUserEmail(email: string): Promise<UserDocument | null> {
-    return this.userModel.findOne({ email }).populate({ path: 'role', select: { name: 1 } });
+    return this.userModel
+      .findOne({ email, isDeleted: false })
+      .populate({ path: 'role', select: { name: 1 } });
   }
 
   async findByEmail(email: string): Promise<UserDocument | null> {
