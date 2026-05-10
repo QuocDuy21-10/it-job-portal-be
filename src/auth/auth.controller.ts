@@ -171,7 +171,6 @@ export class AuthController {
     @Body() authGoogleLoginDto: AuthGoogleLoginDto,
     @Res({ passthrough: true }) response: Response,
   ) {
-    // Tạm thời chưa truyền userAgent và ip vào googleLogin, sẽ cần refactor tiếp
     return this.authService.googleLogin(authGoogleLoginDto.idToken, response);
   }
 

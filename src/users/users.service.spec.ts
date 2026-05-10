@@ -276,13 +276,14 @@ describe('UsersService', () => {
         page: '2',
         limit: '5',
         name: 'alice',
+        $where: 'this.email.includes("@example.com")',
       } as any);
 
       expect(mockUserRepository.findPaginated).toHaveBeenCalledWith(
         { name: 'alice' },
         5,
         5,
-        undefined,
+        {},
         undefined,
       );
       expect(result).toEqual({
@@ -296,6 +297,54 @@ describe('UsersService', () => {
           },
         },
       });
+    });
+
+    it('should fall back to safe pagination defaults for invalid values', async () => {
+      mockUserRepository.findPaginated.mockResolvedValue({
+        result: [],
+        totalItems: 0,
+        totalPages: 0,
+      } as any);
+
+      const result = await service.findAll(0, Number.NaN, {
+        page: '0',
+        limit: 'invalid',
+        email: 'user@example.com',
+      } as any);
+
+      expect(mockUserRepository.findPaginated).toHaveBeenCalledWith(
+        { email: 'user@example.com' },
+        0,
+        10,
+        {},
+        undefined,
+      );
+      expect(result.meta.pagination).toEqual({
+        current_page: 1,
+        per_page: 10,
+        total_pages: 0,
+        total: 0,
+      });
+    });
+
+    it('should escape regex filters for text fields before querying MongoDB', async () => {
+      mockUserRepository.findPaginated.mockResolvedValue({
+        result: [],
+        totalItems: 0,
+        totalPages: 0,
+      } as any);
+
+      await service.findAll(1, 10, 'name=/ali.*/ig');
+
+      const [filter, offset, limit, sort, population] =
+        mockUserRepository.findPaginated.mock.calls[0];
+      expect(filter.name).toBeInstanceOf(RegExp);
+      expect(filter.name.source).toBe('ali\\.\\*');
+      expect(filter.name.flags).toBe('i');
+      expect(offset).toBe(0);
+      expect(limit).toBe(10);
+      expect(sort).toEqual({});
+      expect(population).toBeUndefined();
     });
   });
 
@@ -458,6 +507,19 @@ describe('UsersService', () => {
           $unset: { company: 1 },
           updatedBy: { _id: actingUser._id, email: actingUser.email },
         }),
+      );
+    });
+
+    it('should reject when no user record matches the update query', async () => {
+      mockUserRepository.findWithSelect.mockResolvedValue({
+        role: roleId,
+        company: null,
+      } as any);
+      mockUserRepository.resolveCompanyAssignmentForRole.mockResolvedValue(undefined);
+      mockUserRepository.updateOne.mockResolvedValue({ matchedCount: 0 } as any);
+
+      await expect(service.update(id, { name: 'Updated Name' } as any, actingUser)).rejects.toThrow(
+        'User not found',
       );
     });
   });

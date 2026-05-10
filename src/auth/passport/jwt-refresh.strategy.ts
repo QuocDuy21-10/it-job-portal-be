@@ -30,7 +30,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
         },
       ]),
       secretOrKey: configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
-      passReqToCallback: true,  // Cho phép truy cập request object
+      passReqToCallback: true, // Cho phép truy cập request object
       // Không ignore expiration - JWT sẽ tự động check hết hạn
       ignoreExpiration: false,
     });
@@ -79,7 +79,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
         path: 'role',
         select: '_id name',
       })
-      .select('-password -refreshToken') 
+      .select('-password -refreshToken')
       .lean()
       .exec();
 
