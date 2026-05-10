@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenAI, Type } from '@google/genai';
+import { FunctionCallingConfigMode, GoogleGenAI, Type } from '@google/genai';
 import { ParsedDataDto } from 'src/resumes/dto/parsed-data.dto';
 
 @Injectable()
@@ -12,6 +12,27 @@ export class GeminiService {
   private readonly MODEL_NAME = 'gemini-2.5-flash-lite';
   private readonly PARSE_MAX_TOKENS = 5000;
   private readonly PARSE_TEMPERATURE = 0.3;
+
+  // Tool declaration for job recommendations in streaming mode.
+  // The model calls this instead of embedding IDs in free-form text.
+  private readonly RECOMMEND_JOBS_TOOL = {
+    name: 'recommend_jobs',
+    description:
+      'Call this function when you want to recommend specific jobs to the user. ' +
+      'Only use job IDs that appear verbatim in the YOUR MATCHING JOBS or SEARCH RESULTS sections of your context. ' +
+      'Never fabricate or guess job IDs.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        jobIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of job IDs from the provided context to recommend.',
+        },
+      },
+      required: ['jobIds'],
+    },
+  };
 
   // Chat response JSON schema — enforced at API level
   private readonly CHAT_RESPONSE_SCHEMA = {
@@ -255,8 +276,134 @@ ${cvText}`;
   }
 
   /**
+   * Build the multi-turn contents array shared by chat and streaming methods.
+   */
+  private buildChatContents(
+    systemPrompt: string,
+    conversationHistory: Array<{ role: string; content: string }>,
+    message: string,
+  ): any[] {
+    const contents: any[] = [];
+
+    contents.push(
+      { role: 'user', parts: [{ text: systemPrompt }] },
+      {
+        role: 'model',
+        parts: [
+          {
+            text: 'Đã nhận thông tin ngữ cảnh. Tôi sẵn sàng hỗ trợ bạn về các vấn đề liên quan đến việc làm và phát triển sự nghiệp trong lĩnh vực IT.',
+          },
+        ],
+      },
+    );
+
+    for (const msg of conversationHistory) {
+      contents.push({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }],
+      });
+    }
+
+    contents.push({ role: 'user', parts: [{ text: message }] });
+    return contents;
+  }
+
+  /**
+   * Streaming chat with function-calling tool for structured job recommendations.
+   *
+   * Flow:
+   *  Turn 1 (non-streaming) — model receives the recommend_jobs tool declaration.
+   *    If it calls the tool, we capture the exact job IDs and send a function_response.
+   *    If it does not call the tool, we fall back to emitting the text directly.
+   *  Turn 2 (streaming) — model generates the final natural-language response which
+   *    we yield as text chunks.
+   *
+   * The generator's RETURN VALUE (accessible when done === true) is the string[]
+   * of recommended job IDs from the tool call (empty array if no tool was called).
+   */
+  async *chatWithContextStreamAndTools(
+    message: string,
+    conversationHistory: Array<{ role: string; content: string }>,
+    systemPrompt: string,
+  ): AsyncGenerator<string, string[], unknown> {
+    const contents = this.buildChatContents(systemPrompt, conversationHistory, message);
+
+    // Turn 1: non-streaming — let the model decide whether to call recommend_jobs
+    const turn1 = await this.makeRequestWithRetry(async () => {
+      return await this.ai.models.generateContent({
+        model: this.MODEL_NAME,
+        contents,
+        config: {
+          temperature: 0.7,
+          maxOutputTokens: 2000,
+          tools: [{ functionDeclarations: [this.RECOMMEND_JOBS_TOOL] }],
+          toolConfig: {
+            functionCallingConfig: { mode: FunctionCallingConfigMode.AUTO },
+          },
+        },
+      });
+    });
+
+    const recommendJobCall = turn1.functionCalls?.find(fc => fc.name === 'recommend_jobs');
+
+    if (recommendJobCall) {
+      const rawArgs = recommendJobCall.args as { jobIds?: unknown };
+      const recommendedJobIds: string[] = Array.isArray(rawArgs?.jobIds)
+        ? (rawArgs.jobIds as unknown[]).filter((id): id is string => typeof id === 'string')
+        : [];
+
+      // Build the function_response turn so the model continues with full context
+      const modelContent = turn1.candidates?.[0]?.content;
+      const functionResponseContents = modelContent
+        ? [
+            ...contents,
+            modelContent,
+            {
+              role: 'user',
+              parts: [
+                {
+                  functionResponse: {
+                    name: 'recommend_jobs',
+                    response: { status: 'accepted', count: recommendedJobIds.length },
+                  },
+                },
+              ],
+            },
+          ]
+        : contents;
+
+      // Turn 2: stream the final assistant response
+      await this.enforceRateLimit();
+      const turn2Stream = await this.ai.models.generateContentStream({
+        model: this.MODEL_NAME,
+        contents: functionResponseContents,
+        config: {
+          temperature: 0.7,
+          maxOutputTokens: 2000,
+        },
+      });
+
+      for await (const chunk of turn2Stream) {
+        if (chunk.text) {
+          yield chunk.text;
+        }
+      }
+
+      return recommendedJobIds;
+    } else {
+      // No tool call — emit whatever text the model returned in turn 1
+      const text = turn1.text || '';
+      if (text) {
+        yield text;
+      }
+      return [];
+    }
+  }
+
+  /**
    * Streaming chat with context — yields text chunks as they are generated
    * Does NOT use JSON mode (streaming requires plain text for incremental tokens)
+   * @deprecated Use chatWithContextStreamAndTools for accurate job recommendations
    */
   async *chatWithContextStream(
     message: string,

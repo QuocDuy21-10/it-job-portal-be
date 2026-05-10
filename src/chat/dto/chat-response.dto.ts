@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ChatRecommendedJobDto } from './chat-recommended-job.dto';
 
 export class ChatResponseDto {
   @ApiProperty({
@@ -28,9 +29,18 @@ export class ChatResponseDto {
 
   @ApiProperty({
     description:
+      'Validated recommended job IDs persisted with the assistant message so the frontend can rehydrate cards after refresh',
+    required: false,
+    type: [String],
+    example: ['507f1f77bcf86cd799439011'],
+  })
+  recommendedJobIds?: string[];
+
+  @ApiProperty({
+    description:
       'Recommended jobs array (Structured Output) - Frontend can render as clickable cards',
     required: false,
-    type: 'array',
+    type: [ChatRecommendedJobDto],
     example: [
       {
         _id: '507f1f77bcf86cd799439011',
@@ -42,5 +52,5 @@ export class ChatResponseDto {
       },
     ],
   })
-  recommendedJobs?: any[];
+  recommendedJobs?: ChatRecommendedJobDto[];
 }

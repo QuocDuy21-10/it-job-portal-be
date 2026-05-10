@@ -63,6 +63,7 @@ describe('JobsService', () => {
       countJobsOwnedByCompany: jest.fn(),
       bulkSoftDelete: jest.fn(),
       findLean: jest.fn(),
+      findPublicChatCardJobsByIds: jest.fn(),
       findExpiredJobsLean: jest.fn(),
       aggregate: jest.fn(),
       getCompanySnapshot: jest.fn(),
@@ -232,6 +233,27 @@ describe('JobsService', () => {
 
       const result = await service.findOne('job-1', superAdminUser());
       expect(result).toEqual(pendingJob);
+    });
+  });
+
+  describe('findPublicChatCardJobsByIds', () => {
+    it('deduplicates incoming IDs before querying the repository', async () => {
+      mockJobRepository.findPublicChatCardJobsByIds.mockResolvedValue([activeApprovedJob()] as any);
+
+      const result = await service.findPublicChatCardJobsByIds(['job-1', 'job-2', 'job-1']);
+
+      expect(mockJobRepository.findPublicChatCardJobsByIds).toHaveBeenCalledWith([
+        'job-1',
+        'job-2',
+      ]);
+      expect(result).toEqual([activeApprovedJob()]);
+    });
+
+    it('returns early when no IDs are provided', async () => {
+      const result = await service.findPublicChatCardJobsByIds([]);
+
+      expect(result).toEqual([]);
+      expect(mockJobRepository.findPublicChatCardJobsByIds).not.toHaveBeenCalled();
     });
   });
 

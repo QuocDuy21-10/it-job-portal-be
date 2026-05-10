@@ -15,6 +15,11 @@ export class Message {
   @Prop({ required: true, type: String })
   content: string;
 
+  // Persisted only for assistant messages that were produced by a function-calling
+  // stream; allows history endpoints to know which jobs the model explicitly recommended.
+  @Prop({ type: [String], default: undefined })
+  recommendedJobIds?: string[];
+
   @Prop({ type: Date, default: () => new Date() })
   timestamp: Date;
 }

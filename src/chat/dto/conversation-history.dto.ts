@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsOptional, IsInt, Min, Max } from 'class-validator';
+import { ChatRecommendedJobDto } from './chat-recommended-job.dto';
 
 export class ConversationHistoryQueryDto {
   @ApiProperty({
@@ -51,6 +52,23 @@ export class MessageDto {
     example: '2024-12-01T10:30:00.000Z',
   })
   timestamp: Date;
+
+  @ApiProperty({
+    description:
+      'Validated recommended job IDs for assistant messages. Frontend can use these IDs to rehydrate job cards on history reload.',
+    required: false,
+    type: [String],
+    example: ['507f1f77bcf86cd799439011'],
+  })
+  recommendedJobIds?: string[];
+
+  @ApiProperty({
+    description:
+      'Hydrated public job cards for assistant messages. Unavailable jobs are omitted while recommendedJobIds stays intact.',
+    required: false,
+    type: [ChatRecommendedJobDto],
+  })
+  recommendedJobs?: ChatRecommendedJobDto[];
 }
 
 export class ConversationHistoryResponseDto {

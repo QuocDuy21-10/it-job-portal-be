@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import mongoose from 'mongoose';
 import { Job, JobDocument } from '../schemas/job.schema';
+import { EJobApprovalStatus } from '../enums/job-approval-status.enum';
 import { Company, CompanyDocument } from 'src/companies/schemas/company.schema';
 import { IUser } from 'src/users/user.interface';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
@@ -94,6 +95,28 @@ export class JobRepository {
       .select(select)
       .sort(sort as any)
       .limit(limit)
+      .lean()
+      .exec() as unknown as Job[];
+  }
+
+  async findPublicChatCardJobsByIds(jobIds: string[]): Promise<Job[]> {
+    const objectIds = [...new Set(jobIds)]
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => new mongoose.Types.ObjectId(id));
+
+    if (objectIds.length === 0) {
+      return [];
+    }
+
+    return this.jobModel
+      .find({
+        _id: { $in: objectIds },
+        isActive: true,
+        isDeleted: { $ne: true },
+        approvalStatus: EJobApprovalStatus.APPROVED,
+        $or: [{ endDate: { $gte: new Date() } }, { endDate: null }],
+      })
+      .select('_id name company location locationCode skills level salary')
       .lean()
       .exec() as unknown as Job[];
   }

@@ -258,10 +258,20 @@ export class JobsService {
         isDeleted: false,
         skills: { $in: skillRegexes },
       },
-      'name company location skills level',
+      'name company location locationCode skills level salary',
       { createdAt: -1 },
       limit,
     );
+  }
+
+  async findPublicChatCardJobsByIds(jobIds: string[]): Promise<Job[]> {
+    const uniqueJobIds = [...new Set(jobIds.filter(Boolean))];
+
+    if (uniqueJobIds.length === 0) {
+      return [];
+    }
+
+    return this.jobRepository.findPublicChatCardJobsByIds(uniqueJobIds);
   }
 
   async approveJob(id: string, dto: ApproveJobDto, user: IUser) {

@@ -9,8 +9,10 @@ import { Conversation, ConversationDocument, Message } from './schemas/conversat
 import { GeminiService } from '../gemini/gemini.service';
 import { ChatResponseDto } from './dto/chat-response.dto';
 import { ConversationHistoryResponseDto } from './dto/conversation-history.dto';
+import { ChatRecommendedJobDto } from './dto/chat-recommended-job.dto';
 import { ChatContextService } from './chat-context.service';
 import { ChatPromptBuilder } from './chat-prompt.builder';
+import { JobsService } from '../jobs/jobs.service';
 
 @Injectable()
 export class ChatService {
@@ -32,6 +34,7 @@ export class ChatService {
     private geminiService: GeminiService,
     private chatContextService: ChatContextService,
     private chatPromptBuilder: ChatPromptBuilder,
+    private jobsService: JobsService,
   ) {}
 
   async sendMessage(userId: string, message: string): Promise<ChatResponseDto> {
@@ -73,15 +76,7 @@ export class ChatService {
       const validatedJobIds = parsedResponse.recommendedJobIds.filter(id => validJobIds.has(id));
 
       // 8. Map validated job IDs to full job objects (deduplicated)
-      const seenIds = new Set<string>();
-      const recommendedJobs = allContextJobs.filter((job: any) => {
-        const jobId = job._id.toString();
-        if (validatedJobIds.includes(jobId) && !seenIds.has(jobId)) {
-          seenIds.add(jobId);
-          return true;
-        }
-        return false;
-      });
+      const recommendedJobs = this.buildRecommendedJobsFromIds(validatedJobIds, allContextJobs);
 
       // 9. Save both user message and AI response
       const userMessage: Message = {
@@ -94,6 +89,7 @@ export class ChatService {
         role: 'assistant',
         content: parsedResponse.text,
         timestamp: new Date(),
+        recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
       };
 
       conversation.messages.push(userMessage, assistantMessage);
@@ -120,10 +116,12 @@ export class ChatService {
         response: parsedResponse.text,
         timestamp: new Date(),
         suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
+        recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
         recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined,
       };
     } catch (error) {
-      this.logger.error(`Error sending message for user ${userId}:`, error.stack || error);
+      const errorDetails = error instanceof Error ? (error.stack ?? error.message) : error;
+      this.logger.error(`Error sending message for user ${userId}:`, errorDetails);
 
       if (error instanceof BadRequestException) {
         throw error;
@@ -203,9 +201,10 @@ export class ChatService {
       const startIndex = Math.max(0, endIndex - limit);
 
       const messages = sortedMessages.slice(startIndex, endIndex);
+      const hydratedMessages = await this.hydrateRecommendedJobs(messages);
 
       return {
-        messages,
+        messages: hydratedMessages,
         total,
         page,
         limit,
@@ -419,29 +418,36 @@ export class ChatService {
     let eventId = 0;
 
     // Stream text chunks
-    for await (const chunk of this.geminiService.chatWithContextStream(
-      sanitizedMessage,
-      history,
-      systemPrompt,
-    )) {
-      fullText += chunk;
-      subject.next({ data: chunk, type: 'token', id: String(++eventId) } as MessageEvent);
-    }
-
-    // Match recommended jobs from response text against all context jobs
+    // Collect all candidate jobs BEFORE streaming so we can validate tool-returned IDs
     const allContextJobs = [
       ...fullContext.user.matchingJobs,
       ...fullContext.queryAware.detectedJobs,
     ];
-    const seenIds = new Set<string>();
-    const recommendedJobs = allContextJobs.filter((job: any) => {
-      const jobId = job._id.toString();
-      if (seenIds.has(jobId)) return false;
-      const matches =
-        fullText.toLowerCase().includes(job.name.toLowerCase()) || fullText.includes(jobId);
-      if (matches) seenIds.add(jobId);
-      return matches;
-    });
+    const validJobIds = new Set(allContextJobs.map((job: any) => job._id.toString()));
+
+    // Stream text chunks via function-calling generator; the generator return value
+    // contains the exact job IDs the model recommended through the tool call.
+    const gen = this.geminiService.chatWithContextStreamAndTools(
+      sanitizedMessage,
+      history,
+      systemPrompt,
+    );
+
+    let iterResult = await gen.next();
+    while (!iterResult.done) {
+      const chunk = iterResult.value as string;
+      fullText += chunk;
+      subject.next({ data: chunk, type: 'token', id: String(++eventId) } as MessageEvent);
+      iterResult = await gen.next();
+    }
+
+    // Exact IDs from the model's tool call — no heuristic text scanning
+    const rawJobIds: string[] = (iterResult.value as string[]) || [];
+    const validatedJobIds = [...new Set(rawJobIds.filter(jobId => validJobIds.has(jobId)))];
+
+    // Validate: keep only IDs that exist in the current context (defence against
+    // any hallucinated IDs that bypassed the tool-call guard)
+    const recommendedJobs = this.buildRecommendedJobsFromIds(validatedJobIds, allContextJobs);
 
     // Save conversation
     const userMessage: Message = {
@@ -453,6 +459,7 @@ export class ChatService {
       role: 'assistant',
       content: fullText,
       timestamp: new Date(),
+      recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
     };
     conversation.messages.push(userMessage, assistantMessage);
 
@@ -470,6 +477,7 @@ export class ChatService {
     // Send final "done" event with metadata
     const donePayload = {
       conversationId: conversation._id.toString(),
+      recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
       recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined,
       suggestedActions: this.extractSuggestedActions(fullText, fullContext.user),
     };
@@ -482,5 +490,97 @@ export class ChatService {
     subject.complete();
     this.streams.delete(streamId);
     this.logger.log(`Stream ${streamId} completed for user ${userId}`);
+  }
+
+  private async hydrateRecommendedJobs(messages: Message[]): Promise<Message[]> {
+    const uniqueRecommendedJobIds = [
+      ...new Set(messages.flatMap(message => message.recommendedJobIds ?? [])),
+    ];
+
+    if (uniqueRecommendedJobIds.length === 0) {
+      return messages;
+    }
+
+    const recommendedJobs =
+      await this.jobsService.findPublicChatCardJobsByIds(uniqueRecommendedJobIds);
+    const recommendedJobMap = new Map<string, ChatRecommendedJobDto>(
+      recommendedJobs.map(job => {
+        const serializedJob = this.serializeRecommendedJob(job);
+        return [serializedJob._id, serializedJob];
+      }),
+    );
+
+    return messages.map(message => {
+      if (!message.recommendedJobIds?.length) {
+        return message;
+      }
+
+      const hydratedRecommendedJobs = this.mapRecommendedJobsByIds(
+        message.recommendedJobIds,
+        recommendedJobMap,
+      );
+
+      return hydratedRecommendedJobs.length > 0
+        ? {
+            ...message,
+            recommendedJobs: hydratedRecommendedJobs,
+          }
+        : { ...message };
+    });
+  }
+
+  private buildRecommendedJobsFromIds(
+    recommendedJobIds: string[],
+    jobs: Array<Record<string, any>>,
+  ): ChatRecommendedJobDto[] {
+    const recommendedJobMap = new Map<string, ChatRecommendedJobDto>(
+      jobs.map(job => {
+        const serializedJob = this.serializeRecommendedJob(job);
+        return [serializedJob._id, serializedJob];
+      }),
+    );
+
+    return this.mapRecommendedJobsByIds(recommendedJobIds, recommendedJobMap);
+  }
+
+  private mapRecommendedJobsByIds(
+    recommendedJobIds: string[],
+    recommendedJobMap: Map<string, ChatRecommendedJobDto>,
+  ): ChatRecommendedJobDto[] {
+    const seenIds = new Set<string>();
+
+    return recommendedJobIds.reduce<ChatRecommendedJobDto[]>((result, jobId) => {
+      if (seenIds.has(jobId)) {
+        return result;
+      }
+
+      const recommendedJob = recommendedJobMap.get(jobId);
+      if (!recommendedJob) {
+        return result;
+      }
+
+      seenIds.add(jobId);
+      result.push(recommendedJob);
+      return result;
+    }, []);
+  }
+
+  private serializeRecommendedJob(job: Record<string, any>): ChatRecommendedJobDto {
+    const companyId = job.company?._id?.toString?.() ?? String(job.company?._id ?? '');
+
+    return {
+      _id: job._id?.toString?.() ?? String(job._id ?? ''),
+      name: job.name ?? '',
+      company: {
+        _id: companyId,
+        name: job.company?.name ?? '',
+        ...(job.company?.logo ? { logo: job.company.logo } : {}),
+      },
+      location: job.location ?? '',
+      ...(job.locationCode ? { locationCode: job.locationCode } : {}),
+      skills: Array.isArray(job.skills) ? job.skills : [],
+      level: job.level ?? '',
+      ...(typeof job.salary === 'number' ? { salary: job.salary } : {}),
+    };
   }
 }
