@@ -16,10 +16,12 @@ import { Model } from 'mongoose';
 import { InjectQueue } from '@nestjs/bullmq';
 import { SkillsService } from 'src/skills/skills.service';
 
+const RESUME_QUEUE_GEMINI_RPM_LIMIT = 15;
+
 @Processor(RESUME_QUEUE, {
   concurrency: 1,
   limiter: {
-    max: 10, // Gemini 2.5 Flash FREE tier: 10 RPM
+    max: RESUME_QUEUE_GEMINI_RPM_LIMIT, // Mirror the current Gemini 3.1 Flash-Lite RPM ceiling.
     duration: 60000, // per 60 seconds
   },
 })

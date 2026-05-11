@@ -25,6 +25,7 @@ import { SkipTransform } from '../utils/decorators/skip-transform.decorator';
 import { Public } from '../utils/decorators/public.decorator';
 import { User } from '../utils/decorators/user.decorator';
 import { IUser } from '../users/user.interface';
+import { CHAT_ROUTE_RPM_LIMIT } from './constants/chat.constant';
 
 @ApiTags('Chat')
 @Controller('chat')
@@ -32,7 +33,7 @@ export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   @Post('message')
-  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @Throttle({ default: { ttl: 60000, limit: CHAT_ROUTE_RPM_LIMIT } })
   @ApiOperation({
     summary: 'Send message to AI career advisor',
     description:
@@ -105,7 +106,7 @@ export class ChatController {
   }
 
   @Post('stream')
-  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @Throttle({ default: { ttl: 60000, limit: CHAT_ROUTE_RPM_LIMIT } })
   @ApiOperation({
     summary: 'Initiate a streaming chat response',
     description:

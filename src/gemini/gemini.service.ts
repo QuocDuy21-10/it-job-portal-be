@@ -3,13 +3,18 @@ import { ConfigService } from '@nestjs/config';
 import { FunctionCallingConfigMode, GoogleGenAI, Type } from '@google/genai';
 import { ParsedDataDto } from 'src/resumes/dto/parsed-data.dto';
 
+const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-lite';
+const DEFAULT_GEMINI_RPM = 15;
+const MIN_GEMINI_RPM = 1;
+
 @Injectable()
 export class GeminiService {
   private readonly logger = new Logger(GeminiService.name);
   private readonly ai: GoogleGenAI;
 
   // Model configuration
-  private readonly MODEL_NAME = 'gemini-2.5-flash-lite';
+  private readonly modelName: string;
+  private readonly configuredRpm: number;
   private readonly PARSE_MAX_TOKENS = 5000;
   private readonly PARSE_TEMPERATURE = 0.3;
 
@@ -85,23 +90,37 @@ export class GeminiService {
     required: ['skills'],
   };
 
-  // Rate limiting configuration (Gemini 2.5 Flash FREE tier: RPM=10, TPM=250K, RPD=20)
+  // Rate limiting configuration derived from the active Gemini project quota.
   private readonly MAX_RETRIES = 3;
   private readonly INITIAL_RETRY_DELAY = 5000; // 5 seconds
   private readonly MAX_RETRY_DELAY = 60000; // 60 seconds
   private lastRequestTime: number = 0;
-  private readonly MIN_REQUEST_INTERVAL = 6000; // 6 seconds between requests (10 RPM = 1 req per 6s)
+  private readonly minRequestInterval: number;
 
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
+    const configuredModel = this.configService.get<string>('GEMINI_MODEL')?.trim();
+    const configuredRpm = this.configService.get<string>('GEMINI_RPM');
 
     if (!apiKey) {
       this.logger.error('GEMINI_API_KEY is not configured');
       throw new Error('Gemini API key is required');
     }
 
+    const parsedRpm = configuredRpm ? Number.parseInt(configuredRpm, 10) : DEFAULT_GEMINI_RPM;
+    if (!Number.isFinite(parsedRpm) || parsedRpm < MIN_GEMINI_RPM) {
+      this.logger.error(`Invalid GEMINI_RPM value: ${configuredRpm}`);
+      throw new Error('GEMINI_RPM must be a positive integer');
+    }
+
+    this.modelName = configuredModel || DEFAULT_GEMINI_MODEL;
+    this.configuredRpm = parsedRpm;
+    this.minRequestInterval = Math.ceil(60000 / this.configuredRpm);
+
     this.ai = new GoogleGenAI({ apiKey });
-    this.logger.log(`Gemini AI Service initialized with model: ${this.MODEL_NAME}`);
+    this.logger.log(
+      `Gemini AI Service initialized with model: ${this.modelName} (RPM: ${this.configuredRpm}, min interval: ${this.minRequestInterval}ms)`,
+    );
   }
 
   /**
@@ -113,7 +132,7 @@ export class GeminiService {
 
       const response = await this.makeRequestWithRetry(async () => {
         return await this.ai.models.generateContent({
-          model: this.MODEL_NAME,
+          model: this.modelName,
           contents: prompt,
           config: {
             temperature: this.PARSE_TEMPERATURE,
@@ -129,7 +148,7 @@ export class GeminiService {
       return parsedData;
     } catch (error) {
       this.logger.error('Error parsing CV:', error);
-      throw new Error(`CV parsing failed: ${error.message}`);
+      throw new Error(`CV parsing failed: ${this.getErrorMessage(error)}`);
     }
   }
 
@@ -174,8 +193,8 @@ ${cvText}`;
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
 
-    if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
-      const waitTime = this.MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+    if (timeSinceLastRequest < this.minRequestInterval) {
+      const waitTime = this.minRequestInterval - timeSinceLastRequest;
       this.logger.debug(`Rate limiting: Waiting ${waitTime}ms before next request`);
       await this.sleep(waitTime);
     }
@@ -214,6 +233,10 @@ ${cvText}`;
 
   estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);
+  }
+
+  private getErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : 'Unknown Gemini error';
   }
 
   /**
@@ -255,7 +278,7 @@ ${cvText}`;
 
       const response = await this.makeRequestWithRetry(async () => {
         return await this.ai.models.generateContent({
-          model: this.MODEL_NAME,
+          model: this.modelName,
           contents,
           config: {
             temperature: 0.7,
@@ -271,7 +294,7 @@ ${cvText}`;
       return parsed;
     } catch (error) {
       this.logger.error('Error in chatWithContext:', error);
-      throw new Error(`AI chat failed: ${error.message}`);
+      throw new Error(`AI chat failed: ${this.getErrorMessage(error)}`);
     }
   }
 
@@ -331,7 +354,7 @@ ${cvText}`;
     // Turn 1: non-streaming — let the model decide whether to call recommend_jobs
     const turn1 = await this.makeRequestWithRetry(async () => {
       return await this.ai.models.generateContent({
-        model: this.MODEL_NAME,
+        model: this.modelName,
         contents,
         config: {
           temperature: 0.7,
@@ -375,7 +398,7 @@ ${cvText}`;
       // Turn 2: stream the final assistant response
       await this.enforceRateLimit();
       const turn2Stream = await this.ai.models.generateContentStream({
-        model: this.MODEL_NAME,
+        model: this.modelName,
         contents: functionResponseContents,
         config: {
           temperature: 0.7,
@@ -436,7 +459,7 @@ ${cvText}`;
     await this.enforceRateLimit();
 
     const response = await this.ai.models.generateContentStream({
-      model: this.MODEL_NAME,
+      model: this.modelName,
       contents,
       config: {
         temperature: 0.7,
@@ -462,7 +485,7 @@ ${cvText}`;
 
       const response = await this.makeRequestWithRetry(async () => {
         return await this.ai.models.generateContent({
-          model: this.MODEL_NAME,
+          model: this.modelName,
           contents: prompt,
           config: {
             temperature: 0.3,
