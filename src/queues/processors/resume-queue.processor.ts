@@ -15,6 +15,8 @@ import { Resume } from 'src/resumes/schemas/resume.schema';
 import { Model } from 'mongoose';
 import { InjectQueue } from '@nestjs/bullmq';
 import { SkillsService } from 'src/skills/skills.service';
+import { GeminiQuotaDeniedException } from 'src/gemini/gemini-quota-denied.exception';
+import { ResumeQueueService } from '../services/resume-queue.service';
 
 const RESUME_QUEUE_GEMINI_RPM_LIMIT = 15;
 
@@ -35,6 +37,7 @@ export class ResumeQueueProcessor extends WorkerHost {
     private readonly matchingService: MatchingService,
     private readonly jobsService: JobsService,
     private readonly skillsService: SkillsService,
+    private readonly resumeQueueService: ResumeQueueService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @InjectQueue(RESUME_QUEUE) private resumeQueue: Queue,
   ) {
@@ -155,6 +158,40 @@ export class ResumeQueueProcessor extends WorkerHost {
         parsedFields: Object.keys(normalizedParsedData).length,
       };
     } catch (error) {
+      if (error instanceof GeminiQuotaDeniedException) {
+        try {
+          const scheduledRetry = await this.resumeQueueService.scheduleParseResumeRetry(
+            job.data,
+            error.retryAfterMs,
+          );
+
+          this.logger.warn(
+            `[Parse Job ${job.id}] Gemini quota denied (${error.scope}). Rescheduled parse for resume ${resumeId} in ${scheduledRetry.delayMs}ms`,
+          );
+
+          return {
+            success: false,
+            delayed: true,
+            scope: error.scope,
+            retryAfterMs: scheduledRetry.delayMs,
+          };
+        } catch (rescheduleError) {
+          const rescheduleErrorMessage = this.getErrorMessage(rescheduleError);
+
+          this.logger.error(
+            `[Parse Job ${job.id}] Failed to reschedule quota-delayed parse for resume ${resumeId}:`,
+            rescheduleErrorMessage,
+          );
+
+          await this.resumeModel.findByIdAndUpdate(resumeId, {
+            isParsed: false,
+            parseError: rescheduleErrorMessage,
+          });
+
+          throw rescheduleError;
+        }
+      }
+
       const errorMessage = this.getErrorMessage(error);
 
       this.logger.error(
@@ -265,15 +302,6 @@ export class ResumeQueueProcessor extends WorkerHost {
         isAnalyzed: false,
         analysisError: errorMessage,
       });
-
-      // 🚀 LOGIC SỬA LỖI:
-      // Nếu đây là lỗi Rate Limit (429), chúng ta KHÔNG throw error.
-      // Việc không throw sẽ khiến BullMQ hiểu là job đã "hoàn thành" (dù là fail)
-      // và sẽ KHÔNG retry.
-      if (this.aiService.isRateLimitError(error)) {
-        this.logger.warn(`[Parse Job ${job.id}] Rate limit error. Job will not be retried.`);
-        return; // Không re-throw để ngăn BullMQ retry
-      }
 
       // Nếu là lỗi khác (mất mạng, file hỏng...), re-throw để BullMQ retry.
       throw error;

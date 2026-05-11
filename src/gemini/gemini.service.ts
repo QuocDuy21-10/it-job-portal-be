@@ -2,10 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FunctionCallingConfigMode, GoogleGenAI, Type } from '@google/genai';
 import { ParsedDataDto } from 'src/resumes/dto/parsed-data.dto';
+import { GeminiQuotaService } from './gemini-quota.service';
+import { GeminiQuotaWorkload } from './gemini-quota.constants';
 
 const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-lite';
-const DEFAULT_GEMINI_RPM = 15;
-const MIN_GEMINI_RPM = 1;
 
 @Injectable()
 export class GeminiService {
@@ -14,7 +14,6 @@ export class GeminiService {
 
   // Model configuration
   private readonly modelName: string;
-  private readonly configuredRpm: number;
   private readonly PARSE_MAX_TOKENS = 5000;
   private readonly PARSE_TEMPERATURE = 0.3;
 
@@ -94,33 +93,23 @@ export class GeminiService {
   private readonly MAX_RETRIES = 3;
   private readonly INITIAL_RETRY_DELAY = 5000; // 5 seconds
   private readonly MAX_RETRY_DELAY = 60000; // 60 seconds
-  private lastRequestTime: number = 0;
-  private readonly minRequestInterval: number;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private readonly geminiQuotaService: GeminiQuotaService,
+  ) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     const configuredModel = this.configService.get<string>('GEMINI_MODEL')?.trim();
-    const configuredRpm = this.configService.get<string>('GEMINI_RPM');
 
     if (!apiKey) {
       this.logger.error('GEMINI_API_KEY is not configured');
       throw new Error('Gemini API key is required');
     }
 
-    const parsedRpm = configuredRpm ? Number.parseInt(configuredRpm, 10) : DEFAULT_GEMINI_RPM;
-    if (!Number.isFinite(parsedRpm) || parsedRpm < MIN_GEMINI_RPM) {
-      this.logger.error(`Invalid GEMINI_RPM value: ${configuredRpm}`);
-      throw new Error('GEMINI_RPM must be a positive integer');
-    }
-
     this.modelName = configuredModel || DEFAULT_GEMINI_MODEL;
-    this.configuredRpm = parsedRpm;
-    this.minRequestInterval = Math.ceil(60000 / this.configuredRpm);
 
     this.ai = new GoogleGenAI({ apiKey });
-    this.logger.log(
-      `Gemini AI Service initialized with model: ${this.modelName} (RPM: ${this.configuredRpm}, min interval: ${this.minRequestInterval}ms)`,
-    );
+    this.logger.log(`Gemini AI Service initialized with model: ${this.modelName}`);
   }
 
   /**
@@ -130,7 +119,7 @@ export class GeminiService {
     try {
       const prompt = this.buildCVParsingPrompt(cvText);
 
-      const response = await this.makeRequestWithRetry(async () => {
+      const response = await this.makeRequestWithRetry('parse', async () => {
         return await this.ai.models.generateContent({
           model: this.modelName,
           contents: prompt,
@@ -147,6 +136,10 @@ export class GeminiService {
       this.logger.log('CV parsed successfully');
       return parsedData;
     } catch (error) {
+      if (this.geminiQuotaService.isQuotaDeniedError(error)) {
+        throw error;
+      }
+
       this.logger.error('Error parsing CV:', error);
       throw new Error(`CV parsing failed: ${this.getErrorMessage(error)}`);
     }
@@ -166,13 +159,18 @@ ${cvText}`;
 
   // Make API request with rate limiting and exponential backoff retry
   private async makeRequestWithRetry<T>(
+    workload: GeminiQuotaWorkload,
     requestFn: () => Promise<T>,
     retryCount: number = 0,
   ): Promise<T> {
     try {
-      await this.enforceRateLimit();
+      await this.geminiQuotaService.reserveRequest(workload);
       return await requestFn();
     } catch (error) {
+      if (this.geminiQuotaService.isQuotaDeniedError(error)) {
+        throw error;
+      }
+
       const isRateLimitError = this.isRateLimitError(error);
       const shouldRetry = retryCount < this.MAX_RETRIES && isRateLimitError;
 
@@ -182,27 +180,18 @@ ${cvText}`;
           `Rate limit hit. Retrying in ${retryDelay}ms (attempt ${retryCount + 1}/${this.MAX_RETRIES})`,
         );
         await this.sleep(retryDelay);
-        return this.makeRequestWithRetry(requestFn, retryCount + 1);
+        return this.makeRequestWithRetry(workload, requestFn, retryCount + 1);
       }
 
       throw error;
     }
   }
 
-  private async enforceRateLimit(): Promise<void> {
-    const now = Date.now();
-    const timeSinceLastRequest = now - this.lastRequestTime;
-
-    if (timeSinceLastRequest < this.minRequestInterval) {
-      const waitTime = this.minRequestInterval - timeSinceLastRequest;
-      this.logger.debug(`Rate limiting: Waiting ${waitTime}ms before next request`);
-      await this.sleep(waitTime);
+  public isRateLimitError(error: any): boolean {
+    if (this.geminiQuotaService.isQuotaDeniedError(error)) {
+      return true;
     }
 
-    this.lastRequestTime = Date.now();
-  }
-
-  public isRateLimitError(error: any): boolean {
     const errorMessage = error?.message || '';
     return (
       errorMessage.includes('429') ||
@@ -276,7 +265,7 @@ ${cvText}`;
       // Add new user message
       contents.push({ role: 'user', parts: [{ text: message }] });
 
-      const response = await this.makeRequestWithRetry(async () => {
+      const response = await this.makeRequestWithRetry('chat-fallback', async () => {
         return await this.ai.models.generateContent({
           model: this.modelName,
           contents,
@@ -293,6 +282,10 @@ ${cvText}`;
       this.logger.log('AI chat response generated successfully');
       return parsed;
     } catch (error) {
+      if (this.geminiQuotaService.isQuotaDeniedError(error)) {
+        throw error;
+      }
+
       this.logger.error('Error in chatWithContext:', error);
       throw new Error(`AI chat failed: ${this.getErrorMessage(error)}`);
     }
@@ -352,7 +345,7 @@ ${cvText}`;
     const contents = this.buildChatContents(systemPrompt, conversationHistory, message);
 
     // Turn 1: non-streaming — let the model decide whether to call recommend_jobs
-    const turn1 = await this.makeRequestWithRetry(async () => {
+    const turn1 = await this.makeRequestWithRetry('chat-fallback', async () => {
       return await this.ai.models.generateContent({
         model: this.modelName,
         contents,
@@ -396,14 +389,15 @@ ${cvText}`;
         : contents;
 
       // Turn 2: stream the final assistant response
-      await this.enforceRateLimit();
-      const turn2Stream = await this.ai.models.generateContentStream({
-        model: this.modelName,
-        contents: functionResponseContents,
-        config: {
-          temperature: 0.7,
-          maxOutputTokens: 2000,
-        },
+      const turn2Stream = await this.makeRequestWithRetry('chat-fallback', async () => {
+        return await this.ai.models.generateContentStream({
+          model: this.modelName,
+          contents: functionResponseContents,
+          config: {
+            temperature: 0.7,
+            maxOutputTokens: 2000,
+          },
+        });
       });
 
       for await (const chunk of turn2Stream) {
@@ -456,15 +450,15 @@ ${cvText}`;
 
     contents.push({ role: 'user', parts: [{ text: message }] });
 
-    await this.enforceRateLimit();
-
-    const response = await this.ai.models.generateContentStream({
-      model: this.modelName,
-      contents,
-      config: {
-        temperature: 0.7,
-        maxOutputTokens: 2000,
-      },
+    const response = await this.makeRequestWithRetry('chat-fallback', async () => {
+      return await this.ai.models.generateContentStream({
+        model: this.modelName,
+        contents,
+        config: {
+          temperature: 0.7,
+          maxOutputTokens: 2000,
+        },
+      });
     });
 
     for await (const chunk of response) {
@@ -483,7 +477,7 @@ ${cvText}`;
 
       const prompt = `Summarize this conversation in 2-3 sentences, focusing on key topics discussed and user's main concerns:\n\n${conversationText}`;
 
-      const response = await this.makeRequestWithRetry(async () => {
+      const response = await this.makeRequestWithRetry('summary', async () => {
         return await this.ai.models.generateContent({
           model: this.modelName,
           contents: prompt,
@@ -496,6 +490,10 @@ ${cvText}`;
 
       return response.text;
     } catch (error) {
+      if (this.geminiQuotaService.isQuotaDeniedError(error)) {
+        throw error;
+      }
+
       this.logger.error('Error summarizing conversation:', error);
       return 'Previous conversation context';
     }

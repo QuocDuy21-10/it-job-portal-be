@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { AIService } from './ai.service';
 import { GeminiService } from 'src/gemini/gemini.service';
 import { GroqService } from 'src/groq/groq.service';
+import { GeminiQuotaDeniedException } from 'src/gemini/gemini-quota-denied.exception';
 
 describe('AIService', () => {
   const createStream = (
@@ -134,6 +135,17 @@ describe('AIService', () => {
     });
 
     expect(geminiServiceMock.chatWithContext).toHaveBeenCalledWith('hello', [], 'prompt');
+  });
+
+  it('surfaces Gemini quota denial when Groq fallback is unavailable', async () => {
+    const { service, groqServiceMock, geminiServiceMock } = await createTestingModule();
+    const quotaError = new GeminiQuotaDeniedException('chat-fallback', 'day', 60000, 0, 0);
+
+    groqServiceMock.chatWithContext.mockRejectedValue(new Error('Groq unavailable'));
+    groqServiceMock.isFallbackEligibleError.mockReturnValue(true);
+    geminiServiceMock.chatWithContext.mockRejectedValue(quotaError);
+
+    await expect(service.generateChat('hello', [], 'prompt')).rejects.toBe(quotaError);
   });
 
   it('falls back to Gemini streaming before the first chunk', async () => {
