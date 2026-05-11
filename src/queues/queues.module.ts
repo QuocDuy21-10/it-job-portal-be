@@ -12,8 +12,8 @@ import { JobExpirationQueueProcessor } from './processors/job-expiration-queue.p
 import { JobExpirationQueueService } from './services/job-expiration-queue.service';
 import { AccountDeletionQueueProcessor } from './processors/account-deletion-queue.processor';
 import { AccountDeletionQueueService } from './services/account-deletion-queue.service';
+import { AIModule } from 'src/ai/ai.module';
 import { CvParserModule } from 'src/cv-parser/cv-parser.module';
-import { GeminiModule } from 'src/gemini/gemini.module';
 import { MatchingModule } from 'src/matching/matching.module';
 import { JobsModule } from 'src/jobs/jobs.module';
 import { MailModule } from 'src/mail/mail.module';
@@ -81,8 +81,8 @@ export class QueuesModule {
           { name: CvProfile.name, schema: CvProfileSchema },
           { name: Conversation.name, schema: ConversationSchema },
         ]),
+        AIModule,
         CvParserModule,
-        GeminiModule,
         MatchingModule,
         JobsModule,
         MailModule,

@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { ChatService } from './chat.service';
 import { Conversation } from './schemas/conversation.schema';
-import { GeminiService } from '../gemini/gemini.service';
+import { AIService } from '../ai/ai.service';
 import { ChatContextService } from './chat-context.service';
 import { ChatPromptBuilder } from './chat-prompt.builder';
 import { JobsService } from '../jobs/jobs.service';
@@ -40,7 +40,7 @@ describe('ChatService', () => {
           useValue: { get: jest.fn(), set: jest.fn(), del: jest.fn() },
         },
         {
-          provide: GeminiService,
+          provide: AIService,
           useValue: {},
         },
         {

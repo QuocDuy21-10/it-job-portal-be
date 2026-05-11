@@ -6,7 +6,7 @@ import { Model, Types } from 'mongoose';
 import { Subject, Observable } from 'rxjs';
 import { randomUUID } from 'crypto';
 import { Conversation, ConversationDocument, Message } from './schemas/conversation.schema';
-import { GeminiService } from '../gemini/gemini.service';
+import { AIService } from '../ai/ai.service';
 import { ChatResponseDto } from './dto/chat-response.dto';
 import { ConversationHistoryResponseDto } from './dto/conversation-history.dto';
 import { ChatRecommendedJobDto } from './dto/chat-recommended-job.dto';
@@ -31,7 +31,7 @@ export class ChatService {
     @InjectModel(Conversation.name)
     private conversationModel: Model<ConversationDocument>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
-    private geminiService: GeminiService,
+    private aiService: AIService,
     private chatContextService: ChatContextService,
     private chatPromptBuilder: ChatPromptBuilder,
     private jobsService: JobsService,
@@ -61,7 +61,7 @@ export class ChatService {
       );
 
       // 6. Call Gemini AI — returns guaranteed-valid JSON via native JSON mode
-      const parsedResponse = await this.geminiService.chatWithContext(
+      const parsedResponse = await this.aiService.generateChat(
         sanitizedMessage,
         history,
         systemPrompt,
@@ -127,7 +127,7 @@ export class ChatService {
         throw error;
       }
 
-      if (this.geminiService.isRateLimitError(error)) {
+      if (this.aiService.isRateLimitError(error)) {
         throw new BadRequestException(
           'AI service is currently busy. Please try again in a few seconds.',
         );
@@ -289,7 +289,7 @@ export class ChatService {
         role: m.role,
         content: m.content,
       }));
-      const summary = await this.geminiService
+      const summary = await this.aiService
         .summarizeConversation(summaryMessages)
         .catch(() => 'Previous conversation context');
 
@@ -427,11 +427,7 @@ export class ChatService {
 
     // Stream text chunks via function-calling generator; the generator return value
     // contains the exact job IDs the model recommended through the tool call.
-    const gen = this.geminiService.chatWithContextStreamAndTools(
-      sanitizedMessage,
-      history,
-      systemPrompt,
-    );
+    const gen = this.aiService.streamChat(sanitizedMessage, history, systemPrompt);
 
     let iterResult = await gen.next();
     while (!iterResult.done) {

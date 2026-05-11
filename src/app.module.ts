@@ -18,7 +18,6 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
 import Redis from 'ioredis';
 import { HealthModule } from './health/health.module';
 import { RedisModule } from './redis/redis.module';
-import { GeminiModule } from './gemini/gemini.module';
 import { CvParserModule } from './cv-parser/cv-parser.module';
 import { QueuesModule } from './queues/queues.module';
 import { CvProfilesModule } from './cv-profiles';
@@ -67,7 +66,6 @@ import { SkillsModule } from './skills/skills.module';
       isGlobal: true,
     }),
     RedisModule,
-    GeminiModule,
     CvParserModule,
     SessionsModule,
     ChatModule,

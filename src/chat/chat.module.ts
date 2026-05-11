@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Conversation, ConversationSchema } from './schemas/conversation.schema';
-import { GeminiModule } from '../gemini/gemini.module';
+import { AIModule } from '../ai/ai.module';
 import { CvProfilesModule } from '../cv-profiles/cv-profiles.module';
 import { JobsModule } from '../jobs/jobs.module';
 import { UsersModule } from '../users/users.module';
@@ -15,7 +15,7 @@ import { ChatPromptBuilder } from './chat-prompt.builder';
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Conversation.name, schema: ConversationSchema }]),
-    GeminiModule,
+    AIModule,
     CvProfilesModule,
     JobsModule,
     UsersModule,
