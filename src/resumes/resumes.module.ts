@@ -13,6 +13,7 @@ import { ResumeProcessingService } from './resume-processing.service';
 import { ResumeRepository } from './repositories/resume.repository';
 import { ApplicationNotificationService } from './services/application-notification.service';
 import { ApplicationSubmissionService } from './services/application-submission.service';
+import { StatisticsModule } from 'src/statistics/statistics.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ApplicationSubmissionService } from './services/application-submission.
     CvProfilesModule,
     JobsModule,
     NotificationsModule,
+    StatisticsModule,
   ],
   controllers: [ResumesController],
   providers: [

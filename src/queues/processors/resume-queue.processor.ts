@@ -17,6 +17,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { SkillsService } from 'src/skills/skills.service';
 import { GeminiQuotaDeniedException } from 'src/gemini/gemini-quota-denied.exception';
 import { ResumeQueueService } from '../services/resume-queue.service';
+import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
 
 const RESUME_QUEUE_GEMINI_RPM_LIMIT = 15;
 
@@ -38,6 +39,7 @@ export class ResumeQueueProcessor extends WorkerHost {
     private readonly jobsService: JobsService,
     private readonly skillsService: SkillsService,
     private readonly resumeQueueService: ResumeQueueService,
+    private readonly statisticsCacheService: StatisticsCacheService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @InjectQueue(RESUME_QUEUE) private resumeQueue: Queue,
   ) {
@@ -117,11 +119,17 @@ export class ResumeQueueProcessor extends WorkerHost {
       await job.updateProgress(80);
 
       // Step 5: Update resume with parsed data
-      await this.resumeModel.findByIdAndUpdate(resumeId, {
-        parsedData: normalizedParsedData,
-        isParsed: true,
-        parseError: null,
-      });
+      const updatedResume = await this.resumeModel.findByIdAndUpdate(
+        resumeId,
+        {
+          parsedData: normalizedParsedData,
+          isParsed: true,
+          parseError: null,
+        },
+        { new: true },
+      );
+
+      await this.clearDashboardCachesForResume(updatedResume);
 
       this.logger.log(`[Parse Job ${job.id}] Resume updated with parsed data`);
       await job.updateProgress(90);
@@ -183,10 +191,16 @@ export class ResumeQueueProcessor extends WorkerHost {
             rescheduleErrorMessage,
           );
 
-          await this.resumeModel.findByIdAndUpdate(resumeId, {
-            isParsed: false,
-            parseError: rescheduleErrorMessage,
-          });
+          const updatedResume = await this.resumeModel.findByIdAndUpdate(
+            resumeId,
+            {
+              isParsed: false,
+              parseError: rescheduleErrorMessage,
+            },
+            { new: true },
+          );
+
+          await this.clearDashboardCachesForResume(updatedResume);
 
           throw rescheduleError;
         }
@@ -200,10 +214,16 @@ export class ResumeQueueProcessor extends WorkerHost {
       );
 
       // Update resume with error
-      await this.resumeModel.findByIdAndUpdate(resumeId, {
-        isParsed: false,
-        parseError: errorMessage,
-      });
+      const updatedResume = await this.resumeModel.findByIdAndUpdate(
+        resumeId,
+        {
+          isParsed: false,
+          parseError: errorMessage,
+        },
+        { new: true },
+      );
+
+      await this.clearDashboardCachesForResume(updatedResume);
 
       throw error;
     }
@@ -215,6 +235,7 @@ export class ResumeQueueProcessor extends WorkerHost {
    */
   private async handleAnalyzeResume(job: Job<AnalyzeResumeJobData>) {
     const { resumeId, jobId } = job.data;
+    let companyId: string | undefined;
 
     try {
       this.logger.log(
@@ -227,6 +248,8 @@ export class ResumeQueueProcessor extends WorkerHost {
       const resume = await this.resumeModel.findById(resumeId);
       const jobData = await this.jobsService.findOne(jobId);
       await job.updateProgress(20);
+
+      companyId = resume?.companyId?.toString();
 
       if (!resume.parsedData) {
         throw new Error('Resume must be parsed before analysis');
@@ -275,6 +298,8 @@ export class ResumeQueueProcessor extends WorkerHost {
         analysisError: null,
       });
 
+      await this.statisticsCacheService.clearScopedDashboards(companyId);
+
       await job.updateProgress(100);
 
       this.logger.log(
@@ -303,6 +328,8 @@ export class ResumeQueueProcessor extends WorkerHost {
         analysisError: errorMessage,
       });
 
+      await this.statisticsCacheService.clearScopedDashboards(companyId);
+
       // Nếu là lỗi khác (mất mạng, file hỏng...), re-throw để BullMQ retry.
       throw error;
     }
@@ -321,6 +348,13 @@ export class ResumeQueueProcessor extends WorkerHost {
     if (matchingScore >= 70) return EResumePriority.HIGH;
     if (matchingScore >= 50) return EResumePriority.MEDIUM;
     return EResumePriority.LOW;
+  }
+
+  private async clearDashboardCachesForResume(
+    resume: { companyId?: { toString(): string } | string | null } | null,
+  ): Promise<void> {
+    const companyId = resume?.companyId ? resume.companyId.toString() : undefined;
+    await this.statisticsCacheService.clearScopedDashboards(companyId);
   }
 
   @OnWorkerEvent('completed')

@@ -80,6 +80,27 @@ export class JobRepository {
     });
   }
 
+  async findCompanyIdsByJobIds(ids: string[]): Promise<string[]> {
+    const objectIds = ids
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => new mongoose.Types.ObjectId(id));
+
+    if (objectIds.length === 0) {
+      return [];
+    }
+
+    const jobs = await this.jobModel
+      .find({
+        _id: { $in: objectIds },
+        isDeleted: { $ne: true },
+      })
+      .select('company._id')
+      .lean()
+      .exec();
+
+    return [...new Set(jobs.map(job => job.company?._id?.toString()).filter(Boolean))];
+  }
+
   async bulkSoftDelete(ids: string[], user: IUser): Promise<IBulkDeleteResult> {
     return bulkSoftDelete(this.jobModel, ids, user);
   }

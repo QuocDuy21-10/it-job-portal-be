@@ -110,6 +110,27 @@ export class ResumeRepository {
     });
   }
 
+  async findCompanyIdsByResumeIds(ids: string[]): Promise<string[]> {
+    const objectIds = ids
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => new mongoose.Types.ObjectId(id));
+
+    if (objectIds.length === 0) {
+      return [];
+    }
+
+    const resumes = await this.resumeModel
+      .find({
+        _id: { $in: objectIds },
+        isDeleted: { $ne: true },
+      })
+      .select('companyId')
+      .lean()
+      .exec();
+
+    return [...new Set(resumes.map(resume => resume.companyId?.toString()).filter(Boolean))];
+  }
+
   async bulkSoftDelete(ids: string[], user: IUser): Promise<IBulkDeleteResult> {
     return bulkSoftDelete(this.resumeModel, ids, user);
   }

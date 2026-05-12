@@ -23,6 +23,7 @@ import {
 } from 'src/companies/company-snapshot.util';
 import { JobRepository } from './repositories/job.repository';
 import { SkillsService } from 'src/skills/skills.service';
+import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
 import {
   getLocationByCode,
   resolveLocationFromInput,
@@ -73,6 +74,7 @@ export class JobsService {
     private readonly skillsService: SkillsService,
     private readonly companyFollowerQueueService: CompanyFollowerQueueService,
     private readonly jobExpirationQueueService: JobExpirationQueueService,
+    private readonly statisticsCacheService: StatisticsCacheService,
   ) {}
   async create(createJobDto: CreateJobDto, user: IUser) {
     const normalizedSkills = await this.skillsService.normalizeControlledSkills(
@@ -108,6 +110,8 @@ export class JobsService {
         error instanceof Error ? error.stack : undefined,
       );
     }
+
+    await this.clearDashboardCachesForCompanies([newJob.company._id.toString()]);
 
     return { _id: newJob._id, createdAt: newJob.createdAt };
   }
@@ -229,7 +233,15 @@ export class JobsService {
       updatePayload.locationCode = resolvedLocation.locationCode;
     }
 
-    return this.jobRepository.updateOne({ _id: id }, updatePayload);
+    const result = await this.jobRepository.updateOne({ _id: id }, updatePayload);
+    const affectedCompanyIds = [
+      job?.company?._id?.toString(),
+      updatePayload.company?._id?.toString(),
+    ].filter(Boolean);
+
+    await this.clearDashboardCachesForCompanies(affectedCompanyIds);
+
+    return result;
   }
   /**
    * Find matching jobs based on user skills
@@ -293,6 +305,8 @@ export class JobsService {
       },
     );
 
+    await this.clearDashboardCachesForCompanies([job.company?._id?.toString()].filter(Boolean));
+
     return { _id: id, approvalStatus: dto.status };
   }
 
@@ -303,10 +317,21 @@ export class JobsService {
     const job = await this.jobRepository.findById(id);
     await this.assertHrOwnership(job, id, user);
 
-    return this.jobRepository.softDeleteById(id, { _id: user._id, email: user.email });
+    const result = await this.jobRepository.softDeleteById(id, {
+      _id: user._id,
+      email: user.email,
+    });
+
+    await this.clearDashboardCachesForCompanies([job?.company?._id?.toString()].filter(Boolean));
+
+    return result;
   }
 
   async bulkRemove(ids: string[], user: IUser): Promise<IBulkDeleteResult> {
+    const affectedCompanyIds = user.company?._id
+      ? [user.company._id.toString()]
+      : await this.jobRepository.findCompanyIdsByJobIds(ids);
+
     // HR can only delete jobs belonging to their own company
     if (user.role?.name === ERole.HR) {
       if (!user.company?._id) {
@@ -320,7 +345,11 @@ export class JobsService {
       }
     }
 
-    return this.jobRepository.bulkSoftDelete(ids, user);
+    const result = await this.jobRepository.bulkSoftDelete(ids, user);
+
+    await this.clearDashboardCachesForCompanies(affectedCompanyIds);
+
+    return result;
   }
 
   @Cron('0 * * * *', {
@@ -344,6 +373,10 @@ export class JobsService {
 
     const expiredIds = expiredJobs.map(job => job._id);
     await this.jobRepository.updateMany({ _id: { $in: expiredIds } }, { isActive: false });
+
+    await this.clearDashboardCachesForCompanies(
+      expiredJobs.map(job => job.company?._id?.toString()).filter(Boolean),
+    );
 
     this.logger.log(`Deactivated ${expiredJobs.length} expired job(s)`);
 
@@ -592,6 +625,13 @@ export class JobsService {
     }
 
     return resolvedLocation;
+  }
+
+  private async clearDashboardCachesForCompanies(companyIds: string[]): Promise<void> {
+    await Promise.all([
+      this.statisticsCacheService.clearAdminDashboard(),
+      this.statisticsCacheService.clearHrDashboards(companyIds),
+    ]);
   }
 
   private escapeRegex(value: string): string {

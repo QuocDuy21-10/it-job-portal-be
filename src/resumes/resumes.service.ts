@@ -15,6 +15,7 @@ import mongoose from 'mongoose';
 import { EResumeStatus } from './enums/resume-status.enum';
 import { ResumeRepository } from './repositories/resume.repository';
 import { ApplicationNotificationService } from './services/application-notification.service';
+import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
 
 @Injectable()
 export class ResumesService {
@@ -52,6 +53,7 @@ export class ResumesService {
   constructor(
     private readonly resumeRepository: ResumeRepository,
     private readonly applicationNotificationService: ApplicationNotificationService,
+    private readonly statisticsCacheService: StatisticsCacheService,
   ) {}
 
   async create(createUserCvDto: CreateUserCvDto, user: IUser) {
@@ -69,6 +71,9 @@ export class ResumesService {
       ...createUserCvDto,
       createdBy: { _id: user._id, email: user.email },
     });
+
+    await this.clearDashboardCachesForCompany(newResume.companyId?.toString());
+
     return { _id: newResume?._id, createdAt: newResume?.createdAt };
   }
 
@@ -172,6 +177,8 @@ export class ResumesService {
         );
     }
 
+    await this.clearDashboardCachesForCompany(existing.companyId?.toString());
+
     return result;
   }
 
@@ -189,10 +196,21 @@ export class ResumesService {
       }
     }
 
-    return this.resumeRepository.softDeleteById(id, { _id: user._id, email: user.email });
+    const result = await this.resumeRepository.softDeleteById(id, {
+      _id: user._id,
+      email: user.email,
+    });
+
+    await this.clearDashboardCachesForCompany(existing.companyId?.toString());
+
+    return result;
   }
 
   async bulkRemove(ids: string[], user: IUser): Promise<IBulkDeleteResult> {
+    const affectedCompanyIds = user.company?._id
+      ? [user.company._id.toString()]
+      : await this.resumeRepository.findCompanyIdsByResumeIds(ids);
+
     if (user.role?.name === ERole.HR) {
       if (!user.company?._id) {
         throw new ForbiddenException('HR user must be associated with a company');
@@ -207,7 +225,11 @@ export class ResumesService {
       }
     }
 
-    return this.resumeRepository.bulkSoftDelete(ids, user);
+    const result = await this.resumeRepository.bulkSoftDelete(ids, user);
+
+    await this.clearDashboardCachesForCompanies(affectedCompanyIds);
+
+    return result;
   }
 
   async getResumeByUser(user: IUser) {
@@ -265,5 +287,16 @@ export class ResumesService {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new BadRequestException(`Not found Resume with id = ${id}`);
     }
+  }
+
+  private async clearDashboardCachesForCompany(companyId?: string): Promise<void> {
+    await this.statisticsCacheService.clearScopedDashboards(companyId);
+  }
+
+  private async clearDashboardCachesForCompanies(companyIds: string[]): Promise<void> {
+    await Promise.all([
+      this.statisticsCacheService.clearAdminDashboard(),
+      this.statisticsCacheService.clearHrDashboards(companyIds),
+    ]);
   }
 }

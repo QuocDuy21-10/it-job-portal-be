@@ -26,6 +26,7 @@ import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
 import { Session, SessionSchema } from 'src/sessions/schemas/session.schema';
 import { CvProfile, CvProfileSchema } from 'src/cv-profiles/schemas/cv-profile.schema';
 import { Conversation, ConversationSchema } from 'src/chat/schemas/conversation.schema';
+import { StatisticsModule } from 'src/statistics/statistics.module';
 import {
   RESUME_QUEUE,
   COMPANY_FOLLOWER_NOTIFICATION_QUEUE,
@@ -87,6 +88,7 @@ export class QueuesModule {
         JobsModule,
         MailModule,
         SkillsModule,
+        StatisticsModule,
       ],
       providers: [
         ResumeQueueProcessor,

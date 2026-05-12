@@ -1,46 +1,56 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { StatisticsService } from './statistics.service';
-import { DashboardStatsDto } from './dto/dashboard-stats.dto';
+import { AdminDashboardStatsDto, HrDashboardStatsDto } from './dto/dashboard-stats.dto';
 import { Roles, ERole } from 'src/casl';
+import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
+import { User } from 'src/utils/decorators/user.decorator';
+import { IUser } from 'src/users/user.interface';
 
 @ApiTags('Statistics')
 @Controller('statistics')
 export class StatisticsController {
   constructor(private readonly statisticsService: StatisticsService) {}
 
-  @Get('dashboard')
-  @Roles(ERole.SUPER_ADMIN, ERole.HR)
+  @Get('admin-dashboard')
+  @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'Get dashboard statistics',
+    summary: 'Get admin dashboard statistics',
     description:
-      'Retrieve comprehensive dashboard statistics including job counts, salary distribution, and trends. Data is cached for 15 minutes for optimal performance.',
+      'Retrieve platform-wide dashboard statistics for SUPER ADMIN users. Data is cached for 15 minutes for optimal performance.',
   })
   @ApiResponse({
     status: 200,
-    description: 'Dashboard statistics retrieved successfully',
-    type: DashboardStatsDto,
+    description: 'Admin dashboard statistics retrieved successfully',
+    type: AdminDashboardStatsDto,
   })
   @ApiResponse({
     status: 401,
     description: 'Unauthorized - Invalid or missing token',
   })
-  async getDashboardStats(): Promise<DashboardStatsDto> {
-    return this.statisticsService.getDashboardStats();
+  @ResponseMessage('Get admin dashboard statistics')
+  async getAdminDashboardStats(): Promise<AdminDashboardStatsDto> {
+    return this.statisticsService.getAdminDashboardStats();
   }
 
-  @Get('dashboard/refresh')
+  @Get('hr-dashboard')
+  @Roles(ERole.HR)
   @ApiOperation({
-    summary: 'Clear dashboard cache',
+    summary: 'Get HR dashboard statistics',
     description:
-      'Manually clear the dashboard cache to force fresh data computation on next request',
+      'Retrieve dashboard statistics scoped to the authenticated HR user company. Data is cached for 3 minutes for optimal freshness.',
   })
   @ApiResponse({
     status: 200,
-    description: 'Dashboard cache cleared successfully',
+    description: 'HR dashboard statistics retrieved successfully',
+    type: HrDashboardStatsDto,
   })
-  async clearDashboardCache(): Promise<{ message: string }> {
-    await this.statisticsService.clearDashboardCache();
-    return { message: 'Dashboard cache cleared successfully' };
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - HR account is not associated with a company',
+  })
+  @ResponseMessage('Get HR dashboard statistics')
+  async getHrDashboardStats(@User() user: IUser): Promise<HrDashboardStatsDto> {
+    return this.statisticsService.getHrDashboardStats(user.company?._id);
   }
 }
