@@ -5,14 +5,12 @@ import {
   Delete,
   Body,
   Query,
-  Param,
-  Sse,
-  BadRequestException,
-  MessageEvent,
+  Res,
+  HttpException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBody, ApiQuery, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBody, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { Observable } from 'rxjs';
+import { Response } from 'express';
 import { ChatService } from './chat.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { ChatResponseDto } from './dto/chat-response.dto';
@@ -22,7 +20,6 @@ import {
 } from './dto/conversation-history.dto';
 import { ResponseMessage } from '../utils/decorators/response-message.decorator';
 import { SkipTransform } from '../utils/decorators/skip-transform.decorator';
-import { Public } from '../utils/decorators/public.decorator';
 import { User } from '../utils/decorators/user.decorator';
 import { IUser } from '../users/user.interface';
 import { CHAT_ROUTE_RPM_LIMIT } from './constants/chat.constant';
@@ -105,42 +102,62 @@ export class ChatController {
     return this.chatService.clearConversation(user._id);
   }
 
-  @Post('stream')
+  @Post('message/stream')
   @Throttle({ default: { ttl: 60000, limit: CHAT_ROUTE_RPM_LIMIT } })
+  @SkipTransform()
   @ApiOperation({
-    summary: 'Initiate a streaming chat response',
+    summary: 'Stream AI career advisor response',
     description:
-      'Starts AI processing and returns a streamId. Use GET /chat/stream/:streamId to receive SSE events.',
+      'Authenticated fetch-stream endpoint. Events: "token" (text chunk), "done" (final metadata), "error" (safe error message).',
   })
   @ApiBody({ type: SendMessageDto })
   @ApiResponse({
-    status: 201,
-    description: 'Stream initiated',
-    schema: { properties: { streamId: { type: 'string' } } },
+    status: 200,
+    description: 'SSE-compatible stream',
   })
-  @ResponseMessage('Stream initiated')
-  async initiateStream(
+  async streamMessage(
     @User() user: IUser,
     @Body() sendMessageDto: SendMessageDto,
-  ): Promise<{ streamId: string }> {
-    const streamId = await this.chatService.initiateStream(user._id, sendMessageDto.message);
-    return { streamId };
+    @Res() response: Response,
+  ): Promise<void> {
+    response.status(200);
+    response.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    response.setHeader('Cache-Control', 'no-cache, no-transform');
+    response.setHeader('Connection', 'keep-alive');
+    response.flushHeaders?.();
+
+    try {
+      for await (const event of this.chatService.streamMessage(user._id, sendMessageDto.message)) {
+        response.write(this.formatSseEvent(event.type, event.data));
+      }
+    } catch (error) {
+      response.write(this.formatSseEvent('error', { message: this.getStreamErrorMessage(error) }));
+    } finally {
+      response.end();
+    }
   }
 
-  @Sse('stream/:streamId')
-  @Public()
-  @SkipTransform()
-  @ApiOperation({
-    summary: 'Connect to streaming chat response via SSE',
-    description:
-      'EventSource endpoint. Events: "token" (text chunk), "done" (final metadata with recommendedJobs). Stream auto-closes after completion or 60s timeout.',
-  })
-  @ApiParam({ name: 'streamId', description: 'Stream ID from POST /chat/stream' })
-  stream(@Param('streamId') streamId: string): Observable<MessageEvent> {
-    const observable = this.chatService.getStream(streamId);
-    if (!observable) {
-      throw new BadRequestException('Stream not found or expired');
+  private formatSseEvent(event: string, data: string | Record<string, unknown>): string {
+    const serializedData = typeof data === 'string' ? data : JSON.stringify(data);
+    const dataLines = serializedData
+      .split(/\r?\n/)
+      .map(line => `data: ${line}`)
+      .join('\n');
+
+    return `event: ${event}\n${dataLines}\n\n`;
+  }
+
+  private getStreamErrorMessage(error: unknown): string {
+    if (!(error instanceof HttpException)) {
+      return 'Unable to process your message at this time. Please try again later.';
     }
-    return observable;
+
+    const response = error.getResponse();
+    if (typeof response === 'string') {
+      return response;
+    }
+
+    const message = (response as { message?: string | string[] }).message;
+    return Array.isArray(message) ? message.join(', ') : message || error.message;
   }
 }

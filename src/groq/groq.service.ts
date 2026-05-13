@@ -10,6 +10,8 @@ import Groq, {
 import { IAIChatMessage } from 'src/ai/interfaces/ai-chat-message.interface';
 import { IAIChatResponse } from 'src/ai/interfaces/ai-chat-response.interface';
 import { AI_PROVIDER_GROQ } from 'src/ai/ai.constants';
+import { IAIChatUsageMetadata } from 'src/ai/interfaces/ai-chat-usage-metadata.interface';
+import { IAIChatStreamResult } from 'src/ai/interfaces/ai-chat-stream-result.interface';
 
 const DEFAULT_GROQ_CHAT_MODEL = 'llama-3.3-70b-versatile';
 const DEFAULT_GROQ_SUMMARY_MODEL = DEFAULT_GROQ_CHAT_MODEL;
@@ -83,6 +85,7 @@ export class GroqService {
   ): Promise<IAIChatResponse> {
     const client = this.getClient();
     const messages = this.buildChatMessages(systemPrompt, conversationHistory, message);
+    const startedAt = Date.now();
 
     const firstTurn = await client.chat.completions.create({
       model: this.chatModelName,
@@ -107,6 +110,7 @@ export class GroqService {
         text: assistantMessage.content ?? '',
         recommendedJobIds,
         provider: AI_PROVIDER_GROQ,
+        metadata: this.buildUsageMetadata([firstTurn], Date.now() - startedAt),
       };
     }
 
@@ -131,6 +135,7 @@ export class GroqService {
       text: secondTurn.choices[0]?.message?.content ?? assistantMessage.content ?? '',
       recommendedJobIds,
       provider: AI_PROVIDER_GROQ,
+      metadata: this.buildUsageMetadata([firstTurn, secondTurn], Date.now() - startedAt),
     };
   }
 
@@ -138,9 +143,10 @@ export class GroqService {
     message: string,
     conversationHistory: IAIChatMessage[],
     systemPrompt: string,
-  ): AsyncGenerator<string, string[], unknown> {
+  ): AsyncGenerator<string, IAIChatStreamResult, unknown> {
     const client = this.getClient();
     const messages = this.buildChatMessages(systemPrompt, conversationHistory, message);
+    const startedAt = Date.now();
 
     const firstTurn = await client.chat.completions.create({
       model: this.chatModelName,
@@ -163,7 +169,12 @@ export class GroqService {
       if (text) {
         yield text;
       }
-      return [];
+      return {
+        recommendedJobIds: [],
+        provider: AI_PROVIDER_GROQ,
+        model: this.chatModelName,
+        metadata: this.buildUsageMetadata([firstTurn], Date.now() - startedAt),
+      };
     }
 
     const recommendedJobIds = this.extractRecommendedJobIds(toolCalls);
@@ -192,7 +203,12 @@ export class GroqService {
       }
     }
 
-    return recommendedJobIds;
+    return {
+      recommendedJobIds,
+      provider: AI_PROVIDER_GROQ,
+      model: this.chatModelName,
+      metadata: this.buildUsageMetadata([firstTurn], Date.now() - startedAt),
+    };
   }
 
   async summarizeConversation(messages: IAIChatMessage[]): Promise<string> {
@@ -223,6 +239,10 @@ export class GroqService {
 
   estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);
+  }
+
+  getChatModelName(): string {
+    return this.chatModelName;
   }
 
   isRateLimitError(error: unknown): boolean {
@@ -316,6 +336,34 @@ export class GroqService {
       this.logger.warn('Groq returned invalid tool arguments for recommend_jobs', error);
       throw new Error('Groq returned invalid tool arguments');
     }
+  }
+
+  private buildUsageMetadata(responses: unknown[], latencyMs: number): IAIChatUsageMetadata {
+    const usage = responses.reduce<{
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+    }>(
+      (total, response) => {
+        const responseUsage = (response as any)?.usage;
+
+        return {
+          promptTokens: total.promptTokens + (responseUsage?.prompt_tokens ?? 0),
+          completionTokens: total.completionTokens + (responseUsage?.completion_tokens ?? 0),
+          totalTokens: total.totalTokens + (responseUsage?.total_tokens ?? 0),
+        };
+      },
+      { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    );
+
+    return {
+      provider: AI_PROVIDER_GROQ,
+      model: this.chatModelName,
+      promptTokens: usage.promptTokens || undefined,
+      completionTokens: usage.completionTokens || undefined,
+      totalTokens: usage.totalTokens || undefined,
+      latencyMs,
+    };
   }
 
   private getClient(): Groq {

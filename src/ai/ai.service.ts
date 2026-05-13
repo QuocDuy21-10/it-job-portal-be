@@ -22,6 +22,7 @@ import {
 } from './ai.constants';
 import { IAIChatMessage } from './interfaces/ai-chat-message.interface';
 import { IAIChatResponse } from './interfaces/ai-chat-response.interface';
+import { IAIChatStreamResult } from './interfaces/ai-chat-stream-result.interface';
 
 @Injectable()
 export class AIService {
@@ -146,7 +147,7 @@ export class AIService {
     message: string,
     conversationHistory: IAIChatMessage[],
     systemPrompt: string,
-  ): AsyncGenerator<string, string[], unknown> {
+  ): AsyncGenerator<string, IAIChatStreamResult, unknown> {
     const primaryProvider = this.chatPrimaryProvider;
     const preparedRequest = this.prepareChatRequest(
       primaryProvider,
@@ -199,7 +200,10 @@ export class AIService {
         nextResult = await fallbackGenerator.next();
       }
 
-      return nextResult.value;
+      return {
+        ...(nextResult.value as IAIChatStreamResult),
+        fallbackUsed: true,
+      };
     }
   }
 
@@ -230,6 +234,28 @@ export class AIService {
     return this.geminiService.isRateLimitError(error) || this.groqService.isRateLimitError(error);
   }
 
+  isServiceUnavailableError(error: unknown): boolean {
+    if (this.groqService.isFallbackEligibleError(error)) {
+      return true;
+    }
+
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    const message = error.message.toLowerCase();
+    return (
+      message.includes('timeout') ||
+      message.includes('unavailable') ||
+      message.includes('connection') ||
+      message.includes('econnreset') ||
+      message.includes('internal server error') ||
+      message.includes('503') ||
+      message.includes('502') ||
+      message.includes('500')
+    );
+  }
+
   private async generateChatWithProvider(
     provider: AIProvider,
     message: string,
@@ -257,7 +283,7 @@ export class AIService {
     message: string,
     conversationHistory: IAIChatMessage[],
     systemPrompt: string,
-  ): AsyncGenerator<string, string[], unknown> {
+  ): AsyncGenerator<string, IAIChatStreamResult, unknown> {
     if (provider === AI_PROVIDER_GROQ) {
       return this.groqService.chatWithContextStreamAndTools(
         message,

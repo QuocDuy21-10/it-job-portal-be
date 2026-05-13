@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Conversation, ConversationSchema } from './schemas/conversation.schema';
+import { AiUsageLog, AiUsageLogSchema } from './schemas/ai-usage-log.schema';
 import { AIModule } from '../ai/ai.module';
 import { CvProfilesModule } from '../cv-profiles/cv-profiles.module';
 import { JobsModule } from '../jobs/jobs.module';
@@ -11,10 +12,15 @@ import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { ChatContextService } from './chat-context.service';
 import { ChatPromptBuilder } from './chat-prompt.builder';
+import { ChatGuardrailService } from './chat-guardrail.service';
+import { AiUsageService } from './ai-usage.service';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Conversation.name, schema: ConversationSchema }]),
+    MongooseModule.forFeature([
+      { name: Conversation.name, schema: ConversationSchema },
+      { name: AiUsageLog.name, schema: AiUsageLogSchema },
+    ]),
     AIModule,
     CvProfilesModule,
     JobsModule,
@@ -23,7 +29,13 @@ import { ChatPromptBuilder } from './chat-prompt.builder';
     SkillsModule,
   ],
   controllers: [ChatController],
-  providers: [ChatService, ChatContextService, ChatPromptBuilder],
+  providers: [
+    ChatService,
+    ChatContextService,
+    ChatPromptBuilder,
+    ChatGuardrailService,
+    AiUsageService,
+  ],
   exports: [ChatService],
 })
 export class ChatModule {}

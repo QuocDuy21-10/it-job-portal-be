@@ -4,6 +4,10 @@ import { FunctionCallingConfigMode, GoogleGenAI, Type } from '@google/genai';
 import { ParsedDataDto } from 'src/resumes/dto/parsed-data.dto';
 import { GeminiQuotaService } from './gemini-quota.service';
 import { GeminiQuotaWorkload } from './gemini-quota.constants';
+import { AI_PROVIDER_GEMINI } from 'src/ai/ai.constants';
+import { IAIChatResponse } from 'src/ai/interfaces/ai-chat-response.interface';
+import { IAIChatStreamResult } from 'src/ai/interfaces/ai-chat-stream-result.interface';
+import { IAIChatUsageMetadata } from 'src/ai/interfaces/ai-chat-usage-metadata.interface';
 
 const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-lite';
 
@@ -224,6 +228,10 @@ ${cvText}`;
     return Math.ceil(text.length / 4);
   }
 
+  getChatModelName(): string {
+    return this.modelName;
+  }
+
   private getErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : 'Unknown Gemini error';
   }
@@ -236,8 +244,9 @@ ${cvText}`;
     message: string,
     conversationHistory: Array<{ role: string; content: string }>,
     systemPrompt: string,
-  ): Promise<{ text: string; recommendedJobIds: string[] }> {
+  ): Promise<IAIChatResponse> {
     try {
+      const startedAt = Date.now();
       // Build multi-turn contents array
       const contents = [];
 
@@ -280,7 +289,11 @@ ${cvText}`;
 
       const parsed = JSON.parse(response.text) as { text: string; recommendedJobIds: string[] };
       this.logger.log('AI chat response generated successfully');
-      return parsed;
+      return {
+        ...parsed,
+        provider: AI_PROVIDER_GEMINI,
+        metadata: this.buildUsageMetadata(response, Date.now() - startedAt),
+      };
     } catch (error) {
       if (this.geminiQuotaService.isQuotaDeniedError(error)) {
         throw error;
@@ -341,7 +354,8 @@ ${cvText}`;
     message: string,
     conversationHistory: Array<{ role: string; content: string }>,
     systemPrompt: string,
-  ): AsyncGenerator<string, string[], unknown> {
+  ): AsyncGenerator<string, IAIChatStreamResult, unknown> {
+    const startedAt = Date.now();
     const contents = this.buildChatContents(systemPrompt, conversationHistory, message);
 
     // Turn 1: non-streaming — let the model decide whether to call recommend_jobs
@@ -406,14 +420,24 @@ ${cvText}`;
         }
       }
 
-      return recommendedJobIds;
+      return {
+        recommendedJobIds,
+        provider: AI_PROVIDER_GEMINI,
+        model: this.modelName,
+        metadata: this.buildUsageMetadata(turn1, Date.now() - startedAt),
+      };
     } else {
       // No tool call — emit whatever text the model returned in turn 1
       const text = turn1.text || '';
       if (text) {
         yield text;
       }
-      return [];
+      return {
+        recommendedJobIds: [],
+        provider: AI_PROVIDER_GEMINI,
+        model: this.modelName,
+        metadata: this.buildUsageMetadata(turn1, Date.now() - startedAt),
+      };
     }
   }
 
@@ -497,5 +521,18 @@ ${cvText}`;
       this.logger.error('Error summarizing conversation:', error);
       return 'Previous conversation context';
     }
+  }
+
+  private buildUsageMetadata(response: unknown, latencyMs: number): IAIChatUsageMetadata {
+    const usage = (response as any)?.usageMetadata;
+
+    return {
+      provider: AI_PROVIDER_GEMINI,
+      model: this.modelName,
+      promptTokens: usage?.promptTokenCount,
+      completionTokens: usage?.candidatesTokenCount,
+      totalTokens: usage?.totalTokenCount,
+      latencyMs,
+    };
   }
 }

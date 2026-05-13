@@ -1,10 +1,15 @@
-import { Injectable, Inject, Logger, BadRequestException, MessageEvent } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { InjectModel } from '@nestjs/mongoose';
 import { Cache } from 'cache-manager';
 import { Model, Types } from 'mongoose';
-import { Subject, Observable } from 'rxjs';
-import { randomUUID } from 'crypto';
+import { IAIChatUsageMetadata } from 'src/ai/interfaces/ai-chat-usage-metadata.interface';
 import { Conversation, ConversationDocument, Message } from './schemas/conversation.schema';
 import { AIService } from '../ai/ai.service';
 import { ChatResponseDto } from './dto/chat-response.dto';
@@ -13,19 +18,26 @@ import { ChatRecommendedJobDto } from './dto/chat-recommended-job.dto';
 import { ChatContextService } from './chat-context.service';
 import { ChatPromptBuilder } from './chat-prompt.builder';
 import { JobsService } from '../jobs/jobs.service';
+import { UserContext } from './interfaces/chat-context.interface';
+import {
+  ChatGuardrailBlockedException,
+  ChatGuardrailService,
+} from './chat-guardrail.service';
+import { AiUsageService } from './ai-usage.service';
+import { TooManyRequestsException } from './exceptions/too-many-requests.exception';
+
+export interface ChatStreamEvent {
+  type: 'token' | 'done';
+  data: string | Record<string, unknown>;
+}
 
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
 
-  // Constants
   private readonly MAX_HISTORY_MESSAGES = 10;
   private readonly MAX_CONVERSATION_LENGTH = 100;
   private readonly CACHE_PREFIX_CONV = 'chat_conv:';
-  private readonly STREAM_TIMEOUT = 60000; // 60s auto-cleanup
-
-  // Active SSE streams keyed by streamId
-  private readonly streams = new Map<string, Subject<MessageEvent>>();
 
   constructor(
     @InjectModel(Conversation.name)
@@ -35,50 +47,52 @@ export class ChatService {
     private chatContextService: ChatContextService,
     private chatPromptBuilder: ChatPromptBuilder,
     private jobsService: JobsService,
+    private chatGuardrailService: ChatGuardrailService,
+    private aiUsageService: AiUsageService,
   ) {}
 
   async sendMessage(userId: string, message: string): Promise<ChatResponseDto> {
+    const startedAt = Date.now();
+    let conversationId: string | undefined;
+    let guardrailFlags: string[] = [];
+    let promptEstimateSource = message;
+
     try {
       this.validateUserId(userId);
       this.logger.log(`Processing message from user ${userId}`);
 
-      // 1. Sanitize user input (prompt injection defense)
-      const sanitizedMessage = this.sanitizeUserInput(message);
+      const guardrail = this.chatGuardrailService.validateMessage(message);
+      guardrailFlags = guardrail.flags;
+      const sanitizedMessage = guardrail.sanitizedMessage;
+      promptEstimateSource = sanitizedMessage;
 
-      // 2. Get or create conversation
       const conversation = await this.getOrCreateConversation(userId);
+      conversationId = conversation._id.toString();
 
-      // 3. Build full context (platform + user + query-aware)
       const fullContext = await this.chatContextService.buildFullContext(userId, sanitizedMessage);
-
-      // 4. Get conversation history (last N messages for context)
       const history = conversation.messages.slice(-this.MAX_HISTORY_MESSAGES);
-
-      // 5. Build system prompt with guardrails and all context layers
       const systemPrompt = this.chatPromptBuilder.buildSystemPrompt(
         fullContext,
         (conversation as any).summary,
       );
+      promptEstimateSource = this.buildPromptEstimateSource(systemPrompt, history, sanitizedMessage);
 
-      // 6. Call Gemini AI — returns guaranteed-valid JSON via native JSON mode
       const parsedResponse = await this.aiService.generateChat(
         sanitizedMessage,
         history,
         systemPrompt,
       );
 
-      // 7. Validate recommended job IDs against all known jobs in context
       const allContextJobs = [
         ...fullContext.user.matchingJobs,
         ...fullContext.queryAware.detectedJobs,
       ];
       const validJobIds = new Set(allContextJobs.map((job: any) => job._id.toString()));
-      const validatedJobIds = parsedResponse.recommendedJobIds.filter(id => validJobIds.has(id));
-
-      // 8. Map validated job IDs to full job objects (deduplicated)
+      const validatedJobIds = (parsedResponse.recommendedJobIds ?? []).filter(id =>
+        validJobIds.has(id),
+      );
       const recommendedJobs = this.buildRecommendedJobsFromIds(validatedJobIds, allContextJobs);
 
-      // 9. Save both user message and AI response
       const userMessage: Message = {
         role: 'user',
         content: sanitizedMessage,
@@ -94,25 +108,35 @@ export class ChatService {
 
       conversation.messages.push(userMessage, assistantMessage);
 
-      // 10. Auto-generate title from first user message
       if (!(conversation as any).title) {
         (conversation as any).title = sanitizedMessage.slice(0, 80);
       }
 
-      // 11. Check if conversation is getting too long
       if (conversation.messages.length > this.MAX_CONVERSATION_LENGTH) {
         await this.archiveLongConversation(conversation);
       } else {
         await conversation.save();
       }
 
-      // 11. Extract suggested actions
       const suggestedActions = this.extractSuggestedActions(parsedResponse.text, fullContext.user);
+      await this.recordUsage({
+        userId,
+        conversationId,
+        operationType: 'chat_message',
+        success: true,
+        metadata: this.withEstimatedUsage(
+          parsedResponse.metadata,
+          promptEstimateSource,
+          Date.now() - startedAt,
+        ),
+        fallbackUsed: parsedResponse.fallbackUsed,
+        guardrailFlags,
+      });
 
       this.logger.log(`Successfully generated AI response for user ${userId}`);
 
       return {
-        conversationId: conversation._id.toString(),
+        conversationId,
         response: parsedResponse.text,
         timestamp: new Date(),
         suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
@@ -120,46 +144,136 @@ export class ChatService {
         recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined,
       };
     } catch (error) {
+      guardrailFlags = this.resolveGuardrailFlags(error, guardrailFlags);
+      await this.recordUsage({
+        userId,
+        conversationId,
+        operationType: 'chat_message',
+        success: false,
+        metadata: this.withEstimatedUsage(undefined, promptEstimateSource, Date.now() - startedAt),
+        guardrailFlags,
+        errorCategory: this.categorizeError(error),
+      });
+
       const errorDetails = error instanceof Error ? (error.stack ?? error.message) : error;
       this.logger.error(`Error sending message for user ${userId}:`, errorDetails);
-
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-
-      if (this.aiService.isRateLimitError(error)) {
-        throw new BadRequestException(
-          'AI service is currently busy. Please try again in a few seconds.',
-        );
-      }
-
-      throw new BadRequestException(
-        'Unable to process your message at this time. Please try again later.',
-      );
+      throw this.mapChatError(error);
     }
   }
 
-  private sanitizeUserInput(message: string): string {
-    let sanitized = message;
+  async *streamMessage(userId: string, message: string): AsyncGenerator<ChatStreamEvent> {
+    const startedAt = Date.now();
+    let conversationId: string | undefined;
+    let guardrailFlags: string[] = [];
+    let promptEstimateSource = message;
+    let fullText = '';
 
-    // Strip control characters (keep newlines and tabs for readability)
-    sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    try {
+      this.validateUserId(userId);
 
-    // Neutralize instruction-like prefixes that attempt to override system prompt
-    const injectionPatterns = [
-      /^(SYSTEM|ROLE|INSTRUCTION|CONTEXT|PROMPT)\s*:/gi,
-      /IGNORE\s+(ALL\s+)?PREVIOUS\s+(INSTRUCTIONS?|PROMPTS?|RULES?)/gi,
-      /YOU\s+ARE\s+NOW\s+/gi,
-      /DISREGARD\s+(ALL\s+)?(ABOVE|PREVIOUS)/gi,
-      /NEW\s+INSTRUCTIONS?\s*:/gi,
-      /OVERRIDE\s+(SYSTEM|RULES?|INSTRUCTIONS?)/gi,
-    ];
+      const guardrail = this.chatGuardrailService.validateMessage(message);
+      guardrailFlags = guardrail.flags;
+      const sanitizedMessage = guardrail.sanitizedMessage;
+      promptEstimateSource = sanitizedMessage;
 
-    for (const pattern of injectionPatterns) {
-      sanitized = sanitized.replace(pattern, '[filtered] ');
+      const conversation = await this.getOrCreateConversation(userId);
+      conversationId = conversation._id.toString();
+
+      const fullContext = await this.chatContextService.buildFullContext(userId, sanitizedMessage);
+      const history = conversation.messages.slice(-this.MAX_HISTORY_MESSAGES);
+      const systemPrompt = this.chatPromptBuilder.buildSystemPrompt(
+        fullContext,
+        (conversation as any).summary,
+      );
+      promptEstimateSource = this.buildPromptEstimateSource(systemPrompt, history, sanitizedMessage);
+
+      const allContextJobs = [
+        ...fullContext.user.matchingJobs,
+        ...fullContext.queryAware.detectedJobs,
+      ];
+      const validJobIds = new Set(allContextJobs.map((job: any) => job._id.toString()));
+
+      const gen = this.aiService.streamChat(sanitizedMessage, history, systemPrompt);
+      let iterResult = await gen.next();
+
+      while (!iterResult.done) {
+        const chunk = iterResult.value as string;
+        fullText += chunk;
+        yield { type: 'token', data: chunk };
+        iterResult = await gen.next();
+      }
+
+      const streamResult = iterResult.value;
+      const rawJobIds = streamResult?.recommendedJobIds ?? [];
+      const validatedJobIds = [...new Set(rawJobIds.filter(jobId => validJobIds.has(jobId)))];
+      const recommendedJobs = this.buildRecommendedJobsFromIds(validatedJobIds, allContextJobs);
+
+      const userMessage: Message = {
+        role: 'user',
+        content: sanitizedMessage,
+        timestamp: new Date(),
+      };
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: fullText,
+        timestamp: new Date(),
+        recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
+      };
+      conversation.messages.push(userMessage, assistantMessage);
+
+      if (!(conversation as any).title) {
+        (conversation as any).title = sanitizedMessage.slice(0, 80);
+      }
+
+      if (conversation.messages.length > this.MAX_CONVERSATION_LENGTH) {
+        await this.archiveLongConversation(conversation);
+      } else {
+        await conversation.save();
+      }
+
+      await this.recordUsage({
+        userId,
+        conversationId,
+        operationType: 'chat_stream',
+        success: true,
+        metadata: this.withEstimatedUsage(
+          streamResult?.metadata,
+          promptEstimateSource,
+          Date.now() - startedAt,
+        ),
+        fallbackUsed: streamResult?.fallbackUsed,
+        guardrailFlags,
+      });
+
+      const suggestedActions = this.extractSuggestedActions(fullText, fullContext.user);
+
+      yield {
+        type: 'done',
+        data: {
+          conversationId,
+          recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
+          recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined,
+          suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
+        },
+      };
+
+      this.logger.log(`Streaming message completed for user ${userId}`);
+    } catch (error) {
+      guardrailFlags = this.resolveGuardrailFlags(error, guardrailFlags);
+      await this.recordUsage({
+        userId,
+        conversationId,
+        operationType: 'chat_stream',
+        success: false,
+        metadata: this.withEstimatedUsage(undefined, promptEstimateSource, Date.now() - startedAt),
+        guardrailFlags,
+        errorCategory: this.categorizeError(error),
+      });
+
+      const errorDetails = error instanceof Error ? (error.stack ?? error.message) : error;
+      this.logger.error(`Error streaming message for user ${userId}:`, errorDetails);
+      throw this.mapChatError(error);
     }
-
-    return sanitized.trim();
   }
 
   async getConversationHistory(
@@ -188,15 +302,11 @@ export class ChatService {
         };
       }
 
-      // Sort messages by timestamp in ascending order (oldest → newest)
-      // This ensures consistent ordering with how frontend adds new messages
       const sortedMessages = [...conversation.messages].sort(
         (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
       );
 
       const total = sortedMessages.length;
-
-      // Calculate pagination - most recent messages first (page 1 = newest)
       const endIndex = Math.max(0, total - (page - 1) * limit);
       const startIndex = Math.max(0, endIndex - limit);
 
@@ -230,7 +340,6 @@ export class ChatService {
         },
       );
 
-      // Invalidate cached conversation ID
       await this.cacheManager.del(`${this.CACHE_PREFIX_CONV}${userId}`);
 
       if (result.modifiedCount > 0) {
@@ -244,18 +353,15 @@ export class ChatService {
     }
   }
 
-  // Get or create active conversation for user (with Redis-cached conversation ID)
   private async getOrCreateConversation(userId: string): Promise<ConversationDocument> {
     const cacheKey = `${this.CACHE_PREFIX_CONV}${userId}`;
 
-    // Check cache for active conversation ID
     const cachedId = await this.cacheManager.get<string>(cacheKey);
     if (cachedId) {
       const conversation = await this.conversationModel.findById(cachedId).exec();
       if (conversation && conversation.isActive) {
         return conversation;
       }
-      // Cached ID is stale, clear it
       await this.cacheManager.del(cacheKey);
     }
 
@@ -275,16 +381,13 @@ export class ChatService {
       this.logger.log(`Created new conversation for user ${userId}`);
     }
 
-    // Cache the active conversation ID (no expiry — invalidated on clear/archive)
     await this.cacheManager.set(cacheKey, conversation._id.toString(), 0);
 
     return conversation;
   }
 
-  // Archive long conversation: generate summary, carry over last 5 messages to new conversation
   private async archiveLongConversation(conversation: ConversationDocument): Promise<void> {
     try {
-      // Generate summary of the conversation for long-term context
       const summaryMessages = conversation.messages.map(m => ({
         role: m.role,
         content: m.content,
@@ -293,14 +396,10 @@ export class ChatService {
         .summarizeConversation(summaryMessages)
         .catch(() => 'Previous conversation context');
 
-      // Archive the old conversation
       conversation.isActive = false;
       await conversation.save();
 
-      // Carry over last 5 messages for immediate context continuity
       const carryOverMessages = conversation.messages.slice(-5);
-
-      // Create new conversation with summary and carried-over messages
       const newConversation = await this.conversationModel.create({
         userId: conversation.userId,
         messages: carryOverMessages,
@@ -309,7 +408,6 @@ export class ChatService {
         title: (conversation as any).title || undefined,
       });
 
-      // Update cached conversation ID to point to the new one
       await this.cacheManager.set(
         `${this.CACHE_PREFIX_CONV}${conversation.userId.toString()}`,
         newConversation._id.toString(),
@@ -325,17 +423,15 @@ export class ChatService {
     }
   }
 
-  private extractSuggestedActions(aiResponse: string, userContext: any): string[] {
+  private extractSuggestedActions(aiResponse: string, userContext: UserContext): string[] {
     const actions: string[] = [];
-
-    // Simple keyword-based action extraction
     const lowerResponse = aiResponse.toLowerCase();
 
-    if (!userContext.cvProfile && lowerResponse.includes('cv')) {
+    if (!userContext.profile && lowerResponse.includes('cv')) {
       actions.push('Create your CV profile');
     }
 
-    if (userContext.savedJobs?.length === 0 && lowerResponse.includes('job')) {
+    if (userContext.matchingJobs.length === 0 && lowerResponse.includes('job')) {
       actions.push('Browse jobs matching your skills');
     }
 
@@ -347,7 +443,7 @@ export class ChatService {
       actions.push('View recommended jobs');
     }
 
-    return actions.slice(0, 3); // Max 3 suggestions
+    return actions.slice(0, 3);
   }
 
   private validateUserId(userId: string): void {
@@ -363,129 +459,6 @@ export class ChatService {
     if (limit < 1 || limit > 100) {
       throw new BadRequestException('Limit must be between 1 and 100');
     }
-  }
-
-  // SSE Streaming
-
-  async initiateStream(userId: string, message: string): Promise<string> {
-    this.validateUserId(userId);
-
-    const streamId = randomUUID();
-    const subject = new Subject<MessageEvent>();
-    this.streams.set(streamId, subject);
-
-    // Start streaming in background (fire-and-forget)
-    this.processStream(userId, message, subject, streamId).catch(err => {
-      this.logger.error(`Stream ${streamId} failed:`, err.stack || err);
-      subject.next({ data: 'Stream processing failed' } as MessageEvent);
-      subject.complete();
-      this.streams.delete(streamId);
-    });
-
-    // Auto-cleanup after timeout (prevents memory leaks from abandoned streams)
-    setTimeout(() => {
-      if (this.streams.has(streamId)) {
-        this.streams.delete(streamId);
-        if (!subject.closed) subject.complete();
-      }
-    }, this.STREAM_TIMEOUT);
-
-    return streamId;
-  }
-
-  // Get the Observable for an active stream (used by SSE GET endpoint)
-  getStream(streamId: string): Observable<MessageEvent> | null {
-    const subject = this.streams.get(streamId);
-    return subject ? subject.asObservable() : null;
-  }
-
-  private async processStream(
-    userId: string,
-    message: string,
-    subject: Subject<MessageEvent>,
-    streamId: string,
-  ): Promise<void> {
-    const sanitizedMessage = this.sanitizeUserInput(message);
-    const conversation = await this.getOrCreateConversation(userId);
-    const fullContext = await this.chatContextService.buildFullContext(userId, sanitizedMessage);
-    const history = conversation.messages.slice(-this.MAX_HISTORY_MESSAGES);
-    const systemPrompt = this.chatPromptBuilder.buildSystemPrompt(
-      fullContext,
-      (conversation as any).summary,
-    );
-
-    let fullText = '';
-    let eventId = 0;
-
-    // Stream text chunks
-    // Collect all candidate jobs BEFORE streaming so we can validate tool-returned IDs
-    const allContextJobs = [
-      ...fullContext.user.matchingJobs,
-      ...fullContext.queryAware.detectedJobs,
-    ];
-    const validJobIds = new Set(allContextJobs.map((job: any) => job._id.toString()));
-
-    // Stream text chunks via function-calling generator; the generator return value
-    // contains the exact job IDs the model recommended through the tool call.
-    const gen = this.aiService.streamChat(sanitizedMessage, history, systemPrompt);
-
-    let iterResult = await gen.next();
-    while (!iterResult.done) {
-      const chunk = iterResult.value as string;
-      fullText += chunk;
-      subject.next({ data: chunk, type: 'token', id: String(++eventId) } as MessageEvent);
-      iterResult = await gen.next();
-    }
-
-    // Exact IDs from the model's tool call — no heuristic text scanning
-    const rawJobIds: string[] = (iterResult.value as string[]) || [];
-    const validatedJobIds = [...new Set(rawJobIds.filter(jobId => validJobIds.has(jobId)))];
-
-    // Validate: keep only IDs that exist in the current context (defence against
-    // any hallucinated IDs that bypassed the tool-call guard)
-    const recommendedJobs = this.buildRecommendedJobsFromIds(validatedJobIds, allContextJobs);
-
-    // Save conversation
-    const userMessage: Message = {
-      role: 'user',
-      content: sanitizedMessage,
-      timestamp: new Date(),
-    };
-    const assistantMessage: Message = {
-      role: 'assistant',
-      content: fullText,
-      timestamp: new Date(),
-      recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
-    };
-    conversation.messages.push(userMessage, assistantMessage);
-
-    // Auto-generate title from first user message
-    if (!(conversation as any).title) {
-      (conversation as any).title = sanitizedMessage.slice(0, 80);
-    }
-
-    if (conversation.messages.length > this.MAX_CONVERSATION_LENGTH) {
-      await this.archiveLongConversation(conversation);
-    } else {
-      await conversation.save();
-    }
-
-    // Send final "done" event with metadata
-    const donePayload = {
-      conversationId: conversation._id.toString(),
-      recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
-      recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined,
-      suggestedActions: this.extractSuggestedActions(fullText, fullContext.user),
-    };
-    subject.next({
-      data: JSON.stringify(donePayload),
-      type: 'done',
-      id: String(++eventId),
-    } as MessageEvent);
-
-    subject.complete();
-    this.streams.delete(streamId);
-    this.logger.log(`Stream ${streamId} completed for user ${userId}`);
   }
 
   private async hydrateRecommendedJobs(messages: Message[]): Promise<Message[]> {
@@ -578,5 +551,97 @@ export class ChatService {
       level: job.level ?? '',
       ...(typeof job.salary === 'number' ? { salary: job.salary } : {}),
     };
+  }
+
+  private buildPromptEstimateSource(
+    systemPrompt: string,
+    history: Message[],
+    message: string,
+  ): string {
+    const historyText = history.map(item => `${item.role}: ${item.content}`).join('\n');
+    return `${systemPrompt}\n${historyText}\n${message}`;
+  }
+
+  private withEstimatedUsage(
+    metadata: IAIChatUsageMetadata | undefined,
+    promptSource: string,
+    latencyMs: number,
+  ): IAIChatUsageMetadata {
+    const shouldEstimatePromptTokens = !metadata?.promptTokens && !metadata?.estimatedPromptTokens;
+
+    return {
+      ...metadata,
+      estimatedPromptTokens: shouldEstimatePromptTokens
+        ? this.aiService.estimateTokens(promptSource)
+        : metadata?.estimatedPromptTokens,
+      latencyMs: metadata?.latencyMs ?? latencyMs,
+    } as IAIChatUsageMetadata;
+  }
+
+  private async recordUsage(input: {
+    userId: string;
+    conversationId?: string;
+    operationType: string;
+    success: boolean;
+    metadata?: IAIChatUsageMetadata;
+    fallbackUsed?: boolean;
+    guardrailFlags?: string[];
+    errorCategory?: string;
+  }): Promise<void> {
+    if (!Types.ObjectId.isValid(input.userId)) {
+      return;
+    }
+
+    await this.aiUsageService.record(input);
+  }
+
+  private resolveGuardrailFlags(error: unknown, currentFlags: string[]): string[] {
+    if (error instanceof ChatGuardrailBlockedException) {
+      return error.flags;
+    }
+
+    return currentFlags;
+  }
+
+  private categorizeError(error: unknown): string {
+    if (error instanceof ChatGuardrailBlockedException) {
+      return 'GUARDRAIL_BLOCKED';
+    }
+
+    if (this.aiService.isRateLimitError(error)) {
+      return 'RATE_LIMIT';
+    }
+
+    if (this.aiService.isServiceUnavailableError(error)) {
+      return 'SERVICE_UNAVAILABLE';
+    }
+
+    if (error instanceof BadRequestException) {
+      return 'BAD_REQUEST';
+    }
+
+    return 'UNKNOWN';
+  }
+
+  private mapChatError(error: unknown): Error {
+    if (error instanceof BadRequestException) {
+      return error;
+    }
+
+    if (this.aiService.isRateLimitError(error)) {
+      return new TooManyRequestsException(
+        'AI service is currently busy. Please try again in a few seconds.',
+      );
+    }
+
+    if (this.aiService.isServiceUnavailableError(error)) {
+      return new ServiceUnavailableException(
+        'The chatbot is currently unavailable. Please try again later.',
+      );
+    }
+
+    return new BadRequestException(
+      'Unable to process your message at this time. Please try again later.',
+    );
   }
 }

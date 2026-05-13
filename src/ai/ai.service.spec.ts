@@ -4,25 +4,31 @@ import { AIService } from './ai.service';
 import { GeminiService } from 'src/gemini/gemini.service';
 import { GroqService } from 'src/groq/groq.service';
 import { GeminiQuotaDeniedException } from 'src/gemini/gemini-quota-denied.exception';
+import { IAIChatStreamResult } from './interfaces/ai-chat-stream-result.interface';
 
 describe('AIService', () => {
   const createStream = (
     chunks: string[],
     finalJobIds: string[] = [],
-  ): AsyncGenerator<string, string[], unknown> => {
+    provider: 'groq' | 'gemini' = 'groq',
+  ): AsyncGenerator<string, IAIChatStreamResult, unknown> => {
     return (async function* () {
       for (const chunk of chunks) {
         yield chunk;
       }
 
-      return finalJobIds;
+      return {
+        recommendedJobIds: finalJobIds,
+        provider,
+        model: `${provider}-model`,
+      };
     })();
   };
 
   const createFailingStream = (
     error: Error,
     chunksBeforeFailure: string[] = [],
-  ): AsyncGenerator<string, string[], unknown> => {
+  ): AsyncGenerator<string, IAIChatStreamResult, unknown> => {
     return (async function* () {
       for (const chunk of chunksBeforeFailure) {
         yield chunk;
@@ -32,7 +38,9 @@ describe('AIService', () => {
     })();
   };
 
-  const collectStream = async (generator: AsyncGenerator<string, string[], unknown>) => {
+  const collectStream = async (
+    generator: AsyncGenerator<string, IAIChatStreamResult, unknown>,
+  ) => {
     const chunks: string[] = [];
     let result = await generator.next();
 
@@ -43,7 +51,7 @@ describe('AIService', () => {
 
     return {
       text: chunks.join(''),
-      recommendedJobIds: result.value,
+      streamResult: result.value,
     };
   };
 
@@ -155,12 +163,17 @@ describe('AIService', () => {
     );
     groqServiceMock.isFallbackEligibleError.mockReturnValue(true);
     geminiServiceMock.chatWithContextStreamAndTools.mockReturnValue(
-      createStream(['Gemini ', 'stream'], ['job-2']),
+      createStream(['Gemini ', 'stream'], ['job-2'], 'gemini'),
     );
 
     await expect(collectStream(service.streamChat('hello', [], 'prompt'))).resolves.toEqual({
       text: 'Gemini stream',
-      recommendedJobIds: ['job-2'],
+      streamResult: {
+        recommendedJobIds: ['job-2'],
+        provider: 'gemini',
+        model: 'gemini-model',
+        fallbackUsed: true,
+      },
     });
   });
 
