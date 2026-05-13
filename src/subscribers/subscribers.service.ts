@@ -4,7 +4,6 @@ import { UpdateSubscriberDto } from './dto/update-subscriber.dto';
 import { GetSubscribersQueryDto } from './dto/get-subscribers-query.dto';
 import { IUser } from 'src/users/user.interface';
 import { SubscribersRepository } from './repositories/subscribers.repository';
-import mongoose from 'mongoose';
 import { SkillsService } from 'src/skills/skills.service';
 import { resolveLocationFromInput, resolveLocationPayload } from 'src/utils/location-catalog';
 
@@ -62,10 +61,7 @@ export class SubscribersService {
     const defaultLimit = limit >= 1 ? Math.min(limit, 100) : 10;
     const offset = (defaultPage - 1) * defaultLimit;
 
-    const filter: Record<string, any> = {
-      'createdBy._id': new mongoose.Types.ObjectId(user._id),
-      isDeleted: false,
-    };
+    const filter: Record<string, any> = {};
 
     if (query.locationCode) {
       const resolvedLocation = this.resolveOptionalLocationPayload(query.locationCode, undefined);
@@ -90,6 +86,7 @@ export class SubscribersService {
     const sort: Record<string, 1 | -1> = { [sortField]: sortDir };
 
     const { result, totalItems, totalPages } = await this.subscribersRepository.findOwned(
+      user._id,
       filter,
       offset,
       defaultLimit,
@@ -161,7 +158,6 @@ export class SubscribersService {
 
   async remove(id: string, user: IUser) {
     this.subscribersRepository.validateObjectId(id);
-
     const existing = await this.subscribersRepository.findOneOwned(id, user._id);
     if (!existing) {
       throw new NotFoundException('Subscriber not found');

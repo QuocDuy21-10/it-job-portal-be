@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import mongoose from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { SubscribersService } from './subscribers.service';
 import { SubscribersRepository } from './repositories/subscribers.repository';
 import { SkillsService } from 'src/skills/skills.service';
@@ -112,16 +112,18 @@ describe('SubscribersService', () => {
         user,
       );
 
-      const [filter, offset, limit, sort] = mockSubscribersRepository.findOwned.mock.calls[0];
+      const [ownerUserId, filter, offset, limit, sort] =
+        mockSubscribersRepository.findOwned.mock.calls[0];
 
+      expect(ownerUserId).toBe(user._id);
       expect(offset).toBe(0);
       expect(limit).toBe(100);
       expect(sort).toEqual({ name: 1 });
-      expect(filter.isDeleted).toBe(false);
       expect(filter.skills).toEqual({ $in: ['TypeScript'] });
       expect(filter.locationCode).toBe('ha-noi');
-      expect(filter['createdBy._id']).toBeInstanceOf(mongoose.Types.ObjectId);
-      expect(filter['createdBy._id'].toString()).toBe(user._id);
+      expect(mockSubscribersRepository.findOwned).toHaveBeenCalledWith(user._id, filter, 0, 100, {
+        name: 1,
+      });
       expect(mockSkillsService.normalizeControlledSkills).toHaveBeenCalledWith(['TypeScript']);
       expect(result.meta.pagination).toEqual({
         current_page: 1,
@@ -140,7 +142,7 @@ describe('SubscribersService', () => {
 
       await service.findAll(undefined as any, undefined as any, {} as any, user);
 
-      const [, offset, limit, sort] = mockSubscribersRepository.findOwned.mock.calls[0];
+      const [, , offset, limit, sort] = mockSubscribersRepository.findOwned.mock.calls[0];
       expect(offset).toBe(0);
       expect(limit).toBe(10);
       expect(sort).toEqual({ createdAt: -1 });
@@ -224,7 +226,13 @@ describe('SubscribersService', () => {
     it('should soft delete an owned subscriber with deletedBy metadata', async () => {
       const id = new mongoose.Types.ObjectId().toString();
       const softDeleteResult = { deleted: 1 };
-      mockSubscribersRepository.findOneOwned.mockResolvedValue({ _id: id } as any);
+      mockSubscribersRepository.findOneOwned.mockResolvedValue({
+        _id: id,
+        createdBy: {
+          _id: user._id,
+          email: user.email,
+        },
+      } as any);
       mockSubscribersRepository.softDeleteOwned.mockResolvedValue(softDeleteResult as any);
 
       const result = await service.remove(id, user);
@@ -245,6 +253,22 @@ describe('SubscribersService', () => {
       );
 
       expect(mockSubscribersRepository.softDeleteOwned).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('repository contract', () => {
+    it('should keep string user ids at the service boundary for repository ownership checks', async () => {
+      const id = new Types.ObjectId().toString();
+      mockSubscribersRepository.findOneOwned.mockResolvedValue({ _id: id } as any);
+
+      await service.findOne(id, user);
+      await service.update(id, { name: 'Updated Name' }, user);
+      await service.remove(id, user);
+
+      expect(mockSubscribersRepository.findOneOwned).toHaveBeenNthCalledWith(1, id, user._id);
+      expect(mockSubscribersRepository.findOneOwned).toHaveBeenNthCalledWith(2, id, user._id);
+      expect(mockSubscribersRepository.findOneOwned).toHaveBeenNthCalledWith(3, id, user._id);
+      expect(mockSubscribersRepository.findOneOwned).toHaveBeenNthCalledWith(4, id, user._id);
     });
   });
 
