@@ -6,6 +6,7 @@ import { AiUsageLog, AiUsageLogDocument } from './schemas/ai-usage-log.schema';
 
 export interface CreateAiUsageLogInput {
   userId: string;
+  sessionId?: string;
   conversationId?: string;
   operationType: string;
   success: boolean;
@@ -29,6 +30,7 @@ export class AiUsageService {
     try {
       await this.aiUsageLogModel.create({
         userId: new Types.ObjectId(input.userId),
+        sessionId: input.sessionId ? new Types.ObjectId(input.sessionId) : undefined,
         conversationId: input.conversationId
           ? new Types.ObjectId(input.conversationId)
           : undefined,
@@ -53,4 +55,3 @@ export class AiUsageService {
     }
   }
 }
-

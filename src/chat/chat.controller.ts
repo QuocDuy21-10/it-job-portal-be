@@ -5,6 +5,7 @@ import {
   Delete,
   Body,
   Query,
+  Param,
   Res,
   HttpException,
 } from '@nestjs/common';
@@ -18,6 +19,8 @@ import {
   ConversationHistoryQueryDto,
   ConversationHistoryResponseDto,
 } from './dto/conversation-history.dto';
+import { CreateChatSessionDto } from './dto/create-chat-session.dto';
+import { ChatSessionDto, ChatSessionListResponseDto } from './dto/chat-session.dto';
 import { ResponseMessage } from '../utils/decorators/response-message.decorator';
 import { SkipTransform } from '../utils/decorators/skip-transform.decorator';
 import { User } from '../utils/decorators/user.decorator';
@@ -55,7 +58,7 @@ export class ChatController {
     @User() user: IUser,
     @Body() sendMessageDto: SendMessageDto,
   ): Promise<ChatResponseDto> {
-    return this.chatService.sendMessage(user._id, sendMessageDto.message);
+    return this.chatService.sendMessage(user, sendMessageDto.message);
   }
 
   @Get('history')
@@ -102,6 +105,114 @@ export class ChatController {
     return this.chatService.clearConversation(user._id);
   }
 
+  @Post('sessions')
+  @ApiOperation({
+    summary: 'Create chat session',
+    description: 'Create a new chat session for the current user',
+  })
+  @ApiBody({ type: CreateChatSessionDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Chat session created successfully',
+    type: ChatSessionDto,
+  })
+  @ResponseMessage('Chat session created successfully')
+  async createSession(
+    @User() user: IUser,
+    @Body() dto: CreateChatSessionDto,
+  ): Promise<ChatSessionDto> {
+    return this.chatService.createSession(user, dto);
+  }
+
+  @Get('sessions')
+  @ApiOperation({
+    summary: 'List chat sessions',
+    description: 'Retrieve chat sessions owned by the current user',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Chat sessions retrieved successfully',
+    type: ChatSessionListResponseDto,
+  })
+  @ResponseMessage('Chat sessions retrieved successfully')
+  async listSessions(@User() user: IUser): Promise<ChatSessionListResponseDto> {
+    return this.chatService.listSessions(user._id);
+  }
+
+  @Get('sessions/:sessionId/messages')
+  @ApiOperation({
+    summary: 'Get chat session messages',
+    description: 'Retrieve paginated messages for a specific chat session owned by the user',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Messages per page (default: 50, max: 100)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Session messages retrieved successfully',
+    type: ConversationHistoryResponseDto,
+  })
+  @ResponseMessage('Session messages retrieved successfully')
+  async getSessionMessages(
+    @User() user: IUser,
+    @Param('sessionId') sessionId: string,
+    @Query() query: ConversationHistoryQueryDto,
+  ): Promise<ConversationHistoryResponseDto> {
+    return this.chatService.getSessionMessages(
+      user._id,
+      sessionId,
+      query.page || 1,
+      query.limit || 50,
+    );
+  }
+
+  @Post('sessions/:sessionId/messages')
+  @Throttle({ default: { ttl: 60000, limit: CHAT_ROUTE_RPM_LIMIT } })
+  @ApiOperation({
+    summary: 'Send message to a chat session',
+    description: 'Send a message to a specific AI career advisor session',
+  })
+  @ApiBody({ type: SendMessageDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Message sent successfully',
+    type: ChatResponseDto,
+  })
+  @ResponseMessage('Message sent successfully')
+  async sendSessionMessage(
+    @User() user: IUser,
+    @Param('sessionId') sessionId: string,
+    @Body() sendMessageDto: SendMessageDto,
+  ): Promise<ChatResponseDto> {
+    return this.chatService.sendMessage(user, sendMessageDto.message, sessionId);
+  }
+
+  @Delete('sessions/:sessionId')
+  @ApiOperation({
+    summary: 'Clear chat session',
+    description: 'Mark a specific chat session as inactive',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Chat session cleared successfully',
+  })
+  @ResponseMessage('Chat session cleared successfully')
+  async clearSession(
+    @User() user: IUser,
+    @Param('sessionId') sessionId: string,
+  ): Promise<{ message: string }> {
+    return this.chatService.clearSession(user._id, sessionId);
+  }
+
   @Post('message/stream')
   @Throttle({ default: { ttl: 60000, limit: CHAT_ROUTE_RPM_LIMIT } })
   @SkipTransform()
@@ -120,6 +231,37 @@ export class ChatController {
     @Body() sendMessageDto: SendMessageDto,
     @Res() response: Response,
   ): Promise<void> {
+    await this.writeMessageStream(user, sendMessageDto.message, response);
+  }
+
+  @Post('sessions/:sessionId/messages/stream')
+  @Throttle({ default: { ttl: 60000, limit: CHAT_ROUTE_RPM_LIMIT } })
+  @SkipTransform()
+  @ApiOperation({
+    summary: 'Stream AI response for a chat session',
+    description:
+      'Authenticated fetch-stream endpoint for a specific session. Events: "token", "done", "error".',
+  })
+  @ApiBody({ type: SendMessageDto })
+  @ApiResponse({
+    status: 200,
+    description: 'SSE-compatible stream',
+  })
+  async streamSessionMessage(
+    @User() user: IUser,
+    @Param('sessionId') sessionId: string,
+    @Body() sendMessageDto: SendMessageDto,
+    @Res() response: Response,
+  ): Promise<void> {
+    await this.writeMessageStream(user, sendMessageDto.message, response, sessionId);
+  }
+
+  private async writeMessageStream(
+    user: IUser,
+    message: string,
+    response: Response,
+    sessionId?: string,
+  ): Promise<void> {
     response.status(200);
     response.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     response.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -127,7 +269,7 @@ export class ChatController {
     response.flushHeaders?.();
 
     try {
-      for await (const event of this.chatService.streamMessage(user._id, sendMessageDto.message)) {
+      for await (const event of this.chatService.streamMessage(user, message, sessionId)) {
         response.write(this.formatSseEvent(event.type, event.data));
       }
     } catch (error) {

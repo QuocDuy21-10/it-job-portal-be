@@ -23,6 +23,13 @@ export class AiUsageLog {
   })
   conversationId?: Types.ObjectId;
 
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'ChatSession',
+    index: true,
+  })
+  sessionId?: Types.ObjectId;
+
   @Prop({ required: true, type: String, index: true })
   operationType: string;
 
@@ -64,5 +71,5 @@ export const AiUsageLogSchema = SchemaFactory.createForClass(AiUsageLog);
 
 AiUsageLogSchema.index({ createdAt: -1 });
 AiUsageLogSchema.index({ userId: 1, createdAt: -1 });
+AiUsageLogSchema.index({ sessionId: 1, createdAt: -1 });
 AiUsageLogSchema.index({ provider: 1, success: 1, createdAt: -1 });
-

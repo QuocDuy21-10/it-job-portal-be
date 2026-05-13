@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { Conversation, ConversationSchema } from './schemas/conversation.schema';
+import { ChatSession, ChatSessionSchema } from './schemas/chat-session.schema';
+import { ChatMessage, ChatMessageSchema } from './schemas/chat-message.schema';
 import { AiUsageLog, AiUsageLogSchema } from './schemas/ai-usage-log.schema';
 import { AIModule } from '../ai/ai.module';
 import { CvProfilesModule } from '../cv-profiles/cv-profiles.module';
@@ -18,7 +19,8 @@ import { AiUsageService } from './ai-usage.service';
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: Conversation.name, schema: ConversationSchema },
+      { name: ChatSession.name, schema: ChatSessionSchema },
+      { name: ChatMessage.name, schema: ChatMessageSchema },
       { name: AiUsageLog.name, schema: AiUsageLogSchema },
     ]),
     AIModule,

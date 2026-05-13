@@ -3,7 +3,13 @@ import { ChatRecommendedJobDto } from './chat-recommended-job.dto';
 
 export class ChatResponseDto {
   @ApiProperty({
-    description: 'Conversation ID',
+    description: 'Chat session ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  sessionId: string;
+
+  @ApiProperty({
+    description: 'Backward-compatible conversation ID alias. This is the chat session ID.',
     example: '507f1f77bcf86cd799439011',
   })
   conversationId: string;
