@@ -58,7 +58,12 @@ export class ChatController {
     @User() user: IUser,
     @Body() sendMessageDto: SendMessageDto,
   ): Promise<ChatResponseDto> {
-    return this.chatService.sendMessage(user, sendMessageDto.message);
+    return this.chatService.sendMessage(
+      user,
+      sendMessageDto.message,
+      undefined,
+      sendMessageDto.jobId,
+    );
   }
 
   @Get('history')
@@ -193,7 +198,12 @@ export class ChatController {
     @Param('sessionId') sessionId: string,
     @Body() sendMessageDto: SendMessageDto,
   ): Promise<ChatResponseDto> {
-    return this.chatService.sendMessage(user, sendMessageDto.message, sessionId);
+    return this.chatService.sendMessage(
+      user,
+      sendMessageDto.message,
+      sessionId,
+      sendMessageDto.jobId,
+    );
   }
 
   @Delete('sessions/:sessionId')
@@ -231,7 +241,13 @@ export class ChatController {
     @Body() sendMessageDto: SendMessageDto,
     @Res() response: Response,
   ): Promise<void> {
-    await this.writeMessageStream(user, sendMessageDto.message, response);
+    await this.writeMessageStream(
+      user,
+      sendMessageDto.message,
+      response,
+      undefined,
+      sendMessageDto.jobId,
+    );
   }
 
   @Post('sessions/:sessionId/messages/stream')
@@ -253,7 +269,13 @@ export class ChatController {
     @Body() sendMessageDto: SendMessageDto,
     @Res() response: Response,
   ): Promise<void> {
-    await this.writeMessageStream(user, sendMessageDto.message, response, sessionId);
+    await this.writeMessageStream(
+      user,
+      sendMessageDto.message,
+      response,
+      sessionId,
+      sendMessageDto.jobId,
+    );
   }
 
   private async writeMessageStream(
@@ -261,6 +283,7 @@ export class ChatController {
     message: string,
     response: Response,
     sessionId?: string,
+    jobId?: string,
   ): Promise<void> {
     response.status(200);
     response.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -269,7 +292,7 @@ export class ChatController {
     response.flushHeaders?.();
 
     try {
-      for await (const event of this.chatService.streamMessage(user, message, sessionId)) {
+      for await (const event of this.chatService.streamMessage(user, message, sessionId, jobId)) {
         response.write(this.formatSseEvent(event.type, event.data));
       }
     } catch (error) {

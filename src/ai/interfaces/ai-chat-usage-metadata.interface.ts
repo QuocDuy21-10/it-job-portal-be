@@ -9,4 +9,3 @@ export interface IAIChatUsageMetadata {
   estimatedPromptTokens?: number;
   latencyMs?: number;
 }
-

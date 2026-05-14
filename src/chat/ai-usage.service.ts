@@ -3,12 +3,16 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { IAIChatUsageMetadata } from 'src/ai/interfaces/ai-chat-usage-metadata.interface';
 import { AiUsageLog, AiUsageLogDocument } from './schemas/ai-usage-log.schema';
+import { EChatIntent } from './enums/chat-intent.enum';
+import { ChatIntentDetectionSource } from './interfaces/chat-intent-result.interface';
 
 export interface CreateAiUsageLogInput {
   userId: string;
   sessionId?: string;
   conversationId?: string;
   operationType: string;
+  intent?: EChatIntent;
+  intentDetectionSource?: ChatIntentDetectionSource;
   success: boolean;
   metadata?: IAIChatUsageMetadata;
   fallbackUsed?: boolean;
@@ -31,10 +35,10 @@ export class AiUsageService {
       await this.aiUsageLogModel.create({
         userId: new Types.ObjectId(input.userId),
         sessionId: input.sessionId ? new Types.ObjectId(input.sessionId) : undefined,
-        conversationId: input.conversationId
-          ? new Types.ObjectId(input.conversationId)
-          : undefined,
+        conversationId: input.conversationId ? new Types.ObjectId(input.conversationId) : undefined,
         operationType: input.operationType,
+        intent: input.intent,
+        intentDetectionSource: input.intentDetectionSource,
         provider: input.metadata?.provider,
         model: input.metadata?.model,
         promptTokens: input.metadata?.promptTokens,

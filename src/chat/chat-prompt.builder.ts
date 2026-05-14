@@ -1,87 +1,157 @@
 import { Injectable } from '@nestjs/common';
-import { FullChatContext } from './interfaces/chat-context.interface';
+import { EChatIntent } from './enums/chat-intent.enum';
+import { IntentAwareChatContext } from './interfaces/chat-context.interface';
 
 @Injectable()
 export class ChatPromptBuilder {
-  buildSystemPrompt(context: FullChatContext, conversationSummary?: string): string {
-    const { platform, user: userCtx, queryAware } = context;
+  buildSystemPrompt(context: IntentAwareChatContext, conversationSummary?: string): string {
+    const userName = context.user.user?.name || 'User';
+    const sections = [
+      `ROLE: Expert AI Career Advisor for IT Job Portal (Vietnam).`,
+      `INTENT: ${context.intent}`,
+      `USER: ${userName}`,
+      this.buildIntentSection(context),
+      conversationSummary ? `PREVIOUS CONTEXT: ${conversationSummary}` : '',
+      this.buildRules(context.intent),
+    ].filter(Boolean);
 
-    // Personal matching jobs
-    const jobsData =
-      userCtx.matchingJobs?.map((job: any) => ({
-        id: job._id.toString(),
-        name: job.name,
-        company: job.company?.name || 'N/A',
-        location: job.location || 'N/A',
-        level: job.level || 'N/A',
-        skills: job.skills || [],
-      })) || [];
+    return sections.join('\n\n');
+  }
 
-    const profileData = userCtx.profile || {};
-    const userName = userCtx.user?.name || 'User';
-
-    // --- Build prompt ---
-
-    let prompt = `ROLE: Expert AI Career Advisor for IT Job Portal (Vietnam).
-
-USER: ${userName}
-PROFILE: ${JSON.stringify(profileData)}`;
-
-    // Layer 1: Platform context (always included)
-    prompt += `
-
-PLATFORM:
-- Active jobs: ${platform.activeJobCount}
-- Hiring companies: ${platform.hiringCompaniesCount}
-- Top skills: ${platform.topSkills.map(s => `${s.name} (${s.count})`).join(', ') || 'N/A'}
-- Top companies: ${platform.topCompanies.map(c => `${c.name} (${c.jobCount} jobs)`).join(', ') || 'N/A'}
-- Jobs by level: ${platform.jobsByLevel.map(l => `${l.level}: ${l.count}`).join(', ') || 'N/A'}`;
-
-    // Layer 2: Personal matching jobs
-    if (jobsData.length > 0) {
-      prompt += `\nYOUR MATCHING JOBS: ${JSON.stringify(jobsData)}`;
+  private buildIntentSection(context: IntentAwareChatContext): string {
+    switch (context.intent) {
+      case EChatIntent.JOB_ADVISOR:
+        return this.buildJobAdvisorSection(context);
+      case EChatIntent.COMPANY_INFO:
+        return this.buildCompanySection(context);
+      case EChatIntent.CV_REVIEW:
+        return this.buildCvReviewSection(context);
+      case EChatIntent.JOB_MATCHING:
+        return this.buildJobMatchingSection(context);
+      case EChatIntent.FAQ:
+        return context.faq ? `FAQ: ${JSON.stringify(context.faq)}` : '';
+      case EChatIntent.RECRUITER_SUPPORT:
+        return 'RECRUITER SUPPORT: Provide general recruiter guidance only. Do not expose candidate private data.';
+      default:
+        return 'GENERAL CONTEXT: Answer only if the request is about IT careers, jobs, CVs, interviews, or hiring.';
     }
-    prompt += `\nAPPLIED: ${userCtx.appliedJobsCount || 0}`;
+  }
 
-    // Layer 3: Query-aware context
-    if (queryAware.detectedJobs.length > 0) {
-      const searchJobs = queryAware.detectedJobs.map((job: any) => ({
-        id: job._id.toString(),
-        name: job.name,
-        company: job.company?.name || 'N/A',
-        location: job.location || 'N/A',
-        level: job.level || 'N/A',
-        skills: job.skills || [],
-        salary: job.salary || 'N/A',
-      }));
-      prompt += `\nSEARCH RESULTS: ${JSON.stringify(searchJobs)}`;
+  private buildJobAdvisorSection(context: IntentAwareChatContext): string {
+    const lines = [
+      context.platform ? this.buildPlatformSection(context) : '',
+      context.user.profile ? `PROFILE: ${JSON.stringify(context.user.profile)}` : '',
+      context.user.matchingJobs.length > 0
+        ? `YOUR MATCHING JOBS: ${JSON.stringify(this.serializeJobs(context.user.matchingJobs))}`
+        : '',
+      `APPLIED: ${context.user.appliedJobsCount || 0}`,
+      context.queryAware.detectedJobs.length > 0
+        ? `SEARCH RESULTS: ${JSON.stringify(this.serializeJobs(context.queryAware.detectedJobs))}`
+        : '',
+    ];
+
+    return lines.filter(Boolean).join('\n');
+  }
+
+  private buildCompanySection(context: IntentAwareChatContext): string {
+    const lines = [
+      context.platform ? this.buildPlatformSection(context) : '',
+      context.queryAware.detectedCompanies.length > 0
+        ? `COMPANY INFO: ${JSON.stringify(
+            context.queryAware.detectedCompanies.map(company => ({
+              name: company.name,
+              address: company.address,
+              description: company.description,
+              activeJobs: company.jobCount,
+            })),
+          )}`
+        : '',
+      context.queryAware.detectedJobs.length > 0
+        ? `SEARCH RESULTS: ${JSON.stringify(this.serializeJobs(context.queryAware.detectedJobs))}`
+        : '',
+    ];
+
+    return lines.filter(Boolean).join('\n');
+  }
+
+  private buildCvReviewSection(context: IntentAwareChatContext): string {
+    return [
+      context.user.profile ? `PROFILE: ${JSON.stringify(context.user.profile)}` : 'PROFILE: N/A',
+      context.cvReview ? `CV REVIEW SIGNALS: ${JSON.stringify(context.cvReview)}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  private buildJobMatchingSection(context: IntentAwareChatContext): string {
+    return [
+      context.user.profile ? `PROFILE: ${JSON.stringify(context.user.profile)}` : 'PROFILE: N/A',
+      context.jobMatching?.selectedJob
+        ? `SELECTED JOB: ${JSON.stringify(this.serializeJob(context.jobMatching.selectedJob))}`
+        : '',
+      context.jobMatching?.matchResult
+        ? `DETERMINISTIC MATCH: ${JSON.stringify(context.jobMatching.matchResult)}`
+        : '',
+      context.jobMatching?.missingReason
+        ? `MATCHING STATUS: ${context.jobMatching.missingReason}`
+        : '',
+      context.contextJobs.length > 0
+        ? `YOUR MATCHING JOBS: ${JSON.stringify(this.serializeJobs(context.contextJobs))}`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  private buildPlatformSection(context: IntentAwareChatContext): string {
+    const platform = context.platform;
+    if (!platform) {
+      return '';
     }
 
-    if (queryAware.detectedCompanies.length > 0) {
-      const companyInfo = queryAware.detectedCompanies.map(c => ({
-        name: c.name,
-        address: c.address,
-        description: c.description,
-        activeJobs: c.jobCount,
-      }));
-      prompt += `\nCOMPANY INFO: ${JSON.stringify(companyInfo)}`;
-    }
+    return [
+      'PLATFORM:',
+      `- Active jobs: ${platform.activeJobCount}`,
+      `- Hiring companies: ${platform.hiringCompaniesCount}`,
+      `- Top skills: ${platform.topSkills.map(s => `${s.name} (${s.count})`).join(', ') || 'N/A'}`,
+      `- Top companies: ${
+        platform.topCompanies.map(c => `${c.name} (${c.jobCount} jobs)`).join(', ') || 'N/A'
+      }`,
+      `- Jobs by level: ${
+        platform.jobsByLevel.map(level => `${level.level}: ${level.count}`).join(', ') || 'N/A'
+      }`,
+    ].join('\n');
+  }
 
-    if (conversationSummary) {
-      prompt += `\nPREVIOUS CONTEXT: ${conversationSummary}`;
-    }
+  private buildRules(intent: EChatIntent): string {
+    const jobRule =
+      intent === EChatIntent.JOB_ADVISOR || intent === EChatIntent.JOB_MATCHING
+        ? '2. JOBS: When recommending specific jobs, call `recommend_jobs` with exact job IDs from YOUR MATCHING JOBS, SEARCH RESULTS, or SELECTED JOB. Never fabricate job IDs.'
+        : '2. JOBS: Do not recommend specific job IDs unless they are present in provided context.';
 
-    prompt += `
+    return [
+      'RULES:',
+      '1. SCOPE: Only answer about IT careers, jobs, CVs, interviews, skills, salary, companies, and hiring in Vietnam IT market. Politely refuse off-topic requests.',
+      jobRule,
+      '3. ACCURACY: Only reference real data from provided context. Acknowledge missing data honestly.',
+      '4. PRIVACY: Never discuss other users data, private candidate data, or hidden recruiter data.',
+      '5. TONE: Professional, concise, and practical. Match user language. Use Markdown. Keep under 300 words unless detailed analysis is requested.',
+    ].join('\n');
+  }
 
-RULES:
-1. SCOPE: Only answer about IT careers, jobs, CVs, interviews, skills, salary in Vietnam IT market. Politely refuse off-topic requests.
-2. JOBS: When you want to recommend specific jobs, call the \`recommend_jobs\` function with exact job IDs from YOUR MATCHING JOBS or SEARCH RESULTS. Never fabricate job IDs. Describe the recommended jobs naturally in your text response.
-3. PLATFORM: Use PLATFORM data to answer general questions about job market stats, available skills, hiring trends, and company counts.
-4. COMPANIES: Use COMPANY INFO to answer questions about specific companies. If company data is available, reference it. If not, acknowledge you don't have info about that company.
-5. ACCURACY: Only reference real data from user profile, provided jobs, and platform data. Acknowledge missing data honestly.
-6. TONE: Professional, encouraging, concise. Match user's language (Vietnamese/English). Use Markdown. Keep under 300 words unless detailed analysis requested.
-7. PRIVACY: Never discuss other users' data.`;
+  private serializeJobs(jobs: any[]): Array<Record<string, unknown>> {
+    return jobs.map(job => this.serializeJob(job));
+  }
 
-    return prompt;
+  private serializeJob(job: any): Record<string, unknown> {
+    return {
+      id: job._id?.toString?.() ?? String(job._id ?? ''),
+      name: job.name,
+      company: job.company?.name || 'N/A',
+      location: job.location || 'N/A',
+      level: job.level || 'N/A',
+      skills: job.skills || [],
+      salary: job.salary || 'N/A',
+    };
   }
 }

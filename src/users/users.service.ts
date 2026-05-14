@@ -175,7 +175,8 @@ export class UsersService {
       roleToCheck,
       companyToCheck,
     );
-    const { company: _company, ...restUpdateUserDto } = updateUserDto;
+    const restUpdateUserDto = { ...updateUserDto };
+    delete restUpdateUserDto.company;
 
     const updatePayload: Record<string, any> = {
       ...restUpdateUserDto,

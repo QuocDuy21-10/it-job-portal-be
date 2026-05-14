@@ -1,5 +1,5 @@
 import { join } from 'path';
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { MailService } from './mail.service';
 import { ConfigService } from '@nestjs/config';
 import { MailController } from './mail.controller';

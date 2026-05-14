@@ -8,4 +8,3 @@ export interface IAIChatStreamResult {
   fallbackUsed?: boolean;
   metadata?: IAIChatUsageMetadata;
 }
-

@@ -5,4 +5,3 @@ export class TooManyRequestsException extends HttpException {
     super(message, HttpStatus.TOO_MANY_REQUESTS);
   }
 }
-

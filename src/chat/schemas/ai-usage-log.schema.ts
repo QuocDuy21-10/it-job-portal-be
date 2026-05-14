@@ -39,6 +39,12 @@ export class AiUsageLog {
   @Prop({ type: String })
   model?: string;
 
+  @Prop({ type: String, index: true })
+  intent?: string;
+
+  @Prop({ type: String })
+  intentDetectionSource?: string;
+
   @Prop({ type: Number })
   promptTokens?: number;
 

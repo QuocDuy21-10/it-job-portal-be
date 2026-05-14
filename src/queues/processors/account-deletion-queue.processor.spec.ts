@@ -21,9 +21,6 @@ describe('AccountDeletionQueueProcessor', () => {
     const cvProfileModel = {
       deleteOne: jest.fn().mockResolvedValue({ deletedCount: 1 }),
     };
-    const conversationModel = {
-      deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 }),
-    };
     const chatSessionModel = {
       deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 }),
     };
@@ -47,7 +44,6 @@ describe('AccountDeletionQueueProcessor', () => {
       userModel as any,
       resumeModel as any,
       cvProfileModel as any,
-      conversationModel as any,
       chatSessionModel as any,
       chatMessageModel as any,
       subscriberModel as any,
@@ -62,7 +58,6 @@ describe('AccountDeletionQueueProcessor', () => {
       data: { userId },
     } as any);
 
-    expect(conversationModel.deleteMany).toHaveBeenCalledWith({ userId });
     expect(chatSessionModel.deleteMany).toHaveBeenCalledWith({ userId });
     expect(chatMessageModel.deleteMany).toHaveBeenCalledWith({ userId });
   });

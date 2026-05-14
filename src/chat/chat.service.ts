@@ -18,19 +18,12 @@ import { ChatSession, ChatSessionDocument } from './schemas/chat-session.schema'
 import { ChatMessage, ChatMessageDocument } from './schemas/chat-message.schema';
 import { AIService } from '../ai/ai.service';
 import { ChatResponseDto } from './dto/chat-response.dto';
-import {
-  ConversationHistoryResponseDto,
-  MessageDto,
-} from './dto/conversation-history.dto';
+import { ConversationHistoryResponseDto, MessageDto } from './dto/conversation-history.dto';
 import { ChatRecommendedJobDto } from './dto/chat-recommended-job.dto';
-import { ChatContextService } from './chat-context.service';
 import { ChatPromptBuilder } from './chat-prompt.builder';
 import { JobsService } from '../jobs/jobs.service';
-import { FullChatContext, UserContext } from './interfaces/chat-context.interface';
-import {
-  ChatGuardrailBlockedException,
-  ChatGuardrailService,
-} from './chat-guardrail.service';
+import { IntentAwareChatContext, UserContext } from './interfaces/chat-context.interface';
+import { ChatGuardrailBlockedException, ChatGuardrailService } from './chat-guardrail.service';
 import { AiUsageService } from './ai-usage.service';
 import { TooManyRequestsException } from './exceptions/too-many-requests.exception';
 import { EChatMessageRole } from './enums/chat-message-role.enum';
@@ -38,6 +31,10 @@ import { EChatSessionType } from './enums/chat-session-type.enum';
 import { CreateChatSessionDto } from './dto/create-chat-session.dto';
 import { ChatSessionDto, ChatSessionListResponseDto } from './dto/chat-session.dto';
 import { IChatMessageMetadata } from './interfaces/chat-message-metadata.interface';
+import { EChatIntent } from './enums/chat-intent.enum';
+import { ChatIntentDetectionSource } from './interfaces/chat-intent-result.interface';
+import { ChatIntentService } from './chat-intent.service';
+import { ChatContextProviderRegistry } from './chat-context-provider.registry';
 
 export interface ChatStreamEvent {
   type: 'token' | 'done';
@@ -49,12 +46,20 @@ interface ChatTurnContext {
   sessionId: string;
   sanitizedMessage: string;
   guardrailFlags: string[];
-  fullContext: FullChatContext;
+  intent: EChatIntent;
+  intentDetectionSource: ChatIntentDetectionSource;
+  intentContext: IntentAwareChatContext;
   history: IAIChatMessage[];
   systemPrompt: string;
   promptEstimateSource: string;
   validJobIds: Set<string>;
   allContextJobs: Array<Record<string, any>>;
+}
+
+interface PrepareChatTurnOptions {
+  sessionId?: string;
+  jobId?: string;
+  allowAiIntentClassifier: boolean;
 }
 
 @Injectable()
@@ -72,7 +77,8 @@ export class ChatService {
     private readonly chatMessageModel: Model<ChatMessageDocument>,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly aiService: AIService,
-    private readonly chatContextService: ChatContextService,
+    private readonly chatIntentService: ChatIntentService,
+    private readonly chatContextProviderRegistry: ChatContextProviderRegistry,
     private readonly chatPromptBuilder: ChatPromptBuilder,
     private readonly jobsService: JobsService,
     private readonly chatGuardrailService: ChatGuardrailService,
@@ -115,17 +121,26 @@ export class ChatService {
     user: IUser,
     message: string,
     sessionId?: string,
+    jobId?: string,
   ): Promise<ChatResponseDto> {
     const startedAt = Date.now();
     let resolvedSessionId: string | undefined = sessionId;
     let guardrailFlags: string[] = [];
     let promptEstimateSource = message;
+    let intent: EChatIntent | undefined;
+    let intentDetectionSource: ChatIntentDetectionSource | undefined;
 
     try {
-      const turn = await this.prepareChatTurn(user, message, sessionId);
+      const turn = await this.prepareChatTurn(user, message, {
+        sessionId,
+        jobId,
+        allowAiIntentClassifier: true,
+      });
       resolvedSessionId = turn.sessionId;
       guardrailFlags = turn.guardrailFlags;
       promptEstimateSource = turn.promptEstimateSource;
+      intent = turn.intent;
+      intentDetectionSource = turn.intentDetectionSource;
 
       const parsedResponse = await this.aiService.generateChat(
         turn.sanitizedMessage,
@@ -157,14 +172,22 @@ export class ChatService {
           usageMetadata,
           parsedResponse.fallbackUsed,
           guardrailFlags,
+          undefined,
+          turn.intent,
+          turn.intentDetectionSource,
         ),
       });
 
-      const suggestedActions = this.extractSuggestedActions(parsedResponse.text, turn.fullContext.user);
+      const suggestedActions = this.extractSuggestedActions(
+        parsedResponse.text,
+        turn.intentContext.user,
+      );
       await this.recordUsage({
         userId: user._id,
         sessionId: turn.sessionId,
         operationType: 'chat_message',
+        intent: turn.intent,
+        intentDetectionSource: turn.intentDetectionSource,
         success: true,
         metadata: usageMetadata,
         fallbackUsed: parsedResponse.fallbackUsed,
@@ -178,6 +201,7 @@ export class ChatService {
         conversationId: turn.sessionId,
         response: parsedResponse.text,
         timestamp: new Date(),
+        intent: turn.intent,
         suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
         recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
         recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined,
@@ -188,6 +212,8 @@ export class ChatService {
         userId: user._id,
         sessionId: resolvedSessionId,
         operationType: 'chat_message',
+        intent,
+        intentDetectionSource,
         success: false,
         metadata: this.withEstimatedUsage(undefined, promptEstimateSource, Date.now() - startedAt),
         guardrailFlags,
@@ -204,18 +230,27 @@ export class ChatService {
     user: IUser,
     message: string,
     sessionId?: string,
+    jobId?: string,
   ): AsyncGenerator<ChatStreamEvent> {
     const startedAt = Date.now();
     let resolvedSessionId: string | undefined = sessionId;
     let guardrailFlags: string[] = [];
     let promptEstimateSource = message;
     let fullText = '';
+    let intent: EChatIntent | undefined;
+    let intentDetectionSource: ChatIntentDetectionSource | undefined;
 
     try {
-      const turn = await this.prepareChatTurn(user, message, sessionId);
+      const turn = await this.prepareChatTurn(user, message, {
+        sessionId,
+        jobId,
+        allowAiIntentClassifier: false,
+      });
       resolvedSessionId = turn.sessionId;
       guardrailFlags = turn.guardrailFlags;
       promptEstimateSource = turn.promptEstimateSource;
+      intent = turn.intent;
+      intentDetectionSource = turn.intentDetectionSource;
 
       const gen = this.aiService.streamChat(turn.sanitizedMessage, turn.history, turn.systemPrompt);
       let iterResult = await gen.next();
@@ -252,6 +287,9 @@ export class ChatService {
           usageMetadata,
           streamResult?.fallbackUsed,
           guardrailFlags,
+          undefined,
+          turn.intent,
+          turn.intentDetectionSource,
         ),
       });
 
@@ -259,19 +297,22 @@ export class ChatService {
         userId: user._id,
         sessionId: turn.sessionId,
         operationType: 'chat_stream',
+        intent: turn.intent,
+        intentDetectionSource: turn.intentDetectionSource,
         success: true,
         metadata: usageMetadata,
         fallbackUsed: streamResult?.fallbackUsed,
         guardrailFlags,
       });
 
-      const suggestedActions = this.extractSuggestedActions(fullText, turn.fullContext.user);
+      const suggestedActions = this.extractSuggestedActions(fullText, turn.intentContext.user);
 
       yield {
         type: 'done',
         data: {
           sessionId: turn.sessionId,
           conversationId: turn.sessionId,
+          intent: turn.intent,
           recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
           recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined,
           suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
@@ -285,6 +326,8 @@ export class ChatService {
         userId: user._id,
         sessionId: resolvedSessionId,
         operationType: 'chat_stream',
+        intent,
+        intentDetectionSource,
         success: false,
         metadata: this.withEstimatedUsage(undefined, promptEstimateSource, Date.now() - startedAt),
         guardrailFlags,
@@ -458,41 +501,49 @@ export class ChatService {
   private async prepareChatTurn(
     user: IUser,
     message: string,
-    sessionId?: string,
+    options: PrepareChatTurnOptions,
   ): Promise<ChatTurnContext> {
     this.validateUserId(user._id);
 
     const guardrail = this.chatGuardrailService.validateMessage(message);
     const sanitizedMessage = guardrail.sanitizedMessage;
-    const session = sessionId
-      ? await this.getOwnedSession(user._id, sessionId, true)
+    const session = options.sessionId
+      ? await this.getOwnedSession(user._id, options.sessionId, true)
       : await this.getOrCreateActiveSession(user);
 
-    const fullContext = await this.chatContextService.buildFullContext(user._id, sanitizedMessage);
+    const intentResult = await this.chatIntentService.detectIntent({
+      user,
+      message: sanitizedMessage,
+      sessionType: session.type,
+      jobId: options.jobId,
+      allowAiFallback: options.allowAiIntentClassifier,
+    });
+    const intentContext = await this.chatContextProviderRegistry.build(intentResult.intent, {
+      user,
+      message: sanitizedMessage,
+      jobId: options.jobId,
+    });
     const history = await this.getPromptHistory(session._id.toString());
-    const systemPrompt = this.chatPromptBuilder.buildSystemPrompt(fullContext, session.summary);
+    const systemPrompt = this.chatPromptBuilder.buildSystemPrompt(intentContext, session.summary);
     const promptEstimateSource = this.buildPromptEstimateSource(
       systemPrompt,
       history,
       sanitizedMessage,
     );
 
-    const allContextJobs = [
-      ...fullContext.user.matchingJobs,
-      ...fullContext.queryAware.detectedJobs,
-    ];
-
     return {
       session,
       sessionId: session._id.toString(),
       sanitizedMessage,
       guardrailFlags: guardrail.flags,
-      fullContext,
+      intent: intentResult.intent,
+      intentDetectionSource: intentResult.source,
+      intentContext,
       history,
       systemPrompt,
       promptEstimateSource,
-      validJobIds: new Set(allContextJobs.map((job: any) => job._id.toString())),
-      allContextJobs,
+      validJobIds: new Set(intentContext.validJobIds),
+      allContextJobs: intentContext.contextJobs,
     };
   }
 
@@ -578,12 +629,10 @@ export class ChatService {
       .lean()
       .exec();
 
-    return messages
-      .reverse()
-      .map(message => ({
-        role: message.role,
-        content: message.content,
-      }));
+    return messages.reverse().map(message => ({
+      role: message.role,
+      content: message.content,
+    }));
   }
 
   private async persistMessageTurn(input: {
@@ -912,10 +961,14 @@ export class ChatService {
     fallbackUsed?: boolean,
     guardrailFlags?: string[],
     errorCategory?: string,
+    intent?: EChatIntent,
+    intentDetectionSource?: ChatIntentDetectionSource,
   ): IChatMessageMetadata {
     return {
       provider: metadata?.provider,
       model: metadata?.model,
+      intent,
+      intentDetectionSource,
       latencyMs: metadata?.latencyMs,
       promptTokens: metadata?.promptTokens,
       completionTokens: metadata?.completionTokens,
@@ -932,6 +985,8 @@ export class ChatService {
     sessionId?: string;
     conversationId?: string;
     operationType: string;
+    intent?: EChatIntent;
+    intentDetectionSource?: ChatIntentDetectionSource;
     success: boolean;
     metadata?: IAIChatUsageMetadata;
     fallbackUsed?: boolean;

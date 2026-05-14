@@ -15,12 +15,12 @@ describe('ChatGuardrailService', () => {
   });
 
   it('allows normal career advice questions', () => {
-    expect(
-      service.validateMessage('Tôi nên học gì để trở thành Senior Backend Engineer?'),
-    ).toEqual({
-      sanitizedMessage: 'Tôi nên học gì để trở thành Senior Backend Engineer?',
-      flags: [],
-    });
+    expect(service.validateMessage('Tôi nên học gì để trở thành Senior Backend Engineer?')).toEqual(
+      {
+        sanitizedMessage: 'Tôi nên học gì để trở thành Senior Backend Engineer?',
+        flags: [],
+      },
+    );
   });
 
   it('sanitizes unsafe control characters without changing readable content', () => {

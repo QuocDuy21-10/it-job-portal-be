@@ -14,7 +14,7 @@ export class JwtRefreshGuard extends AuthGuard('jwt-refresh') {
   /**
    * Override handleRequest để customize error messages
    */
-  handleRequest(err: any, user: any, info: any) {
+  handleRequest(err: any, user: any) {
     // Nếu có lỗi hoặc không có user → throw UnauthorizedException
     if (err || !user) {
       throw err || new UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn');

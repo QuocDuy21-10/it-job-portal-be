@@ -74,7 +74,7 @@ export class RolesService {
   }
 
   async findOne(id: string) {
-    this.validateObjectId;
+    this.validateObjectId(id);
     return await this.roleModel.findById(id);
   }
 

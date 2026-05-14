@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ChatRecommendedJobDto } from './chat-recommended-job.dto';
+import { EChatIntent } from '../enums/chat-intent.enum';
 
 export class ChatResponseDto {
   @ApiProperty({
@@ -25,6 +26,13 @@ export class ChatResponseDto {
     example: '2024-12-01T10:30:00.000Z',
   })
   timestamp: Date;
+
+  @ApiProperty({
+    description: 'Detected per-message chat intent',
+    enum: EChatIntent,
+    required: false,
+  })
+  intent?: EChatIntent;
 
   @ApiProperty({
     description: 'Suggested follow-up actions (optional)',

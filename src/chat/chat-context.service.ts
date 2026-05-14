@@ -58,7 +58,7 @@ export class ChatContextService {
     await this.cacheManager.del(`${this.CACHE_PREFIX_CTX}${userId}`);
   }
 
-  private async buildPlatformContext(): Promise<PlatformContext> {
+  async buildPlatformContext(): Promise<PlatformContext> {
     const cached = await this.cacheManager.get<PlatformContext>(this.CACHE_KEY_PLATFORM);
     if (cached) return cached;
 
@@ -78,7 +78,7 @@ export class ChatContextService {
     }
   }
 
-  private async buildUserContext(userId: string): Promise<UserContext> {
+  async buildUserContext(userId: string): Promise<UserContext> {
     const cacheKey = `${this.CACHE_PREFIX_CTX}${userId}`;
 
     const cached = await this.cacheManager.get<UserContext>(cacheKey);
@@ -133,7 +133,7 @@ export class ChatContextService {
     }
   }
 
-  private async buildQueryAwareContext(
+  async buildQueryAwareContext(
     message: string,
     platform: PlatformContext,
   ): Promise<QueryAwareContext> {

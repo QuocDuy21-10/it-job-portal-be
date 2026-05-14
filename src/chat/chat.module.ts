@@ -9,12 +9,20 @@ import { JobsModule } from '../jobs/jobs.module';
 import { UsersModule } from '../users/users.module';
 import { CompaniesModule } from '../companies/companies.module';
 import { SkillsModule } from '../skills/skills.module';
+import { MatchingModule } from '../matching/matching.module';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { ChatContextService } from './chat-context.service';
+import { ChatContextProviderRegistry } from './chat-context-provider.registry';
 import { ChatPromptBuilder } from './chat-prompt.builder';
 import { ChatGuardrailService } from './chat-guardrail.service';
+import { ChatIntentService } from './chat-intent.service';
 import { AiUsageService } from './ai-usage.service';
+import { CompanyContextProvider } from './context-providers/company-context.provider';
+import { CvReviewContextProvider } from './context-providers/cv-review-context.provider';
+import { FaqContextProvider } from './context-providers/faq-context.provider';
+import { JobMatchingContextProvider } from './context-providers/job-matching-context.provider';
+import { JobSearchContextProvider } from './context-providers/job-search-context.provider';
 
 @Module({
   imports: [
@@ -29,14 +37,22 @@ import { AiUsageService } from './ai-usage.service';
     UsersModule,
     CompaniesModule,
     SkillsModule,
+    MatchingModule,
   ],
   controllers: [ChatController],
   providers: [
     ChatService,
     ChatContextService,
+    ChatContextProviderRegistry,
     ChatPromptBuilder,
     ChatGuardrailService,
+    ChatIntentService,
     AiUsageService,
+    JobSearchContextProvider,
+    CompanyContextProvider,
+    CvReviewContextProvider,
+    JobMatchingContextProvider,
+    FaqContextProvider,
   ],
   exports: [ChatService],
 })

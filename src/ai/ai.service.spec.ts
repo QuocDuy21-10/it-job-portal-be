@@ -38,9 +38,7 @@ describe('AIService', () => {
     })();
   };
 
-  const collectStream = async (
-    generator: AsyncGenerator<string, IAIChatStreamResult, unknown>,
-  ) => {
+  const collectStream = async (generator: AsyncGenerator<string, IAIChatStreamResult, unknown>) => {
     const chunks: string[] = [];
     let result = await generator.next();
 
