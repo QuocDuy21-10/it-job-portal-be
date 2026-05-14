@@ -1,6 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ChatRecommendedJobDto } from './chat-recommended-job.dto';
 import { EChatIntent } from '../enums/chat-intent.enum';
+import { ChatQuotaStatusDto } from './chat-quota.dto';
+import { PendingChatToolActionDto } from './chat-tool-action.dto';
 
 export class ChatResponseDto {
   @ApiProperty({
@@ -67,4 +69,32 @@ export class ChatResponseDto {
     ],
   })
   recommendedJobs?: ChatRecommendedJobDto[];
+
+  @ApiProperty({
+    description: 'Daily quota status after this request',
+    required: false,
+    type: ChatQuotaStatusDto,
+  })
+  quota?: ChatQuotaStatusDto;
+
+  @ApiProperty({
+    description: 'Tool actions that require user confirmation before the backend executes them',
+    required: false,
+    type: [PendingChatToolActionDto],
+  })
+  pendingToolActions?: PendingChatToolActionDto[];
+
+  @ApiProperty({
+    description: 'Whether this response was served from cache',
+    required: false,
+    example: false,
+  })
+  cacheHit?: boolean;
+
+  @ApiProperty({
+    description: 'Cache category used for this response',
+    required: false,
+    example: 'faq_response',
+  })
+  cacheCategory?: string;
 }

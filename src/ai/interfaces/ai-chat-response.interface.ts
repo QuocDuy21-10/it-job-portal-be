@@ -7,4 +7,6 @@ export interface IAIChatResponse {
   provider: AIProvider;
   fallbackUsed?: boolean;
   metadata?: IAIChatUsageMetadata;
+  cacheHit?: boolean;
+  cacheCategory?: string;
 }

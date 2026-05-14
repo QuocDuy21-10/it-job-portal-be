@@ -7,4 +7,6 @@ export interface IAIChatStreamResult {
   model?: string;
   fallbackUsed?: boolean;
   metadata?: IAIChatUsageMetadata;
+  cacheHit?: boolean;
+  cacheCategory?: string;
 }

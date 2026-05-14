@@ -60,6 +60,24 @@ export class AiUsageLog {
   @Prop({ type: Number })
   latencyMs?: number;
 
+  @Prop({ type: Number })
+  estimatedCostUsd?: number;
+
+  @Prop({ type: Boolean, default: false })
+  costEstimated?: boolean;
+
+  @Prop({ type: Boolean, default: false, index: true })
+  cacheHit?: boolean;
+
+  @Prop({ type: String, index: true })
+  cacheCategory?: string;
+
+  @Prop({ type: Date, index: true })
+  requestStartedAt?: Date;
+
+  @Prop({ type: Date, index: true })
+  requestCompletedAt?: Date;
+
   @Prop({ required: true, type: Boolean, index: true })
   success: boolean;
 
@@ -79,3 +97,5 @@ AiUsageLogSchema.index({ createdAt: -1 });
 AiUsageLogSchema.index({ userId: 1, createdAt: -1 });
 AiUsageLogSchema.index({ sessionId: 1, createdAt: -1 });
 AiUsageLogSchema.index({ provider: 1, success: 1, createdAt: -1 });
+AiUsageLogSchema.index({ operationType: 1, createdAt: -1 });
+AiUsageLogSchema.index({ cacheHit: 1, cacheCategory: 1, createdAt: -1 });

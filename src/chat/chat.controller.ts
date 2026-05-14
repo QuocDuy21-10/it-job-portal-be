@@ -21,16 +21,34 @@ import {
 } from './dto/conversation-history.dto';
 import { CreateChatSessionDto } from './dto/create-chat-session.dto';
 import { ChatSessionDto, ChatSessionListResponseDto } from './dto/chat-session.dto';
+import {
+  AiUsageQueryDto,
+  AiUsageTimeseriesQueryDto,
+  AiUsageTopUsersQueryDto,
+} from './dto/ai-usage-query.dto';
+import {
+  AiUsageSummaryDto,
+  AiUsageTimeseriesDto,
+  AiUsageTopUsersDto,
+} from './dto/ai-usage-stats.dto';
+import { ChatToolActionResultDto } from './dto/chat-tool-action.dto';
 import { ResponseMessage } from '../utils/decorators/response-message.decorator';
 import { SkipTransform } from '../utils/decorators/skip-transform.decorator';
 import { User } from '../utils/decorators/user.decorator';
 import { IUser } from '../users/user.interface';
 import { CHAT_ROUTE_RPM_LIMIT } from './constants/chat.constant';
+import { AiUsageService } from './ai-usage.service';
+import { ChatToolActionService } from './chat-tool-action.service';
+import { Roles, ERole } from 'src/casl';
 
 @ApiTags('Chat')
 @Controller('chat')
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly aiUsageService: AiUsageService,
+    private readonly chatToolActionService: ChatToolActionService,
+  ) {}
 
   @Post('message')
   @Throttle({ default: { ttl: 60000, limit: CHAT_ROUTE_RPM_LIMIT } })
@@ -221,6 +239,92 @@ export class ChatController {
     @Param('sessionId') sessionId: string,
   ): Promise<{ message: string }> {
     return this.chatService.clearSession(user._id, sessionId);
+  }
+
+  @Get('admin/usage/summary')
+  @Roles(ERole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Get AI usage summary',
+    description: 'Retrieve AI usage, cost, quota, cache, and reliability metrics.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'AI usage summary retrieved successfully',
+    type: AiUsageSummaryDto,
+  })
+  @ResponseMessage('AI usage summary retrieved successfully')
+  async getUsageSummary(@Query() query: AiUsageQueryDto): Promise<AiUsageSummaryDto> {
+    return this.aiUsageService.getUsageSummary(query);
+  }
+
+  @Get('admin/usage/timeseries')
+  @Roles(ERole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Get AI usage timeseries',
+    description: 'Retrieve daily AI usage trend data.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'AI usage timeseries retrieved successfully',
+    type: AiUsageTimeseriesDto,
+  })
+  @ResponseMessage('AI usage timeseries retrieved successfully')
+  async getUsageTimeseries(
+    @Query() query: AiUsageTimeseriesQueryDto,
+  ): Promise<AiUsageTimeseriesDto> {
+    return this.aiUsageService.getUsageTimeseries(query);
+  }
+
+  @Get('admin/usage/top-users')
+  @Roles(ERole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Get top AI users',
+    description: 'Retrieve users with the highest AI usage.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Top AI users retrieved successfully',
+    type: AiUsageTopUsersDto,
+  })
+  @ResponseMessage('Top AI users retrieved successfully')
+  async getTopUsers(@Query() query: AiUsageTopUsersQueryDto): Promise<AiUsageTopUsersDto> {
+    return this.aiUsageService.getTopUsers(query);
+  }
+
+  @Post('tool-actions/:actionId/confirm')
+  @ApiOperation({
+    summary: 'Confirm a pending chat tool action',
+    description: 'Executes a pending chat tool action owned by the authenticated user.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Chat tool action confirmed successfully',
+    type: ChatToolActionResultDto,
+  })
+  @ResponseMessage('Chat tool action confirmed successfully')
+  async confirmToolAction(
+    @User() user: IUser,
+    @Param('actionId') actionId: string,
+  ): Promise<ChatToolActionResultDto> {
+    return this.chatToolActionService.confirm(user, actionId);
+  }
+
+  @Delete('tool-actions/:actionId')
+  @ApiOperation({
+    summary: 'Cancel a pending chat tool action',
+    description: 'Cancels a pending chat tool action owned by the authenticated user.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Chat tool action canceled successfully',
+    type: ChatToolActionResultDto,
+  })
+  @ResponseMessage('Chat tool action canceled successfully')
+  async cancelToolAction(
+    @User() user: IUser,
+    @Param('actionId') actionId: string,
+  ): Promise<ChatToolActionResultDto> {
+    return this.chatToolActionService.cancel(user, actionId);
   }
 
   @Post('message/stream')

@@ -13,7 +13,13 @@ import { ChatPromptBuilder } from './chat-prompt.builder';
 import { JobsService } from '../jobs/jobs.service';
 import { ChatGuardrailBlockedException, ChatGuardrailService } from './chat-guardrail.service';
 import { AiUsageService } from './ai-usage.service';
-import { TooManyRequestsException } from './exceptions/too-many-requests.exception';
+import {
+  ChatQuotaExceededException,
+  TooManyRequestsException,
+} from './exceptions/too-many-requests.exception';
+import { ChatQuotaService } from './chat-quota.service';
+import { ChatCacheService } from './chat-cache.service';
+import { ChatToolActionService } from './chat-tool-action.service';
 import { EChatMessageRole } from './enums/chat-message-role.enum';
 import { EChatSessionType } from './enums/chat-session-type.enum';
 import { EChatIntent } from './enums/chat-intent.enum';
@@ -47,8 +53,20 @@ describe('ChatService', () => {
   let mockChatIntentService: { detectIntent: jest.Mock };
   let mockChatContextProviderRegistry: { build: jest.Mock };
   let mockPromptBuilder: { buildSystemPrompt: jest.Mock };
-  let mockGuardrailService: { validateMessage: jest.Mock };
+  let mockGuardrailService: { validateMessage: jest.Mock; sanitizeAssistantOutput: jest.Mock };
   let mockAiUsageService: { record: jest.Mock };
+  let mockChatQuotaService: { consume: jest.Mock };
+  let mockChatCacheService: {
+    getContext: jest.Mock;
+    setContext: jest.Mock;
+    getFaqResponse: jest.Mock;
+    setFaqResponse: jest.Mock;
+  };
+  let mockChatToolActionService: {
+    createSaveJobActions: jest.Mock;
+    confirm: jest.Mock;
+    cancel: jest.Mock;
+  };
   let mockCacheManager: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
 
   const user = {
@@ -197,10 +215,38 @@ describe('ChatService', () => {
         sanitizedMessage: message.trim(),
         flags: [],
       })),
+      sanitizeAssistantOutput: jest.fn((message: string) => ({
+        sanitizedOutput: message,
+        flags: [],
+        riskLevel: 'low',
+      })),
     };
 
     mockAiUsageService = {
       record: jest.fn(),
+    };
+
+    mockChatQuotaService = {
+      consume: jest.fn().mockResolvedValue({
+        limit: 30,
+        used: 1,
+        remaining: 29,
+        resetAt: new Date('2024-12-02T00:00:00.000Z'),
+        unlimited: false,
+      }),
+    };
+
+    mockChatCacheService = {
+      getContext: jest.fn().mockResolvedValue(undefined),
+      setContext: jest.fn().mockResolvedValue(undefined),
+      getFaqResponse: jest.fn().mockResolvedValue(undefined),
+      setFaqResponse: jest.fn().mockResolvedValue(undefined),
+    };
+
+    mockChatToolActionService = {
+      createSaveJobActions: jest.fn().mockResolvedValue([]),
+      confirm: jest.fn(),
+      cancel: jest.fn(),
     };
 
     mockCacheManager = {
@@ -252,6 +298,18 @@ describe('ChatService', () => {
           provide: AiUsageService,
           useValue: mockAiUsageService,
         },
+        {
+          provide: ChatQuotaService,
+          useValue: mockChatQuotaService,
+        },
+        {
+          provide: ChatCacheService,
+          useValue: mockChatCacheService,
+        },
+        {
+          provide: ChatToolActionService,
+          useValue: mockChatToolActionService,
+        },
       ],
     }).compile();
 
@@ -260,7 +318,6 @@ describe('ChatService', () => {
 
   describe('sendMessage', () => {
     beforeEach(() => {
-      mockCacheManager.get.mockResolvedValue(undefined);
       setupActiveSession();
       setupPromptHistory();
       mockChatContextProviderRegistry.build.mockResolvedValue(mockIntentContext);
@@ -446,6 +503,90 @@ describe('ChatService', () => {
         }),
       );
     });
+
+    it('records quota denials before calling the AI provider', async () => {
+      mockChatQuotaService.consume.mockRejectedValue(
+        new ChatQuotaExceededException({
+          limit: 30,
+          used: 31,
+          remaining: 0,
+          resetAt: new Date('2024-12-02T00:00:00.000Z'),
+          unlimited: false,
+        }),
+      );
+
+      await expect(service.sendMessage(user as any, 'show backend jobs')).rejects.toBeInstanceOf(
+        TooManyRequestsException,
+      );
+
+      expect(mockAIService.generateChat).not.toHaveBeenCalled();
+      expect(mockAiUsageService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          errorCategory: 'QUOTA_EXCEEDED',
+        }),
+      );
+    });
+
+    it('serves cached FAQ responses without consuming quota or calling AI', async () => {
+      const faqContext = {
+        ...mockIntentContext,
+        intent: EChatIntent.FAQ,
+        faq: { topic: 'apply', answer: 'Apply from the job detail page.' },
+        contextJobs: [],
+        validJobIds: [],
+      };
+      mockChatIntentService.detectIntent.mockResolvedValue({
+        intent: EChatIntent.FAQ,
+        confidence: 0.9,
+        source: 'deterministic',
+      });
+      mockChatContextProviderRegistry.build.mockResolvedValue(faqContext);
+      mockChatCacheService.getFaqResponse.mockResolvedValue({
+        response: 'Apply from the job detail page.',
+      });
+
+      const result = await service.sendMessage(user as any, 'How to apply?');
+
+      expect(result.cacheHit).toBe(true);
+      expect(result.cacheCategory).toBe('faq_response');
+      expect(mockChatQuotaService.consume).not.toHaveBeenCalled();
+      expect(mockAIService.generateChat).not.toHaveBeenCalled();
+      expect(mockAiUsageService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          cacheHit: true,
+          cacheCategory: 'faq_response',
+        }),
+      );
+    });
+
+    it('returns pending save-job actions when the assistant suggests saving recommended jobs', async () => {
+      const pendingAction = {
+        actionId: '507f1f77bcf86cd799439050',
+        type: 'save_job',
+        label: 'Save Backend Developer',
+        payload: { jobId: 'job-1' },
+        expiresAt: new Date('2024-12-01T10:15:00.000Z'),
+      };
+      mockChatToolActionService.createSaveJobActions.mockResolvedValue([pendingAction]);
+      mockAIService.generateChat.mockResolvedValue({
+        text: 'You can save this recommended job for later.',
+        recommendedJobIds: ['job-1'],
+        provider: 'groq',
+        metadata: { provider: 'groq', model: 'llama' },
+      });
+
+      const result = await service.sendMessage(user as any, 'show backend jobs');
+
+      expect(mockChatToolActionService.createSaveJobActions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId,
+          jobs: [expect.objectContaining({ _id: 'job-1' })],
+        }),
+      );
+      expect(result.pendingToolActions).toEqual([pendingAction]);
+    });
   });
 
   describe('streamMessage', () => {
@@ -486,6 +627,13 @@ describe('ChatService', () => {
               },
             ],
             suggestedActions: undefined,
+            quota: {
+              limit: 30,
+              used: 1,
+              remaining: 29,
+              resetAt: new Date('2024-12-02T00:00:00.000Z'),
+              unlimited: false,
+            },
           },
         },
       ]);

@@ -25,7 +25,10 @@ import { JobsService } from '../jobs/jobs.service';
 import { IntentAwareChatContext, UserContext } from './interfaces/chat-context.interface';
 import { ChatGuardrailBlockedException, ChatGuardrailService } from './chat-guardrail.service';
 import { AiUsageService } from './ai-usage.service';
-import { TooManyRequestsException } from './exceptions/too-many-requests.exception';
+import {
+  ChatQuotaExceededException,
+  TooManyRequestsException,
+} from './exceptions/too-many-requests.exception';
 import { EChatMessageRole } from './enums/chat-message-role.enum';
 import { EChatSessionType } from './enums/chat-session-type.enum';
 import { CreateChatSessionDto } from './dto/create-chat-session.dto';
@@ -35,6 +38,11 @@ import { EChatIntent } from './enums/chat-intent.enum';
 import { ChatIntentDetectionSource } from './interfaces/chat-intent-result.interface';
 import { ChatIntentService } from './chat-intent.service';
 import { ChatContextProviderRegistry } from './chat-context-provider.registry';
+import { ChatQuotaService } from './chat-quota.service';
+import { IChatQuotaStatus } from './interfaces/chat-quota-status.interface';
+import { ChatCacheService } from './chat-cache.service';
+import { ChatToolActionService } from './chat-tool-action.service';
+import { PendingChatToolActionDto } from './dto/chat-tool-action.dto';
 
 export interface ChatStreamEvent {
   type: 'token' | 'done';
@@ -54,6 +62,8 @@ interface ChatTurnContext {
   promptEstimateSource: string;
   validJobIds: Set<string>;
   allContextJobs: Array<Record<string, any>>;
+  contextCacheHit: boolean;
+  contextCacheCategory?: string;
 }
 
 interface PrepareChatTurnOptions {
@@ -83,6 +93,9 @@ export class ChatService {
     private readonly jobsService: JobsService,
     private readonly chatGuardrailService: ChatGuardrailService,
     private readonly aiUsageService: AiUsageService,
+    private readonly chatQuotaService: ChatQuotaService,
+    private readonly chatCacheService: ChatCacheService,
+    private readonly chatToolActionService: ChatToolActionService,
   ) {}
 
   async createSession(user: IUser, dto: CreateChatSessionDto): Promise<ChatSessionDto> {
@@ -142,11 +155,77 @@ export class ChatService {
       intent = turn.intent;
       intentDetectionSource = turn.intentDetectionSource;
 
+      const cachedFaqResponse = await this.getCachedFaqResponse(user, turn);
+      if (cachedFaqResponse) {
+        const usageMetadata = this.withEstimatedUsage(
+          undefined,
+          promptEstimateSource,
+          Date.now() - startedAt,
+        );
+        const outputGuardrail = this.chatGuardrailService.sanitizeAssistantOutput(
+          cachedFaqResponse.response,
+        );
+        guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
+
+        await this.persistMessageTurn({
+          session: turn.session,
+          userId: user._id,
+          userMessage: turn.sanitizedMessage,
+          assistantMessage: outputGuardrail.sanitizedOutput,
+          relatedJobIds: cachedFaqResponse.recommendedJobIds ?? [],
+          assistantMetadata: this.buildMessageMetadata(
+            usageMetadata,
+            false,
+            guardrailFlags,
+            undefined,
+            turn.intent,
+            turn.intentDetectionSource,
+          ),
+        });
+
+        await this.recordUsage({
+          userId: user._id,
+          sessionId: turn.sessionId,
+          operationType: 'chat_message',
+          intent: turn.intent,
+          intentDetectionSource: turn.intentDetectionSource,
+          success: true,
+          metadata: usageMetadata,
+          guardrailFlags,
+          cacheHit: true,
+          cacheCategory: 'faq_response',
+          requestStartedAt: new Date(startedAt),
+          requestCompletedAt: new Date(),
+        });
+
+        const suggestedActions = this.extractSuggestedActions(
+          outputGuardrail.sanitizedOutput,
+          turn.intentContext.user,
+        );
+
+        return {
+          sessionId: turn.sessionId,
+          conversationId: turn.sessionId,
+          response: outputGuardrail.sanitizedOutput,
+          timestamp: new Date(),
+          intent: turn.intent,
+          suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
+          recommendedJobIds: cachedFaqResponse.recommendedJobIds,
+          cacheHit: true,
+          cacheCategory: 'faq_response',
+        };
+      }
+
+      const quotaStatus = await this.chatQuotaService.consume(user);
       const parsedResponse = await this.aiService.generateChat(
         turn.sanitizedMessage,
         turn.history,
         turn.systemPrompt,
       );
+      const outputGuardrail = this.chatGuardrailService.sanitizeAssistantOutput(
+        parsedResponse.text,
+      );
+      guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
 
       const validatedJobIds = this.validateRecommendedJobIds(
         parsedResponse.recommendedJobIds ?? [],
@@ -161,12 +240,18 @@ export class ChatService {
         promptEstimateSource,
         Date.now() - startedAt,
       );
+      const pendingToolActions = await this.createPendingToolActions({
+        user,
+        sessionId: turn.sessionId,
+        responseText: outputGuardrail.sanitizedOutput,
+        recommendedJobs,
+      });
 
       await this.persistMessageTurn({
         session: turn.session,
         userId: user._id,
         userMessage: turn.sanitizedMessage,
-        assistantMessage: parsedResponse.text,
+        assistantMessage: outputGuardrail.sanitizedOutput,
         relatedJobIds: validatedJobIds,
         assistantMetadata: this.buildMessageMetadata(
           usageMetadata,
@@ -179,9 +264,11 @@ export class ChatService {
       });
 
       const suggestedActions = this.extractSuggestedActions(
-        parsedResponse.text,
+        outputGuardrail.sanitizedOutput,
         turn.intentContext.user,
       );
+
+      await this.cacheFaqResponse(user, turn, outputGuardrail.sanitizedOutput, validatedJobIds);
       await this.recordUsage({
         userId: user._id,
         sessionId: turn.sessionId,
@@ -192,6 +279,10 @@ export class ChatService {
         metadata: usageMetadata,
         fallbackUsed: parsedResponse.fallbackUsed,
         guardrailFlags,
+        cacheHit: turn.contextCacheHit,
+        cacheCategory: turn.contextCacheCategory,
+        requestStartedAt: new Date(startedAt),
+        requestCompletedAt: new Date(),
       });
 
       this.logger.log(`Successfully generated AI response for user ${user._id}`);
@@ -199,12 +290,16 @@ export class ChatService {
       return {
         sessionId: turn.sessionId,
         conversationId: turn.sessionId,
-        response: parsedResponse.text,
+        response: outputGuardrail.sanitizedOutput,
         timestamp: new Date(),
         intent: turn.intent,
         suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
         recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
         recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined,
+        quota: quotaStatus,
+        pendingToolActions: pendingToolActions.length > 0 ? pendingToolActions : undefined,
+        cacheHit: turn.contextCacheHit || undefined,
+        cacheCategory: turn.contextCacheCategory,
       };
     } catch (error) {
       guardrailFlags = this.resolveGuardrailFlags(error, guardrailFlags);
@@ -218,6 +313,8 @@ export class ChatService {
         metadata: this.withEstimatedUsage(undefined, promptEstimateSource, Date.now() - startedAt),
         guardrailFlags,
         errorCategory: this.categorizeError(error),
+        requestStartedAt: new Date(startedAt),
+        requestCompletedAt: new Date(),
       });
 
       const errorDetails = error instanceof Error ? (error.stack ?? error.message) : error;
@@ -239,6 +336,7 @@ export class ChatService {
     let fullText = '';
     let intent: EChatIntent | undefined;
     let intentDetectionSource: ChatIntentDetectionSource | undefined;
+    let quotaStatus: IChatQuotaStatus | undefined;
 
     try {
       const turn = await this.prepareChatTurn(user, message, {
@@ -252,17 +350,86 @@ export class ChatService {
       intent = turn.intent;
       intentDetectionSource = turn.intentDetectionSource;
 
+      const cachedFaqResponse = await this.getCachedFaqResponse(user, turn);
+      if (cachedFaqResponse) {
+        const outputGuardrail = this.chatGuardrailService.sanitizeAssistantOutput(
+          cachedFaqResponse.response,
+        );
+        fullText = outputGuardrail.sanitizedOutput;
+        guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
+        const usageMetadata = this.withEstimatedUsage(
+          undefined,
+          promptEstimateSource,
+          Date.now() - startedAt,
+        );
+
+        yield { type: 'token', data: fullText };
+
+        await this.persistMessageTurn({
+          session: turn.session,
+          userId: user._id,
+          userMessage: turn.sanitizedMessage,
+          assistantMessage: fullText,
+          relatedJobIds: cachedFaqResponse.recommendedJobIds ?? [],
+          assistantMetadata: this.buildMessageMetadata(
+            usageMetadata,
+            false,
+            guardrailFlags,
+            undefined,
+            turn.intent,
+            turn.intentDetectionSource,
+          ),
+        });
+
+        await this.recordUsage({
+          userId: user._id,
+          sessionId: turn.sessionId,
+          operationType: 'chat_stream',
+          intent: turn.intent,
+          intentDetectionSource: turn.intentDetectionSource,
+          success: true,
+          metadata: usageMetadata,
+          guardrailFlags,
+          cacheHit: true,
+          cacheCategory: 'faq_response',
+          requestStartedAt: new Date(startedAt),
+          requestCompletedAt: new Date(),
+        });
+
+        const suggestedActions = this.extractSuggestedActions(fullText, turn.intentContext.user);
+
+        yield {
+          type: 'done',
+          data: {
+            sessionId: turn.sessionId,
+            conversationId: turn.sessionId,
+            intent: turn.intent,
+            recommendedJobIds: cachedFaqResponse.recommendedJobIds,
+            suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
+            cacheHit: true,
+            cacheCategory: 'faq_response',
+          },
+        };
+
+        return;
+      }
+
+      quotaStatus = await this.chatQuotaService.consume(user);
       const gen = this.aiService.streamChat(turn.sanitizedMessage, turn.history, turn.systemPrompt);
       let iterResult = await gen.next();
 
       while (!iterResult.done) {
-        const chunk = iterResult.value as string;
-        fullText += chunk;
-        yield { type: 'token', data: chunk };
+        const chunk = this.chatGuardrailService.sanitizeAssistantOutput(iterResult.value as string);
+        fullText += chunk.sanitizedOutput;
+        guardrailFlags = [...new Set([...guardrailFlags, ...chunk.flags])];
+        yield { type: 'token', data: chunk.sanitizedOutput };
         iterResult = await gen.next();
       }
 
       const streamResult = iterResult.value;
+      const outputGuardrail = this.chatGuardrailService.sanitizeAssistantOutput(fullText);
+      fullText = outputGuardrail.sanitizedOutput;
+      guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
       const validatedJobIds = this.validateRecommendedJobIds(
         streamResult?.recommendedJobIds ?? [],
         turn.validJobIds,
@@ -276,6 +443,12 @@ export class ChatService {
         promptEstimateSource,
         Date.now() - startedAt,
       );
+      const pendingToolActions = await this.createPendingToolActions({
+        user,
+        sessionId: turn.sessionId,
+        responseText: fullText,
+        recommendedJobs,
+      });
 
       await this.persistMessageTurn({
         session: turn.session,
@@ -303,9 +476,14 @@ export class ChatService {
         metadata: usageMetadata,
         fallbackUsed: streamResult?.fallbackUsed,
         guardrailFlags,
+        cacheHit: turn.contextCacheHit,
+        cacheCategory: turn.contextCacheCategory,
+        requestStartedAt: new Date(startedAt),
+        requestCompletedAt: new Date(),
       });
 
       const suggestedActions = this.extractSuggestedActions(fullText, turn.intentContext.user);
+      await this.cacheFaqResponse(user, turn, fullText, validatedJobIds);
 
       yield {
         type: 'done',
@@ -316,6 +494,10 @@ export class ChatService {
           recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
           recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined,
           suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
+          quota: quotaStatus,
+          pendingToolActions: pendingToolActions.length > 0 ? pendingToolActions : undefined,
+          cacheHit: turn.contextCacheHit || undefined,
+          cacheCategory: turn.contextCacheCategory,
         },
       };
 
@@ -332,6 +514,8 @@ export class ChatService {
         metadata: this.withEstimatedUsage(undefined, promptEstimateSource, Date.now() - startedAt),
         guardrailFlags,
         errorCategory: this.categorizeError(error),
+        requestStartedAt: new Date(startedAt),
+        requestCompletedAt: new Date(),
       });
 
       const errorDetails = error instanceof Error ? (error.stack ?? error.message) : error;
@@ -518,11 +702,31 @@ export class ChatService {
       jobId: options.jobId,
       allowAiFallback: options.allowAiIntentClassifier,
     });
-    const intentContext = await this.chatContextProviderRegistry.build(intentResult.intent, {
+    let contextCacheHit = false;
+    let intentContext = await this.chatCacheService.getContext(
       user,
-      message: sanitizedMessage,
-      jobId: options.jobId,
-    });
+      intentResult.intent,
+      sanitizedMessage,
+      options.jobId,
+    );
+
+    if (intentContext) {
+      contextCacheHit = true;
+    } else {
+      intentContext = await this.chatContextProviderRegistry.build(intentResult.intent, {
+        user,
+        message: sanitizedMessage,
+        jobId: options.jobId,
+      });
+      await this.chatCacheService.setContext(
+        user,
+        intentResult.intent,
+        sanitizedMessage,
+        intentContext,
+        options.jobId,
+      );
+    }
+
     const history = await this.getPromptHistory(session._id.toString());
     const systemPrompt = this.chatPromptBuilder.buildSystemPrompt(intentContext, session.summary);
     const promptEstimateSource = this.buildPromptEstimateSource(
@@ -544,6 +748,8 @@ export class ChatService {
       promptEstimateSource,
       validJobIds: new Set(intentContext.validJobIds),
       allContextJobs: intentContext.contextJobs,
+      contextCacheHit,
+      contextCacheCategory: contextCacheHit ? 'retrieval_context' : undefined,
     };
   }
 
@@ -763,6 +969,72 @@ export class ChatService {
     } catch (error) {
       this.logger.error('Error archiving chat session:', error);
     }
+  }
+
+  private async getCachedFaqResponse(
+    user: IUser,
+    turn: ChatTurnContext,
+  ): Promise<{ response: string; recommendedJobIds?: string[] } | undefined> {
+    if (turn.intent !== EChatIntent.FAQ) {
+      return undefined;
+    }
+
+    return this.chatCacheService.getFaqResponse(
+      user,
+      turn.sanitizedMessage,
+      turn.intentContext.faq?.topic,
+    );
+  }
+
+  private async cacheFaqResponse(
+    user: IUser,
+    turn: ChatTurnContext,
+    response: string,
+    recommendedJobIds: string[],
+  ): Promise<void> {
+    if (turn.intent !== EChatIntent.FAQ) {
+      return;
+    }
+
+    await this.chatCacheService.setFaqResponse(
+      user,
+      turn.sanitizedMessage,
+      {
+        response,
+        recommendedJobIds: recommendedJobIds.length > 0 ? recommendedJobIds : undefined,
+      },
+      turn.intentContext.faq?.topic,
+    );
+  }
+
+  private async createPendingToolActions(input: {
+    user: IUser;
+    sessionId: string;
+    responseText: string;
+    recommendedJobs: ChatRecommendedJobDto[];
+  }): Promise<PendingChatToolActionDto[]> {
+    if (
+      input.recommendedJobs.length === 0 ||
+      !this.shouldProposeSaveJobActions(input.responseText)
+    ) {
+      return [];
+    }
+
+    return this.chatToolActionService.createSaveJobActions({
+      user: input.user,
+      sessionId: input.sessionId,
+      jobs: input.recommendedJobs,
+    });
+  }
+
+  private shouldProposeSaveJobActions(responseText: string): boolean {
+    const normalizedResponse = responseText.toLowerCase();
+    return (
+      normalizedResponse.includes('save') ||
+      normalizedResponse.includes('bookmark') ||
+      normalizedResponse.includes('lưu') ||
+      normalizedResponse.includes('luu')
+    );
   }
 
   private extractSuggestedActions(aiResponse: string, userContext: UserContext): string[] {
@@ -992,6 +1264,10 @@ export class ChatService {
     fallbackUsed?: boolean;
     guardrailFlags?: string[];
     errorCategory?: string;
+    cacheHit?: boolean;
+    cacheCategory?: string;
+    requestStartedAt?: Date;
+    requestCompletedAt?: Date;
   }): Promise<void> {
     if (!Types.ObjectId.isValid(input.userId)) {
       return;
@@ -1011,6 +1287,10 @@ export class ChatService {
   private categorizeError(error: unknown): string {
     if (error instanceof ChatGuardrailBlockedException) {
       return 'GUARDRAIL_BLOCKED';
+    }
+
+    if (error instanceof ChatQuotaExceededException) {
+      return 'QUOTA_EXCEEDED';
     }
 
     if (this.aiService.isRateLimitError(error)) {
