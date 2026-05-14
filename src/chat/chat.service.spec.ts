@@ -20,6 +20,7 @@ import {
 import { ChatQuotaService } from './chat-quota.service';
 import { ChatCacheService } from './chat-cache.service';
 import { ChatToolActionService } from './chat-tool-action.service';
+import { ChatResponseFormatterService } from './chat-response-formatter.service';
 import { EChatMessageRole } from './enums/chat-message-role.enum';
 import { EChatSessionType } from './enums/chat-session-type.enum';
 import { EChatIntent } from './enums/chat-intent.enum';
@@ -54,6 +55,7 @@ describe('ChatService', () => {
   let mockChatContextProviderRegistry: { build: jest.Mock };
   let mockPromptBuilder: { buildSystemPrompt: jest.Mock };
   let mockGuardrailService: { validateMessage: jest.Mock; sanitizeAssistantOutput: jest.Mock };
+  let mockChatResponseFormatterService: { formatAssistantOutput: jest.Mock };
   let mockAiUsageService: { record: jest.Mock };
   let mockChatQuotaService: { consume: jest.Mock };
   let mockChatCacheService: {
@@ -222,6 +224,14 @@ describe('ChatService', () => {
       })),
     };
 
+    mockChatResponseFormatterService = {
+      formatAssistantOutput: jest.fn((message: string) => ({
+        sanitizedOutput: message,
+        flags: [],
+        riskLevel: 'low',
+      })),
+    };
+
     mockAiUsageService = {
       record: jest.fn(),
     };
@@ -293,6 +303,10 @@ describe('ChatService', () => {
         {
           provide: ChatGuardrailService,
           useValue: mockGuardrailService,
+        },
+        {
+          provide: ChatResponseFormatterService,
+          useValue: mockChatResponseFormatterService,
         },
         {
           provide: AiUsageService,
@@ -403,6 +417,35 @@ describe('ChatService', () => {
         }),
       );
       expect(mockCacheManager.set).toHaveBeenCalledWith(`chat_session:${userId}`, sessionId, 0);
+    });
+
+    it('returns and persists formatted assistant output', async () => {
+      mockAIService.generateChat.mockResolvedValue({
+        text: 'There are 18 companies hiring.Let me know if you want company details.',
+        recommendedJobIds: [],
+        provider: 'groq',
+        metadata: { provider: 'groq', model: 'llama' },
+      });
+      mockChatResponseFormatterService.formatAssistantOutput.mockReturnValue({
+        sanitizedOutput:
+          'There are 18 companies hiring.\n\nLet me know if you want company details.',
+        flags: [],
+        riskLevel: 'low',
+      });
+
+      const result = await service.sendMessage(user as any, 'how many companies are hiring');
+
+      expect(result.response).toBe(
+        'There are 18 companies hiring.\n\nLet me know if you want company details.',
+      );
+      expect(mockChatMessageModel.insertMany).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: EChatMessageRole.ASSISTANT,
+            content: 'There are 18 companies hiring.\n\nLet me know if you want company details.',
+          }),
+        ]),
+      );
     });
 
     it('passes jobId into intent detection and context routing', async () => {
@@ -600,6 +643,11 @@ describe('ChatService', () => {
       mockChatMessageModel.insertMany.mockResolvedValue([]);
       mockChatSessionModel.updateOne.mockResolvedValue({ modifiedCount: 1 });
       mockAIService.streamChat.mockReturnValue(createStream(['Hello ', 'there'], ['job-1']));
+      mockChatResponseFormatterService.formatAssistantOutput.mockReturnValue({
+        sanitizedOutput: 'Hello\n\nthere',
+        flags: [],
+        riskLevel: 'low',
+      });
 
       const events = [];
       for await (const event of service.streamMessage(user as any, 'show backend jobs')) {
@@ -614,6 +662,7 @@ describe('ChatService', () => {
           data: {
             sessionId,
             conversationId: sessionId,
+            response: 'Hello\n\nthere',
             intent: EChatIntent.JOB_ADVISOR,
             recommendedJobIds: ['job-1'],
             recommendedJobs: [
@@ -637,6 +686,14 @@ describe('ChatService', () => {
           },
         },
       ]);
+      expect(mockChatMessageModel.insertMany).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: EChatMessageRole.ASSISTANT,
+            content: 'Hello\n\nthere',
+          }),
+        ]),
+      );
       expect(mockAiUsageService.record).toHaveBeenCalledWith(
         expect.objectContaining({
           sessionId,

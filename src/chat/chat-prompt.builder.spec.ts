@@ -66,4 +66,20 @@ describe('ChatPromptBuilder', () => {
     expect(prompt).toContain('DETERMINISTIC MATCH');
     expect(prompt).toContain('YOUR MATCHING JOBS');
   });
+
+  it('requires readable and proofread assistant answers', () => {
+    const prompt = builder.buildSystemPrompt(baseContext);
+
+    expect(prompt).toContain('Proofread spelling and grammar before finalizing.');
+    expect(prompt).toContain('Start with the direct answer');
+    expect(prompt).toContain('separate follow-up questions with a blank line');
+    expect(prompt).toContain('Avoid dense single-paragraph responses');
+  });
+
+  it('includes Vietnamese language quality instruction in rules', () => {
+    const prompt = builder.buildSystemPrompt(baseContext);
+
+    expect(prompt).toContain('Vietnamese');
+    expect(prompt).toContain('diacritical marks');
+  });
 });

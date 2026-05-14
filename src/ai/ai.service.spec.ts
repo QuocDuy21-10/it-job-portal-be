@@ -7,6 +7,17 @@ import { GeminiQuotaDeniedException } from 'src/gemini/gemini-quota-denied.excep
 import { IAIChatStreamResult } from './interfaces/ai-chat-stream-result.interface';
 
 describe('AIService', () => {
+  const requiredGroqConfig: Record<string, string> = {
+    AI_GROQ_HISTORY_LIMIT: '6',
+    AI_GROQ_MAX_INPUT_TOKENS: '6000',
+    AI_GROQ_MAX_MATCHING_JOBS: '3',
+    AI_GROQ_MAX_SEARCH_RESULTS: '3',
+    AI_GROQ_MAX_COMPANY_ITEMS: '2',
+    AI_GROQ_MAX_TOP_SKILLS: '5',
+    AI_GROQ_MAX_TOP_COMPANIES: '5',
+    AI_GROQ_MAX_SUMMARY_CHARS: '400',
+  };
+
   const createStream = (
     chunks: string[],
     finalJobIds: string[] = [],
@@ -77,7 +88,7 @@ describe('AIService', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn((key: string) => configValues[key]),
+            get: jest.fn((key: string) => ({ ...requiredGroqConfig, ...configValues })[key]),
           },
         },
         {
@@ -105,6 +116,18 @@ describe('AIService', () => {
 
     await expect(service.parseCV('cv text')).resolves.toEqual(parsedData);
     expect(geminiServiceMock.parseCV).toHaveBeenCalledWith('cv text');
+  });
+
+  it('fails fast when a required Groq config value is missing', async () => {
+    await expect(createTestingModule({ AI_GROQ_HISTORY_LIMIT: undefined })).rejects.toThrow(
+      'Missing required environment variable AI_GROQ_HISTORY_LIMIT',
+    );
+  });
+
+  it('fails fast when a required Groq config value is invalid', async () => {
+    await expect(createTestingModule({ AI_GROQ_MAX_INPUT_TOKENS: '0' })).rejects.toThrow(
+      'AI_GROQ_MAX_INPUT_TOKENS must be a positive integer',
+    );
   });
 
   it('uses Groq as the default chat provider', async () => {

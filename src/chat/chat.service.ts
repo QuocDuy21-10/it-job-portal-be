@@ -43,6 +43,7 @@ import { IChatQuotaStatus } from './interfaces/chat-quota-status.interface';
 import { ChatCacheService } from './chat-cache.service';
 import { ChatToolActionService } from './chat-tool-action.service';
 import { PendingChatToolActionDto } from './dto/chat-tool-action.dto';
+import { ChatResponseFormatterService } from './chat-response-formatter.service';
 
 export interface ChatStreamEvent {
   type: 'token' | 'done';
@@ -96,6 +97,7 @@ export class ChatService {
     private readonly chatQuotaService: ChatQuotaService,
     private readonly chatCacheService: ChatCacheService,
     private readonly chatToolActionService: ChatToolActionService,
+    private readonly chatResponseFormatterService: ChatResponseFormatterService,
   ) {}
 
   async createSession(user: IUser, dto: CreateChatSessionDto): Promise<ChatSessionDto> {
@@ -162,7 +164,7 @@ export class ChatService {
           promptEstimateSource,
           Date.now() - startedAt,
         );
-        const outputGuardrail = this.chatGuardrailService.sanitizeAssistantOutput(
+        const outputGuardrail = this.chatResponseFormatterService.formatAssistantOutput(
           cachedFaqResponse.response,
         );
         guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
@@ -222,7 +224,7 @@ export class ChatService {
         turn.history,
         turn.systemPrompt,
       );
-      const outputGuardrail = this.chatGuardrailService.sanitizeAssistantOutput(
+      const outputGuardrail = this.chatResponseFormatterService.formatAssistantOutput(
         parsedResponse.text,
       );
       guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
@@ -352,7 +354,7 @@ export class ChatService {
 
       const cachedFaqResponse = await this.getCachedFaqResponse(user, turn);
       if (cachedFaqResponse) {
-        const outputGuardrail = this.chatGuardrailService.sanitizeAssistantOutput(
+        const outputGuardrail = this.chatResponseFormatterService.formatAssistantOutput(
           cachedFaqResponse.response,
         );
         fullText = outputGuardrail.sanitizedOutput;
@@ -403,6 +405,7 @@ export class ChatService {
           data: {
             sessionId: turn.sessionId,
             conversationId: turn.sessionId,
+            response: fullText,
             intent: turn.intent,
             recommendedJobIds: cachedFaqResponse.recommendedJobIds,
             suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
@@ -427,7 +430,7 @@ export class ChatService {
       }
 
       const streamResult = iterResult.value;
-      const outputGuardrail = this.chatGuardrailService.sanitizeAssistantOutput(fullText);
+      const outputGuardrail = this.chatResponseFormatterService.formatAssistantOutput(fullText);
       fullText = outputGuardrail.sanitizedOutput;
       guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
       const validatedJobIds = this.validateRecommendedJobIds(
@@ -490,6 +493,7 @@ export class ChatService {
         data: {
           sessionId: turn.sessionId,
           conversationId: turn.sessionId,
+          response: fullText,
           intent: turn.intent,
           recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
           recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined,

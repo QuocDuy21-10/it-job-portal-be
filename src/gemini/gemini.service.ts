@@ -20,6 +20,9 @@ export class GeminiService {
   private readonly modelName: string;
   private readonly PARSE_MAX_TOKENS = 5000;
   private readonly PARSE_TEMPERATURE = 0.3;
+  // private readonly CHAT_TEMPERATURE = 0.4;
+  private readonly CHAT_TEMPERATURE = 0.7;
+
 
   // Tool declaration for job recommendations in streaming mode.
   // The model calls this instead of embedding IDs in free-form text.
@@ -279,7 +282,7 @@ ${cvText}`;
           model: this.modelName,
           contents,
           config: {
-            temperature: 0.7,
+            temperature: this.CHAT_TEMPERATURE,
             maxOutputTokens: 2000,
             responseMimeType: 'application/json',
             responseJsonSchema: this.CHAT_RESPONSE_SCHEMA,
@@ -364,7 +367,7 @@ ${cvText}`;
         model: this.modelName,
         contents,
         config: {
-          temperature: 0.7,
+          temperature: this.CHAT_TEMPERATURE,
           maxOutputTokens: 2000,
           tools: [{ functionDeclarations: [this.RECOMMEND_JOBS_TOOL] }],
           toolConfig: {
@@ -408,7 +411,7 @@ ${cvText}`;
           model: this.modelName,
           contents: functionResponseContents,
           config: {
-            temperature: 0.7,
+            temperature: this.CHAT_TEMPERATURE,
             maxOutputTokens: 2000,
           },
         });
@@ -479,7 +482,7 @@ ${cvText}`;
         model: this.modelName,
         contents,
         config: {
-          temperature: 0.7,
+          temperature: this.CHAT_TEMPERATURE,
           maxOutputTokens: 2000,
         },
       });

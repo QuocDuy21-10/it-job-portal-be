@@ -31,6 +31,7 @@ export class GroqService {
   private readonly summaryModelName: string;
   private readonly maxCompletionTokens = 1200;
   private readonly summaryMaxCompletionTokens = 200;
+  // private readonly temperature = 0.4;
   private readonly temperature = 0.7;
   private readonly summaryTemperature = 0.3;
   private readonly structuredResponseInstruction =
