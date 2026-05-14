@@ -143,6 +143,24 @@ describe('AIService', () => {
     expect(geminiServiceMock.chatWithContext).toHaveBeenCalledWith('hello', [], 'prompt');
   });
 
+  it('falls back to Gemini when Groq structured output validation fails', async () => {
+    const { service, groqServiceMock, geminiServiceMock } = await createTestingModule();
+    const structuredError = new Error('Groq returned invalid structured chat response');
+    groqServiceMock.chatWithContext.mockRejectedValue(structuredError);
+    groqServiceMock.isFallbackEligibleError.mockReturnValue(true);
+    geminiServiceMock.chatWithContext.mockResolvedValue({
+      text: 'Gemini structured fallback',
+      recommendedJobIds: ['job-1'],
+    });
+
+    await expect(service.generateChat('show jobs', [], 'prompt')).resolves.toEqual({
+      text: 'Gemini structured fallback',
+      recommendedJobIds: ['job-1'],
+      provider: 'gemini',
+      fallbackUsed: true,
+    });
+  });
+
   it('surfaces Gemini quota denial when Groq fallback is unavailable', async () => {
     const { service, groqServiceMock, geminiServiceMock } = await createTestingModule();
     const quotaError = new GeminiQuotaDeniedException('chat-fallback', 'day', 60000, 0, 0);

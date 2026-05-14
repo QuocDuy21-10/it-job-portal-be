@@ -13,10 +13,15 @@ import { AI_PROVIDER_GROQ } from 'src/ai/ai.constants';
 import { IAIChatUsageMetadata } from 'src/ai/interfaces/ai-chat-usage-metadata.interface';
 import { IAIChatStreamResult } from 'src/ai/interfaces/ai-chat-stream-result.interface';
 
-const DEFAULT_GROQ_CHAT_MODEL = 'llama-3.3-70b-versatile';
+const DEFAULT_GROQ_CHAT_MODEL = 'openai/gpt-oss-20b';
 const DEFAULT_GROQ_SUMMARY_MODEL = DEFAULT_GROQ_CHAT_MODEL;
 const DEFAULT_GROQ_TIMEOUT_MS = 30000;
 const DEFAULT_GROQ_MAX_RETRIES = 2;
+
+interface IGroqStructuredChatResponse {
+  text: string;
+  recommendedJobIds: string[];
+}
 
 @Injectable()
 export class GroqService {
@@ -28,6 +33,36 @@ export class GroqService {
   private readonly summaryMaxCompletionTokens = 200;
   private readonly temperature = 0.7;
   private readonly summaryTemperature = 0.3;
+  private readonly structuredResponseInstruction =
+    'Return the final assistant answer using the required JSON schema. ' +
+    '`text` must contain the conversational Markdown response for the user. ' +
+    '`recommendedJobIds` must contain only exact job IDs accepted through the recommend_jobs tool. ' +
+    'If no recommend_jobs tool response was provided, use an empty array.';
+
+  private readonly chatResponseFormat = {
+    type: 'json_schema' as const,
+    json_schema: {
+      name: 'chat_response',
+      description: 'Structured AI career advisor chat response for frontend rendering.',
+      strict: true,
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          text: {
+            type: 'string',
+            description: 'Conversational response with Markdown formatting.',
+          },
+          recommendedJobIds: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Array of job IDs from provided context to recommend.',
+          },
+        },
+        required: ['text', 'recommendedJobIds'],
+      },
+    },
+  };
 
   private readonly recommendJobsTool = {
     type: 'function' as const,
@@ -103,37 +138,17 @@ export class GroqService {
     }
 
     const toolCalls = assistantMessage.tool_calls ?? [];
-    const recommendedJobIds = this.extractRecommendedJobIds(toolCalls);
-
-    if (toolCalls.length === 0) {
-      return {
-        text: assistantMessage.content ?? '',
-        recommendedJobIds,
-        provider: AI_PROVIDER_GROQ,
-        metadata: this.buildUsageMetadata([firstTurn], Date.now() - startedAt),
-      };
-    }
-
-    const finalMessages: any[] = [
-      ...messages,
-      {
-        role: 'assistant' as const,
-        content: assistantMessage.content ?? '',
-        tool_calls: toolCalls,
-      },
-      ...this.buildToolResponseMessages(toolCalls),
-    ];
-
-    const secondTurn = await client.chat.completions.create({
-      model: this.chatModelName,
-      messages: finalMessages,
-      temperature: this.temperature,
-      max_completion_tokens: this.maxCompletionTokens,
-    });
+    const toolRecommendedJobIds = this.extractRecommendedJobIds(toolCalls);
+    const finalMessages = this.buildStructuredFinalMessages(messages, assistantMessage, toolCalls);
+    const secondTurn = await this.createStructuredChatCompletion(client, finalMessages);
+    const structuredResponse = this.parseStructuredChatResponse(secondTurn);
 
     return {
-      text: secondTurn.choices[0]?.message?.content ?? assistantMessage.content ?? '',
-      recommendedJobIds,
+      text: structuredResponse.text,
+      recommendedJobIds: this.resolveRecommendedJobIds(
+        toolRecommendedJobIds,
+        structuredResponse.recommendedJobIds,
+      ),
       provider: AI_PROVIDER_GROQ,
       metadata: this.buildUsageMetadata([firstTurn, secondTurn], Date.now() - startedAt),
     };
@@ -164,50 +179,23 @@ export class GroqService {
     }
 
     const toolCalls = assistantMessage.tool_calls ?? [];
-    if (toolCalls.length === 0) {
-      const text = assistantMessage.content ?? '';
-      if (text) {
-        yield text;
-      }
-      return {
-        recommendedJobIds: [],
-        provider: AI_PROVIDER_GROQ,
-        model: this.chatModelName,
-        metadata: this.buildUsageMetadata([firstTurn], Date.now() - startedAt),
-      };
-    }
+    const toolRecommendedJobIds = this.extractRecommendedJobIds(toolCalls);
+    const finalMessages = this.buildStructuredFinalMessages(messages, assistantMessage, toolCalls);
+    const secondTurn = await this.createStructuredChatCompletion(client, finalMessages);
+    const structuredResponse = this.parseStructuredChatResponse(secondTurn);
 
-    const recommendedJobIds = this.extractRecommendedJobIds(toolCalls);
-    const finalMessages: any[] = [
-      ...messages,
-      {
-        role: 'assistant' as const,
-        content: assistantMessage.content ?? '',
-        tool_calls: toolCalls,
-      },
-      ...this.buildToolResponseMessages(toolCalls),
-    ];
-
-    const stream = await client.chat.completions.create({
-      model: this.chatModelName,
-      messages: finalMessages,
-      temperature: this.temperature,
-      max_completion_tokens: this.maxCompletionTokens,
-      stream: true,
-    });
-
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta;
-      if (delta?.content) {
-        yield delta.content;
-      }
+    if (structuredResponse.text) {
+      yield structuredResponse.text;
     }
 
     return {
-      recommendedJobIds,
+      recommendedJobIds: this.resolveRecommendedJobIds(
+        toolRecommendedJobIds,
+        structuredResponse.recommendedJobIds,
+      ),
       provider: AI_PROVIDER_GROQ,
       model: this.chatModelName,
-      metadata: this.buildUsageMetadata([firstTurn], Date.now() - startedAt),
+      metadata: this.buildUsageMetadata([firstTurn, secondTurn], Date.now() - startedAt),
     };
   }
 
@@ -314,6 +302,44 @@ export class GroqService {
     });
   }
 
+  private buildStructuredFinalMessages(
+    messages: any[],
+    assistantMessage: {
+      content?: string | null;
+      tool_calls?: Array<{ id: string; function: { arguments: string; name: string } }>;
+    },
+    toolCalls: Array<{ id: string; function: { arguments: string; name: string } }>,
+  ): any[] {
+    const assistantTurn: any = {
+      role: 'assistant' as const,
+      content: assistantMessage.content ?? '',
+    };
+
+    if (toolCalls.length > 0) {
+      assistantTurn.tool_calls = toolCalls;
+    }
+
+    return [
+      ...messages,
+      assistantTurn,
+      ...this.buildToolResponseMessages(toolCalls),
+      {
+        role: 'user' as const,
+        content: this.structuredResponseInstruction,
+      },
+    ];
+  }
+
+  private async createStructuredChatCompletion(client: Groq, messages: any[]) {
+    return client.chat.completions.create({
+      model: this.chatModelName,
+      messages,
+      temperature: this.temperature,
+      max_completion_tokens: this.maxCompletionTokens,
+      response_format: this.chatResponseFormat,
+    });
+  }
+
   private extractRecommendedJobIds(
     toolCalls: Array<{ function: { arguments: string; name: string } }>,
   ): string[] {
@@ -336,6 +362,46 @@ export class GroqService {
       this.logger.warn('Groq returned invalid tool arguments for recommend_jobs', error);
       throw new Error('Groq returned invalid tool arguments');
     }
+  }
+
+  private parseStructuredChatResponse(response: unknown): IGroqStructuredChatResponse {
+    const content = (response as any)?.choices?.[0]?.message?.content;
+    if (typeof content !== 'string' || content.trim().length === 0) {
+      throw new Error('Groq returned invalid structured chat response');
+    }
+
+    try {
+      const parsed = JSON.parse(content) as unknown;
+      if (!this.isStructuredChatResponse(parsed)) {
+        throw new Error('Invalid structured chat response shape');
+      }
+
+      return parsed;
+    } catch (error) {
+      this.logger.warn('Groq returned malformed structured chat response', error);
+      throw new Error('Groq returned invalid structured chat response');
+    }
+  }
+
+  private isStructuredChatResponse(value: unknown): value is IGroqStructuredChatResponse {
+    if (!value || typeof value !== 'object') {
+      return false;
+    }
+
+    const response = value as Record<string, unknown>;
+    return (
+      typeof response.text === 'string' &&
+      Array.isArray(response.recommendedJobIds) &&
+      response.recommendedJobIds.every(jobId => typeof jobId === 'string')
+    );
+  }
+
+  private resolveRecommendedJobIds(toolJobIds: string[], _structuredJobIds: string[]): string[] {
+    if (toolJobIds.length > 0) {
+      return [...new Set(toolJobIds)];
+    }
+
+    return [];
   }
 
   private buildUsageMetadata(responses: unknown[], latencyMs: number): IAIChatUsageMetadata {
