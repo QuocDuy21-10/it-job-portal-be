@@ -1,5 +1,20 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+export class PublicChatQuotaStatusDto {
+  @ApiProperty({
+    description: 'Messages remaining in the current quota window. Null means unlimited.',
+    example: 38,
+    nullable: true,
+  })
+  remainingQuota: number | null;
+
+  @ApiProperty({
+    description: 'Unix timestamp in seconds when the current quota window resets.',
+    example: 1778836964,
+  })
+  nextResetTime: number;
+}
+
 export class ChatQuotaStatusDto {
   @ApiProperty({
     description: 'Daily quota limit. Null means unlimited.',

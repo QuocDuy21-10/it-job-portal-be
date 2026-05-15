@@ -89,6 +89,21 @@ export class AiUsageLog {
 
   @Prop({ type: String, index: true })
   errorCategory?: string;
+
+  @Prop({ type: Boolean, default: false, index: true })
+  quotaConsumed?: boolean;
+
+  @Prop({ type: Number })
+  quotaRemaining?: number;
+
+  @Prop({ type: Date })
+  quotaResetAt?: Date;
+
+  @Prop({ type: Boolean, default: false })
+  quotaUnavailable?: boolean;
+
+  @Prop({ type: Boolean, default: false, index: true })
+  quotaRollback?: boolean;
 }
 
 export const AiUsageLogSchema = SchemaFactory.createForClass(AiUsageLog);
@@ -99,3 +114,4 @@ AiUsageLogSchema.index({ sessionId: 1, createdAt: -1 });
 AiUsageLogSchema.index({ provider: 1, success: 1, createdAt: -1 });
 AiUsageLogSchema.index({ operationType: 1, createdAt: -1 });
 AiUsageLogSchema.index({ cacheHit: 1, cacheCategory: 1, createdAt: -1 });
+AiUsageLogSchema.index({ quotaConsumed: 1, quotaRollback: 1, createdAt: -1 });

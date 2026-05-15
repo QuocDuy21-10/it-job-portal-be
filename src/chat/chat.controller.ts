@@ -40,6 +40,7 @@ import { CHAT_ROUTE_RPM_LIMIT } from './constants/chat.constant';
 import { AiUsageService } from './ai-usage.service';
 import { ChatToolActionService } from './chat-tool-action.service';
 import { Roles, ERole } from 'src/casl';
+import { ChatQuotaExceededException } from './exceptions/too-many-requests.exception';
 
 @ApiTags('Chat')
 @Controller('chat')
@@ -400,7 +401,7 @@ export class ChatController {
         response.write(this.formatSseEvent(event.type, event.data));
       }
     } catch (error) {
-      response.write(this.formatSseEvent('error', { message: this.getStreamErrorMessage(error) }));
+      response.write(this.formatSseEvent('error', this.getStreamErrorPayload(error)));
     } finally {
       response.end();
     }
@@ -428,5 +429,20 @@ export class ChatController {
 
     const message = (response as { message?: string | string[] }).message;
     return Array.isArray(message) ? message.join(', ') : message || error.message;
+  }
+
+  private getStreamErrorPayload(error: unknown): Record<string, unknown> {
+    const payload: Record<string, unknown> = {
+      message: this.getStreamErrorMessage(error),
+    };
+
+    if (error instanceof ChatQuotaExceededException) {
+      payload.quota = {
+        remainingQuota: error.quota.remaining,
+        nextResetTime: Math.floor(error.quota.resetAt.getTime() / 1000),
+      };
+    }
+
+    return payload;
   }
 }

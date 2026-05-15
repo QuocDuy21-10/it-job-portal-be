@@ -34,6 +34,11 @@ export interface CreateAiUsageLogInput {
   cacheCategory?: string;
   requestStartedAt?: Date;
   requestCompletedAt?: Date;
+  quotaConsumed?: boolean;
+  quotaRemaining?: number | null;
+  quotaResetAt?: Date;
+  quotaUnavailable?: boolean;
+  quotaRollback?: boolean;
 }
 
 @Injectable()
@@ -74,6 +79,11 @@ export class AiUsageService {
         fallbackUsed: input.fallbackUsed ?? false,
         guardrailFlags: input.guardrailFlags ?? [],
         errorCategory: input.errorCategory,
+        quotaConsumed: input.quotaConsumed ?? false,
+        quotaRemaining: input.quotaRemaining ?? undefined,
+        quotaResetAt: input.quotaResetAt,
+        quotaUnavailable: input.quotaUnavailable ?? false,
+        quotaRollback: input.quotaRollback ?? false,
       });
     } catch (error) {
       this.logger.warn(

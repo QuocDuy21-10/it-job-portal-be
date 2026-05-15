@@ -6,3 +6,14 @@ export interface IChatQuotaStatus {
   unlimited: boolean;
   unavailable?: boolean;
 }
+
+export interface IChatQuotaPublicStatus {
+  remainingQuota: number | null;
+  nextResetTime: number;
+}
+
+export interface IChatQuotaReservation {
+  key?: string;
+  consumed: boolean;
+  status: IChatQuotaStatus;
+}

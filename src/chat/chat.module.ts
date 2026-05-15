@@ -4,6 +4,7 @@ import { ChatSession, ChatSessionSchema } from './schemas/chat-session.schema';
 import { ChatMessage, ChatMessageSchema } from './schemas/chat-message.schema';
 import { AiUsageLog, AiUsageLogSchema } from './schemas/ai-usage-log.schema';
 import { ChatToolAction, ChatToolActionSchema } from './schemas/chat-tool-action.schema';
+import { ChatQuotaPolicy, ChatQuotaPolicySchema } from './schemas/chat-quota-policy.schema';
 import { AIModule } from '../ai/ai.module';
 import { CvProfilesModule } from '../cv-profiles/cv-profiles.module';
 import { JobsModule } from '../jobs/jobs.module';
@@ -36,6 +37,7 @@ import { JobSearchContextProvider } from './context-providers/job-search-context
       { name: ChatMessage.name, schema: ChatMessageSchema },
       { name: AiUsageLog.name, schema: AiUsageLogSchema },
       { name: ChatToolAction.name, schema: ChatToolActionSchema },
+      { name: ChatQuotaPolicy.name, schema: ChatQuotaPolicySchema },
     ]),
     AIModule,
     CvProfilesModule,

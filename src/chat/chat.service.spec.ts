@@ -57,7 +57,12 @@ describe('ChatService', () => {
   let mockGuardrailService: { validateMessage: jest.Mock; sanitizeAssistantOutput: jest.Mock };
   let mockChatResponseFormatterService: { formatAssistantOutput: jest.Mock };
   let mockAiUsageService: { record: jest.Mock };
-  let mockChatQuotaService: { consume: jest.Mock };
+  let mockChatQuotaService: {
+    reserve: jest.Mock;
+    rollback: jest.Mock;
+    getStatus: jest.Mock;
+    serializePublicStatus: jest.Mock;
+  };
   let mockChatCacheService: {
     getContext: jest.Mock;
     setContext: jest.Mock;
@@ -161,6 +166,16 @@ describe('ChatService', () => {
     })();
   };
 
+  const createFailingStream = (error: Error, chunks: string[] = []) => {
+    return (async function* () {
+      for (const chunk of chunks) {
+        yield chunk;
+      }
+
+      throw error;
+    })();
+  };
+
   const setupActiveSession = (session = createSession()) => {
     mockChatSessionModel.findOne.mockReturnValue(createQuery(session));
   };
@@ -236,14 +251,26 @@ describe('ChatService', () => {
       record: jest.fn(),
     };
 
+    const quotaStatus = {
+      limit: 30,
+      used: 1,
+      remaining: 29,
+      resetAt: new Date('2024-12-02T00:00:00.000Z'),
+      unlimited: false,
+    };
+
     mockChatQuotaService = {
-      consume: jest.fn().mockResolvedValue({
-        limit: 30,
-        used: 1,
-        remaining: 29,
-        resetAt: new Date('2024-12-02T00:00:00.000Z'),
-        unlimited: false,
+      reserve: jest.fn().mockResolvedValue({
+        key: 'chat:quota:v1:20241201:role:NORMAL USER:user:507f1f77bcf86cd799439011',
+        consumed: true,
+        status: quotaStatus,
       }),
+      rollback: jest.fn().mockResolvedValue(undefined),
+      getStatus: jest.fn().mockResolvedValue(quotaStatus),
+      serializePublicStatus: jest.fn(status => ({
+        remainingQuota: status.remaining,
+        nextResetTime: Math.floor(status.resetAt.getTime() / 1000),
+      })),
     };
 
     mockChatCacheService = {
@@ -548,7 +575,7 @@ describe('ChatService', () => {
     });
 
     it('records quota denials before calling the AI provider', async () => {
-      mockChatQuotaService.consume.mockRejectedValue(
+      mockChatQuotaService.reserve.mockRejectedValue(
         new ChatQuotaExceededException({
           limit: 30,
           used: 31,
@@ -563,6 +590,7 @@ describe('ChatService', () => {
       );
 
       expect(mockAIService.generateChat).not.toHaveBeenCalled();
+      expect(mockChatQuotaService.rollback).not.toHaveBeenCalled();
       expect(mockAiUsageService.record).toHaveBeenCalledWith(
         expect.objectContaining({
           success: false,
@@ -593,7 +621,8 @@ describe('ChatService', () => {
 
       expect(result.cacheHit).toBe(true);
       expect(result.cacheCategory).toBe('faq_response');
-      expect(mockChatQuotaService.consume).not.toHaveBeenCalled();
+      expect(mockChatQuotaService.reserve).not.toHaveBeenCalled();
+      expect(mockChatQuotaService.getStatus).toHaveBeenCalledWith(user);
       expect(mockAIService.generateChat).not.toHaveBeenCalled();
       expect(mockAiUsageService.record).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -677,11 +706,8 @@ describe('ChatService', () => {
             ],
             suggestedActions: undefined,
             quota: {
-              limit: 30,
-              used: 1,
-              remaining: 29,
-              resetAt: new Date('2024-12-02T00:00:00.000Z'),
-              unlimited: false,
+              remainingQuota: 29,
+              nextResetTime: 1733097600,
             },
           },
         },
@@ -699,6 +725,157 @@ describe('ChatService', () => {
           sessionId,
           operationType: 'chat_stream',
           success: true,
+          quotaConsumed: true,
+          quotaRemaining: 29,
+        }),
+      );
+    });
+
+    it('serves cached FAQ stream responses with quota metadata without reserving quota', async () => {
+      const faqContext = {
+        ...mockIntentContext,
+        intent: EChatIntent.FAQ,
+        faq: { topic: 'apply', answer: 'Apply from the job detail page.' },
+        contextJobs: [],
+        validJobIds: [],
+      };
+      mockCacheManager.get.mockResolvedValue(undefined);
+      setupActiveSession();
+      setupPromptHistory();
+      mockChatIntentService.detectIntent.mockResolvedValue({
+        intent: EChatIntent.FAQ,
+        confidence: 0.9,
+        source: 'deterministic',
+      });
+      mockChatContextProviderRegistry.build.mockResolvedValue(faqContext);
+      mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
+      mockChatMessageModel.countDocuments.mockResolvedValue(0);
+      mockChatMessageModel.insertMany.mockResolvedValue([]);
+      mockChatSessionModel.updateOne.mockResolvedValue({ modifiedCount: 1 });
+      mockChatCacheService.getFaqResponse.mockResolvedValue({
+        response: 'Apply from the job detail page.',
+      });
+
+      const events = [];
+      for await (const event of service.streamMessage(user as any, 'How to apply?')) {
+        events.push(event);
+      }
+
+      expect(mockChatQuotaService.reserve).not.toHaveBeenCalled();
+      expect(mockChatQuotaService.getStatus).toHaveBeenCalledWith(user);
+      expect(events).toEqual([
+        { type: 'token', data: 'Apply from the job detail page.' },
+        {
+          type: 'done',
+          data: expect.objectContaining({
+            response: 'Apply from the job detail page.',
+            quota: {
+              remainingQuota: 29,
+              nextResetTime: 1733097600,
+            },
+            cacheHit: true,
+            cacheCategory: 'faq_response',
+          }),
+        },
+      ]);
+    });
+
+    it('rejects quota-exceeded streams before calling the AI provider', async () => {
+      mockCacheManager.get.mockResolvedValue(undefined);
+      setupActiveSession();
+      setupPromptHistory();
+      mockChatContextProviderRegistry.build.mockResolvedValue(mockIntentContext);
+      mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
+      mockChatMessageModel.countDocuments.mockResolvedValue(0);
+      mockChatQuotaService.reserve.mockRejectedValue(
+        new ChatQuotaExceededException({
+          limit: 30,
+          used: 30,
+          remaining: 0,
+          resetAt: new Date('2024-12-02T00:00:00.000Z'),
+          unlimited: false,
+        }),
+      );
+
+      const streamPromise = (async () => {
+        for await (const event of service.streamMessage(user as any, 'show backend jobs')) {
+          void event;
+        }
+      })();
+
+      await expect(streamPromise).rejects.toBeInstanceOf(TooManyRequestsException);
+
+      expect(mockAIService.streamChat).not.toHaveBeenCalled();
+      expect(mockChatQuotaService.rollback).not.toHaveBeenCalled();
+      expect(mockAiUsageService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operationType: 'chat_stream',
+          success: false,
+          errorCategory: 'QUOTA_EXCEEDED',
+          quotaConsumed: false,
+          quotaRemaining: 0,
+        }),
+      );
+    });
+
+    it('rolls back stream quota when AI fails before the first token', async () => {
+      mockCacheManager.get.mockResolvedValue(undefined);
+      setupActiveSession();
+      setupPromptHistory();
+      mockChatContextProviderRegistry.build.mockResolvedValue(mockIntentContext);
+      mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
+      mockChatMessageModel.countDocuments.mockResolvedValue(0);
+      mockAIService.streamChat.mockReturnValue(createFailingStream(new Error('provider failed')));
+
+      const streamPromise = (async () => {
+        for await (const event of service.streamMessage(user as any, 'show backend jobs')) {
+          void event;
+        }
+      })();
+
+      await expect(streamPromise).rejects.toThrow('Unable to process your message');
+
+      expect(mockChatQuotaService.rollback).toHaveBeenCalledWith(
+        expect.objectContaining({ consumed: true }),
+      );
+      expect(mockAiUsageService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operationType: 'chat_stream',
+          success: false,
+          quotaConsumed: true,
+          quotaRollback: true,
+        }),
+      );
+    });
+
+    it('does not roll back stream quota when AI fails after a token was emitted', async () => {
+      mockCacheManager.get.mockResolvedValue(undefined);
+      setupActiveSession();
+      setupPromptHistory();
+      mockChatContextProviderRegistry.build.mockResolvedValue(mockIntentContext);
+      mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
+      mockChatMessageModel.countDocuments.mockResolvedValue(0);
+      mockAIService.streamChat.mockReturnValue(
+        createFailingStream(new Error('provider failed'), ['partial']),
+      );
+
+      const events = [];
+      const streamPromise = (async () => {
+        for await (const event of service.streamMessage(user as any, 'show backend jobs')) {
+          events.push(event);
+        }
+      })();
+
+      await expect(streamPromise).rejects.toThrow('Unable to process your message');
+
+      expect(events).toEqual([{ type: 'token', data: 'partial' }]);
+      expect(mockChatQuotaService.rollback).not.toHaveBeenCalled();
+      expect(mockAiUsageService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operationType: 'chat_stream',
+          success: false,
+          quotaConsumed: true,
+          quotaRollback: false,
         }),
       );
     });

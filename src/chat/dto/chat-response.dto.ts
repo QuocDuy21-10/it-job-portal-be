@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ChatRecommendedJobDto } from './chat-recommended-job.dto';
 import { EChatIntent } from '../enums/chat-intent.enum';
-import { ChatQuotaStatusDto } from './chat-quota.dto';
+import { PublicChatQuotaStatusDto } from './chat-quota.dto';
 import { PendingChatToolActionDto } from './chat-tool-action.dto';
 
 export class ChatResponseDto {
@@ -71,11 +71,11 @@ export class ChatResponseDto {
   recommendedJobs?: ChatRecommendedJobDto[];
 
   @ApiProperty({
-    description: 'Daily quota status after this request',
+    description: 'Public daily quota status after this request',
     required: false,
-    type: ChatQuotaStatusDto,
+    type: PublicChatQuotaStatusDto,
   })
-  quota?: ChatQuotaStatusDto;
+  quota?: PublicChatQuotaStatusDto;
 
   @ApiProperty({
     description: 'Tool actions that require user confirmation before the backend executes them',

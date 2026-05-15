@@ -39,7 +39,7 @@ import { ChatIntentDetectionSource } from './interfaces/chat-intent-result.inter
 import { ChatIntentService } from './chat-intent.service';
 import { ChatContextProviderRegistry } from './chat-context-provider.registry';
 import { ChatQuotaService } from './chat-quota.service';
-import { IChatQuotaStatus } from './interfaces/chat-quota-status.interface';
+import { IChatQuotaReservation, IChatQuotaStatus } from './interfaces/chat-quota-status.interface';
 import { ChatCacheService } from './chat-cache.service';
 import { ChatToolActionService } from './chat-tool-action.service';
 import { PendingChatToolActionDto } from './dto/chat-tool-action.dto';
@@ -144,6 +144,8 @@ export class ChatService {
     let promptEstimateSource = message;
     let intent: EChatIntent | undefined;
     let intentDetectionSource: ChatIntentDetectionSource | undefined;
+    let quotaReservation: IChatQuotaReservation | undefined;
+    let quotaRollback = false;
 
     try {
       const turn = await this.prepareChatTurn(user, message, {
@@ -159,6 +161,7 @@ export class ChatService {
 
       const cachedFaqResponse = await this.getCachedFaqResponse(user, turn);
       if (cachedFaqResponse) {
+        const quotaStatus = await this.chatQuotaService.getStatus(user);
         const usageMetadata = this.withEstimatedUsage(
           undefined,
           promptEstimateSource,
@@ -198,6 +201,7 @@ export class ChatService {
           cacheCategory: 'faq_response',
           requestStartedAt: new Date(startedAt),
           requestCompletedAt: new Date(),
+          ...this.buildQuotaUsageFields(quotaStatus, false, false),
         });
 
         const suggestedActions = this.extractSuggestedActions(
@@ -213,12 +217,14 @@ export class ChatService {
           intent: turn.intent,
           suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
           recommendedJobIds: cachedFaqResponse.recommendedJobIds,
+          quota: this.chatQuotaService.serializePublicStatus(quotaStatus),
           cacheHit: true,
           cacheCategory: 'faq_response',
         };
       }
 
-      const quotaStatus = await this.chatQuotaService.consume(user);
+      quotaReservation = await this.chatQuotaService.reserve(user);
+      const quotaStatus = quotaReservation.status;
       const parsedResponse = await this.aiService.generateChat(
         turn.sanitizedMessage,
         turn.history,
@@ -285,6 +291,7 @@ export class ChatService {
         cacheCategory: turn.contextCacheCategory,
         requestStartedAt: new Date(startedAt),
         requestCompletedAt: new Date(),
+        ...this.buildQuotaUsageFields(quotaStatus, quotaReservation.consumed, false),
       });
 
       this.logger.log(`Successfully generated AI response for user ${user._id}`);
@@ -298,12 +305,17 @@ export class ChatService {
         suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
         recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
         recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined,
-        quota: quotaStatus,
+        quota: this.chatQuotaService.serializePublicStatus(quotaStatus),
         pendingToolActions: pendingToolActions.length > 0 ? pendingToolActions : undefined,
         cacheHit: turn.contextCacheHit || undefined,
         cacheCategory: turn.contextCacheCategory,
       };
     } catch (error) {
+      if (quotaReservation?.consumed) {
+        await this.chatQuotaService.rollback(quotaReservation);
+        quotaRollback = true;
+      }
+
       guardrailFlags = this.resolveGuardrailFlags(error, guardrailFlags);
       await this.recordUsage({
         userId: user._id,
@@ -317,6 +329,11 @@ export class ChatService {
         errorCategory: this.categorizeError(error),
         requestStartedAt: new Date(startedAt),
         requestCompletedAt: new Date(),
+        ...this.buildQuotaUsageFields(
+          quotaReservation?.status ?? this.getQuotaStatusFromError(error),
+          quotaReservation?.consumed ?? false,
+          quotaRollback,
+        ),
       });
 
       const errorDetails = error instanceof Error ? (error.stack ?? error.message) : error;
@@ -338,7 +355,9 @@ export class ChatService {
     let fullText = '';
     let intent: EChatIntent | undefined;
     let intentDetectionSource: ChatIntentDetectionSource | undefined;
-    let quotaStatus: IChatQuotaStatus | undefined;
+    let quotaReservation: IChatQuotaReservation | undefined;
+    let hasEmittedToken = false;
+    let quotaRollback = false;
 
     try {
       const turn = await this.prepareChatTurn(user, message, {
@@ -354,6 +373,7 @@ export class ChatService {
 
       const cachedFaqResponse = await this.getCachedFaqResponse(user, turn);
       if (cachedFaqResponse) {
+        const quotaStatus = await this.chatQuotaService.getStatus(user);
         const outputGuardrail = this.chatResponseFormatterService.formatAssistantOutput(
           cachedFaqResponse.response,
         );
@@ -396,6 +416,7 @@ export class ChatService {
           cacheCategory: 'faq_response',
           requestStartedAt: new Date(startedAt),
           requestCompletedAt: new Date(),
+          ...this.buildQuotaUsageFields(quotaStatus, false, false),
         });
 
         const suggestedActions = this.extractSuggestedActions(fullText, turn.intentContext.user);
@@ -409,6 +430,7 @@ export class ChatService {
             intent: turn.intent,
             recommendedJobIds: cachedFaqResponse.recommendedJobIds,
             suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
+            quota: this.chatQuotaService.serializePublicStatus(quotaStatus),
             cacheHit: true,
             cacheCategory: 'faq_response',
           },
@@ -417,7 +439,8 @@ export class ChatService {
         return;
       }
 
-      quotaStatus = await this.chatQuotaService.consume(user);
+      quotaReservation = await this.chatQuotaService.reserve(user);
+      const quotaStatus = quotaReservation.status;
       const gen = this.aiService.streamChat(turn.sanitizedMessage, turn.history, turn.systemPrompt);
       let iterResult = await gen.next();
 
@@ -425,6 +448,7 @@ export class ChatService {
         const chunk = this.chatGuardrailService.sanitizeAssistantOutput(iterResult.value as string);
         fullText += chunk.sanitizedOutput;
         guardrailFlags = [...new Set([...guardrailFlags, ...chunk.flags])];
+        hasEmittedToken = true;
         yield { type: 'token', data: chunk.sanitizedOutput };
         iterResult = await gen.next();
       }
@@ -483,6 +507,7 @@ export class ChatService {
         cacheCategory: turn.contextCacheCategory,
         requestStartedAt: new Date(startedAt),
         requestCompletedAt: new Date(),
+        ...this.buildQuotaUsageFields(quotaStatus, quotaReservation.consumed, false),
       });
 
       const suggestedActions = this.extractSuggestedActions(fullText, turn.intentContext.user);
@@ -498,7 +523,7 @@ export class ChatService {
           recommendedJobIds: validatedJobIds.length > 0 ? validatedJobIds : undefined,
           recommendedJobs: recommendedJobs.length > 0 ? recommendedJobs : undefined,
           suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
-          quota: quotaStatus,
+          quota: this.chatQuotaService.serializePublicStatus(quotaStatus),
           pendingToolActions: pendingToolActions.length > 0 ? pendingToolActions : undefined,
           cacheHit: turn.contextCacheHit || undefined,
           cacheCategory: turn.contextCacheCategory,
@@ -507,6 +532,11 @@ export class ChatService {
 
       this.logger.log(`Streaming message completed for user ${user._id}`);
     } catch (error) {
+      if (quotaReservation?.consumed && !hasEmittedToken) {
+        await this.chatQuotaService.rollback(quotaReservation);
+        quotaRollback = true;
+      }
+
       guardrailFlags = this.resolveGuardrailFlags(error, guardrailFlags);
       await this.recordUsage({
         userId: user._id,
@@ -520,6 +550,11 @@ export class ChatService {
         errorCategory: this.categorizeError(error),
         requestStartedAt: new Date(startedAt),
         requestCompletedAt: new Date(),
+        ...this.buildQuotaUsageFields(
+          quotaReservation?.status ?? this.getQuotaStatusFromError(error),
+          quotaReservation?.consumed ?? false,
+          quotaRollback,
+        ),
       });
 
       const errorDetails = error instanceof Error ? (error.stack ?? error.message) : error;
@@ -1232,6 +1267,30 @@ export class ChatService {
     } as IAIChatUsageMetadata;
   }
 
+  private buildQuotaUsageFields(
+    quotaStatus: IChatQuotaStatus | undefined,
+    quotaConsumed: boolean,
+    quotaRollback: boolean,
+  ): {
+    quotaConsumed: boolean;
+    quotaRemaining?: number;
+    quotaResetAt?: Date;
+    quotaUnavailable?: boolean;
+    quotaRollback: boolean;
+  } {
+    return {
+      quotaConsumed,
+      quotaRemaining: quotaStatus?.remaining ?? undefined,
+      quotaResetAt: quotaStatus?.resetAt,
+      quotaUnavailable: quotaStatus?.unavailable ?? false,
+      quotaRollback,
+    };
+  }
+
+  private getQuotaStatusFromError(error: unknown): IChatQuotaStatus | undefined {
+    return error instanceof ChatQuotaExceededException ? error.quota : undefined;
+  }
+
   private buildMessageMetadata(
     metadata: IAIChatUsageMetadata | undefined,
     fallbackUsed?: boolean,
@@ -1272,6 +1331,11 @@ export class ChatService {
     cacheCategory?: string;
     requestStartedAt?: Date;
     requestCompletedAt?: Date;
+    quotaConsumed?: boolean;
+    quotaRemaining?: number;
+    quotaResetAt?: Date;
+    quotaUnavailable?: boolean;
+    quotaRollback?: boolean;
   }): Promise<void> {
     if (!Types.ObjectId.isValid(input.userId)) {
       return;
