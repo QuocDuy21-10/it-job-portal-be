@@ -25,7 +25,8 @@ import { Subscriber, SubscriberSchema } from 'src/subscribers/schemas/subscriber
 import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
 import { Session, SessionSchema } from 'src/sessions/schemas/session.schema';
 import { CvProfile, CvProfileSchema } from 'src/cv-profiles/schemas/cv-profile.schema';
-import { Conversation, ConversationSchema } from 'src/chat/schemas/conversation.schema';
+import { ChatSession, ChatSessionSchema } from 'src/chat/schemas/chat-session.schema';
+import { ChatMessage, ChatMessageSchema } from 'src/chat/schemas/chat-message.schema';
 import { StatisticsModule } from 'src/statistics/statistics.module';
 import {
   RESUME_QUEUE,
@@ -80,7 +81,8 @@ export class QueuesModule {
           { name: Job.name, schema: JobSchema },
           { name: Session.name, schema: SessionSchema },
           { name: CvProfile.name, schema: CvProfileSchema },
-          { name: Conversation.name, schema: ConversationSchema },
+          { name: ChatSession.name, schema: ChatSessionSchema },
+          { name: ChatMessage.name, schema: ChatMessageSchema },
         ]),
         AIModule,
         CvParserModule,

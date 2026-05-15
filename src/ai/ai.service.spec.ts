@@ -4,25 +4,42 @@ import { AIService } from './ai.service';
 import { GeminiService } from 'src/gemini/gemini.service';
 import { GroqService } from 'src/groq/groq.service';
 import { GeminiQuotaDeniedException } from 'src/gemini/gemini-quota-denied.exception';
+import { IAIChatStreamResult } from './interfaces/ai-chat-stream-result.interface';
 
 describe('AIService', () => {
+  const requiredGroqConfig: Record<string, string> = {
+    AI_GROQ_HISTORY_LIMIT: '6',
+    AI_GROQ_MAX_INPUT_TOKENS: '6000',
+    AI_GROQ_MAX_MATCHING_JOBS: '3',
+    AI_GROQ_MAX_SEARCH_RESULTS: '3',
+    AI_GROQ_MAX_COMPANY_ITEMS: '2',
+    AI_GROQ_MAX_TOP_SKILLS: '5',
+    AI_GROQ_MAX_TOP_COMPANIES: '5',
+    AI_GROQ_MAX_SUMMARY_CHARS: '400',
+  };
+
   const createStream = (
     chunks: string[],
     finalJobIds: string[] = [],
-  ): AsyncGenerator<string, string[], unknown> => {
+    provider: 'groq' | 'gemini' = 'groq',
+  ): AsyncGenerator<string, IAIChatStreamResult, unknown> => {
     return (async function* () {
       for (const chunk of chunks) {
         yield chunk;
       }
 
-      return finalJobIds;
+      return {
+        recommendedJobIds: finalJobIds,
+        provider,
+        model: `${provider}-model`,
+      };
     })();
   };
 
   const createFailingStream = (
     error: Error,
     chunksBeforeFailure: string[] = [],
-  ): AsyncGenerator<string, string[], unknown> => {
+  ): AsyncGenerator<string, IAIChatStreamResult, unknown> => {
     return (async function* () {
       for (const chunk of chunksBeforeFailure) {
         yield chunk;
@@ -32,7 +49,7 @@ describe('AIService', () => {
     })();
   };
 
-  const collectStream = async (generator: AsyncGenerator<string, string[], unknown>) => {
+  const collectStream = async (generator: AsyncGenerator<string, IAIChatStreamResult, unknown>) => {
     const chunks: string[] = [];
     let result = await generator.next();
 
@@ -43,7 +60,7 @@ describe('AIService', () => {
 
     return {
       text: chunks.join(''),
-      recommendedJobIds: result.value,
+      streamResult: result.value,
     };
   };
 
@@ -71,7 +88,7 @@ describe('AIService', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn((key: string) => configValues[key]),
+            get: jest.fn((key: string) => ({ ...requiredGroqConfig, ...configValues })[key]),
           },
         },
         {
@@ -99,6 +116,18 @@ describe('AIService', () => {
 
     await expect(service.parseCV('cv text')).resolves.toEqual(parsedData);
     expect(geminiServiceMock.parseCV).toHaveBeenCalledWith('cv text');
+  });
+
+  it('fails fast when a required Groq config value is missing', async () => {
+    await expect(createTestingModule({ AI_GROQ_HISTORY_LIMIT: undefined })).rejects.toThrow(
+      'Missing required environment variable AI_GROQ_HISTORY_LIMIT',
+    );
+  });
+
+  it('fails fast when a required Groq config value is invalid', async () => {
+    await expect(createTestingModule({ AI_GROQ_MAX_INPUT_TOKENS: '0' })).rejects.toThrow(
+      'AI_GROQ_MAX_INPUT_TOKENS must be a positive integer',
+    );
   });
 
   it('uses Groq as the default chat provider', async () => {
@@ -137,6 +166,24 @@ describe('AIService', () => {
     expect(geminiServiceMock.chatWithContext).toHaveBeenCalledWith('hello', [], 'prompt');
   });
 
+  it('falls back to Gemini when Groq structured output validation fails', async () => {
+    const { service, groqServiceMock, geminiServiceMock } = await createTestingModule();
+    const structuredError = new Error('Groq returned invalid structured chat response');
+    groqServiceMock.chatWithContext.mockRejectedValue(structuredError);
+    groqServiceMock.isFallbackEligibleError.mockReturnValue(true);
+    geminiServiceMock.chatWithContext.mockResolvedValue({
+      text: 'Gemini structured fallback',
+      recommendedJobIds: ['job-1'],
+    });
+
+    await expect(service.generateChat('show jobs', [], 'prompt')).resolves.toEqual({
+      text: 'Gemini structured fallback',
+      recommendedJobIds: ['job-1'],
+      provider: 'gemini',
+      fallbackUsed: true,
+    });
+  });
+
   it('surfaces Gemini quota denial when Groq fallback is unavailable', async () => {
     const { service, groqServiceMock, geminiServiceMock } = await createTestingModule();
     const quotaError = new GeminiQuotaDeniedException('chat-fallback', 'day', 60000, 0, 0);
@@ -155,12 +202,17 @@ describe('AIService', () => {
     );
     groqServiceMock.isFallbackEligibleError.mockReturnValue(true);
     geminiServiceMock.chatWithContextStreamAndTools.mockReturnValue(
-      createStream(['Gemini ', 'stream'], ['job-2']),
+      createStream(['Gemini ', 'stream'], ['job-2'], 'gemini'),
     );
 
     await expect(collectStream(service.streamChat('hello', [], 'prompt'))).resolves.toEqual({
       text: 'Gemini stream',
-      recommendedJobIds: ['job-2'],
+      streamResult: {
+        recommendedJobIds: ['job-2'],
+        provider: 'gemini',
+        model: 'gemini-model',
+        fallbackUsed: true,
+      },
     });
   });
 

@@ -9,7 +9,8 @@ import { Cache } from 'cache-manager';
 import { User as UserModel, UserDocument } from 'src/users/schemas/user.schema';
 import { Resume, ResumeDocument } from 'src/resumes/schemas/resume.schema';
 import { CvProfile, CvProfileDocument } from 'src/cv-profiles/schemas/cv-profile.schema';
-import { Conversation, ConversationDocument } from 'src/chat/schemas/conversation.schema';
+import { ChatSession, ChatSessionDocument } from 'src/chat/schemas/chat-session.schema';
+import { ChatMessage, ChatMessageDocument } from 'src/chat/schemas/chat-message.schema';
 import { Subscriber, SubscriberDocument } from 'src/subscribers/schemas/subscriber.schema';
 import { Session } from 'src/sessions/schemas/session.schema';
 import { SessionDocument } from 'src/sessions/schemas/session.schema';
@@ -25,8 +26,10 @@ export class AccountDeletionQueueProcessor extends WorkerHost {
     @InjectModel(UserModel.name) private readonly userModel: SoftDeleteModel<UserDocument>,
     @InjectModel(Resume.name) private readonly resumeModel: SoftDeleteModel<ResumeDocument>,
     @InjectModel(CvProfile.name) private readonly cvProfileModel: Model<CvProfileDocument>,
-    @InjectModel(Conversation.name)
-    private readonly conversationModel: Model<ConversationDocument>,
+    @InjectModel(ChatSession.name)
+    private readonly chatSessionModel: Model<ChatSessionDocument>,
+    @InjectModel(ChatMessage.name)
+    private readonly chatMessageModel: Model<ChatMessageDocument>,
     @InjectModel(Subscriber.name)
     private readonly subscriberModel: SoftDeleteModel<SubscriberDocument>,
     @InjectModel(Session.name) private readonly sessionModel: Model<SessionDocument>,
@@ -87,6 +90,8 @@ export class AccountDeletionQueueProcessor extends WorkerHost {
       await this.cacheManager.del(`cancel_deletion:${cancelToken}`);
     }
     await this.cacheManager.del(`cancel_deletion_user:${userId}`);
+    await this.cacheManager.del(`chat_session:${userId}`);
+    await this.cacheManager.del(`chat_conv:${userId}`);
 
     // Step 2: Anonymise resumes — preserve the document for HR audit trail
     await this.resumeModel.updateMany({ userId }, { $set: { email: anonymisedEmail } });
@@ -94,8 +99,9 @@ export class AccountDeletionQueueProcessor extends WorkerHost {
     // Step 3: GDPR hard-delete CV profile
     await this.cvProfileModel.deleteOne({ userId });
 
-    // Step 4: GDPR hard-delete AI conversations
-    await this.conversationModel.deleteMany({ userId });
+    // Step 4: GDPR hard-delete AI conversations and normalized chat records
+    await this.chatSessionModel.deleteMany({ userId });
+    await this.chatMessageModel.deleteMany({ userId });
 
     // Step 5: Soft-delete job subscriptions (consistent with project convention)
     await this.subscriberModel.softDelete({ email: originalEmail });

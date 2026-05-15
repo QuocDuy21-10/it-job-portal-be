@@ -2,7 +2,7 @@ import { Controller, Get, Logger } from '@nestjs/common';
 import { MailService } from './mail.service';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { Subscriber, SubscriberDocument } from 'src/subscribers/schemas/subscriber.schema';

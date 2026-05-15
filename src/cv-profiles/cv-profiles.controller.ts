@@ -13,7 +13,6 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
-  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -179,7 +178,7 @@ export class CvProfilesController {
     let cvData: UpsertCvProfileDto;
     try {
       cvData = JSON.parse(cvDataString);
-    } catch (error) {
+    } catch {
       throw new BadRequestException('Invalid JSON format for cvData field');
     }
 

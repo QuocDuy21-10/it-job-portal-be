@@ -1,3 +1,6 @@
+import { MatchResultDto } from 'src/matching/dto/match-result.dto';
+import { EChatIntent } from '../enums/chat-intent.enum';
+
 export interface PlatformContext {
   activeJobCount: number;
   hiringCompaniesCount: number;
@@ -35,4 +38,33 @@ export interface FullChatContext {
   platform: PlatformContext;
   user: UserContext;
   queryAware: QueryAwareContext;
+}
+
+export interface ChatFaqContext {
+  topic: string;
+  answer: string;
+}
+
+export interface ChatCvReviewContext {
+  hasProfile: boolean;
+  missingFields: string[];
+  recommendations: string[];
+}
+
+export interface ChatJobMatchingContext {
+  selectedJob: any | null;
+  matchResult?: MatchResultDto;
+  missingReason?: string;
+}
+
+export interface IntentAwareChatContext {
+  intent: EChatIntent;
+  platform?: PlatformContext;
+  user: UserContext;
+  queryAware: QueryAwareContext;
+  faq?: ChatFaqContext;
+  cvReview?: ChatCvReviewContext;
+  jobMatching?: ChatJobMatchingContext;
+  contextJobs: any[];
+  validJobIds: string[];
 }

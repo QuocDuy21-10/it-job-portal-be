@@ -132,7 +132,7 @@ export class CvParserService {
   fileExists(filePath: string): boolean {
     try {
       return fs.existsSync(filePath);
-    } catch (error) {
+    } catch {
       return false;
     }
   }

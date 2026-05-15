@@ -1,9 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ChatRecommendedJobDto } from './chat-recommended-job.dto';
+import { EChatIntent } from '../enums/chat-intent.enum';
+import { PublicChatQuotaStatusDto } from './chat-quota.dto';
+import { PendingChatToolActionDto } from './chat-tool-action.dto';
 
 export class ChatResponseDto {
   @ApiProperty({
-    description: 'Conversation ID',
+    description: 'Chat session ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  sessionId: string;
+
+  @ApiProperty({
+    description: 'Backward-compatible conversation ID alias. This is the chat session ID.',
     example: '507f1f77bcf86cd799439011',
   })
   conversationId: string;
@@ -19,6 +28,13 @@ export class ChatResponseDto {
     example: '2024-12-01T10:30:00.000Z',
   })
   timestamp: Date;
+
+  @ApiProperty({
+    description: 'Detected per-message chat intent',
+    enum: EChatIntent,
+    required: false,
+  })
+  intent?: EChatIntent;
 
   @ApiProperty({
     description: 'Suggested follow-up actions (optional)',
@@ -53,4 +69,32 @@ export class ChatResponseDto {
     ],
   })
   recommendedJobs?: ChatRecommendedJobDto[];
+
+  @ApiProperty({
+    description: 'Public daily quota status after this request',
+    required: false,
+    type: PublicChatQuotaStatusDto,
+  })
+  quota?: PublicChatQuotaStatusDto;
+
+  @ApiProperty({
+    description: 'Tool actions that require user confirmation before the backend executes them',
+    required: false,
+    type: [PendingChatToolActionDto],
+  })
+  pendingToolActions?: PendingChatToolActionDto[];
+
+  @ApiProperty({
+    description: 'Whether this response was served from cache',
+    required: false,
+    example: false,
+  })
+  cacheHit?: boolean;
+
+  @ApiProperty({
+    description: 'Cache category used for this response',
+    required: false,
+    example: 'faq_response',
+  })
+  cacheCategory?: string;
 }

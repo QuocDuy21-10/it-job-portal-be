@@ -73,6 +73,20 @@ export class MessageDto {
 
 export class ConversationHistoryResponseDto {
   @ApiProperty({
+    description: 'Chat session ID',
+    example: '507f1f77bcf86cd799439011',
+    required: false,
+  })
+  sessionId?: string;
+
+  @ApiProperty({
+    description: 'Backward-compatible conversation ID alias. This is the chat session ID.',
+    example: '507f1f77bcf86cd799439011',
+    required: false,
+  })
+  conversationId?: string;
+
+  @ApiProperty({
     description: 'Array of messages',
     type: [MessageDto],
   })

@@ -22,6 +22,7 @@ import {
 } from './ai.constants';
 import { IAIChatMessage } from './interfaces/ai-chat-message.interface';
 import { IAIChatResponse } from './interfaces/ai-chat-response.interface';
+import { IAIChatStreamResult } from './interfaces/ai-chat-stream-result.interface';
 
 @Injectable()
 export class AIService {
@@ -60,35 +61,35 @@ export class AIService {
       'AI_SUMMARY_GEMINI_FALLBACK_ENABLED',
       DEFAULT_AI_SUMMARY_FALLBACK_ENABLED,
     );
-    this.groqHistoryLimit = this.readPositiveIntConfig(
+    this.groqHistoryLimit = this.readRequiredPositiveIntConfig(
       'AI_GROQ_HISTORY_LIMIT',
       DEFAULT_AI_GROQ_HISTORY_LIMIT,
     );
-    this.groqMaxInputTokens = this.readPositiveIntConfig(
+    this.groqMaxInputTokens = this.readRequiredPositiveIntConfig(
       'AI_GROQ_MAX_INPUT_TOKENS',
       DEFAULT_AI_GROQ_MAX_INPUT_TOKENS,
     );
-    this.groqMaxMatchingJobs = this.readPositiveIntConfig(
+    this.groqMaxMatchingJobs = this.readRequiredPositiveIntConfig(
       'AI_GROQ_MAX_MATCHING_JOBS',
       DEFAULT_AI_GROQ_MAX_MATCHING_JOBS,
     );
-    this.groqMaxSearchResults = this.readPositiveIntConfig(
+    this.groqMaxSearchResults = this.readRequiredPositiveIntConfig(
       'AI_GROQ_MAX_SEARCH_RESULTS',
       DEFAULT_AI_GROQ_MAX_SEARCH_RESULTS,
     );
-    this.groqMaxCompanyItems = this.readPositiveIntConfig(
+    this.groqMaxCompanyItems = this.readRequiredPositiveIntConfig(
       'AI_GROQ_MAX_COMPANY_ITEMS',
       DEFAULT_AI_GROQ_MAX_COMPANY_ITEMS,
     );
-    this.groqMaxTopSkills = this.readPositiveIntConfig(
+    this.groqMaxTopSkills = this.readRequiredPositiveIntConfig(
       'AI_GROQ_MAX_TOP_SKILLS',
       DEFAULT_AI_GROQ_MAX_TOP_SKILLS,
     );
-    this.groqMaxTopCompanies = this.readPositiveIntConfig(
+    this.groqMaxTopCompanies = this.readRequiredPositiveIntConfig(
       'AI_GROQ_MAX_TOP_COMPANIES',
       DEFAULT_AI_GROQ_MAX_TOP_COMPANIES,
     );
-    this.groqSummaryMaxChars = this.readPositiveIntConfig(
+    this.groqSummaryMaxChars = this.readRequiredPositiveIntConfig(
       'AI_GROQ_MAX_SUMMARY_CHARS',
       DEFAULT_AI_GROQ_MAX_SUMMARY_CHARS,
     );
@@ -146,7 +147,7 @@ export class AIService {
     message: string,
     conversationHistory: IAIChatMessage[],
     systemPrompt: string,
-  ): AsyncGenerator<string, string[], unknown> {
+  ): AsyncGenerator<string, IAIChatStreamResult, unknown> {
     const primaryProvider = this.chatPrimaryProvider;
     const preparedRequest = this.prepareChatRequest(
       primaryProvider,
@@ -199,7 +200,10 @@ export class AIService {
         nextResult = await fallbackGenerator.next();
       }
 
-      return nextResult.value;
+      return {
+        ...(nextResult.value as IAIChatStreamResult),
+        fallbackUsed: true,
+      };
     }
   }
 
@@ -230,6 +234,28 @@ export class AIService {
     return this.geminiService.isRateLimitError(error) || this.groqService.isRateLimitError(error);
   }
 
+  isServiceUnavailableError(error: unknown): boolean {
+    if (this.groqService.isFallbackEligibleError(error)) {
+      return true;
+    }
+
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    const message = error.message.toLowerCase();
+    return (
+      message.includes('timeout') ||
+      message.includes('unavailable') ||
+      message.includes('connection') ||
+      message.includes('econnreset') ||
+      message.includes('internal server error') ||
+      message.includes('503') ||
+      message.includes('502') ||
+      message.includes('500')
+    );
+  }
+
   private async generateChatWithProvider(
     provider: AIProvider,
     message: string,
@@ -257,7 +283,7 @@ export class AIService {
     message: string,
     conversationHistory: IAIChatMessage[],
     systemPrompt: string,
-  ): AsyncGenerator<string, string[], unknown> {
+  ): AsyncGenerator<string, IAIChatStreamResult, unknown> {
     if (provider === AI_PROVIDER_GROQ) {
       return this.groqService.chatWithContextStreamAndTools(
         message,
@@ -498,10 +524,23 @@ export class AIService {
     return ['1', 'true', 'yes', 'on'].includes(value);
   }
 
-  private readPositiveIntConfig(key: string, fallback: number): number {
-    const rawValue = this.configService.get<string>(key);
-    const parsedValue = rawValue ? Number.parseInt(rawValue, 10) : fallback;
+  private readRequiredPositiveIntConfig(key: string, recommendedValue: number): number {
+    const rawValue = this.configService.get<string>(key)?.trim();
 
-    return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
+    if (!rawValue) {
+      throw new Error(
+        `Missing required environment variable ${key}. Set it to a positive integer, for example ${recommendedValue}.`,
+      );
+    }
+
+    const parsedValue = Number.parseInt(rawValue, 10);
+
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+      throw new Error(
+        `${key} must be a positive integer. Recommended value: ${recommendedValue}.`,
+      );
+    }
+
+    return parsedValue;
   }
 }
