@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { ERole } from 'src/casl/enums/role.enum';
 import { ChatQuotaExceededException } from './exceptions/too-many-requests.exception';
 import { ChatQuotaService } from './chat-quota.service';
 
@@ -10,7 +11,7 @@ describe('ChatQuotaService', () => {
 
   const user = {
     _id: '507f1f77bcf86cd799439011',
-    role: { _id: 'role-1', name: 'NORMAL USER' },
+    role: ERole.NORMAL_USER,
   } as any;
 
   const createPolicyQuery = (value: unknown = null) => ({
@@ -67,7 +68,7 @@ describe('ChatQuotaService', () => {
 
     const reservation = await service.reserve({
       ...user,
-      role: { _id: 'role-hr', name: 'HR' },
+      role: ERole.HR,
     });
 
     expect(reservation.status.limit).toBe(100);
@@ -83,7 +84,7 @@ describe('ChatQuotaService', () => {
   it('treats super admin as unlimited without touching Redis', async () => {
     const reservation = await service.reserve({
       ...user,
-      role: { _id: 'role-admin', name: 'SUPER ADMIN' },
+      role: ERole.SUPER_ADMIN,
     });
 
     expect(reservation.consumed).toBe(false);

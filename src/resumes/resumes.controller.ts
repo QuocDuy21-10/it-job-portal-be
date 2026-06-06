@@ -278,7 +278,7 @@ export class ResumesController {
     }
 
     // Candidates may only view their own analysis; SUPER_ADMIN sees all
-    if (resume.userId.toString() !== user._id.toString() && user.role?.name !== ERole.SUPER_ADMIN) {
+    if (resume.userId.toString() !== user._id.toString() && user.role !== ERole.SUPER_ADMIN) {
       throw new BadRequestException('You do not have permission to view this resume');
     }
 

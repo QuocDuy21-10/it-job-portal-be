@@ -10,6 +10,7 @@ import { User, UserDocument } from 'src/users/schemas/user.schema';
 import { IJwtRefreshPayload } from '../interfaces/jwt-payload.interface';
 import { IUser } from 'src/users/user.interface';
 import { assertAuthenticatedAccountState } from '../utils/assert-authenticated-account-state.util';
+import { ERole } from 'src/casl/enums/role.enum';
 
 @Injectable()
 export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
@@ -75,10 +76,6 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
 
     const user = await this.userModel
       .findById(payload.sub)
-      .populate({
-        path: 'role',
-        select: '_id name',
-      })
       .select('-password -refreshToken')
       .lean()
       .exec();
@@ -89,17 +86,17 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
 
     assertAuthenticatedAccountState(user, 'refresh');
 
-    const userRole = user.role as any;
+    if (!this.isSystemRole(user.role)) {
+      throw new UnauthorizedException('Role không hợp lệ. Vui lòng liên hệ admin.');
+    }
+
     return {
       _id: user._id.toString(),
       name: user.name,
       email: user.email,
       authProvider: user.authProvider,
       hasPassword: !!user.password,
-      role: {
-        _id: userRole?._id?.toString() || '',
-        name: userRole?.name || '',
-      },
+      role: user.role,
       company: user.company
         ? {
             _id: (user.company as any)._id?.toString() || '',
@@ -110,5 +107,9 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
       savedJobs: user.savedJobs?.map((id: any) => id.toString()) || [],
       companyFollowed: user.companyFollowed?.map((id: any) => id.toString()) || [],
     };
+  }
+
+  private isSystemRole(role: string): role is ERole {
+    return Object.values(ERole).includes(role as ERole);
   }
 }

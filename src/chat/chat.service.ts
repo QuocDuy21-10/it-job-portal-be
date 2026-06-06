@@ -1403,7 +1403,7 @@ export class ChatService {
   }
 
   private resolveUserRole(user: IUser): string {
-    return user.role?.name || 'UNKNOWN';
+    return user.role || 'UNKNOWN';
   }
 
   private getActiveSessionCacheKey(userId: string): string {

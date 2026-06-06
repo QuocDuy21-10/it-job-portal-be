@@ -7,6 +7,7 @@ import { JobExpirationQueueService } from 'src/queues/services/job-expiration-qu
 import { EJobApprovalStatus } from './enums/job-approval-status.enum';
 import { IUser } from 'src/users/user.interface';
 import { SkillsService } from 'src/skills/skills.service';
+import { ERole } from 'src/casl/enums/role.enum';
 
 const hrUser = (companyId: string): IUser => ({
   _id: 'user-hr-1',
@@ -14,7 +15,7 @@ const hrUser = (companyId: string): IUser => ({
   email: 'henry@example.com',
   authProvider: 'local',
   hasPassword: true,
-  role: { _id: 'role-hr', name: 'HR' },
+  role: ERole.HR,
   company: { _id: companyId, name: 'Acme' },
   savedJobs: [],
   companyFollowed: [],
@@ -26,7 +27,7 @@ const superAdminUser = (): IUser => ({
   email: 'admin@example.com',
   authProvider: 'local',
   hasPassword: true,
-  role: { _id: 'role-sa', name: 'SUPER ADMIN' },
+  role: ERole.SUPER_ADMIN,
   savedJobs: [],
   companyFollowed: [],
 });

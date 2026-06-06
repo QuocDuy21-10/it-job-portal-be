@@ -109,7 +109,7 @@ describe('CompaniesService', () => {
     it('should apply HR company filter when user is HR', async () => {
       const hrCompanyId = new mongoose.Types.ObjectId();
       const hrUser = {
-        role: { name: ERole.HR },
+        role: ERole.HR,
         company: { _id: hrCompanyId },
       } as any;
 
@@ -162,7 +162,7 @@ describe('CompaniesService', () => {
 
     it('should throw BadRequestException when an HR user accesses another company', async () => {
       const hrUser = {
-        role: { name: ERole.HR },
+        role: ERole.HR,
         company: { _id: new mongoose.Types.ObjectId() }, // different from companyId
       } as any;
 
@@ -173,7 +173,7 @@ describe('CompaniesService', () => {
     it('should allow an HR user to view their own company', async () => {
       const ownCompanyId = new mongoose.Types.ObjectId();
       const hrUser = {
-        role: { name: ERole.HR },
+        role: ERole.HR,
         company: { _id: ownCompanyId },
       } as any;
       const company = { _id: ownCompanyId, name: 'HR Company' };
@@ -190,7 +190,7 @@ describe('CompaniesService', () => {
     const adminUser = {
       _id: 'uid',
       email: 'admin@test.com',
-      role: { name: ERole.SUPER_ADMIN },
+      role: ERole.SUPER_ADMIN,
     } as any;
 
     it('should update the company for SUPER_ADMIN', async () => {
@@ -222,7 +222,7 @@ describe('CompaniesService', () => {
       const hrUser = {
         _id: 'hr-uid',
         email: 'hr@test.com',
-        role: { name: ERole.HR },
+        role: ERole.HR,
         company: { _id: new mongoose.Types.ObjectId() }, // different from companyId
       } as any;
       const company = { _id: new mongoose.Types.ObjectId(companyId), name: 'Company' };
@@ -239,7 +239,7 @@ describe('CompaniesService', () => {
       const hrUser = {
         _id: 'hr-uid',
         email: 'hr@test.com',
-        role: { name: ERole.HR },
+        role: ERole.HR,
         company: { _id: hrCompanyId },
       } as any;
       const company = { _id: hrCompanyId, name: 'HR Company', logo: null };

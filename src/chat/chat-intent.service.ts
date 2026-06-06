@@ -221,7 +221,7 @@ export class ChatIntentService {
   }
 
   private isRecruiter(user?: IUser): boolean {
-    return user?.role?.name === 'HR';
+    return user?.role === 'HR';
   }
 
   private normalize(value: string): string {

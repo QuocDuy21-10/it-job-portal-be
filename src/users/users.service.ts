@@ -96,7 +96,6 @@ export class UsersService {
       );
     }
 
-    const userRole = await this.userRepository.findRoleByName(ERole.NORMAL_USER);
     const hashedPassword = this.hashPassword(password);
     // verificationExpires: 15 minutes from now — MongoDB TTL index auto-deletes if not verified
     const verificationExpires = new Date(Date.now() + 15 * 60 * 1000);
@@ -104,7 +103,7 @@ export class UsersService {
       name,
       email,
       password: hashedPassword,
-      role: userRole?._id,
+      role: ERole.NORMAL_USER,
       verificationExpires,
     });
   }
@@ -260,8 +259,7 @@ export class UsersService {
     if (user.isDeleted) {
       throw new BadRequestException('Tài khoản đã bị xóa');
     }
-    const userRole = user.role as any;
-    if (!userRole || !userRole._id) {
+    if (!this.isSystemRole(user.role)) {
       throw new BadRequestException('Role không hợp lệ. Vui lòng liên hệ admin.');
     }
     return {
@@ -270,10 +268,7 @@ export class UsersService {
       email: user.email,
       authProvider: user.authProvider,
       hasPassword: !!user.password,
-      role: {
-        _id: userRole._id.toString(),
-        name: userRole.name,
-      },
+      role: user.role,
       company: user.company
         ? {
             _id: (user.company as any)._id?.toString() || '',
@@ -301,14 +296,13 @@ export class UsersService {
     avatar?: string;
   }): Promise<UserDocument> {
     const { googleId, email, name } = googleProfile;
-    const userRole = await this.userRepository.findRoleByName(ERole.NORMAL_USER);
     return this.userRepository.create({
       googleId,
       email,
       name,
       password: null,
       authProvider: EAuthProvider.GOOGLE,
-      role: userRole?._id,
+      role: ERole.NORMAL_USER,
       isActive: true,
     }) as Promise<UserDocument>;
   }
@@ -418,5 +412,9 @@ export class UsersService {
 
   async unlockUser(id: string, adminUser: IUser) {
     return this.userAccountService.unlockUser(id, adminUser);
+  }
+
+  private isSystemRole(role: string): role is ERole {
+    return Object.values(ERole).includes(role as ERole);
   }
 }

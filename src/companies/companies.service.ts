@@ -68,7 +68,7 @@ export class CompaniesService {
     const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
 
     // HR role restriction: restrict listing to the HR's own company
-    if (user && user.role?.name === ERole.HR && user.company?._id) {
+    if (user && user.role === ERole.HR && user.company?._id) {
       filter._id = user.company._id;
     }
 
@@ -109,7 +109,7 @@ export class CompaniesService {
     this.companyRepository.validateObjectId(id);
 
     // HR can only view their own company
-    if (user && user.role?.name === ERole.HR && user.company?._id) {
+    if (user && user.role === ERole.HR && user.company?._id) {
       if (id !== user.company._id.toString()) {
         throw new BadRequestException('You can only view your own company');
       }
@@ -252,7 +252,7 @@ export class CompaniesService {
       throw new NotFoundException(`Company with id = ${companyId} not found`);
     }
 
-    if (user.role?.name === ERole.HR) {
+    if (user.role === ERole.HR) {
       if (!user.company?._id) {
         throw new ForbiddenException('HR user must be associated with a company');
       }

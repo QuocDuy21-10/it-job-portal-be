@@ -1,11 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
-import { Role } from 'src/roles/schemas/role.schema';
 import { EAuthProvider } from 'src/auth/enums/auth-provider.enum';
 import {
   CompanySnapshot,
   CompanySnapshotSchema,
 } from 'src/companies/schemas/company-snapshot.schema';
+import { ERole } from 'src/casl/enums/role.enum';
 
 export type UserDocument = HydratedDocument<User>;
 
@@ -56,8 +56,8 @@ export class User {
   @Prop({ type: CompanySnapshotSchema, required: false })
   company?: CompanySnapshot;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Role.name, required: true })
-  role: mongoose.Schema.Types.ObjectId;
+  @Prop({ type: String, enum: Object.values(ERole), required: true, index: true })
+  role: ERole;
 
   @Prop({ type: [mongoose.Schema.Types.ObjectId], ref: 'Job', default: [] })
   savedJobs: mongoose.Schema.Types.ObjectId[];
@@ -110,7 +110,6 @@ UserSchema.index(
 );
 
 UserSchema.index({ email: 1, isDeleted: 1 });
-UserSchema.index({ role: 1 });
 UserSchema.index({ companyFollowed: 1 });
 UserSchema.index({ savedJobs: 1 });
 UserSchema.index({ googleId: 1, isDeleted: 1 }, { sparse: true });

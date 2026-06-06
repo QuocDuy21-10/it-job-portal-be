@@ -8,6 +8,7 @@ import { IUser } from 'src/users/user.interface';
 import { User, UserDocument } from 'src/users/schemas/user.schema';
 import { IJwtAccessPayload } from '../interfaces/jwt-payload.interface';
 import { assertAuthenticatedAccountState } from '../utils/assert-authenticated-account-state.util';
+import { ERole } from 'src/casl/enums/role.enum';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -27,15 +28,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Invalid token payload');
     }
 
-    const user = await this.userModel
-      .findById(payload.sub)
-      .populate({
-        path: 'role',
-        select: '_id name',
-      })
-      .select('-password')
-      .lean()
-      .exec();
+    const user = await this.userModel.findById(payload.sub).select('-password').lean().exec();
 
     if (!user) {
       throw new UnauthorizedException('User not found. Token không hợp lệ.');
@@ -43,8 +36,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     assertAuthenticatedAccountState(user, 'access');
 
-    const userRole = user.role as any;
-    if (!userRole || !userRole._id) {
+    if (!this.isSystemRole(user.role)) {
       throw new UnauthorizedException('Role không hợp lệ. Vui lòng liên hệ admin.');
     }
 
@@ -54,10 +46,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       authProvider: user.authProvider,
       hasPassword: !!user.password,
-      role: {
-        _id: userRole._id.toString(),
-        name: userRole.name,
-      },
+      role: user.role,
       company: user.company
         ? {
             _id: (user.company as any)._id?.toString() || '',
@@ -68,5 +57,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       savedJobs: user.savedJobs?.map((id: any) => id.toString()) || [],
       companyFollowed: user.companyFollowed?.map((id: any) => id.toString()) || [],
     };
+  }
+
+  private isSystemRole(role: string): role is ERole {
+    return Object.values(ERole).includes(role as ERole);
   }
 }

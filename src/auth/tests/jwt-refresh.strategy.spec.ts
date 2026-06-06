@@ -79,8 +79,7 @@ describe('JwtRefreshStrategy', () => {
       .mockResolvedValue(makeUser({ scheduledDeletionAt: new Date(Date.now() + 60_000) }));
     const lean = jest.fn().mockReturnValue({ exec });
     const select = jest.fn().mockReturnValue({ lean });
-    const populate = jest.fn().mockReturnValue({ select });
-    userModel.findById.mockReturnValue({ populate });
+    userModel.findById.mockReturnValue({ select });
 
     await expect(
       strategy.validate(req, {

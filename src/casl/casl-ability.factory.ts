@@ -25,7 +25,7 @@ export type AppAbility = PureAbility<[EAction, ESubject]>;
 export class CaslAbilityFactory {
   createForUser(user: IUser): AppAbility {
     const { can, build } = new AbilityBuilder<AppAbility>(PureAbility);
-    const roleName = user.role?.name;
+    const roleName = user.role;
 
     switch (roleName) {
       case ERole.SUPER_ADMIN:

@@ -6,7 +6,7 @@ import { ERole } from 'src/casl/enums/role.enum';
 function buildContext(folderType: string, userRole?: ERole): ExecutionContext {
   const mockRequest = {
     headers: { folder_type: folderType },
-    user: userRole ? { role: { name: userRole } } : undefined,
+    user: userRole ? { role: userRole } : undefined,
   };
   return {
     switchToHttp: () => ({ getRequest: () => mockRequest }),

@@ -3,7 +3,6 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from './schemas/user.schema';
-import { Role, RoleSchema } from 'src/roles/schemas/role.schema';
 import { Session, SessionSchema } from 'src/sessions/schemas/session.schema';
 import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
 import { Company, CompanySchema } from 'src/companies/schemas/company.schema';
@@ -16,7 +15,6 @@ import { UserPreferencesService } from './services/user-preferences.service';
   imports: [
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
-      { name: Role.name, schema: RoleSchema },
       { name: Session.name, schema: SessionSchema },
       { name: Job.name, schema: JobSchema },
       { name: Company.name, schema: CompanySchema },

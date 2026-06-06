@@ -5,16 +5,13 @@ import { genSaltSync, hashSync } from 'bcryptjs';
 import { Types } from 'mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 
-import { ERole } from 'src/casl/enums/role.enum';
 import { Company, CompanyDocument } from 'src/companies/schemas/company.schema';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
-import { Role, RoleDocument } from 'src/roles/schemas/role.schema';
 import { Skill, SkillDocument } from 'src/skills/schemas/skill.schema';
 import { User, UserDocument } from 'src/users/schemas/user.schema';
 
 import { COMPANIES_SEED_DATA } from './data/companies.data';
 import { createJobsSeedData } from './data/jobs.data';
-import { ROLES_SEED_DATA } from './data/roles.data';
 import { SKILLS_SEED_DATA } from './data/skills.data';
 import { createUsersSeedData } from './data/users.data';
 
@@ -23,7 +20,6 @@ export class SeedService {
   private readonly logger = new Logger(SeedService.name);
 
   constructor(
-    @InjectModel(Role.name) private readonly roleModel: SoftDeleteModel<RoleDocument>,
     @InjectModel(Skill.name) private readonly skillModel: SoftDeleteModel<SkillDocument>,
     @InjectModel(Company.name) private readonly companyModel: SoftDeleteModel<CompanyDocument>,
     @InjectModel(User.name) private readonly userModel: SoftDeleteModel<UserDocument>,
@@ -38,25 +34,10 @@ export class SeedService {
     const initPassword = this.configService.get<string>('INIT_PASSWORD')!;
     const hashedPassword = hashSync(initPassword, genSaltSync(10));
 
-    const seededRoleIds: Types.ObjectId[] = [];
     const seededSkillIds: Types.ObjectId[] = [];
     const seededCompanyIds: Types.ObjectId[] = [];
     const seededUserIds: Types.ObjectId[] = [];
     const seededJobIds: Types.ObjectId[] = [];
-
-    try {
-      const roleCount = await this.roleModel.countDocuments();
-      if (roleCount === 0) {
-        const inserted = await this.roleModel.insertMany(ROLES_SEED_DATA);
-        inserted.forEach(doc => seededRoleIds.push(doc._id as Types.ObjectId));
-        this.logger.log(`Roles seeded: ${seededRoleIds.length} records`);
-      } else {
-        this.logger.log('Roles already seeded, skipping');
-      }
-    } catch (err) {
-      this.logger.error('Failed to seed roles', (err as Error).stack);
-      throw err;
-    }
 
     try {
       const skillCount = await this.skillModel.countDocuments();
@@ -69,15 +50,7 @@ export class SeedService {
       }
     } catch (err) {
       this.logger.error('Failed to seed skills', (err as Error).stack);
-      await this.cleanup(seededRoleIds, this.roleModel);
       throw err;
-    }
-
-    // Resolve role ObjectIds (works whether just seeded or already existed)
-    const adminRole = await this.roleModel.findOne({ name: ERole.SUPER_ADMIN }).lean();
-    const userRole = await this.roleModel.findOne({ name: ERole.NORMAL_USER }).lean();
-    if (!adminRole || !userRole) {
-      throw new Error('Required roles not found after seeding — cannot continue');
     }
 
     try {
@@ -92,7 +65,6 @@ export class SeedService {
     } catch (err) {
       this.logger.error('Failed to seed companies', (err as Error).stack);
       await this.cleanup(seededSkillIds, this.skillModel);
-      await this.cleanup(seededRoleIds, this.roleModel);
       throw err;
     }
 
@@ -104,12 +76,7 @@ export class SeedService {
     try {
       const userCount = await this.userModel.countDocuments();
       if (userCount === 0) {
-        const usersData = createUsersSeedData(
-          adminRole._id as Types.ObjectId,
-          userRole._id as Types.ObjectId,
-          adminEmail,
-          hashedPassword,
-        );
+        const usersData = createUsersSeedData(adminEmail, hashedPassword);
         const inserted = await this.userModel.insertMany(usersData);
         inserted.forEach(doc => seededUserIds.push(doc._id as Types.ObjectId));
         this.logger.log(`Users seeded: ${seededUserIds.length} records`);
@@ -120,7 +87,6 @@ export class SeedService {
       this.logger.error('Failed to seed users', (err as Error).stack);
       await this.cleanup(seededCompanyIds, this.companyModel);
       await this.cleanup(seededSkillIds, this.skillModel);
-      await this.cleanup(seededRoleIds, this.roleModel);
       throw err;
     }
 
@@ -139,7 +105,6 @@ export class SeedService {
       await this.cleanup(seededUserIds, this.userModel);
       await this.cleanup(seededCompanyIds, this.companyModel);
       await this.cleanup(seededSkillIds, this.skillModel);
-      await this.cleanup(seededRoleIds, this.roleModel);
       throw err;
     }
 

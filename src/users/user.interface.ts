@@ -1,13 +1,12 @@
+import { ERole } from 'src/casl/enums/role.enum';
+
 export interface IUser {
   _id: string;
   name: string;
   email: string;
   authProvider: string;
   hasPassword: boolean;
-  role: {
-    _id: string;
-    name: string;
-  };
+  role: ERole;
   company?: {
     _id: string;
     name: string;

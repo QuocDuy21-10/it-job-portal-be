@@ -85,7 +85,7 @@ export class ResumesService {
     const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
 
     // Role-based scope applied after sanitization — cannot be overridden by query string
-    if (user?.role?.name === ERole.HR && user.company?._id) {
+    if (user?.role === ERole.HR && user.company?._id) {
       filter.companyId = user.company._id;
     }
 
@@ -124,7 +124,7 @@ export class ResumesService {
     }
 
     // HR users may only view resumes belonging to their company
-    if (user?.role?.name === ERole.HR && user.company?._id) {
+    if (user?.role === ERole.HR && user.company?._id) {
       if (resume.companyId?.toString() !== user.company._id.toString()) {
         throw new ForbiddenException('You can only view resumes of your own company');
       }
@@ -142,7 +142,7 @@ export class ResumesService {
       throw new NotFoundException(`Resume with ID ${id} not found`);
     }
 
-    if (user?.role?.name === ERole.HR && user.company?._id) {
+    if (user?.role === ERole.HR && user.company?._id) {
       if (existing.companyId?.toString() !== user.company._id.toString()) {
         throw new ForbiddenException('You can only update resumes that belong to your company');
       }
@@ -190,7 +190,7 @@ export class ResumesService {
       throw new NotFoundException(`Resume with ID ${id} not found`);
     }
 
-    if (user?.role?.name === ERole.HR && user.company?._id) {
+    if (user?.role === ERole.HR && user.company?._id) {
       if (existing.companyId?.toString() !== user.company._id.toString()) {
         throw new ForbiddenException('You can only delete resumes that belong to your company');
       }
@@ -211,7 +211,7 @@ export class ResumesService {
       ? [user.company._id.toString()]
       : await this.resumeRepository.findCompanyIdsByResumeIds(ids);
 
-    if (user.role?.name === ERole.HR) {
+    if (user.role === ERole.HR) {
       if (!user.company?._id) {
         throw new ForbiddenException('HR user must be associated with a company');
       }

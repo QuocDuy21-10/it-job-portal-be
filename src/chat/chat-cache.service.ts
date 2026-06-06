@@ -70,7 +70,7 @@ export class ChatCacheService {
     return [
       'chat_cache',
       'faq_response',
-      this.normalizeRole(user.role?.name),
+      this.normalizeRole(user.role),
       this.normalizeValue(topic || 'general'),
       this.hash(this.normalizeValue(message)),
     ].join(':');

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { EAuthProvider } from '../enums/auth-provider.enum';
 import { IUser } from 'src/users/user.interface';
 import { jest } from '@jest/globals';
+import { ERole } from 'src/casl/enums/role.enum';
 
 export function makeUser(overrides: Record<string, unknown> = {}) {
   return {
@@ -14,7 +15,7 @@ export function makeUser(overrides: Record<string, unknown> = {}) {
     isLocked: false,
     isDeleted: false,
     scheduledDeletionAt: null,
-    role: { _id: { toString: () => 'role-id-1' }, name: 'NORMAL_USER' },
+    role: ERole.NORMAL_USER,
     company: null,
     savedJobs: [],
     companyFollowed: [],
@@ -30,7 +31,7 @@ export function makeIUser(overrides: Partial<IUser> = {}): IUser {
     email: 'test@example.com',
     authProvider: EAuthProvider.LOCAL,
     hasPassword: true,
-    role: { _id: 'role-id-1', name: 'NORMAL_USER' },
+    role: ERole.NORMAL_USER,
     savedJobs: [],
     companyFollowed: [],
     ...overrides,
@@ -47,7 +48,7 @@ export function makeGoogleUser(overrides: Record<string, unknown> = {}) {
     isActive: true,
     isLocked: false,
     isDeleted: false,
-    role: { _id: { toString: () => 'role-id-1' }, name: 'NORMAL_USER' },
+    role: ERole.NORMAL_USER,
     company: null,
     savedJobs: [],
     companyFollowed: [],

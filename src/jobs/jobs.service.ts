@@ -128,9 +128,9 @@ export class JobsService {
       };
     }
 
-    if (user && user.role?.name === ERole.HR && user.company?._id) {
+    if (user && user.role === ERole.HR && user.company?._id) {
       Object.assign(filter, buildEmbeddedCompanyIdFilter(user.company._id));
-    } else if (!user || user.role?.name !== ERole.SUPER_ADMIN) {
+    } else if (!user || user.role !== ERole.SUPER_ADMIN) {
       Object.assign(filter, this.buildActiveJobFilter());
     }
 
@@ -173,7 +173,7 @@ export class JobsService {
     const job = await this.jobRepository.findById(id);
 
     // Nếu user là HR, chỉ cho phép xem job của công ty họ
-    if (user && user.role?.name === ERole.HR && user.company?._id) {
+    if (user && user.role === ERole.HR && user.company?._id) {
       if (job && job.company && job.company._id.toString() !== user.company._id.toString()) {
         throw new BadRequestException('You can only view jobs of your own company');
       }
@@ -181,7 +181,7 @@ export class JobsService {
     }
 
     // Public users and NORMAL_USER can only view APPROVED, active, non-expired jobs
-    if (!user || user.role?.name !== ERole.SUPER_ADMIN) {
+    if (!user || user.role !== ERole.SUPER_ADMIN) {
       if (
         job &&
         (job.approvalStatus !== EJobApprovalStatus.APPROVED ||
@@ -333,7 +333,7 @@ export class JobsService {
       : await this.jobRepository.findCompanyIdsByJobIds(ids);
 
     // HR can only delete jobs belonging to their own company
-    if (user.role?.name === ERole.HR) {
+    if (user.role === ERole.HR) {
       if (!user.company?._id) {
         throw new ForbiddenException('HR user must be associated with a company');
       }
@@ -594,7 +594,7 @@ export class JobsService {
       throw new NotFoundException(`Job with ID ${jobId} not found`);
     }
 
-    if (user.role?.name === ERole.HR) {
+    if (user.role === ERole.HR) {
       if (!user.company?._id) {
         throw new ForbiddenException('HR user must be associated with a company');
       }

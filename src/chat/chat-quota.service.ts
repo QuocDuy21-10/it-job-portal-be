@@ -269,7 +269,7 @@ export class ChatQuotaService {
   }
 
   private resolveUserRoleName(user: IUser): string {
-    return user.role?.name ?? ERole.NORMAL_USER;
+    return user.role ?? ERole.NORMAL_USER;
   }
 
   private buildQuotaKey(userId: string, roleName: string, timezone: string): string {

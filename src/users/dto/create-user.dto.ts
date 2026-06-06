@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsEmail,
-  IsMongoId,
+  IsEnum,
   IsNotEmpty,
   IsNotEmptyObject,
   IsObject,
@@ -11,6 +11,7 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
+import { ERole } from 'src/casl/enums/role.enum';
 import { CompanyDto } from 'src/companies/dto/company.dto';
 
 export class CreateUserDto {
@@ -38,8 +39,7 @@ export class CreateUserDto {
   company?: CompanyDto;
 
   @IsNotEmpty({ message: 'Role is required' })
-  @IsString({ message: 'Role must be a string' })
-  @IsMongoId({ message: 'Role must be a valid MongoDB ObjectId' })
-  @ApiProperty({ example: '68fde8987e1103e9e88e0e4e', description: 'Role of user' })
-  role: string;
+  @IsEnum(ERole, { message: 'Role must be one of: SUPER ADMIN, HR, NORMAL USER' })
+  @ApiProperty({ enum: ERole, example: ERole.HR, description: 'Role of user' })
+  role: ERole;
 }

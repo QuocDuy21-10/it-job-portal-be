@@ -35,10 +35,7 @@ describe('UsersService', () => {
     password: 'hashed-password',
     isActive: true,
     isDeleted: false,
-    role: {
-      _id: new mongoose.Types.ObjectId(),
-      name: ERole.NORMAL_USER,
-    },
+    role: ERole.NORMAL_USER,
     company: {
       _id: new mongoose.Types.ObjectId(),
       name: 'Test Company',
@@ -55,7 +52,6 @@ describe('UsersService', () => {
       emailExists: jest.fn(),
       resolveCompanyAssignmentForRole: jest.fn(),
       create: jest.fn(),
-      findRoleByName: jest.fn(),
       findPaginated: jest.fn(),
       findById: jest.fn(),
       findOneByUserEmail: jest.fn(),
@@ -109,7 +105,6 @@ describe('UsersService', () => {
 
   describe('create', () => {
     const email = 'new.user@example.com';
-    const roleId = new mongoose.Types.ObjectId().toString();
     const companyId = new mongoose.Types.ObjectId().toString();
 
     it('should create a user with a canonical HR company snapshot and createdBy metadata', async () => {
@@ -127,7 +122,7 @@ describe('UsersService', () => {
           name: 'New User',
           email,
           password: 'Secret123!',
-          role: roleId,
+          role: ERole.HR,
           company: {
             _id: companyId,
             name: 'Wrong Name',
@@ -141,7 +136,7 @@ describe('UsersService', () => {
       expect(createPayload).toMatchObject({
         name: 'New User',
         email,
-        role: roleId,
+        role: ERole.HR,
         company: normalizedCompany,
         createdBy: { _id: actingUser._id, email: actingUser.email },
       });
@@ -159,7 +154,7 @@ describe('UsersService', () => {
             name: 'New User',
             email,
             password: 'Secret123!',
-            role: roleId,
+            role: ERole.HR,
           },
           actingUser,
         ),
@@ -180,7 +175,7 @@ describe('UsersService', () => {
           name: 'Normal User',
           email,
           password: 'Secret123!',
-          role: roleId,
+          role: ERole.NORMAL_USER,
           company: {
             _id: companyId,
             name: 'Ignored Company',
@@ -200,12 +195,10 @@ describe('UsersService', () => {
 
   describe('register', () => {
     it('should create a local normal user with verification expiry', async () => {
-      const role = { _id: new mongoose.Types.ObjectId() };
       const createdUser = { _id: new mongoose.Types.ObjectId() };
       const now = Date.now();
 
       mockUserRepository.emailExists.mockResolvedValue(false);
-      mockUserRepository.findRoleByName.mockResolvedValue(role as any);
       mockUserRepository.create.mockResolvedValue(createdUser as any);
 
       const result = await service.register({
@@ -215,11 +208,10 @@ describe('UsersService', () => {
       });
 
       const createPayload = mockUserRepository.create.mock.calls[0][0];
-      expect(mockUserRepository.findRoleByName).toHaveBeenCalledWith(ERole.NORMAL_USER);
       expect(createPayload).toMatchObject({
         name: 'Candidate',
         email: 'candidate@example.com',
-        role: role._id,
+        role: ERole.NORMAL_USER,
       });
       expect(createPayload.password).not.toBe('StrongPass1!');
       expect(service.isValidPassword('StrongPass1!', createPayload.password)).toBe(true);
@@ -395,7 +387,7 @@ describe('UsersService', () => {
             name: 'Password User',
             email: 'password@example.com',
             password,
-            role: new mongoose.Types.ObjectId().toString(),
+            role: ERole.NORMAL_USER,
           },
           actingUser,
         )
@@ -409,7 +401,6 @@ describe('UsersService', () => {
 
   describe('update', () => {
     const id = new mongoose.Types.ObjectId().toString();
-    const roleId = new mongoose.Types.ObjectId().toString();
 
     it('should reject when the target user does not exist', async () => {
       mockUserRepository.findWithSelect.mockResolvedValue(null);
@@ -424,7 +415,7 @@ describe('UsersService', () => {
     it('should use existing role and company when omitted from dto', async () => {
       const existingCompany = makeCompanySnapshot();
       mockUserRepository.findWithSelect.mockResolvedValue({
-        role: roleId,
+        role: ERole.HR,
         company: existingCompany,
       } as any);
       mockUserRepository.toCompanyDto.mockReturnValue({
@@ -438,7 +429,7 @@ describe('UsersService', () => {
       await service.update(id, { name: 'Updated Name' } as any, actingUser);
 
       expect(mockUserRepository.toCompanyDto).toHaveBeenCalledWith(existingCompany);
-      expect(mockUserRepository.resolveCompanyAssignmentForRole).toHaveBeenCalledWith(roleId, {
+      expect(mockUserRepository.resolveCompanyAssignmentForRole).toHaveBeenCalledWith(ERole.HR, {
         _id: existingCompany._id.toString(),
         name: existingCompany.name,
         logo: existingCompany.logo,
@@ -456,7 +447,7 @@ describe('UsersService', () => {
     it('should normalize company for HR users', async () => {
       const normalizedCompany = makeCompanySnapshot();
       mockUserRepository.findWithSelect.mockResolvedValue({
-        role: new mongoose.Types.ObjectId(),
+        role: ERole.NORMAL_USER,
         company: null,
       } as any);
       mockUserRepository.resolveCompanyAssignmentForRole.mockResolvedValue(
@@ -468,7 +459,7 @@ describe('UsersService', () => {
         id,
         {
           name: 'HR User',
-          role: roleId,
+          role: ERole.HR,
           company: {
             _id: normalizedCompany._id.toString(),
             name: 'Wrong Name',
@@ -481,27 +472,40 @@ describe('UsersService', () => {
       expect(mockUserRepository.updateOne).toHaveBeenCalledWith(
         id,
         expect.objectContaining({
-          role: roleId,
+          role: ERole.HR,
           company: normalizedCompany,
           updatedBy: { _id: actingUser._id, email: actingUser.email },
         }),
       );
+      expect(mockUserRepository.resolveCompanyAssignmentForRole).toHaveBeenCalledWith(ERole.HR, {
+        _id: normalizedCompany._id.toString(),
+        name: 'Wrong Name',
+        logo: 'wrong-logo.png',
+      });
     });
 
     it('should unset company when moving away from HR', async () => {
       mockUserRepository.findWithSelect.mockResolvedValue({
-        role: roleId,
+        role: ERole.HR,
         company: makeCompanySnapshot(),
       } as any);
       mockUserRepository.resolveCompanyAssignmentForRole.mockResolvedValue(undefined);
       mockUserRepository.updateOne.mockResolvedValue({ matchedCount: 1 } as any);
 
-      await service.update(id, { role: roleId, name: 'Updated Name' } as any, actingUser);
+      await service.update(
+        id,
+        { role: ERole.NORMAL_USER, name: 'Updated Name' } as any,
+        actingUser,
+      );
+      expect(mockUserRepository.resolveCompanyAssignmentForRole).toHaveBeenCalledWith(
+        ERole.NORMAL_USER,
+        undefined,
+      );
 
       expect(mockUserRepository.updateOne).toHaveBeenCalledWith(
         id,
         expect.objectContaining({
-          role: roleId,
+          role: ERole.NORMAL_USER,
           name: 'Updated Name',
           $unset: { company: 1 },
           updatedBy: { _id: actingUser._id, email: actingUser.email },
@@ -511,7 +515,7 @@ describe('UsersService', () => {
 
     it('should reject when no user record matches the update query', async () => {
       mockUserRepository.findWithSelect.mockResolvedValue({
-        role: roleId,
+        role: ERole.NORMAL_USER,
         company: null,
       } as any);
       mockUserRepository.resolveCompanyAssignmentForRole.mockResolvedValue(undefined);
@@ -704,10 +708,7 @@ describe('UsersService', () => {
         email: profileDoc.email,
         authProvider: profileDoc.authProvider,
         hasPassword: true,
-        role: {
-          _id: profileDoc.role._id.toString(),
-          name: profileDoc.role.name,
-        },
+        role: ERole.NORMAL_USER,
         company: {
           _id: profileDoc.company._id.toString(),
           name: profileDoc.company.name,
@@ -760,9 +761,7 @@ describe('UsersService', () => {
     });
 
     it('should create an active google user with a normal user role', async () => {
-      const role = { _id: new mongoose.Types.ObjectId() };
       const createdUser = { _id: new mongoose.Types.ObjectId() };
-      mockUserRepository.findRoleByName.mockResolvedValue(role as any);
       mockUserRepository.create.mockResolvedValue(createdUser as any);
 
       const result = await service.createGoogleUser({
@@ -772,14 +771,13 @@ describe('UsersService', () => {
         avatar: 'ignored.png',
       });
 
-      expect(mockUserRepository.findRoleByName).toHaveBeenCalledWith(ERole.NORMAL_USER);
       expect(mockUserRepository.create).toHaveBeenCalledWith({
         googleId: 'google-id',
         email: 'google@example.com',
         name: 'Google User',
         password: null,
         authProvider: EAuthProvider.GOOGLE,
-        role: role._id,
+        role: ERole.NORMAL_USER,
         isActive: true,
       });
       expect(result).toBe(createdUser);

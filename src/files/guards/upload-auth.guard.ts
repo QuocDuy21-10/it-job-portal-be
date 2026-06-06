@@ -17,7 +17,7 @@ export class UploadAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<{
       headers: Record<string, string>;
-      user?: { role?: { name: ERole } };
+      user?: { role?: ERole };
     }>();
 
     const rawFolder = (request.headers?.folder_type ?? '').toLowerCase();
@@ -31,7 +31,7 @@ export class UploadAuthGuard implements CanActivate {
     const policy = UPLOAD_POLICIES[rawFolder as UploadFolderType];
 
     if (policy.requiredRoles && policy.requiredRoles.length > 0) {
-      const userRole = request.user?.role?.name as ERole | undefined;
+      const userRole = request.user?.role;
       if (!userRole || !policy.requiredRoles.includes(userRole)) {
         throw new ForbiddenException(
           `Uploading to '${rawFolder}' requires one of the following roles: ${policy.requiredRoles.join(', ')}`,

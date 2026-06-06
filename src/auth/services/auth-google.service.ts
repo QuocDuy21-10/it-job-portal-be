@@ -58,15 +58,13 @@ export class AuthGoogleService {
 
       assertAuthenticatedAccountState(user);
 
-      const userRole = user.role as unknown as { _id: string; name: string };
-
       const userObject: IUser = {
         _id: user._id.toString(),
         name: user.name,
         email: user.email,
         authProvider: user.authProvider || EAuthProvider.GOOGLE,
         hasPassword: !!user.password,
-        role: userRole,
+        role: user.role,
         company: user.company
           ? {
               _id: user.company._id?.toString() || '',

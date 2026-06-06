@@ -8,7 +8,6 @@ import { CompaniesModule } from './companies/companies.module';
 import { JobsModule } from './jobs/jobs.module';
 import { FilesModule } from './files/files.module';
 import { ResumesModule } from './resumes/resumes.module';
-import { RolesModule } from './roles/roles.module';
 import { DatabasesModule } from './databases/databases.module';
 import { SubscribersModule } from './subscribers/subscribers.module';
 import { MailModule } from './mail/mail.module';
@@ -78,7 +77,6 @@ import { SkillsModule } from './skills/skills.module';
     FilesModule,
     ResumesModule,
     QueuesModule.forRoot(),
-    RolesModule,
     CvProfilesModule,
     DatabasesModule,
     SubscribersModule,

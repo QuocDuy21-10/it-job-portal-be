@@ -24,6 +24,7 @@ import { ChatResponseFormatterService } from './chat-response-formatter.service'
 import { EChatMessageRole } from './enums/chat-message-role.enum';
 import { EChatSessionType } from './enums/chat-session-type.enum';
 import { EChatIntent } from './enums/chat-intent.enum';
+import { ERole } from 'src/casl/enums/role.enum';
 
 const userId = '507f1f77bcf86cd799439011';
 const sessionId = '507f1f77bcf86cd799439012';
@@ -82,7 +83,7 @@ describe('ChatService', () => {
     email: 'duy@example.com',
     authProvider: 'local',
     hasPassword: true,
-    role: { _id: 'role-1', name: 'NORMAL USER' },
+    role: ERole.NORMAL_USER,
     savedJobs: [],
     companyFollowed: [],
   };

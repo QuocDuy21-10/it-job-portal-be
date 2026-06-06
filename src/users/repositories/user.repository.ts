@@ -3,7 +3,6 @@ import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import mongoose from 'mongoose';
 import { User as UserModel, UserDocument } from '../schemas/user.schema';
-import { Role, RoleDocument } from 'src/roles/schemas/role.schema';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 import { Company, CompanyDocument } from 'src/companies/schemas/company.schema';
 import { IUser } from '../user.interface';
@@ -20,7 +19,6 @@ import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.inter
 export class UserRepository {
   constructor(
     @InjectModel(UserModel.name) private readonly userModel: SoftDeleteModel<UserDocument>,
-    @InjectModel(Role.name) private readonly roleModel: SoftDeleteModel<RoleDocument>,
     @InjectModel(Job.name) private readonly jobModel: SoftDeleteModel<JobDocument>,
     @InjectModel(Company.name) private readonly companyModel: SoftDeleteModel<CompanyDocument>,
   ) {}
@@ -35,33 +33,23 @@ export class UserRepository {
     return this.userModel
       .findById(id)
       .select('-password -refreshToken')
-      .populate({ path: 'role', select: { _id: 1, name: 1 } });
+      .exec() as Promise<UserDocument | null>;
   }
 
   async findOneByUserEmail(email: string): Promise<UserDocument | null> {
-    return this.userModel
-      .findOne({ email, isDeleted: false })
-      .populate({ path: 'role', select: { name: 1 } });
+    return this.userModel.findOne({ email, isDeleted: false });
   }
 
   async findByEmail(email: string): Promise<UserDocument | null> {
-    return this.userModel
-      .findOne({ email, isDeleted: false })
-      .populate({ path: 'role', select: { name: 1 } });
+    return this.userModel.findOne({ email, isDeleted: false });
   }
 
   async findByGoogleId(googleId: string): Promise<UserDocument | null> {
-    return this.userModel
-      .findOne({ googleId, isDeleted: false })
-      .populate({ path: 'role', select: { name: 1 } });
+    return this.userModel.findOne({ googleId, isDeleted: false });
   }
 
   async findUserProfile(userId: string) {
-    return this.userModel
-      .findById(userId)
-      .populate({ path: 'role', select: '_id name' })
-      .lean()
-      .exec();
+    return this.userModel.findById(userId).lean().exec();
   }
 
   async findActiveUser(id: string) {
@@ -183,16 +171,6 @@ export class UserRepository {
       .exec() as Promise<UserDocument | null>;
   }
 
-  // Cross-collection lookups
-
-  async findRoleById(roleId: string | mongoose.Schema.Types.ObjectId) {
-    return this.roleModel.findById(roleId).select('name');
-  }
-
-  async findRoleByName(name: string) {
-    return this.roleModel.findOne({ name });
-  }
-
   async jobExists(jobId: string): Promise<boolean> {
     const job = await this.jobModel.findOne({ _id: jobId, isDeleted: false }).select('_id').lean();
     return !!job;
@@ -218,14 +196,13 @@ export class UserRepository {
   }
 
   async resolveCompanyAssignmentForRole(
-    roleId: string | mongoose.Schema.Types.ObjectId,
+    role: ERole,
     company?: CompanyDto | null,
   ): Promise<CompanySnapshotValue | undefined> {
-    const userRole = await this.roleModel.findById(roleId).select('name');
-    if (!userRole) {
-      throw new BadRequestException('Role not found');
+    if (!this.isSystemRole(role)) {
+      throw new BadRequestException('Role is not supported by CASL');
     }
-    if (userRole.name !== ERole.HR) {
+    if (role !== ERole.HR) {
       return undefined;
     }
     const companyId = company?._id?.toString();
@@ -233,6 +210,10 @@ export class UserRepository {
       throw new BadRequestException('HR user must be assigned to a company');
     }
     return this.getCompanySnapshot(companyId);
+  }
+
+  private isSystemRole(roleName: string): roleName is ERole {
+    return Object.values(ERole).includes(roleName as ERole);
   }
 
   toCompanyDto(

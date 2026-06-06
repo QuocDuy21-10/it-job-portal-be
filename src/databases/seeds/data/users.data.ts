@@ -1,18 +1,13 @@
-import { Types } from 'mongoose';
+import { ERole } from 'src/casl/enums/role.enum';
 
-export function createUsersSeedData(
-  adminRoleId: Types.ObjectId,
-  userRoleId: Types.ObjectId,
-  adminEmail: string,
-  hashedPassword: string,
-) {
+export function createUsersSeedData(adminEmail: string, hashedPassword: string) {
   return [
     {
       name: 'Super Admin',
       email: adminEmail,
       password: hashedPassword,
       authProvider: 'local',
-      role: adminRoleId,
+      role: ERole.SUPER_ADMIN,
       isActive: true,
     },
     {
@@ -20,7 +15,7 @@ export function createUsersSeedData(
       email: 'user@gmail.com',
       password: hashedPassword,
       authProvider: 'local',
-      role: userRoleId,
+      role: ERole.NORMAL_USER,
       isActive: true,
     },
   ];
