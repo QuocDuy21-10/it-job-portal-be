@@ -15,10 +15,14 @@ import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.inter
 import { ERole } from 'src/casl';
 import { CompanyRepository } from './repositories/company.repository';
 import { CompanyDocument } from './schemas/company.schema';
+import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
+import { TopHiringCompanyDto } from './dto/top-hiring-company.dto';
 
 @Injectable()
 export class CompaniesService {
   private readonly logger = new Logger(CompaniesService.name);
+  private readonly DEFAULT_TOP_HIRING_LIMIT = 8;
+  private readonly MAX_TOP_HIRING_LIMIT = 12;
   private readonly ALLOWED_FILTER_FIELDS = new Set([
     'name',
     'address',
@@ -45,6 +49,7 @@ export class CompaniesService {
   constructor(
     private readonly companyRepository: CompanyRepository,
     private readonly filesService: FilesService,
+    private readonly statisticsCacheService: StatisticsCacheService,
   ) {}
 
   async create(createCompanyDto: CreateCompanyDto, user: IUser) {
@@ -105,6 +110,21 @@ export class CompaniesService {
     };
   }
 
+  async findTopHiringCompanies(limit?: number): Promise<TopHiringCompanyDto[]> {
+    const safeLimit = this.normalizeTopHiringLimit(limit);
+    const cachedData =
+      await this.statisticsCacheService.getTopHiringCompanies<TopHiringCompanyDto[]>(safeLimit);
+
+    if (cachedData) {
+      return cachedData;
+    }
+
+    const companies = await this.companyRepository.findTopHiringCompanies(safeLimit);
+    await this.statisticsCacheService.setTopHiringCompanies(safeLimit, companies);
+
+    return companies;
+  }
+
   async findOne(id: string, user?: IUser) {
     this.companyRepository.validateObjectId(id);
 
@@ -138,10 +158,14 @@ export class CompaniesService {
       }
     }
 
-    return this.companyRepository.updateOne(
+    const result = await this.companyRepository.updateOne(
       { _id: id },
       { ...updateCompanyDto, updatedBy: { _id: user._id, email: user.email } },
     );
+
+    await this.statisticsCacheService.clearTopHiringCompanies();
+
+    return result;
   }
 
   async remove(id: string, user: IUser) {
@@ -152,7 +176,14 @@ export class CompaniesService {
       throw new NotFoundException(`Company with id = ${id} not found`);
     }
 
-    return this.companyRepository.softDeleteById(id, { _id: user._id, email: user.email });
+    const result = await this.companyRepository.softDeleteById(id, {
+      _id: user._id,
+      email: user.email,
+    });
+
+    await this.statisticsCacheService.clearTopHiringCompanies();
+
+    return result;
   }
 
   async bulkRemove(
@@ -162,6 +193,7 @@ export class CompaniesService {
     // Cascade: deactivate all active jobs for the deleted companies before soft-deleting
     const deactivatedJobsCount = await this.companyRepository.deactivateJobsForCompanies(ids);
     const result = await this.companyRepository.bulkSoftDelete(ids, user);
+    await this.statisticsCacheService.clearTopHiringCompanies();
 
     return {
       ...result,
@@ -220,6 +252,16 @@ export class CompaniesService {
   }
 
   // Private helpers
+  private normalizeTopHiringLimit(limit?: number): number {
+    const parsedLimit = Number(limit);
+
+    if (!Number.isInteger(parsedLimit) || parsedLimit < 1) {
+      return this.DEFAULT_TOP_HIRING_LIMIT;
+    }
+
+    return Math.min(parsedLimit, this.MAX_TOP_HIRING_LIMIT);
+  }
+
   private sanitizeAqpQuery(
     rawFilter: Record<string, any>,
     rawSort: Record<string, any>,

@@ -1,7 +1,7 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable } from '@nestjs/common';
 import { Cache } from 'cache-manager';
-import { CACHE_KEYS, CACHE_TTL } from './constants/statistics.constants';
+import { CACHE_KEYS, CACHE_TTL, LIMITS } from './constants/statistics.constants';
 
 @Injectable()
 export class StatisticsCacheService {
@@ -21,6 +21,18 @@ export class StatisticsCacheService {
 
   async setHrDashboard<T>(companyId: string, value: T): Promise<void> {
     await this.cacheManager.set(CACHE_KEYS.hrDashboard(companyId), value, CACHE_TTL.HR_DASHBOARD);
+  }
+
+  async getTopHiringCompanies<T>(limit: number): Promise<T | undefined> {
+    return this.cacheManager.get<T>(CACHE_KEYS.topHiringCompanies(limit));
+  }
+
+  async setTopHiringCompanies<T>(limit: number, value: T): Promise<void> {
+    await this.cacheManager.set(
+      CACHE_KEYS.topHiringCompanies(limit),
+      value,
+      CACHE_TTL.TOP_HIRING_COMPANIES,
+    );
   }
 
   async clearAdminDashboard(): Promise<void> {
@@ -45,5 +57,13 @@ export class StatisticsCacheService {
     const uniqueCompanyIds = [...new Set(companyIds.filter(Boolean))];
 
     await Promise.all(uniqueCompanyIds.map(companyId => this.clearHrDashboard(companyId)));
+  }
+
+  async clearTopHiringCompanies(): Promise<void> {
+    const tasks = Array.from({ length: LIMITS.TOP_HIRING_COMPANIES }, (_, index) =>
+      this.cacheManager.del(CACHE_KEYS.topHiringCompanies(index + 1)),
+    );
+
+    await Promise.all(tasks);
   }
 }

@@ -183,7 +183,7 @@ export class SkillsService {
       .find(filter)
       .sort({ label: 1 })
       .limit(normalizedLimit)
-      .select('label slug aliases category description')
+      .select('label slug aliases category')
       .lean()
       .exec();
 

@@ -8,6 +8,7 @@ import { EJobApprovalStatus } from './enums/job-approval-status.enum';
 import { IUser } from 'src/users/user.interface';
 import { SkillsService } from 'src/skills/skills.service';
 import { ERole } from 'src/casl/enums/role.enum';
+import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
 
 const hrUser = (companyId: string): IUser => ({
   _id: 'user-hr-1',
@@ -50,6 +51,7 @@ describe('JobsService', () => {
   let mockSkillsService: jest.Mocked<Partial<SkillsService>>;
   let mockCompanyFollowerQueueService: jest.Mocked<Partial<CompanyFollowerQueueService>>;
   let mockJobExpirationQueueService: jest.Mocked<Partial<JobExpirationQueueService>>;
+  let mockStatisticsCacheService: jest.Mocked<Partial<StatisticsCacheService>>;
 
   beforeEach(async () => {
     mockJobRepository = {
@@ -62,6 +64,7 @@ describe('JobsService', () => {
       softDeleteById: jest.fn(),
       countDocuments: jest.fn(),
       countJobsOwnedByCompany: jest.fn(),
+      findCompanyIdsByJobIds: jest.fn(),
       bulkSoftDelete: jest.fn(),
       findLean: jest.fn(),
       findPublicChatCardJobsByIds: jest.fn(),
@@ -82,6 +85,12 @@ describe('JobsService', () => {
       addExpiredJobNotification: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockStatisticsCacheService = {
+      clearAdminDashboard: jest.fn().mockResolvedValue(undefined),
+      clearHrDashboards: jest.fn().mockResolvedValue(undefined),
+      clearTopHiringCompanies: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         JobsService,
@@ -89,6 +98,7 @@ describe('JobsService', () => {
         { provide: SkillsService, useValue: mockSkillsService },
         { provide: CompanyFollowerQueueService, useValue: mockCompanyFollowerQueueService },
         { provide: JobExpirationQueueService, useValue: mockJobExpirationQueueService },
+        { provide: StatisticsCacheService, useValue: mockStatisticsCacheService },
       ],
     }).compile();
 
@@ -239,7 +249,8 @@ describe('JobsService', () => {
 
   describe('findPublicChatCardJobsByIds', () => {
     it('deduplicates incoming IDs before querying the repository', async () => {
-      mockJobRepository.findPublicChatCardJobsByIds.mockResolvedValue([activeApprovedJob()] as any);
+      const job = activeApprovedJob();
+      mockJobRepository.findPublicChatCardJobsByIds.mockResolvedValue([job] as any);
 
       const result = await service.findPublicChatCardJobsByIds(['job-1', 'job-2', 'job-1']);
 
@@ -247,7 +258,7 @@ describe('JobsService', () => {
         'job-1',
         'job-2',
       ]);
-      expect(result).toEqual([activeApprovedJob()]);
+      expect(result).toEqual([job]);
     });
 
     it('returns early when no IDs are provided', async () => {
@@ -279,6 +290,7 @@ describe('JobsService', () => {
         { _id: 'job-1' },
         expect.objectContaining({ name: 'Updated' }),
       );
+      expect(mockStatisticsCacheService.clearTopHiringCompanies).toHaveBeenCalled();
     });
 
     it('allows SUPER_ADMIN to update any job', async () => {
@@ -320,6 +332,7 @@ describe('JobsService', () => {
         'job-1',
         expect.objectContaining({ email: 'henry@example.com' }),
       );
+      expect(mockStatisticsCacheService.clearTopHiringCompanies).toHaveBeenCalled();
     });
 
     it('allows SUPER_ADMIN to delete any job', async () => {
@@ -357,14 +370,21 @@ describe('JobsService', () => {
       await service.bulkRemove(['job-1', 'job-2'], hrUser('my-company'));
 
       expect(mockJobRepository.bulkSoftDelete).toHaveBeenCalled();
+      expect(mockStatisticsCacheService.clearTopHiringCompanies).toHaveBeenCalled();
     });
 
     it('SUPER_ADMIN bulk-deletes without company check', async () => {
+      mockJobRepository.findCompanyIdsByJobIds.mockResolvedValue(['company-1']);
       mockJobRepository.bulkSoftDelete.mockResolvedValue({ deleted: 3, failed: [] } as any);
 
       await service.bulkRemove(['job-1', 'job-2', 'job-3'], superAdminUser());
 
       expect(mockJobRepository.countJobsOwnedByCompany).not.toHaveBeenCalled();
+      expect(mockJobRepository.findCompanyIdsByJobIds).toHaveBeenCalledWith([
+        'job-1',
+        'job-2',
+        'job-3',
+      ]);
       expect(mockJobRepository.bulkSoftDelete).toHaveBeenCalled();
     });
   });
@@ -393,6 +413,7 @@ describe('JobsService', () => {
         }),
       );
       expect(result._id).toBe('new-job');
+      expect(mockStatisticsCacheService.clearTopHiringCompanies).toHaveBeenCalled();
     });
 
     it('logs an error but does not reject when queue notification fails', async () => {

@@ -107,6 +107,13 @@ export const JobSchema = SchemaFactory.createForClass(Job);
 // Compound index for common query patterns
 JobSchema.index({ 'company._id': 1, isActive: 1, isDeleted: 1 });
 JobSchema.index({ isActive: 1, endDate: 1, isDeleted: 1 });
+JobSchema.index({
+  approvalStatus: 1,
+  isActive: 1,
+  isDeleted: 1,
+  endDate: 1,
+  'company._id': 1,
+});
 
 // Individual field indexes for filtering
 JobSchema.index({ skills: 1 });

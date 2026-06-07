@@ -111,7 +111,7 @@ export class JobsService {
       );
     }
 
-    await this.clearDashboardCachesForCompanies([newJob.company._id.toString()]);
+    await this.clearJobRelatedCachesForCompanies([newJob.company._id.toString()]);
 
     return { _id: newJob._id, createdAt: newJob.createdAt };
   }
@@ -239,7 +239,7 @@ export class JobsService {
       updatePayload.company?._id?.toString(),
     ].filter(Boolean);
 
-    await this.clearDashboardCachesForCompanies(affectedCompanyIds);
+    await this.clearJobRelatedCachesForCompanies(affectedCompanyIds);
 
     return result;
   }
@@ -305,7 +305,7 @@ export class JobsService {
       },
     );
 
-    await this.clearDashboardCachesForCompanies([job.company?._id?.toString()].filter(Boolean));
+    await this.clearJobRelatedCachesForCompanies([job.company?._id?.toString()].filter(Boolean));
 
     return { _id: id, approvalStatus: dto.status };
   }
@@ -322,7 +322,7 @@ export class JobsService {
       email: user.email,
     });
 
-    await this.clearDashboardCachesForCompanies([job?.company?._id?.toString()].filter(Boolean));
+    await this.clearJobRelatedCachesForCompanies([job?.company?._id?.toString()].filter(Boolean));
 
     return result;
   }
@@ -347,7 +347,7 @@ export class JobsService {
 
     const result = await this.jobRepository.bulkSoftDelete(ids, user);
 
-    await this.clearDashboardCachesForCompanies(affectedCompanyIds);
+    await this.clearJobRelatedCachesForCompanies(affectedCompanyIds);
 
     return result;
   }
@@ -374,7 +374,7 @@ export class JobsService {
     const expiredIds = expiredJobs.map(job => job._id);
     await this.jobRepository.updateMany({ _id: { $in: expiredIds } }, { isActive: false });
 
-    await this.clearDashboardCachesForCompanies(
+    await this.clearJobRelatedCachesForCompanies(
       expiredJobs.map(job => job.company?._id?.toString()).filter(Boolean),
     );
 
@@ -627,10 +627,11 @@ export class JobsService {
     return resolvedLocation;
   }
 
-  private async clearDashboardCachesForCompanies(companyIds: string[]): Promise<void> {
+  private async clearJobRelatedCachesForCompanies(companyIds: string[]): Promise<void> {
     await Promise.all([
       this.statisticsCacheService.clearAdminDashboard(),
       this.statisticsCacheService.clearHrDashboards(companyIds),
+      this.statisticsCacheService.clearTopHiringCompanies(),
     ]);
   }
 

@@ -6,6 +6,7 @@ import { Company, CompanySchema } from './schemas/company.schema';
 import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
 import { FilesModule } from 'src/files/files.module';
 import { CompanyRepository } from './repositories/company.repository';
+import { StatisticsModule } from 'src/statistics/statistics.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { CompanyRepository } from './repositories/company.repository';
       { name: Job.name, schema: JobSchema },
     ]),
     FilesModule,
+    StatisticsModule,
   ],
   controllers: [CompaniesController],
   providers: [CompaniesService, CompanyRepository],

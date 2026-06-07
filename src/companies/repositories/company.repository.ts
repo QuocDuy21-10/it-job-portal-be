@@ -8,6 +8,8 @@ import { IUser } from 'src/users/user.interface';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
 import { bulkSoftDelete } from 'src/utils/helpers/bulk-soft-delete.helper';
 import { buildEmbeddedCompanyIdsInCondition } from '../company-snapshot.util';
+import { EJobApprovalStatus } from 'src/jobs/enums/job-approval-status.enum';
+import { TopHiringCompanyDto } from '../dto/top-hiring-company.dto';
 
 @Injectable()
 export class CompanyRepository {
@@ -109,6 +111,74 @@ export class CompanyRepository {
       map.set(item._id.toString(), item.totalJobs);
     });
     return map;
+  }
+
+  async findTopHiringCompanies(limit: number): Promise<TopHiringCompanyDto[]> {
+    const now = new Date();
+
+    return this.jobModel.aggregate<TopHiringCompanyDto>([
+      {
+        $match: {
+          isActive: true,
+          isDeleted: { $ne: true },
+          approvalStatus: EJobApprovalStatus.APPROVED,
+          $or: [{ endDate: { $gte: now } }, { endDate: null }],
+        },
+      },
+      {
+        $addFields: {
+          companyIdString: { $toString: '$company._id' },
+        },
+      },
+      {
+        $group: {
+          _id: '$companyIdString',
+          companyName: { $first: '$company.name' },
+          totalOpenJobs: { $sum: 1 },
+          latestJobCreatedAt: { $max: '$createdAt' },
+        },
+      },
+      {
+        $sort: {
+          totalOpenJobs: -1,
+          latestJobCreatedAt: -1,
+          companyName: 1,
+        },
+      },
+      { $limit: limit },
+      {
+        $addFields: {
+          companyObjectId: {
+            $cond: [
+              { $regexMatch: { input: '$_id', regex: /^[0-9a-fA-F]{24}$/ } },
+              { $toObjectId: '$_id' },
+              null,
+            ],
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: 'companies',
+          localField: 'companyObjectId',
+          foreignField: '_id',
+          as: 'company',
+        },
+      },
+      { $unwind: '$company' },
+      { $match: { 'company.isDeleted': { $ne: true } } },
+      {
+        $project: {
+          _id: '$_id',
+          name: '$company.name',
+          logo: '$company.logo',
+          address: '$company.address',
+          website: '$company.website',
+          numberOfEmployees: '$company.numberOfEmployees',
+          totalOpenJobs: 1,
+        },
+      },
+    ]);
   }
 
   async findLogoReferences(): Promise<string[]> {

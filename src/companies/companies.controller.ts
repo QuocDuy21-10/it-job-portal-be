@@ -9,6 +9,10 @@ import { ResponseMessage } from 'src/utils/decorators/response-message.decorator
 import { User } from 'src/utils/decorators/user.decorator';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Roles, ERole } from 'src/casl';
+import {
+  TopHiringCompaniesQueryDto,
+  TopHiringCompanyDto,
+} from './dto/top-hiring-company.dto';
 @ApiTags('Company')
 @Controller('companies')
 export class CompaniesController {
@@ -67,6 +71,27 @@ export class CompaniesController {
     @User() user: IUser,
   ) {
     return this.companiesService.findAll(+page, +limit, query, user);
+  }
+
+  @OptionalAuth()
+  @Get('top-hiring')
+  @ApiOperation({
+    summary: 'Get top companies hiring for homepage (Public API)',
+    description:
+      'Retrieves companies ranked by approved active non-expired job count for homepage display.',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Maximum number of companies to return (default: 8, max: 12)',
+    example: 8  ,
+  })
+  @ResponseMessage('Get top hiring companies')
+  findTopHiringCompanies(
+    @Query() query: TopHiringCompaniesQueryDto,
+  ): Promise<TopHiringCompanyDto[]> {
+    return this.companiesService.findTopHiringCompanies(query.limit);
   }
 
   @OptionalAuth()

@@ -5,11 +5,13 @@ import { CompaniesService } from './companies.service';
 import { CompanyRepository } from './repositories/company.repository';
 import { FilesService } from 'src/files/files.service';
 import { ERole } from 'src/casl';
+import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
 
 describe('CompaniesService', () => {
   let service: CompaniesService;
   let mockCompanyRepository: jest.Mocked<CompanyRepository>;
   let mockFilesService: jest.Mocked<FilesService>;
+  let mockStatisticsCacheService: jest.Mocked<StatisticsCacheService>;
 
   beforeEach(async () => {
     mockCompanyRepository = {
@@ -23,6 +25,7 @@ describe('CompaniesService', () => {
       bulkSoftDelete: jest.fn(),
       deactivateJobsForCompanies: jest.fn(),
       getJobCountsForCompanies: jest.fn(),
+      findTopHiringCompanies: jest.fn(),
       findLogoReferences: jest.fn(),
       findByNameRegex: jest.fn(),
     } as any;
@@ -32,11 +35,18 @@ describe('CompaniesService', () => {
       cleanupOrphanedFiles: jest.fn(),
     } as any;
 
+    mockStatisticsCacheService = {
+      getTopHiringCompanies: jest.fn(),
+      setTopHiringCompanies: jest.fn(),
+      clearTopHiringCompanies: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CompaniesService,
         { provide: CompanyRepository, useValue: mockCompanyRepository },
         { provide: FilesService, useValue: mockFilesService },
+        { provide: StatisticsCacheService, useValue: mockStatisticsCacheService },
       ],
     }).compile();
 
@@ -147,6 +157,59 @@ describe('CompaniesService', () => {
     });
   });
 
+  describe('findTopHiringCompanies', () => {
+    const companies = [
+      {
+        _id: 'company-1',
+        name: 'Company One',
+        logo: 'logo.png',
+        address: 'Ha Noi',
+        website: 'https://company-one.example',
+        numberOfEmployees: 100,
+        totalOpenJobs: 5,
+      },
+    ];
+
+    it('should use default limit when input is invalid', async () => {
+      mockCompanyRepository.findTopHiringCompanies.mockResolvedValue(companies);
+
+      await service.findTopHiringCompanies(NaN);
+
+      expect(mockCompanyRepository.findTopHiringCompanies).toHaveBeenCalledWith(10);
+      expect(mockStatisticsCacheService.setTopHiringCompanies).toHaveBeenCalledWith(10, companies);
+    });
+
+    it('should clamp limit to 20 when input exceeds the maximum', async () => {
+      mockCompanyRepository.findTopHiringCompanies.mockResolvedValue(companies);
+
+      await service.findTopHiringCompanies(99);
+
+      expect(mockCompanyRepository.findTopHiringCompanies).toHaveBeenCalledWith(20);
+      expect(mockStatisticsCacheService.setTopHiringCompanies).toHaveBeenCalledWith(20, companies);
+    });
+
+    it('should return cached data without querying the repository', async () => {
+      mockStatisticsCacheService.getTopHiringCompanies.mockResolvedValue(companies);
+
+      const result = await service.findTopHiringCompanies(8);
+
+      expect(result).toEqual(companies);
+      expect(mockStatisticsCacheService.getTopHiringCompanies).toHaveBeenCalledWith(8);
+      expect(mockCompanyRepository.findTopHiringCompanies).not.toHaveBeenCalled();
+    });
+
+    it('should cache repository results on cache miss', async () => {
+      mockStatisticsCacheService.getTopHiringCompanies.mockResolvedValue(undefined);
+      mockCompanyRepository.findTopHiringCompanies.mockResolvedValue(companies);
+
+      const result = await service.findTopHiringCompanies(5);
+
+      expect(result).toEqual(companies);
+      expect(mockCompanyRepository.findTopHiringCompanies).toHaveBeenCalledWith(5);
+      expect(mockStatisticsCacheService.setTopHiringCompanies).toHaveBeenCalledWith(5, companies);
+    });
+  });
+
   describe('findOne', () => {
     const companyId = new mongoose.Types.ObjectId().toString();
 
@@ -207,6 +270,7 @@ describe('CompaniesService', () => {
           updatedBy: { _id: 'uid', email: 'admin@test.com' },
         }),
       );
+      expect(mockStatisticsCacheService.clearTopHiringCompanies).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when the company does not exist', async () => {
@@ -310,6 +374,7 @@ describe('CompaniesService', () => {
         _id: 'uid',
         email: 'admin@test.com',
       });
+      expect(mockStatisticsCacheService.clearTopHiringCompanies).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when the company does not exist', async () => {
@@ -336,6 +401,7 @@ describe('CompaniesService', () => {
       // Jobs must be deactivated before companies are deleted
       expect(mockCompanyRepository.deactivateJobsForCompanies).toHaveBeenCalledWith(ids);
       expect(mockCompanyRepository.bulkSoftDelete).toHaveBeenCalledWith(ids, user);
+      expect(mockStatisticsCacheService.clearTopHiringCompanies).toHaveBeenCalled();
       expect(result.deactivatedJobsCount).toBe(3);
       expect(result.deletedCount).toBe(2);
     });
