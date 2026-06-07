@@ -94,7 +94,8 @@ export class CvProfilesController {
     description:
       'Smart upsert operation with optional avatar file upload. Supports multipart/form-data. ' +
       'Send CV data as JSON string in "cvData" field and optional avatar file in "avatar" field. ' +
-      'If CV exists, it will be updated. If not, a new CV will be created.',
+      'If CV exists, it will be updated. If not, a new CV will be created. ' +
+      'personalInfo.email is read-only and derived from the authenticated account.',
   })
   @ApiBody({
     schema: {
@@ -114,7 +115,6 @@ export class CvProfilesController {
               fullName: 'Nguyễn Văn A',
               title: 'Senior Full Stack Developer',
               phone: '0123456789',
-              email: 'nguyenvana@example.com',
               birthday: '1995-05-15',
               gender: 'Nam',
               address: '123 Đường ABC, Quận 1, TPHCM',
@@ -207,7 +207,8 @@ export class CvProfilesController {
   @Get('me')
   @ApiOperation({
     summary: 'Get Current User CV Profile',
-    description: 'Retrieve the CV Profile of the currently authenticated user',
+    description:
+      'Retrieve the CV Profile of the currently authenticated user. If no saved CV exists, returns a non-persisted draft initialized from account information.',
   })
   @ApiResponse({
     status: 200,
@@ -233,28 +234,19 @@ export class CvProfilesController {
     },
   })
   @ApiResponse({
-    status: 404,
-    description: 'CV Profile not found',
-    schema: {
-      example: {
-        statusCode: 404,
-        message: 'CV Profile not found. Please create your CV first.',
-        error: 'Not Found',
-      },
-    },
-  })
-  @ApiResponse({
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
   async getCurrentUserCv(@User() user: IUser) {
-    const cvProfile = await this.cvProfilesService.getCurrentUserCv(user._id);
+    const cvProfile = await this.cvProfilesService.getCurrentUserCv(user._id, {
+      includeDraft: true,
+    });
 
     return {
-      message: cvProfile
-        ? 'CV Profile retrieved successfully'
-        : 'User does not have a CV Profile yet',
-      data: cvProfile || null,
+      message: (cvProfile as any).isDraft
+        ? 'CV Profile draft initialized from account information'
+        : 'CV Profile retrieved successfully',
+      data: cvProfile,
     };
   }
 

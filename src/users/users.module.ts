@@ -10,6 +10,7 @@ import { SessionsModule } from 'src/sessions/sessions.module';
 import { UserRepository } from './repositories/user.repository';
 import { UserAccountService } from './services/user-account.service';
 import { UserPreferencesService } from './services/user-preferences.service';
+import { ProfileIdentitySyncModule } from 'src/profile-identity/profile-identity-sync.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { UserPreferencesService } from './services/user-preferences.service';
       { name: Company.name, schema: CompanySchema },
     ]),
     SessionsModule,
+    ProfileIdentitySyncModule,
   ],
   controllers: [UsersController],
   providers: [UsersService, UserRepository, UserAccountService, UserPreferencesService],

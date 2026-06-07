@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsEmail,
@@ -29,6 +29,15 @@ export class CreateUserDto {
   @IsNotEmpty({ message: 'Password is required' })
   @ApiProperty({ example: '123456', description: 'Password of user' })
   password: string;
+
+  @IsOptional()
+  @IsString({ message: 'Avatar must be a string' })
+  @MaxLength(500, { message: 'Avatar URL is too long (max: 500 chars)' })
+  @ApiPropertyOptional({
+    example: 'https://example.com/avatar.jpg',
+    description: 'Avatar URL of user',
+  })
+  avatar?: string;
 
   @IsOptional()
   @IsNotEmptyObject({ nullable: true }, { message: 'Company is required' })

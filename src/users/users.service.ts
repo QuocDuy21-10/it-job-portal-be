@@ -14,6 +14,7 @@ import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.inter
 import { UserRepository } from './repositories/user.repository';
 import { UserAccountService } from './services/user-account.service';
 import { UserPreferencesService } from './services/user-preferences.service';
+import { ProfileIdentitySyncService } from 'src/profile-identity/profile-identity-sync.service';
 
 @Injectable()
 export class UsersService {
@@ -56,6 +57,7 @@ export class UsersService {
     private readonly userAccountService: UserAccountService,
     private readonly userPreferencesService: UserPreferencesService,
     private readonly configService: ConfigService,
+    private readonly profileIdentitySyncService: ProfileIdentitySyncService,
   ) {}
 
   private hashPassword(password: string): string {
@@ -63,7 +65,7 @@ export class UsersService {
     return hashSync(password, salt);
   }
   async create(createUserDto: CreateUserDto, user: IUser) {
-    const { name, email, password, role, company } = createUserDto;
+    const { name, email, password, role, company, avatar } = createUserDto;
 
     if (await this.userRepository.emailExists(email)) {
       throw new BadRequestException(
@@ -82,6 +84,7 @@ export class UsersService {
       password: hashedPassword,
       role,
       company: normalizedCompany,
+      avatar,
       createdBy: { _id: user._id, email: user.email },
     });
     return { _id: newUser._id, createAt: newUser.createdAt };
@@ -160,10 +163,12 @@ export class UsersService {
   async update(id: string, updateUserDto: UpdateUserDto, user: IUser) {
     this.userRepository.validateObjectId(id);
 
-    const existingUser = await this.userRepository.findWithSelect(id, 'role company');
+    const existingUser = await this.userRepository.findWithSelect(id, 'role company email');
     if (!existingUser) {
       throw new BadRequestException('User not found');
     }
+
+    this.assertEmailIsUnchanged(updateUserDto.email, existingUser.email);
 
     const roleToCheck = updateUserDto.role || existingUser.role;
     const companyToCheck =
@@ -176,6 +181,7 @@ export class UsersService {
     );
     const restUpdateUserDto = { ...updateUserDto };
     delete restUpdateUserDto.company;
+    delete restUpdateUserDto.email;
 
     const updatePayload: Record<string, any> = {
       ...restUpdateUserDto,
@@ -192,6 +198,12 @@ export class UsersService {
     if (updateResult.matchedCount === 0) {
       throw new BadRequestException('User not found');
     }
+
+    await this.profileIdentitySyncService.syncCvIdentityFromUser(id, {
+      email: existingUser.email,
+      name: restUpdateUserDto.name,
+      avatar: (restUpdateUserDto as any).avatar,
+    });
 
     return updateResult;
   }
@@ -262,7 +274,7 @@ export class UsersService {
     if (!this.isSystemRole(user.role)) {
       throw new BadRequestException('Role không hợp lệ. Vui lòng liên hệ admin.');
     }
-    return {
+    const profile: IUser = {
       _id: user._id.toString(),
       name: user.name,
       email: user.email,
@@ -279,6 +291,12 @@ export class UsersService {
       savedJobs: user.savedJobs?.map((id: any) => id.toString()) || [],
       companyFollowed: user.companyFollowed?.map((id: any) => id.toString()) || [],
     };
+
+    if (user.avatar) {
+      profile.avatar = user.avatar;
+    }
+
+    return profile;
   }
 
   async findUserByGoogleId(googleId: string): Promise<UserDocument | null> {
@@ -295,11 +313,12 @@ export class UsersService {
     name: string;
     avatar?: string;
   }): Promise<UserDocument> {
-    const { googleId, email, name } = googleProfile;
+    const { googleId, email, name, avatar } = googleProfile;
     return this.userRepository.create({
       googleId,
       email,
       name,
+      avatar,
       password: null,
       authProvider: EAuthProvider.GOOGLE,
       role: ERole.NORMAL_USER,
@@ -364,6 +383,20 @@ export class UsersService {
     }
 
     return { filter, sort };
+  }
+
+  private assertEmailIsUnchanged(incomingEmail: string | undefined, currentEmail: string): void {
+    if (!incomingEmail) {
+      return;
+    }
+
+    if (this.normalizeEmail(incomingEmail) !== this.normalizeEmail(currentEmail)) {
+      throw new BadRequestException('Email cannot be updated through this endpoint');
+    }
+  }
+
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
   }
 
   private sanitizeFilterValue(field: string, value: any): any {

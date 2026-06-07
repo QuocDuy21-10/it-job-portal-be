@@ -4,6 +4,7 @@ export interface IUser {
   _id: string;
   name: string;
   email: string;
+  avatar?: string;
   authProvider: string;
   hasPassword: boolean;
   role: ERole;

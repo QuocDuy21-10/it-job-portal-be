@@ -4,11 +4,13 @@ import { CvProfilesController } from './cv-profiles.controller';
 import { CvProfilesService } from './cv-profiles.service';
 import { CvProfile, CvProfileSchema } from './schemas/cv-profile.schema';
 import { FilesModule } from '../files/files.module';
+import { ProfileIdentitySyncModule } from 'src/profile-identity/profile-identity-sync.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: CvProfile.name, schema: CvProfileSchema }]),
     FilesModule,
+    ProfileIdentitySyncModule,
   ],
   controllers: [CvProfilesController],
   providers: [CvProfilesService],

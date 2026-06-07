@@ -13,6 +13,35 @@ import { CvProfile, CvProfileDocument } from './schemas/cv-profile.schema';
 import { CreateCvProfileDto } from './dto/create-cv-profile.dto';
 import { UpdateCvProfileDto } from './dto/update-cv-profile.dto';
 import { FilesService } from '../files/files.service';
+import {
+  ProfileIdentitySyncService,
+  UserIdentitySnapshot,
+} from 'src/profile-identity/profile-identity-sync.service';
+
+export interface CvProfileDraft {
+  isDraft: true;
+  userId: string;
+  personalInfo: {
+    fullName: string;
+    title: string;
+    avatar?: string;
+    phone: string;
+    email: string;
+    birthday: string;
+    gender: string;
+    address: string;
+    personalLink: string;
+    bio: string;
+  };
+  education: [];
+  experience: [];
+  skills: [];
+  languages: [];
+  projects: [];
+  certificates: [];
+  awards: [];
+  isActive: true;
+}
 
 @Injectable()
 export class CvProfilesService {
@@ -21,6 +50,7 @@ export class CvProfilesService {
     private cvProfileModel: Model<CvProfileDocument>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly filesService: FilesService,
+    private readonly profileIdentitySyncService: ProfileIdentitySyncService,
   ) {}
 
   /**
@@ -34,16 +64,54 @@ export class CvProfilesService {
   ): Promise<CvProfile> {
     this.validateUserId(userId);
 
+    const userIdentity = await this.profileIdentitySyncService.getUserIdentity(userId);
     const existingCv = await this.findByUserId(userId);
+    const canonicalCvProfileDto = this.buildCanonicalCvProfileDto(
+      createCvProfileDto,
+      userIdentity,
+      existingCv,
+    );
 
     const result = existingCv
-      ? await this.updateCvProfile(userId, createCvProfileDto)
-      : await this.createCvProfile(userId, createCvProfileDto);
+      ? await this.updateCvProfile(userId, canonicalCvProfileDto)
+      : await this.createCvProfile(userId, canonicalCvProfileDto);
+
+    await this.profileIdentitySyncService.syncUserIdentityFromCv(
+      userId,
+      canonicalCvProfileDto.personalInfo,
+    );
 
     // Invalidate chat user context cache so next chat message gets fresh profile data
     await this.cacheManager.del(`chat_ctx:${userId}`);
 
     return result;
+  }
+
+  private buildCanonicalCvProfileDto(
+    createCvProfileDto: CreateCvProfileDto,
+    userIdentity: UserIdentitySnapshot,
+    existingCv: CvProfile | null,
+  ): CreateCvProfileDto {
+    if (!createCvProfileDto.personalInfo) {
+      throw new BadRequestException('Personal information is required');
+    }
+
+    this.profileIdentitySyncService.assertCvEmailMatchesUser(
+      createCvProfileDto.personalInfo.email,
+      userIdentity.email,
+    );
+
+    const existingAvatar = existingCv?.personalInfo?.avatar;
+    const avatar = createCvProfileDto.personalInfo.avatar || existingAvatar || userIdentity.avatar;
+
+    return {
+      ...createCvProfileDto,
+      personalInfo: {
+        ...createCvProfileDto.personalInfo,
+        ...(avatar ? { avatar } : {}),
+        email: userIdentity.email,
+      },
+    };
   }
 
   /**
@@ -110,14 +178,54 @@ export class CvProfilesService {
    * Get current user's CV Profile
    * Throws error if not found
    */
-  async getCurrentUserCv(userId: string): Promise<CvProfile> {
+  async getCurrentUserCv(userId: string): Promise<CvProfile | null>;
+  async getCurrentUserCv(
+    userId: string,
+    options: { includeDraft: true },
+  ): Promise<CvProfile | CvProfileDraft>;
+  async getCurrentUserCv(
+    userId: string,
+    options: { includeDraft?: boolean } = {},
+  ): Promise<CvProfile | CvProfileDraft | null> {
     const cvProfile = await this.findByUserId(userId);
 
     if (cvProfile) {
       return this.transformCvProfileUrls(cvProfile);
     }
 
-    return cvProfile;
+    if (!options.includeDraft) {
+      return null;
+    }
+
+    const userIdentity = await this.profileIdentitySyncService.getUserIdentity(userId);
+    return this.buildDraftCvProfile(userIdentity);
+  }
+
+  private buildDraftCvProfile(userIdentity: UserIdentitySnapshot): CvProfileDraft {
+    return {
+      isDraft: true,
+      userId: userIdentity._id,
+      personalInfo: {
+        fullName: userIdentity.name,
+        title: '',
+        ...(userIdentity.avatar ? { avatar: userIdentity.avatar } : {}),
+        phone: '',
+        email: userIdentity.email,
+        birthday: '',
+        gender: '',
+        address: '',
+        personalLink: '',
+        bio: '',
+      },
+      education: [],
+      experience: [],
+      skills: [],
+      languages: [],
+      projects: [],
+      certificates: [],
+      awards: [],
+      isActive: true,
+    };
   }
 
   /**

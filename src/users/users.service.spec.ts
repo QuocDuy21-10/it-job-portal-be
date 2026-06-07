@@ -7,6 +7,7 @@ import { UsersService } from './users.service';
 import { UserRepository } from './repositories/user.repository';
 import { UserAccountService } from './services/user-account.service';
 import { UserPreferencesService } from './services/user-preferences.service';
+import { ProfileIdentitySyncService } from 'src/profile-identity/profile-identity-sync.service';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -14,6 +15,7 @@ describe('UsersService', () => {
   let mockUserAccountService: jest.Mocked<UserAccountService>;
   let mockUserPreferencesService: jest.Mocked<UserPreferencesService>;
   let mockConfigService: jest.Mocked<ConfigService>;
+  let mockProfileIdentitySyncService: jest.Mocked<ProfileIdentitySyncService>;
 
   const actingUser = {
     _id: new mongoose.Types.ObjectId().toString(),
@@ -90,6 +92,10 @@ describe('UsersService', () => {
       get: jest.fn(),
     } as any;
 
+    mockProfileIdentitySyncService = {
+      syncCvIdentityFromUser: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
@@ -97,6 +103,7 @@ describe('UsersService', () => {
         { provide: UserAccountService, useValue: mockUserAccountService },
         { provide: UserPreferencesService, useValue: mockUserPreferencesService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: ProfileIdentitySyncService, useValue: mockProfileIdentitySyncService },
       ],
     }).compile();
 
@@ -417,6 +424,7 @@ describe('UsersService', () => {
       mockUserRepository.findWithSelect.mockResolvedValue({
         role: ERole.HR,
         company: existingCompany,
+        email: 'user@example.com',
       } as any);
       mockUserRepository.toCompanyDto.mockReturnValue({
         _id: existingCompany._id.toString(),
@@ -442,6 +450,11 @@ describe('UsersService', () => {
           updatedBy: { _id: actingUser._id, email: actingUser.email },
         }),
       );
+      expect(mockProfileIdentitySyncService.syncCvIdentityFromUser).toHaveBeenCalledWith(id, {
+        email: 'user@example.com',
+        name: 'Updated Name',
+        avatar: undefined,
+      });
     });
 
     it('should normalize company for HR users', async () => {
@@ -449,6 +462,7 @@ describe('UsersService', () => {
       mockUserRepository.findWithSelect.mockResolvedValue({
         role: ERole.NORMAL_USER,
         company: null,
+        email: 'user@example.com',
       } as any);
       mockUserRepository.resolveCompanyAssignmentForRole.mockResolvedValue(
         normalizedCompany as any,
@@ -488,6 +502,7 @@ describe('UsersService', () => {
       mockUserRepository.findWithSelect.mockResolvedValue({
         role: ERole.HR,
         company: makeCompanySnapshot(),
+        email: 'user@example.com',
       } as any);
       mockUserRepository.resolveCompanyAssignmentForRole.mockResolvedValue(undefined);
       mockUserRepository.updateOne.mockResolvedValue({ matchedCount: 1 } as any);
@@ -517,6 +532,7 @@ describe('UsersService', () => {
       mockUserRepository.findWithSelect.mockResolvedValue({
         role: ERole.NORMAL_USER,
         company: null,
+        email: 'user@example.com',
       } as any);
       mockUserRepository.resolveCompanyAssignmentForRole.mockResolvedValue(undefined);
       mockUserRepository.updateOne.mockResolvedValue({ matchedCount: 0 } as any);
@@ -524,6 +540,56 @@ describe('UsersService', () => {
       await expect(service.update(id, { name: 'Updated Name' } as any, actingUser)).rejects.toThrow(
         'User not found',
       );
+      expect(mockProfileIdentitySyncService.syncCvIdentityFromUser).not.toHaveBeenCalled();
+    });
+
+    it('should reject attempts to change email through user update', async () => {
+      mockUserRepository.findWithSelect.mockResolvedValue({
+        role: ERole.NORMAL_USER,
+        company: null,
+        email: 'user@example.com',
+      } as any);
+
+      await expect(
+        service.update(id, { email: 'other@example.com' } as any, actingUser),
+      ).rejects.toThrow('Email cannot be updated through this endpoint');
+
+      expect(mockUserRepository.updateOne).not.toHaveBeenCalled();
+      expect(mockProfileIdentitySyncService.syncCvIdentityFromUser).not.toHaveBeenCalled();
+    });
+
+    it('should ignore same-email no-op updates and sync user identity to the CV profile', async () => {
+      mockUserRepository.findWithSelect.mockResolvedValue({
+        role: ERole.NORMAL_USER,
+        company: null,
+        email: 'user@example.com',
+      } as any);
+      mockUserRepository.resolveCompanyAssignmentForRole.mockResolvedValue(undefined);
+      mockUserRepository.updateOne.mockResolvedValue({ matchedCount: 1 } as any);
+
+      await service.update(
+        id,
+        {
+          name: 'Synced Name',
+          email: ' USER@example.com ',
+          avatar: 'https://example.com/avatar.jpg',
+        } as any,
+        actingUser,
+      );
+
+      expect(mockUserRepository.updateOne).toHaveBeenCalledWith(
+        id,
+        expect.objectContaining({
+          name: 'Synced Name',
+          avatar: 'https://example.com/avatar.jpg',
+        }),
+      );
+      expect(mockUserRepository.updateOne.mock.calls[0][1]).not.toHaveProperty('email');
+      expect(mockProfileIdentitySyncService.syncCvIdentityFromUser).toHaveBeenCalledWith(id, {
+        email: 'user@example.com',
+        name: 'Synced Name',
+        avatar: 'https://example.com/avatar.jpg',
+      });
     });
   });
 
@@ -775,6 +841,7 @@ describe('UsersService', () => {
         googleId: 'google-id',
         email: 'google@example.com',
         name: 'Google User',
+        avatar: 'ignored.png',
         password: null,
         authProvider: EAuthProvider.GOOGLE,
         role: ERole.NORMAL_USER,

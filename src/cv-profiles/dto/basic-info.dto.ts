@@ -40,12 +40,14 @@ export class PersonalInfoDto {
   @MaxLength(20)
   phone: string;
 
-  @ApiProperty({
-    description: 'Email address',
+  @ApiPropertyOptional({
+    description: 'Read-only account email. The backend derives this from the authenticated user.',
     example: 'nguyenvana@example.com',
+    readOnly: true,
   })
+  @IsOptional()
   @IsEmail()
-  email: string;
+  email?: string;
 
   @ApiPropertyOptional({
     description: 'Date of birth (string format)',
