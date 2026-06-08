@@ -34,6 +34,7 @@ import { IUser } from '../users/user.interface';
 import { JwtAuthGuard } from 'src/auth/guards';
 import { FilesService } from '../files/files.service';
 import { UpsertCvProfileDto } from './dto/upsert-cv-profile.dto';
+import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 
 @ApiTags('CV Profiles')
 @Controller('cv-profiles')
@@ -169,6 +170,7 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
+  @ResponseMessage('CV Profile saved successfully')
   async upsertCvProfile(
     @User() user: IUser,
     @Body('cvData') cvDataString: string,
@@ -194,10 +196,7 @@ export class CvProfilesController {
     // Upsert CV profile
     const cvProfile = await this.cvProfilesService.upsertCvProfile(user._id, cvData);
 
-    return {
-      message: 'CV Profile saved successfully',
-      data: cvProfile,
-    };
+    return cvProfile;
   }
 
   /**
@@ -237,17 +236,13 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
+  @ResponseMessage('CV Profile retrieved successfully')
   async getCurrentUserCv(@User() user: IUser) {
     const cvProfile = await this.cvProfilesService.getCurrentUserCv(user._id, {
       includeDraft: true,
     });
 
-    return {
-      message: (cvProfile as any).isDraft
-        ? 'CV Profile draft initialized from account information'
-        : 'CV Profile retrieved successfully',
-      data: cvProfile,
-    };
+    return cvProfile;
   }
 
   /**
@@ -276,14 +271,11 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
+  @ResponseMessage('CV Profile check completed')
   async checkCvProfileExists(@User() user: IUser) {
     const exists = await this.cvProfilesService.hasCvProfile(user._id);
 
-    return {
-      statusCode: HttpStatus.OK,
-      message: 'CV Profile check completed',
-      data: { exists },
-    };
+    return { exists };
   }
 
   /**
@@ -313,14 +305,11 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
+  @ResponseMessage('CV Profile updated successfully')
   async updateCurrentUserCv(@User() user: IUser, @Body() updateCvProfileDto: CreateCvProfileDto) {
     const cvProfile = await this.cvProfilesService.upsertCvProfile(user._id, updateCvProfileDto);
 
-    return {
-      statusCode: HttpStatus.OK,
-      message: 'CV Profile updated successfully',
-      data: cvProfile,
-    };
+    return cvProfile;
   }
 
   /**
@@ -388,14 +377,11 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
+  @ResponseMessage('CV Profile deactivated successfully')
   async deactivateCvProfile(@User() user: IUser) {
     const cvProfile = await this.cvProfilesService.deactivateCvProfile(user._id);
 
-    return {
-      statusCode: HttpStatus.OK,
-      message: 'CV Profile deactivated successfully',
-      data: cvProfile,
-    };
+    return cvProfile;
   }
 
   /**
@@ -431,14 +417,11 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
+  @ResponseMessage('CV Profile activated successfully')
   async activateCvProfile(@User() user: IUser) {
     const cvProfile = await this.cvProfilesService.activateCvProfile(user._id);
 
-    return {
-      statusCode: HttpStatus.OK,
-      message: 'CV Profile activated successfully',
-      data: cvProfile,
-    };
+    return cvProfile;
   }
 
   /**
@@ -473,14 +456,11 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
+  @ResponseMessage('CV Profile retrieved successfully')
   async getCvProfileById(@Param('id') id: string) {
     const cvProfile = await this.cvProfilesService.findById(id);
 
-    return {
-      statusCode: HttpStatus.OK,
-      message: 'CV Profile retrieved successfully',
-      data: cvProfile,
-    };
+    return cvProfile;
   }
 
   /**
@@ -550,6 +530,7 @@ export class CvProfilesController {
     status: 403,
     description: 'Forbidden - Admin access required',
   })
+  @ResponseMessage('CV Profiles retrieved successfully')
   async getAllCvProfiles(@Query('page') page: string = '1', @Query('limit') limit: string = '10') {
     const pageNum = parseInt(page, 10) || 1;
     const limitNum = parseInt(limit, 10) || 10;
@@ -557,8 +538,6 @@ export class CvProfilesController {
     const result = await this.cvProfilesService.findAll(pageNum, limitNum);
 
     return {
-      statusCode: HttpStatus.OK,
-      message: 'CV Profiles retrieved successfully',
       data: result.data,
       meta: {
         total: result.total,
