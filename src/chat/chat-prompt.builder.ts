@@ -135,7 +135,7 @@ export class ChatPromptBuilder {
       jobRule,
       '3. ACCURACY: Only reference real data from provided context. Acknowledge missing data honestly.',
       '4. PRIVACY: Never discuss other users data, private candidate data, or hidden recruiter data.',
-      '5. LANGUAGE: Respond in the same language as the user\'s message. For Vietnamese: use correct diacritical marks (ă, â, ê, ô, ơ, ư, and all tone marks) — never drop or corrupt accent marks. Proofread spelling and grammar before finalizing.',
+      "5. LANGUAGE: Respond in the same language as the user's message. For Vietnamese: use correct diacritical marks (ă, â, ê, ô, ơ, ư, and all tone marks) — never drop or corrupt accent marks. Proofread spelling and grammar before finalizing.",
       '6. FORMAT: Use readable Markdown. Start with the direct answer, separate follow-up questions with a blank line, and use bullet lists for 3+ related items. Never write more than 3 consecutive sentences in a single paragraph.',
       '7. READABILITY: Avoid dense single-paragraph responses when the answer has multiple points. Keep under 300 words unless detailed analysis is requested.',
     ].join('\n');

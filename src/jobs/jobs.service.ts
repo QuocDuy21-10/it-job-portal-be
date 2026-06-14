@@ -24,6 +24,13 @@ import {
 import { JobRepository } from './repositories/job.repository';
 import { SkillsService } from 'src/skills/skills.service';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
+import { ListCacheService } from 'src/redis/list-cache.service';
+import {
+  LIST_CACHE_ENDPOINTS,
+  LIST_CACHE_SCOPES,
+  LIST_CACHE_TAGS,
+  LIST_CACHE_TTL,
+} from 'src/redis/list-cache.constants';
 import {
   getLocationByCode,
   resolveLocationFromInput,
@@ -75,6 +82,7 @@ export class JobsService {
     private readonly companyFollowerQueueService: CompanyFollowerQueueService,
     private readonly jobExpirationQueueService: JobExpirationQueueService,
     private readonly statisticsCacheService: StatisticsCacheService,
+    private readonly listCacheService: ListCacheService,
   ) {}
   async create(createJobDto: CreateJobDto, user: IUser) {
     const normalizedSkills = await this.skillsService.normalizeControlledSkills(
@@ -145,26 +153,47 @@ export class JobsService {
     }
 
     const safeLimit = limit > 0 ? limit : 10;
-    const safeOffset = ((page > 0 ? page : 1) - 1) * safeLimit;
+    const safePage = page > 0 ? page : 1;
+    const safeOffset = (safePage - 1) * safeLimit;
+    const cacheScope = this.resolveJobsListCacheScope(user);
+    const cacheFilter = this.buildJobsListCacheFilterSignature(filter);
 
-    const { result, totalItems, totalPages } = await this.jobRepository.findPaginated(
-      filter,
-      safeOffset,
-      safeLimit,
-      sort,
-    );
-
-    return {
-      result,
-      meta: {
-        pagination: {
-          current_page: page,
-          per_page: limit,
-          total_pages: totalPages,
-          total: totalItems,
+    return this.listCacheService.getOrSet({
+      keyInput: {
+        endpoint: LIST_CACHE_ENDPOINTS.JOBS,
+        scope: cacheScope,
+        payload: {
+          filter: cacheFilter,
+          keyword: trimmedKeyword ?? null,
+          limit: safeLimit,
+          page: safePage,
+          sort,
         },
       },
-    };
+      ttlMs: LIST_CACHE_TTL.JOBS,
+      tags: response =>
+        this.buildJobsListCacheTags(cacheScope, filter, trimmedKeyword, response.result),
+      loader: async () => {
+        const { result, totalItems, totalPages } = await this.jobRepository.findPaginated(
+          filter,
+          safeOffset,
+          safeLimit,
+          sort,
+        );
+
+        return {
+          result,
+          meta: {
+            pagination: {
+              current_page: safePage,
+              per_page: safeLimit,
+              total_pages: totalPages,
+              total: totalItems,
+            },
+          },
+        };
+      },
+    });
   }
 
   async findOne(id: string, user?: IUser) {
@@ -628,11 +657,120 @@ export class JobsService {
   }
 
   private async clearJobRelatedCachesForCompanies(companyIds: string[]): Promise<void> {
+    const uniqueCompanyIds = [...new Set(companyIds.filter(Boolean))];
+
     await Promise.all([
       this.statisticsCacheService.clearAdminDashboard(),
-      this.statisticsCacheService.clearHrDashboards(companyIds),
+      this.statisticsCacheService.clearHrDashboards(uniqueCompanyIds),
       this.statisticsCacheService.clearTopHiringCompanies(),
+      this.listCacheService.reclaimByTags([
+        LIST_CACHE_TAGS.jobs.all,
+        ...uniqueCompanyIds.map(companyId => LIST_CACHE_TAGS.companies.company(companyId)),
+      ]),
     ]);
+  }
+
+  private resolveJobsListCacheScope(user?: IUser): string {
+    if (user?.role === ERole.HR && user.company?._id) {
+      return LIST_CACHE_SCOPES.hr(user.company._id.toString());
+    }
+
+    if (user?.role === ERole.SUPER_ADMIN) {
+      return LIST_CACHE_SCOPES.SUPER_ADMIN;
+    }
+
+    return LIST_CACHE_SCOPES.PUBLIC;
+  }
+
+  private buildJobsListCacheTags(
+    scope: string,
+    filter: Record<string, any>,
+    keyword: string | undefined,
+    jobs: any[],
+  ): string[] {
+    const tags = [
+      LIST_CACHE_TAGS.jobs.all,
+      LIST_CACHE_TAGS.jobs.scope(scope),
+      ...Object.keys(filter).map(field => LIST_CACHE_TAGS.jobs.filter(field)),
+    ];
+
+    if (keyword) {
+      tags.push(LIST_CACHE_TAGS.jobs.keyword);
+    }
+
+    for (const companyId of this.extractCompanyIdsFromFilter(filter['company._id'])) {
+      tags.push(LIST_CACHE_TAGS.jobs.company(companyId));
+    }
+
+    for (const job of jobs) {
+      const jobId = this.toIdString(job?._id);
+      const companyId = this.toIdString(job?.company?._id);
+
+      if (jobId) {
+        tags.push(LIST_CACHE_TAGS.jobs.job(jobId));
+      }
+
+      if (companyId) {
+        tags.push(LIST_CACHE_TAGS.jobs.company(companyId));
+      }
+    }
+
+    return tags;
+  }
+
+  private buildJobsListCacheFilterSignature(value: unknown): unknown {
+    if (value instanceof Date) {
+      return '__dynamic_now__';
+    }
+
+    if (value instanceof RegExp) {
+      return {
+        __type: 'RegExp',
+        flags: value.flags,
+        source: value.source,
+      };
+    }
+
+    if (Array.isArray(value)) {
+      return value.map(item => this.buildJobsListCacheFilterSignature(item));
+    }
+
+    if (value && typeof value === 'object') {
+      const objectValue = value as Record<string, unknown>;
+      return Object.keys(objectValue).reduce<Record<string, unknown>>((signature, key) => {
+        signature[key] = this.buildJobsListCacheFilterSignature(objectValue[key]);
+        return signature;
+      }, {});
+    }
+
+    return value;
+  }
+
+  private extractCompanyIdsFromFilter(companyFilter: any): string[] {
+    if (!companyFilter) {
+      return [];
+    }
+
+    if (typeof companyFilter === 'string') {
+      return [companyFilter];
+    }
+
+    if (Array.isArray(companyFilter.$in)) {
+      return companyFilter.$in
+        .map((companyId: unknown) => this.toIdString(companyId))
+        .filter(Boolean);
+    }
+
+    const companyId = this.toIdString(companyFilter);
+    return companyId ? [companyId] : [];
+  }
+
+  private toIdString(value: unknown): string | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    return value.toString();
   }
 
   private escapeRegex(value: string): string {

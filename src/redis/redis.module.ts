@@ -5,8 +5,10 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-store';
 import type { RedisClientOptions } from 'redis';
 import Redis from 'ioredis';
+import { ListCacheService } from './list-cache.service';
+import { REDIS_CLIENT } from './redis.constants';
 
-export const REDIS_CLIENT = 'REDIS_CLIENT';
+export { REDIS_CLIENT } from './redis.constants';
 
 @Global()
 @Module({
@@ -68,7 +70,8 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
           db: configService.get<number>('REDIS_CACHE_DB', 1),
         }),
     },
+    ListCacheService,
   ],
-  exports: [BullModule, CacheModule, REDIS_CLIENT],
+  exports: [BullModule, CacheModule, REDIS_CLIENT, ListCacheService],
 })
 export class RedisModule {}

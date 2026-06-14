@@ -49,7 +49,7 @@ export class ResumeRepository {
       .find({ userId: userId })
       .sort('-createdAt')
       .populate([
-        { path: 'companyId', select: { name: 1 } },
+        { path: 'companyId', select: { name: 1, logo: 1 } },
         { path: 'jobId', select: { name: 1, location: 1, salary: 1 } },
       ])
       .lean()

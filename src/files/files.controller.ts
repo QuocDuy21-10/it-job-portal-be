@@ -5,9 +5,9 @@ import {
   Delete,
   Body,
   UploadedFile,
-  UseFilters,
-  UseGuards,
   UseInterceptors,
+  UseGuards,
+  UseFilters,
 } from '@nestjs/common';
 import { FilesService } from './files.service';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
@@ -22,12 +22,12 @@ import {
 } from '@nestjs/swagger';
 import { CreateFileDto } from './dto/create-file.dto';
 import { DeleteFileDto } from './dto/delete-file.dto';
-import { HttpExceptionFilter } from 'src/utils/http-exception.filter';
-import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { Roles } from 'src/casl/decorators/roles.decorator';
 import { ERole } from 'src/casl/enums/role.enum';
-import { UploadAuthGuard } from './guards/upload-auth.guard';
 import { UploadFolderType } from './constants/upload-policy';
+import { HttpExceptionFilter } from 'src/utils/http-exception.filter';
+import { ThrottlerGuard } from '@nestjs/throttler';
+import { UploadAuthGuard } from './guards/upload-auth.guard';
 
 @ApiTags('File')
 @Controller('files')
@@ -35,8 +35,7 @@ export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
   @Post('upload')
-  @UseGuards(ThrottlerGuard, UploadAuthGuard)
-  @Throttle({ default: { ttl: 3600000, limit: 20 } })
+  @UseGuards(UploadAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   @UseFilters(new HttpExceptionFilter())
   @ApiOperation({

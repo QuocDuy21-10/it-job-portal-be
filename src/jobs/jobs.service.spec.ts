@@ -9,6 +9,8 @@ import { IUser } from 'src/users/user.interface';
 import { SkillsService } from 'src/skills/skills.service';
 import { ERole } from 'src/casl/enums/role.enum';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
+import { ListCacheService } from 'src/redis/list-cache.service';
+import { LIST_CACHE_SCOPES, LIST_CACHE_TAGS } from 'src/redis/list-cache.constants';
 
 const hrUser = (companyId: string): IUser => ({
   _id: 'user-hr-1',
@@ -52,6 +54,7 @@ describe('JobsService', () => {
   let mockCompanyFollowerQueueService: jest.Mocked<Partial<CompanyFollowerQueueService>>;
   let mockJobExpirationQueueService: jest.Mocked<Partial<JobExpirationQueueService>>;
   let mockStatisticsCacheService: jest.Mocked<Partial<StatisticsCacheService>>;
+  let mockListCacheService: jest.Mocked<Partial<ListCacheService>>;
 
   beforeEach(async () => {
     mockJobRepository = {
@@ -90,6 +93,10 @@ describe('JobsService', () => {
       clearHrDashboards: jest.fn().mockResolvedValue(undefined),
       clearTopHiringCompanies: jest.fn().mockResolvedValue(undefined),
     };
+    mockListCacheService = {
+      getOrSet: jest.fn().mockImplementation(async ({ loader }) => loader()),
+      reclaimByTags: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -99,6 +106,7 @@ describe('JobsService', () => {
         { provide: CompanyFollowerQueueService, useValue: mockCompanyFollowerQueueService },
         { provide: JobExpirationQueueService, useValue: mockJobExpirationQueueService },
         { provide: StatisticsCacheService, useValue: mockStatisticsCacheService },
+        { provide: ListCacheService, useValue: mockListCacheService },
       ],
     }).compile();
 
@@ -206,6 +214,34 @@ describe('JobsService', () => {
       const passedFilter = (mockJobRepository.findPaginated as jest.Mock).mock.calls[0][0];
       expect(passedFilter.locationCode).toBe('ha-noi');
       expect(passedFilter.location).toBeUndefined();
+    });
+
+    it('returns cached data without querying the repository', async () => {
+      const cachedResponse = {
+        result: [activeApprovedJob()],
+        meta: { pagination: { current_page: 1, per_page: 10, total_pages: 1, total: 1 } },
+      };
+      mockListCacheService.getOrSet.mockResolvedValue(cachedResponse);
+
+      const result = await service.findAll(1, 10, '', publicUser());
+
+      expect(result).toEqual(cachedResponse);
+      expect(mockJobRepository.findPaginated).not.toHaveBeenCalled();
+    });
+
+    it('uses separate cache scopes for public, HR, and SUPER_ADMIN list variants', async () => {
+      mockJobRepository.findPaginated.mockResolvedValue(paginatedResponse([]));
+
+      await service.findAll(1, 10, '', publicUser());
+      await service.findAll(1, 10, '', hrUser('507f1f77bcf86cd799439041'));
+      await service.findAll(1, 10, '', superAdminUser());
+
+      const scopes = mockListCacheService.getOrSet.mock.calls.map(call => call[0].keyInput.scope);
+      expect(scopes).toEqual([
+        LIST_CACHE_SCOPES.PUBLIC,
+        LIST_CACHE_SCOPES.hr('507f1f77bcf86cd799439041'),
+        LIST_CACHE_SCOPES.SUPER_ADMIN,
+      ]);
     });
   });
 
@@ -414,6 +450,10 @@ describe('JobsService', () => {
       );
       expect(result._id).toBe('new-job');
       expect(mockStatisticsCacheService.clearTopHiringCompanies).toHaveBeenCalled();
+      expect(mockListCacheService.reclaimByTags).toHaveBeenCalledWith([
+        LIST_CACHE_TAGS.jobs.all,
+        LIST_CACHE_TAGS.companies.company('c1'),
+      ]);
     });
 
     it('logs an error but does not reject when queue notification fails', async () => {

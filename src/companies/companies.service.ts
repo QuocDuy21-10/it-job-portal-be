@@ -17,6 +17,13 @@ import { CompanyRepository } from './repositories/company.repository';
 import { CompanyDocument } from './schemas/company.schema';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
 import { TopHiringCompanyDto } from './dto/top-hiring-company.dto';
+import { ListCacheService } from 'src/redis/list-cache.service';
+import {
+  LIST_CACHE_ENDPOINTS,
+  LIST_CACHE_SCOPES,
+  LIST_CACHE_TAGS,
+  LIST_CACHE_TTL,
+} from 'src/redis/list-cache.constants';
 
 @Injectable()
 export class CompaniesService {
@@ -50,6 +57,7 @@ export class CompaniesService {
     private readonly companyRepository: CompanyRepository,
     private readonly filesService: FilesService,
     private readonly statisticsCacheService: StatisticsCacheService,
+    private readonly listCacheService: ListCacheService,
   ) {}
 
   async create(createCompanyDto: CreateCompanyDto, user: IUser) {
@@ -58,10 +66,14 @@ export class CompaniesService {
       throw new BadRequestException(`Company with name = ${createCompanyDto.name} already exists`);
     }
 
-    return this.companyRepository.create({
+    const company = await this.companyRepository.create({
       ...createCompanyDto,
       createdBy: { _id: user._id, email: user.email },
     });
+
+    await this.clearCompanyListCaches();
+
+    return company;
   }
 
   async findAll(page?: number, limit?: number, query?: string, user?: IUser) {
@@ -81,33 +93,50 @@ export class CompaniesService {
     const safeLimit = limit > 0 ? limit : 10;
     const safePage = page > 0 ? page : 1;
     const offset = (safePage - 1) * safeLimit;
+    const cacheScope = this.resolveCompaniesListCacheScope(user);
 
-    const { result, totalItems, totalPages } = await this.companyRepository.findPaginated(
-      filter,
-      offset,
-      safeLimit,
-      sort,
-    );
-
-    const companyIds = result.map((company: any) => company._id);
-    const jobCountMap = await this.companyRepository.getJobCountsForCompanies(companyIds);
-
-    const resultWithCount = result.map((company: any) => ({
-      ...company,
-      totalJobs: jobCountMap.get(company._id.toString()) || 0,
-    }));
-
-    return {
-      result: resultWithCount,
-      meta: {
-        pagination: {
-          current_page: safePage,
-          per_page: safeLimit,
-          total_pages: totalPages,
-          total: totalItems,
+    return this.listCacheService.getOrSet({
+      keyInput: {
+        endpoint: LIST_CACHE_ENDPOINTS.COMPANIES,
+        scope: cacheScope,
+        payload: {
+          filter,
+          limit: safeLimit,
+          page: safePage,
+          sort,
         },
       },
-    };
+      ttlMs: LIST_CACHE_TTL.COMPANIES,
+      tags: response => this.buildCompaniesListCacheTags(cacheScope, filter, response.result),
+      loader: async () => {
+        const { result, totalItems, totalPages } = await this.companyRepository.findPaginated(
+          filter,
+          offset,
+          safeLimit,
+          sort,
+        );
+
+        const companyIds = result.map((company: any) => company._id);
+        const jobCountMap = await this.companyRepository.getJobCountsForCompanies(companyIds);
+
+        const resultWithCount = result.map((company: any) => ({
+          ...company,
+          totalJobs: jobCountMap.get(company._id.toString()) || 0,
+        }));
+
+        return {
+          result: resultWithCount,
+          meta: {
+            pagination: {
+              current_page: safePage,
+              per_page: safeLimit,
+              total_pages: totalPages,
+              total: totalItems,
+            },
+          },
+        };
+      },
+    });
   }
 
   async findTopHiringCompanies(limit?: number): Promise<TopHiringCompanyDto[]> {
@@ -164,6 +193,7 @@ export class CompaniesService {
     );
 
     await this.statisticsCacheService.clearTopHiringCompanies();
+    await this.clearCompanyListCaches();
 
     return result;
   }
@@ -182,6 +212,8 @@ export class CompaniesService {
     });
 
     await this.statisticsCacheService.clearTopHiringCompanies();
+    await this.clearCompanyListCaches();
+    await this.clearJobListCaches();
 
     return result;
   }
@@ -194,6 +226,7 @@ export class CompaniesService {
     const deactivatedJobsCount = await this.companyRepository.deactivateJobsForCompanies(ids);
     const result = await this.companyRepository.bulkSoftDelete(ids, user);
     await this.statisticsCacheService.clearTopHiringCompanies();
+    await Promise.all([this.clearCompanyListCaches(), this.clearJobListCaches()]);
 
     return {
       ...result,
@@ -302,5 +335,55 @@ export class CompaniesService {
         throw new ForbiddenException('You can only modify your own company');
       }
     }
+  }
+
+  private resolveCompaniesListCacheScope(user?: IUser): string {
+    if (user?.role === ERole.HR && user.company?._id) {
+      return LIST_CACHE_SCOPES.hr(user.company._id.toString());
+    }
+
+    return LIST_CACHE_SCOPES.PUBLIC;
+  }
+
+  private buildCompaniesListCacheTags(
+    scope: string,
+    filter: Record<string, any>,
+    companies: any[],
+  ): string[] {
+    const tags = [
+      LIST_CACHE_TAGS.companies.all,
+      LIST_CACHE_TAGS.companies.scope(scope),
+      ...Object.keys(filter).map(field => LIST_CACHE_TAGS.companies.filter(field)),
+    ];
+
+    const scopedCompanyId = this.toIdString(filter._id);
+    if (scopedCompanyId) {
+      tags.push(LIST_CACHE_TAGS.companies.company(scopedCompanyId));
+    }
+
+    for (const company of companies) {
+      const companyId = this.toIdString(company?._id);
+      if (companyId) {
+        tags.push(LIST_CACHE_TAGS.companies.company(companyId));
+      }
+    }
+
+    return tags;
+  }
+
+  private async clearCompanyListCaches(): Promise<void> {
+    await this.listCacheService.reclaimByTags([LIST_CACHE_TAGS.companies.all]);
+  }
+
+  private async clearJobListCaches(): Promise<void> {
+    await this.listCacheService.reclaimByTags([LIST_CACHE_TAGS.jobs.all]);
+  }
+
+  private toIdString(value: unknown): string | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    return value.toString();
   }
 }

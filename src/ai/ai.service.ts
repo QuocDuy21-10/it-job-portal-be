@@ -536,9 +536,7 @@ export class AIService {
     const parsedValue = Number.parseInt(rawValue, 10);
 
     if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
-      throw new Error(
-        `${key} must be a positive integer. Recommended value: ${recommendedValue}.`,
-      );
+      throw new Error(`${key} must be a positive integer. Recommended value: ${recommendedValue}.`);
     }
 
     return parsedValue;

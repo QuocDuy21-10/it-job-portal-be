@@ -6,12 +6,15 @@ import { CompanyRepository } from './repositories/company.repository';
 import { FilesService } from 'src/files/files.service';
 import { ERole } from 'src/casl';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
+import { ListCacheService } from 'src/redis/list-cache.service';
+import { LIST_CACHE_SCOPES, LIST_CACHE_TAGS } from 'src/redis/list-cache.constants';
 
 describe('CompaniesService', () => {
   let service: CompaniesService;
   let mockCompanyRepository: jest.Mocked<CompanyRepository>;
   let mockFilesService: jest.Mocked<FilesService>;
   let mockStatisticsCacheService: jest.Mocked<StatisticsCacheService>;
+  let mockListCacheService: jest.Mocked<Partial<ListCacheService>>;
 
   beforeEach(async () => {
     mockCompanyRepository = {
@@ -40,6 +43,10 @@ describe('CompaniesService', () => {
       setTopHiringCompanies: jest.fn(),
       clearTopHiringCompanies: jest.fn(),
     } as any;
+    mockListCacheService = {
+      getOrSet: jest.fn().mockImplementation(async ({ loader }) => loader()),
+      reclaimByTags: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -47,6 +54,7 @@ describe('CompaniesService', () => {
         { provide: CompanyRepository, useValue: mockCompanyRepository },
         { provide: FilesService, useValue: mockFilesService },
         { provide: StatisticsCacheService, useValue: mockStatisticsCacheService },
+        { provide: ListCacheService, useValue: mockListCacheService },
       ],
     }).compile();
 
@@ -74,6 +82,9 @@ describe('CompaniesService', () => {
         createdBy: { _id: 'uid', email: 'admin@test.com' },
       });
       expect(result).toHaveProperty('name', 'ACME Corp');
+      expect(mockListCacheService.reclaimByTags).toHaveBeenCalledWith([
+        LIST_CACHE_TAGS.companies.all,
+      ]);
     });
 
     it('should throw BadRequestException when the name already exists', async () => {
@@ -155,6 +166,37 @@ describe('CompaniesService', () => {
       const [filter] = mockCompanyRepository.findPaginated.mock.calls[0];
       expect(filter.$where).toBeUndefined();
     });
+
+    it('returns cached final results without querying the repository', async () => {
+      const cachedResponse = {
+        result: [{ _id: 'company-1', totalJobs: 3 }],
+        meta: { pagination: { current_page: 1, per_page: 10, total_pages: 1, total: 1 } },
+      };
+      mockListCacheService.getOrSet.mockResolvedValue(cachedResponse);
+
+      const result = await service.findAll(1, 10, '');
+
+      expect(result).toEqual(cachedResponse);
+      expect(mockCompanyRepository.findPaginated).not.toHaveBeenCalled();
+      expect(mockCompanyRepository.getJobCountsForCompanies).not.toHaveBeenCalled();
+    });
+
+    it('uses separate cache scopes for public and HR list variants', async () => {
+      const hrCompanyId = new mongoose.Types.ObjectId();
+      const hrUser = {
+        role: ERole.HR,
+        company: { _id: hrCompanyId },
+      } as any;
+
+      await service.findAll(1, 10, '');
+      await service.findAll(1, 10, '', hrUser);
+
+      const scopes = mockListCacheService.getOrSet.mock.calls.map(call => call[0].keyInput.scope);
+      expect(scopes).toEqual([
+        LIST_CACHE_SCOPES.PUBLIC,
+        LIST_CACHE_SCOPES.hr(hrCompanyId.toString()),
+      ]);
+    });
   });
 
   describe('findTopHiringCompanies', () => {
@@ -175,17 +217,17 @@ describe('CompaniesService', () => {
 
       await service.findTopHiringCompanies(NaN);
 
-      expect(mockCompanyRepository.findTopHiringCompanies).toHaveBeenCalledWith(10);
-      expect(mockStatisticsCacheService.setTopHiringCompanies).toHaveBeenCalledWith(10, companies);
+      expect(mockCompanyRepository.findTopHiringCompanies).toHaveBeenCalledWith(8);
+      expect(mockStatisticsCacheService.setTopHiringCompanies).toHaveBeenCalledWith(8, companies);
     });
 
-    it('should clamp limit to 20 when input exceeds the maximum', async () => {
+    it('should clamp limit to the configured maximum when input exceeds it', async () => {
       mockCompanyRepository.findTopHiringCompanies.mockResolvedValue(companies);
 
       await service.findTopHiringCompanies(99);
 
-      expect(mockCompanyRepository.findTopHiringCompanies).toHaveBeenCalledWith(20);
-      expect(mockStatisticsCacheService.setTopHiringCompanies).toHaveBeenCalledWith(20, companies);
+      expect(mockCompanyRepository.findTopHiringCompanies).toHaveBeenCalledWith(12);
+      expect(mockStatisticsCacheService.setTopHiringCompanies).toHaveBeenCalledWith(12, companies);
     });
 
     it('should return cached data without querying the repository', async () => {
@@ -375,6 +417,10 @@ describe('CompaniesService', () => {
         email: 'admin@test.com',
       });
       expect(mockStatisticsCacheService.clearTopHiringCompanies).toHaveBeenCalled();
+      expect(mockListCacheService.reclaimByTags).toHaveBeenCalledWith([
+        LIST_CACHE_TAGS.companies.all,
+      ]);
+      expect(mockListCacheService.reclaimByTags).toHaveBeenCalledWith([LIST_CACHE_TAGS.jobs.all]);
     });
 
     it('should throw NotFoundException when the company does not exist', async () => {

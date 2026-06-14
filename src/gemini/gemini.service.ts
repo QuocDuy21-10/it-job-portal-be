@@ -23,7 +23,6 @@ export class GeminiService {
   // private readonly CHAT_TEMPERATURE = 0.4;
   private readonly CHAT_TEMPERATURE = 0.7;
 
-
   // Tool declaration for job recommendations in streaming mode.
   // The model calls this instead of embedding IDs in free-form text.
   private readonly RECOMMEND_JOBS_TOOL = {

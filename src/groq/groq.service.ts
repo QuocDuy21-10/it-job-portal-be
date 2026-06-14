@@ -397,12 +397,9 @@ export class GroqService {
     );
   }
 
-  private resolveRecommendedJobIds(toolJobIds: string[], _structuredJobIds: string[]): string[] {
-    if (toolJobIds.length > 0) {
-      return [...new Set(toolJobIds)];
-    }
-
-    return [];
+  private resolveRecommendedJobIds(toolJobIds: string[], structuredJobIds: string[]): string[] {
+    const combined = [...toolJobIds, ...structuredJobIds];
+    return [...new Set(combined)];
   }
 
   private buildUsageMetadata(responses: unknown[], latencyMs: number): IAIChatUsageMetadata {
