@@ -4,7 +4,9 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { softDeletePlugin } from 'soft-delete-plugin-mongoose';
 
 import { Company, CompanySchema } from 'src/companies/schemas/company.schema';
+import { CvProfile, CvProfileSchema } from 'src/cv-profiles/schemas/cv-profile.schema';
 import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
+import { Resume, ResumeSchema } from 'src/resumes/schemas/resume.schema';
 import { Skill, SkillSchema } from 'src/skills/schemas/skill.schema';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
 
@@ -32,6 +34,8 @@ import { SeedService } from './seed.service';
       { name: Company.name, schema: CompanySchema },
       { name: User.name, schema: UserSchema },
       { name: Job.name, schema: JobSchema },
+      { name: CvProfile.name, schema: CvProfileSchema },
+      { name: Resume.name, schema: ResumeSchema },
     ]),
   ],
   providers: [SeedService],

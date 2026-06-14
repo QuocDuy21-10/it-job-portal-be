@@ -1,329 +1,244 @@
 import { Types } from 'mongoose';
+
+import { EJobApprovalStatus } from 'src/jobs/enums/job-approval-status.enum';
 import { EJobFormOfWork } from 'src/jobs/enums/job-form-of-work.enum';
 import { EJobLevel } from 'src/jobs/enums/job-level.enum';
 import { resolveLocationPayload } from 'src/utils/location-catalog';
 
-export function createJobsSeedData(
-  companies: Array<{ _id: Types.ObjectId; name: string; logo?: string }>,
-) {
-  const now = new Date();
-  const sixMonthsLater = new Date(now);
-  sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+type CompanyRef = {
+  _id: Types.ObjectId;
+  name: string;
+  logo?: string | null;
+};
 
-  const pick = (index: number) => companies[index % companies.length];
-  const locationFields = (value: string) => {
-    const resolvedLocation = resolveLocationPayload({ location: value });
-
-    if (!resolvedLocation) {
-      throw new Error(`Unsupported seed location: ${value}`);
-    }
-
-    return {
-      location: resolvedLocation.location,
-      locationCode: resolvedLocation.locationCode,
-    };
+export type JobSeed = {
+  name: string;
+  skills: string[];
+  company: {
+    _id: Types.ObjectId;
+    name: string;
+    logo?: string | null;
   };
+  location: string;
+  locationCode: string;
+  salary: number;
+  quantity: number;
+  level: EJobLevel;
+  formOfWork: EJobFormOfWork;
+  description: string;
+  startDate: Date;
+  endDate: Date;
+  isActive: boolean;
+  approvalStatus: EJobApprovalStatus;
+  approvalNote?: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
-  return [
-    {
-      name: 'Senior Backend Engineer (Node.js/NestJS)',
-      skills: ['Node.js', 'NestJS', 'TypeScript', 'MongoDB', 'Redis'],
-      company: { _id: pick(0)._id, name: pick(0).name, logo: pick(0).logo ?? null },
-      ...locationFields('Ha Noi'),
-      salary: 3500,
-      quantity: 3,
-      level: EJobLevel.SENIOR,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'We are looking for a Senior Backend Engineer to design and build scalable RESTful APIs and microservices using NestJS, MongoDB, and Redis.',
-      startDate: now,
-      endDate: sixMonthsLater,
+const jobProfiles = [
+  {
+    title: 'Backend Engineer (Node.js/NestJS)',
+    skills: ['Node.js', 'NestJS', 'TypeScript', 'MongoDB', 'Redis'],
+    level: EJobLevel.SENIOR,
+    formOfWork: EJobFormOfWork.FULL_TIME,
+    baseSalary: 3300,
+    description:
+      'Design scalable APIs, improve service reliability, and own backend features for high-traffic product teams.',
+  },
+  {
+    title: 'Frontend Engineer (React/Next.js)',
+    skills: ['React', 'Next.js', 'TypeScript', 'Redux', 'Tailwind CSS'],
+    level: EJobLevel.MID_LEVEL,
+    formOfWork: EJobFormOfWork.FULL_TIME,
+    baseSalary: 2600,
+    description:
+      'Build polished user interfaces, reusable components, and frontend workflows for customer-facing products.',
+  },
+  {
+    title: 'Full Stack Developer (Java/Spring Boot)',
+    skills: ['Java', 'Spring Boot', 'React', 'PostgreSQL', 'Docker'],
+    level: EJobLevel.MID_LEVEL,
+    formOfWork: EJobFormOfWork.HYBRID,
+    baseSalary: 2800,
+    description:
+      'Work across frontend and backend services to deliver enterprise product features from database to UI.',
+  },
+  {
+    title: 'Mobile Developer (React Native)',
+    skills: ['React Native', 'TypeScript', 'iOS', 'Android', 'REST API'],
+    level: EJobLevel.MID_LEVEL,
+    formOfWork: EJobFormOfWork.FULL_TIME,
+    baseSalary: 2400,
+    description:
+      'Develop cross-platform mobile features with a focus on performance, release quality, and user experience.',
+  },
+  {
+    title: 'DevOps Engineer (AWS/Kubernetes)',
+    skills: ['AWS', 'Kubernetes', 'Docker', 'Terraform', 'CI/CD', 'Linux'],
+    level: EJobLevel.SENIOR,
+    formOfWork: EJobFormOfWork.FULL_TIME,
+    baseSalary: 3600,
+    description:
+      'Operate cloud infrastructure, automate deployments, and improve observability for production systems.',
+  },
+  {
+    title: 'Data Engineer (Spark/Kafka)',
+    skills: ['Python', 'Apache Spark', 'Kafka', 'SQL', 'Airflow', 'AWS S3'],
+    level: EJobLevel.MID_LEVEL,
+    formOfWork: EJobFormOfWork.HYBRID,
+    baseSalary: 3100,
+    description:
+      'Build data pipelines that support analytics, product reporting, and machine learning use cases.',
+  },
+  {
+    title: 'Machine Learning Engineer',
+    skills: ['Python', 'PyTorch', 'TensorFlow', 'MLflow', 'Docker', 'FastAPI'],
+    level: EJobLevel.SENIOR,
+    formOfWork: EJobFormOfWork.FULL_TIME,
+    baseSalary: 4200,
+    description:
+      'Train, evaluate, and deploy machine learning models for recommendation, risk, and automation products.',
+  },
+  {
+    title: 'QA Automation Engineer',
+    skills: ['Cypress', 'Playwright', 'Jest', 'Selenium', 'CI/CD', 'Python'],
+    level: EJobLevel.MID_LEVEL,
+    formOfWork: EJobFormOfWork.FULL_TIME,
+    baseSalary: 1900,
+    description:
+      'Create automated test coverage for critical flows and improve release confidence across product squads.',
+  },
+  {
+    title: 'Security Engineer (Application Security)',
+    skills: ['OWASP', 'Penetration Testing', 'Python', 'Burp Suite', 'AWS', 'Docker'],
+    level: EJobLevel.SENIOR,
+    formOfWork: EJobFormOfWork.HYBRID,
+    baseSalary: 3500,
+    description:
+      'Run application security reviews, threat modeling, and security automation for engineering teams.',
+  },
+  {
+    title: 'Engineering Manager',
+    skills: ['Team Leadership', 'Agile', 'System Design', 'Node.js', 'OKRs', 'Mentoring'],
+    level: EJobLevel.MANAGER,
+    formOfWork: EJobFormOfWork.FULL_TIME,
+    baseSalary: 5200,
+    description:
+      'Lead a cross-functional engineering team, coach engineers, and partner with product on delivery planning.',
+  },
+];
+
+const locations = ['Ha Noi', 'Ho Chi Minh City', 'Da Nang', 'Can Tho', 'Hai Phong', 'Remote'];
+
+const addDays = (date: Date, days: number): Date => {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+};
+
+const addHours = (date: Date, hours: number): Date => {
+  const result = new Date(date);
+  result.setHours(result.getHours() + hours);
+  return result;
+};
+
+const getCreatedAt = (now: Date, index: number): Date => {
+  if (index % 25 === 0) {
+    return addHours(now, -(index % 18));
+  }
+
+  return addDays(now, -(index % 90));
+};
+
+const resolveLocationFields = (value: string) => {
+  const resolvedLocation = resolveLocationPayload({ location: value });
+
+  if (!resolvedLocation) {
+    throw new Error(`Unsupported seed location: ${value}`);
+  }
+
+  return {
+    location: resolvedLocation.location,
+    locationCode: resolvedLocation.locationCode,
+  };
+};
+
+const resolveJobState = (
+  now: Date,
+  createdAt: Date,
+  index: number,
+): Pick<JobSeed, 'approvalStatus' | 'approvalNote' | 'endDate' | 'isActive'> => {
+  const bucket = index % 20;
+
+  if (bucket <= 11) {
+    return {
+      approvalStatus: EJobApprovalStatus.APPROVED,
+      endDate: addDays(now, 30 + (index % 120)),
       isActive: true,
-    },
-    {
-      name: 'Frontend Engineer (ReactJS)',
-      skills: ['React', 'TypeScript', 'Redux', 'Tailwind CSS', 'REST API'],
-      company: { _id: pick(1)._id, name: pick(1).name, logo: pick(1).logo ?? null },
-      ...locationFields('Ho Chi Minh City'),
-      salary: 2800,
-      quantity: 5,
-      level: EJobLevel.MID_LEVEL,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Join our product team to build user-facing features for our e-commerce platform using React, TypeScript, and modern CSS tooling.',
-      startDate: now,
-      endDate: sixMonthsLater,
+    };
+  }
+
+  if (bucket <= 14) {
+    return {
+      approvalStatus: EJobApprovalStatus.APPROVED,
+      endDate: addDays(now, -1 - (index % 45)),
       isActive: true,
-    },
-    {
-      name: 'Mobile Developer (React Native)',
-      skills: ['React Native', 'TypeScript', 'Redux', 'iOS', 'Android'],
-      company: { _id: pick(2)._id, name: pick(2).name, logo: pick(2).logo ?? null },
-      ...locationFields('Ha Noi'),
-      salary: 2500,
-      quantity: 2,
-      level: EJobLevel.MID_LEVEL,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Develop and maintain cross-platform mobile applications using React Native for iOS and Android with a focus on performance and user experience.',
-      startDate: now,
-      endDate: sixMonthsLater,
+    };
+  }
+
+  if (bucket <= 16) {
+    return {
+      approvalStatus: EJobApprovalStatus.PENDING,
+      endDate: addDays(now, 45 + (index % 90)),
       isActive: true,
-    },
-    {
-      name: 'DevOps Engineer (AWS/Kubernetes)',
-      skills: ['AWS', 'Kubernetes', 'Docker', 'Terraform', 'CI/CD', 'Linux'],
-      company: { _id: pick(3)._id, name: pick(3).name, logo: pick(3).logo ?? null },
-      ...locationFields('Ho Chi Minh City'),
-      salary: 3200,
-      quantity: 2,
-      level: EJobLevel.SENIOR,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Own our cloud infrastructure on AWS, manage Kubernetes clusters, build CI/CD pipelines, and ensure high availability of production systems.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'Data Engineer (Apache Spark)',
-      skills: ['Python', 'Apache Spark', 'Kafka', 'SQL', 'Airflow', 'AWS S3'],
-      company: { _id: pick(4)._id, name: pick(4).name, logo: pick(4).logo ?? null },
-      ...locationFields('Ho Chi Minh City'),
-      salary: 3000,
-      quantity: 2,
-      level: EJobLevel.MID_LEVEL,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Build and maintain data pipelines to ingest, transform, and serve data for our analytics and machine learning platforms.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'Machine Learning Engineer',
-      skills: ['Python', 'TensorFlow', 'PyTorch', 'scikit-learn', 'MLflow', 'Docker'],
-      company: { _id: pick(5)._id, name: pick(5).name, logo: pick(5).logo ?? null },
-      ...locationFields('Ho Chi Minh City'),
-      salary: 4000,
-      quantity: 2,
-      level: EJobLevel.SENIOR,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Design, train, and deploy machine learning models for recommendation systems, fraud detection, and natural language processing.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'Full Stack Developer (Next.js + Spring Boot)',
-      skills: ['Next.js', 'React', 'Java', 'Spring Boot', 'PostgreSQL', 'Docker'],
-      company: { _id: pick(6)._id, name: pick(6).name, logo: pick(6).logo ?? null },
-      ...locationFields('Ha Noi'),
-      salary: 2200,
-      quantity: 4,
-      level: EJobLevel.JUNIOR,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Work across the stack developing features for our enterprise SaaS platform, from React/Next.js UI through Spring Boot APIs to PostgreSQL.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'QA Automation Engineer',
-      skills: ['Selenium', 'Cypress', 'Jest', 'Playwright', 'CI/CD', 'Python'],
-      company: { _id: pick(7)._id, name: pick(7).name, logo: pick(7).logo ?? null },
-      ...locationFields('Ho Chi Minh City'),
-      salary: 1800,
-      quantity: 3,
-      level: EJobLevel.MID_LEVEL,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Build and maintain automated test suites (E2E, integration, regression) and integrate them into our CI/CD pipeline.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'Cloud Solutions Architect',
-      skills: ['AWS', 'GCP', 'Azure', 'Terraform', 'Solution Design', 'Microservices'],
-      company: { _id: pick(8)._id, name: pick(8).name, logo: pick(8).logo ?? null },
-      ...locationFields('Ho Chi Minh City'),
-      salary: 5000,
-      quantity: 1,
-      level: EJobLevel.LEAD,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Lead cloud architecture decisions, design multi-cloud solutions, and provide technical guidance for infrastructure modernisation initiatives.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'Backend Developer Intern (Go/Python)',
-      skills: ['Go', 'Python', 'REST API', 'SQL', 'Git'],
-      company: { _id: pick(9)._id, name: pick(9).name, logo: pick(9).logo ?? null },
-      ...locationFields('Ha Noi'),
-      salary: 500,
-      quantity: 6,
-      level: EJobLevel.INTERN,
-      formOfWork: EJobFormOfWork.INTERNSHIP,
-      description:
-        'Join our backend team as an intern, contribute to API development in Go or Python, and learn production engineering practices.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'iOS Developer (Swift)',
-      skills: ['Swift', 'SwiftUI', 'Combine', 'CoreData', 'Xcode', 'REST API'],
-      company: { _id: pick(10)._id, name: pick(10).name, logo: pick(10).logo ?? null },
-      ...locationFields('Ho Chi Minh City'),
-      salary: 3000,
-      quantity: 2,
-      level: EJobLevel.MID_LEVEL,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Build native iOS applications using Swift and SwiftUI, delivering high-quality user experiences for millions of customers.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'Android Developer (Kotlin)',
-      skills: ['Kotlin', 'Jetpack Compose', 'Coroutines', 'MVVM', 'Android SDK'],
-      company: { _id: pick(11)._id, name: pick(11).name, logo: pick(11).logo ?? null },
-      ...locationFields('Ha Noi'),
-      salary: 2800,
-      quantity: 2,
-      level: EJobLevel.MID_LEVEL,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Develop and optimise Android applications using Kotlin and Jetpack libraries, following MVVM architecture with Jetpack Compose.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'Site Reliability Engineer (SRE)',
-      skills: ['Linux', 'Prometheus', 'Grafana', 'Kubernetes', 'Python', 'Go'],
-      company: { _id: pick(12)._id, name: pick(12).name, logo: pick(12).logo ?? null },
-      ...locationFields('Ho Chi Minh City'),
-      salary: 3800,
-      quantity: 2,
-      level: EJobLevel.SENIOR,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Ensure reliability, scalability, and performance of production services. Build monitoring, alerting, and incident response tooling.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'Technical Lead — Java/Spring Boot',
-      skills: ['Java', 'Spring Boot', 'Microservices', 'Kafka', 'PostgreSQL', 'AWS'],
-      company: { _id: pick(13)._id, name: pick(13).name, logo: pick(13).logo ?? null },
-      ...locationFields('Ho Chi Minh City'),
-      salary: 4500,
-      quantity: 1,
-      level: EJobLevel.LEAD,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Lead a team of 5-8 engineers building a core Java microservices platform, setting technical standards and mentoring junior developers.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'Blockchain Developer (Solidity)',
-      skills: ['Solidity', 'Hardhat', 'TypeScript', 'Ethers.js', 'Web3', 'Node.js'],
-      company: { _id: pick(17)._id, name: pick(17).name, logo: pick(17).logo ?? null },
-      ...locationFields('Ho Chi Minh City'),
-      salary: 4200,
-      quantity: 3,
-      level: EJobLevel.MID_LEVEL,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Write and audit Solidity smart contracts, build Web3 integrations, and contribute to our on-chain gaming economy.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'AI/NLP Engineer (Python)',
-      skills: ['Python', 'HuggingFace', 'LangChain', 'PyTorch', 'Transformers', 'FastAPI'],
-      company: { _id: pick(19)._id, name: pick(19).name, logo: pick(19).logo ?? null },
-      ...locationFields('Ho Chi Minh City'),
-      salary: 4000,
-      quantity: 2,
-      level: EJobLevel.SENIOR,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Research and develop NLP and large language model solutions for credit scoring, risk assessment, and document understanding.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'Frontend Intern (Vue.js)',
-      skills: ['Vue.js', 'HTML', 'CSS', 'JavaScript', 'Git'],
-      company: { _id: pick(14)._id, name: pick(14).name, logo: pick(14).logo ?? null },
-      ...locationFields('Ha Noi'),
-      salary: 450,
-      quantity: 5,
-      level: EJobLevel.INTERN,
-      formOfWork: EJobFormOfWork.INTERNSHIP,
-      description:
-        'Learn Vue.js development in a production environment, build UI components, and collaborate with senior engineers on real product features.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'Security Engineer (AppSec)',
-      skills: ['OWASP', 'Penetration Testing', 'Python', 'Burp Suite', 'SAST/DAST', 'AWS'],
-      company: { _id: pick(15)._id, name: pick(15).name, logo: pick(15).logo ?? null },
-      ...locationFields('Ha Noi'),
-      salary: 3500,
-      quantity: 1,
-      level: EJobLevel.SENIOR,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Lead application security reviews, run penetration tests, and build automated security scanning into our development lifecycle.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'Remote — Backend Engineer (Python/Django)',
-      skills: ['Python', 'Django', 'Django REST Framework', 'PostgreSQL', 'Celery', 'Redis'],
-      company: { _id: pick(16)._id, name: pick(16).name, logo: pick(16).logo ?? null },
-      ...locationFields('Remote'),
-      salary: 2600,
-      quantity: 3,
-      level: EJobLevel.MID_LEVEL,
-      formOfWork: EJobFormOfWork.REMOTE,
-      description:
-        'Build backend services and APIs for our browser product using Python and Django, working fully remote with flexible hours.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-    {
-      name: 'Engineering Manager',
-      skills: ['Team Leadership', 'Agile', 'System Design', 'TypeScript', 'Node.js', 'OKRs'],
-      company: { _id: pick(18)._id, name: pick(18).name, logo: pick(18).logo ?? null },
-      ...locationFields('Ho Chi Minh City'),
-      salary: 5500,
-      quantity: 1,
-      level: EJobLevel.MANAGER,
-      formOfWork: EJobFormOfWork.FULL_TIME,
-      description:
-        'Manage and grow an engineering team of 8-12, drive technical strategy, partner with product and design, and own delivery of key platform initiatives.',
-      startDate: now,
-      endDate: sixMonthsLater,
-      isActive: true,
-    },
-  ];
+    };
+  }
+
+  if (bucket <= 18) {
+    return {
+      approvalStatus: EJobApprovalStatus.APPROVED,
+      endDate: addDays(now, 60 + (index % 90)),
+      isActive: false,
+    };
+  }
+
+  return {
+    approvalStatus: EJobApprovalStatus.REJECTED,
+    approvalNote: 'Seeded moderation sample: job description requires revision.',
+    endDate: addDays(createdAt, 60),
+    isActive: false,
+  };
+};
+
+export function createJobsSeedData(companies: CompanyRef[]): JobSeed[] {
+  const now = new Date();
+
+  return companies.flatMap((company, companyIndex) =>
+    jobProfiles.map((profile, profileIndex) => {
+      const index = companyIndex * jobProfiles.length + profileIndex;
+      const createdAt = getCreatedAt(now, index);
+      const state = resolveJobState(now, createdAt, index);
+      const location = locations[(companyIndex + profileIndex) % locations.length];
+
+      return {
+        name: `${profile.title} - ${company.name}`,
+        skills: profile.skills,
+        company: {
+          _id: company._id,
+          name: company.name,
+          logo: company.logo ?? null,
+        },
+        ...resolveLocationFields(location),
+        salary: profile.baseSalary + (companyIndex % 5) * 150 + profileIndex * 50,
+        quantity: 1 + ((companyIndex + profileIndex) % 6),
+        level: profile.level,
+        formOfWork: profile.formOfWork,
+        description: `${profile.description} This role is part of ${company.name}'s technology organization in Vietnam.`,
+        startDate: createdAt,
+        createdAt,
+        updatedAt: createdAt,
+        ...state,
+      };
+    }),
+  );
 }
