@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MaxLength } from 'class-validator';
+import { IsString, IsOptional, MaxLength, IsNotEmpty } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ExperienceDto {
@@ -27,6 +27,7 @@ export class ExperienceDto {
   @MaxLength(100)
   position: string;
 
+  @IsNotEmpty({message: 'Start date is required'})
   @ApiProperty({
     description: 'Start date (string format)',
     example: '2020-01-01',
@@ -34,6 +35,7 @@ export class ExperienceDto {
   @IsString()
   startDate: string;
 
+  @IsNotEmpty({message: 'End date is required'})
   @ApiProperty({
     description: 'End date (string format)',
     example: '2023-12-31',

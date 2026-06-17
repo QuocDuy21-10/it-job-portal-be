@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  DefaultValuePipe,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Roles, ERole } from 'src/casl';
 import { IUser } from 'src/users/user.interface';
@@ -26,6 +37,19 @@ export class SkillsController {
   @ResponseMessage('Get active skills catalog')
   getCatalog(@Query('search') search: string, @Query('limit') limit: string) {
     return this.skillsService.getCatalog(search, +limit);
+  }
+
+  @Public()
+  @Get('popular')
+  @ApiOperation({
+    summary: 'Get popular skills',
+    description: 'Returns top N skills ranked by frequency across approved active job postings.',
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ResponseMessage('Get popular skills')
+  getPopular(@Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number) {
+    const clampedLimit = Math.min(Math.max(limit, 1), 50);
+    return this.skillsService.getPopularSkills(clampedLimit);
   }
 
   @Post()

@@ -3,8 +3,10 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException } fr
 import { InjectModel } from '@nestjs/mongoose';
 import aqp from 'api-query-params';
 import { Cache } from 'cache-manager';
-import mongoose from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
+import { EJobApprovalStatus } from 'src/jobs/enums/job-approval-status.enum';
+import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 import { IUser } from 'src/users/user.interface';
 import { bulkSoftDelete } from 'src/utils/helpers/bulk-soft-delete.helper';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
@@ -23,11 +25,14 @@ export class SkillsService {
   private readonly CATALOG_CACHE_KEY = 'skills:catalog';
   private readonly ALIAS_MAP_CACHE_KEY = 'skills:alias-map';
   private readonly CACHE_TTL = 1800000;
+  private readonly POPULAR_CACHE_TTL = 3600000;
   private readonly DEFAULT_CATALOG_LIMIT = 100;
 
   constructor(
     @InjectModel(Skill.name)
     private readonly skillModel: SoftDeleteModel<SkillDocument>,
+    @InjectModel(Job.name)
+    private readonly jobModel: Model<JobDocument>,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
@@ -151,6 +156,32 @@ export class SkillsService {
     const result = await bulkSoftDelete(this.skillModel, ids, user);
     await this.invalidateCache();
     return result;
+  }
+
+  async getPopularSkills(limit: number): Promise<{ skill: string; count: number }[]> {
+    const cacheKey = `skills:popular:${limit}`;
+    const cached = await this.cacheManager.get<{ skill: string; count: number }[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const results = await this.jobModel.aggregate<{ skill: string; count: number }>([
+      {
+        $match: {
+          isDeleted: false,
+          isActive: true,
+          approvalStatus: EJobApprovalStatus.APPROVED,
+        },
+      },
+      { $unwind: '$skills' },
+      { $group: { _id: '$skills', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: limit },
+      { $project: { _id: 0, skill: '$_id', count: 1 } },
+    ]);
+
+    await this.cacheManager.set(cacheKey, results, this.POPULAR_CACHE_TTL);
+    return results;
   }
 
   async getCatalog(search?: string, limit?: number) {
