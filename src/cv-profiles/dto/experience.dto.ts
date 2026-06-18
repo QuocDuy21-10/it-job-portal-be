@@ -27,7 +27,7 @@ export class ExperienceDto {
   @MaxLength(100)
   position: string;
 
-  @IsNotEmpty({message: 'Start date is required'})
+  @IsNotEmpty({ message: 'Start date is required' })
   @ApiProperty({
     description: 'Start date (string format)',
     example: '2020-01-01',
@@ -35,7 +35,7 @@ export class ExperienceDto {
   @IsString()
   startDate: string;
 
-  @IsNotEmpty({message: 'End date is required'})
+  @IsNotEmpty({ message: 'End date is required' })
   @ApiProperty({
     description: 'End date (string format)',
     example: '2023-12-31',

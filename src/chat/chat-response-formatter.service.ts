@@ -4,20 +4,46 @@ import {
   ChatGuardrailService,
   ChatOutputGuardrailResult,
 } from './chat-guardrail.service';
+import { ChatOutputTopicGuardService, TopicGuardResult } from './chat-output-topic-guard.service';
+
+export interface FormattedAssistantOutput extends ChatOutputGuardrailResult {
+  topicGuardResult?: TopicGuardResult;
+}
 
 @Injectable()
 export class ChatResponseFormatterService {
-  constructor(private readonly chatGuardrailService: ChatGuardrailService) {}
+  constructor(
+    private readonly chatGuardrailService: ChatGuardrailService,
+    private readonly chatOutputTopicGuardService: ChatOutputTopicGuardService,
+  ) {}
 
-  formatAssistantOutput(output: string): ChatOutputGuardrailResult {
+  async formatAssistantOutput(
+    output: string,
+    options?: { skipTopicGuard?: boolean },
+  ): Promise<FormattedAssistantOutput> {
     const firstPass = this.chatGuardrailService.sanitizeAssistantOutput(output);
     const formattedOutput = this.normalizeMarkdown(firstPass.sanitizedOutput);
     const secondPass = this.chatGuardrailService.sanitizeAssistantOutput(formattedOutput);
 
+    let sanitizedOutput = secondPass.sanitizedOutput;
+    const flags = [...new Set([...firstPass.flags, ...secondPass.flags])];
+    let riskLevel = this.maxRisk(firstPass.riskLevel, secondPass.riskLevel);
+    let topicGuardResult: TopicGuardResult | undefined;
+
+    if (!options?.skipTopicGuard) {
+      topicGuardResult = await this.chatOutputTopicGuardService.classify(sanitizedOutput);
+      if (topicGuardResult.blocked) {
+        sanitizedOutput = this.chatOutputTopicGuardService.getRefusalMessage();
+        flags.push('topic_guard_blocked');
+        riskLevel = ChatGuardrailRiskLevel.HIGH;
+      }
+    }
+
     return {
-      sanitizedOutput: secondPass.sanitizedOutput,
-      flags: [...new Set([...firstPass.flags, ...secondPass.flags])],
-      riskLevel: this.maxRisk(firstPass.riskLevel, secondPass.riskLevel),
+      sanitizedOutput,
+      flags,
+      riskLevel,
+      topicGuardResult,
     };
   }
 

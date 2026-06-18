@@ -66,6 +66,41 @@ export class ChatGuardrailService {
       pattern: /\b(system prompt|hidden instruction|developer message)\b/i,
       riskLevel: ChatGuardrailRiskLevel.MEDIUM,
     },
+    {
+      flag: 'code_generation_request',
+      pattern:
+        /(write|generate|create)\s+(me\s+|the\s+)?(an?\s+|some\s+)?(html|css|javascript|python|sql|code|program|script)\b/i,
+      riskLevel: ChatGuardrailRiskLevel.HIGH,
+    },
+    {
+      flag: 'vi_injection',
+      pattern: /bỏ\s*qua.{0,40}?(quy\s*tắc|hướng\s*dẫn|lệnh|chỉ\s*thị)/i,
+      riskLevel: ChatGuardrailRiskLevel.HIGH,
+    },
+    {
+      flag: 'roleplay_bypass',
+      pattern:
+        /\b(pretend\s+(you\s+are|to\s+be)|act\s+as\s+(a|an|the)\s+|you\s+are\s+now\s+a|roleplay\s+as|imagine\s+you\s+are)\b/i,
+      riskLevel: ChatGuardrailRiskLevel.HIGH,
+    },
+    {
+      flag: 'vi_roleplay_bypass',
+      pattern:
+        /(giả\s*vờ\s*(bạn\s*là|như|mình\s*là)|đóng\s*vai|bây\s*giờ\s*bạn\s*là|hãy\s*trở\s*thành)/i,
+      riskLevel: ChatGuardrailRiskLevel.HIGH,
+    },
+    {
+      flag: 'persona_override',
+      pattern:
+        /\b(forget\s+(all\s+)?(your\s+)?(instructions?|rules?|previous\s+instructions?|training))\b/i,
+      riskLevel: ChatGuardrailRiskLevel.HIGH,
+    },
+    {
+      flag: 'prompt_extraction',
+      pattern:
+        /\b(what\s+(are|is)\s+your\s+(instructions?|rules?|system\s+prompt)|tell\s+me\s+your\s+(instructions?|rules?))\b/i,
+      riskLevel: ChatGuardrailRiskLevel.MEDIUM,
+    },
   ];
 
   validateMessage(message: string): ChatGuardrailResult {

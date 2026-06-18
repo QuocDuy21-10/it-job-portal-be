@@ -104,6 +104,15 @@ export class AiUsageLog {
 
   @Prop({ type: Boolean, default: false, index: true })
   quotaRollback?: boolean;
+
+  @Prop({ type: Boolean, index: true })
+  topicGuardBlocked?: boolean;
+
+  @Prop({ type: String })
+  topicGuardCategory?: string;
+
+  @Prop({ type: Number })
+  topicGuardLatencyMs?: number;
 }
 
 export const AiUsageLogSchema = SchemaFactory.createForClass(AiUsageLog);

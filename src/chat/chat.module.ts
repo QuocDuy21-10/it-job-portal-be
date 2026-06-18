@@ -24,6 +24,8 @@ import { ChatCacheService } from './chat-cache.service';
 import { ChatQuotaService } from './chat-quota.service';
 import { ChatToolActionService } from './chat-tool-action.service';
 import { ChatResponseFormatterService } from './chat-response-formatter.service';
+import { ChatOutputTopicGuardService } from './chat-output-topic-guard.service';
+import { ChatStreamRequestService } from './chat-stream-request.service';
 import { CompanyContextProvider } from './context-providers/company-context.provider';
 import { CvReviewContextProvider } from './context-providers/cv-review-context.provider';
 import { FaqContextProvider } from './context-providers/faq-context.provider';
@@ -60,6 +62,7 @@ import { JobSearchContextProvider } from './context-providers/job-search-context
     ChatQuotaService,
     ChatToolActionService,
     ChatResponseFormatterService,
+    ChatOutputTopicGuardService,
     JobSearchContextProvider,
     CompanyContextProvider,
     CvReviewContextProvider,

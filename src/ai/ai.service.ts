@@ -23,6 +23,7 @@ import {
 import { IAIChatMessage } from './interfaces/ai-chat-message.interface';
 import { IAIChatResponse } from './interfaces/ai-chat-response.interface';
 import { IAIChatStreamResult } from './interfaces/ai-chat-stream-result.interface';
+import { TopicGuardClassification } from './interfaces/topic-guard-classification.interface';
 
 @Injectable()
 export class AIService {
@@ -228,6 +229,47 @@ export class AIService {
 
   estimateTokens(text: string): number {
     return this.geminiService.estimateTokens(text);
+  }
+
+  async classifyTopic(text: string): Promise<TopicGuardClassification | null> {
+    const systemPrompt = [
+      'You are a strict content classifier for a Vietnam IT career advisor chatbot.',
+      'Determine whether the provided text is on-topic for the chatbot domain.',
+      '',
+      'VALID topics: IT career advice, job search, CV/resume review, interview preparation,',
+      'IT skills and learning paths, salary information, company information, Vietnam tech industry.',
+      '',
+      'INVALID topics: source code (HTML, CSS, JavaScript, Python, SQL, any language), creative writing,',
+      'general knowledge unrelated to IT careers, harmful or offensive content.',
+      '',
+      'Respond ONLY with valid JSON:',
+      '{"onTopic": boolean, "reason": "<under 15 words>", "category": "on_topic"|"code_generation"|"off_topic"|"harmful"}',
+    ].join('\n');
+
+    try {
+      const raw = await this.groqService.classifyContent(systemPrompt, text.slice(0, 1500));
+      if (!raw) {
+        return null;
+      }
+
+      const parsed = JSON.parse(raw) as Partial<TopicGuardClassification>;
+      if (typeof parsed.onTopic !== 'boolean' || !parsed.category) {
+        this.logger.warn('Topic classifier returned malformed JSON');
+        return null;
+      }
+
+      return {
+        onTopic: parsed.onTopic,
+        reason: parsed.reason ?? '',
+        category: parsed.category,
+      };
+    } catch (error) {
+      this.logger.warn(
+        'Topic classification failed',
+        error instanceof Error ? error.message : String(error),
+      );
+      return null;
+    }
   }
 
   isRateLimitError(error: unknown): boolean {

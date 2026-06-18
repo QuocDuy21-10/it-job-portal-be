@@ -39,6 +39,9 @@ export interface CreateAiUsageLogInput {
   quotaResetAt?: Date;
   quotaUnavailable?: boolean;
   quotaRollback?: boolean;
+  topicGuardBlocked?: boolean;
+  topicGuardCategory?: string | null;
+  topicGuardLatencyMs?: number;
 }
 
 @Injectable()
@@ -84,6 +87,9 @@ export class AiUsageService {
         quotaResetAt: input.quotaResetAt,
         quotaUnavailable: input.quotaUnavailable ?? false,
         quotaRollback: input.quotaRollback ?? false,
+        topicGuardBlocked: input.topicGuardBlocked ?? undefined,
+        topicGuardCategory: input.topicGuardCategory ?? undefined,
+        topicGuardLatencyMs: input.topicGuardLatencyMs,
       });
     } catch (error) {
       this.logger.warn(

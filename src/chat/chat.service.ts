@@ -167,7 +167,7 @@ export class ChatService {
           promptEstimateSource,
           Date.now() - startedAt,
         );
-        const outputGuardrail = this.chatResponseFormatterService.formatAssistantOutput(
+        const outputGuardrail = await this.chatResponseFormatterService.formatAssistantOutput(
           cachedFaqResponse.response,
         );
         guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
@@ -201,6 +201,9 @@ export class ChatService {
           cacheCategory: 'faq_response',
           requestStartedAt: new Date(startedAt),
           requestCompletedAt: new Date(),
+          topicGuardBlocked: outputGuardrail.topicGuardResult?.blocked,
+          topicGuardCategory: outputGuardrail.topicGuardResult?.category,
+          topicGuardLatencyMs: outputGuardrail.topicGuardResult?.latencyMs,
           ...this.buildQuotaUsageFields(quotaStatus, false, false),
         });
 
@@ -230,7 +233,7 @@ export class ChatService {
         turn.history,
         turn.systemPrompt,
       );
-      const outputGuardrail = this.chatResponseFormatterService.formatAssistantOutput(
+      const outputGuardrail = await this.chatResponseFormatterService.formatAssistantOutput(
         parsedResponse.text,
       );
       guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
@@ -291,6 +294,9 @@ export class ChatService {
         cacheCategory: turn.contextCacheCategory,
         requestStartedAt: new Date(startedAt),
         requestCompletedAt: new Date(),
+        topicGuardBlocked: outputGuardrail.topicGuardResult?.blocked,
+        topicGuardCategory: outputGuardrail.topicGuardResult?.category,
+        topicGuardLatencyMs: outputGuardrail.topicGuardResult?.latencyMs,
         ...this.buildQuotaUsageFields(quotaStatus, quotaReservation.consumed, false),
       });
 
@@ -374,8 +380,9 @@ export class ChatService {
       const cachedFaqResponse = await this.getCachedFaqResponse(user, turn);
       if (cachedFaqResponse) {
         const quotaStatus = await this.chatQuotaService.getStatus(user);
-        const outputGuardrail = this.chatResponseFormatterService.formatAssistantOutput(
+        const outputGuardrail = await this.chatResponseFormatterService.formatAssistantOutput(
           cachedFaqResponse.response,
+          { skipTopicGuard: true },
         );
         fullText = outputGuardrail.sanitizedOutput;
         guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
@@ -454,7 +461,10 @@ export class ChatService {
       }
 
       const streamResult = iterResult.value;
-      const outputGuardrail = this.chatResponseFormatterService.formatAssistantOutput(fullText);
+      const outputGuardrail = await this.chatResponseFormatterService.formatAssistantOutput(
+        fullText,
+        { skipTopicGuard: true },
+      );
       fullText = outputGuardrail.sanitizedOutput;
       guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
       const validatedJobIds = this.validateRecommendedJobIds(
@@ -1336,6 +1346,9 @@ export class ChatService {
     quotaResetAt?: Date;
     quotaUnavailable?: boolean;
     quotaRollback?: boolean;
+    topicGuardBlocked?: boolean;
+    topicGuardCategory?: string | null;
+    topicGuardLatencyMs?: number;
   }): Promise<void> {
     if (!Types.ObjectId.isValid(input.userId)) {
       return;
