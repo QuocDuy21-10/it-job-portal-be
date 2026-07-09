@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/logo.png" alt="DevLink Logo" width="600" />
+  <img src="assets/logo.png" alt="DevLink Logo" width="250" />
 </div>
 
 # 🚀 DevLink Backend
