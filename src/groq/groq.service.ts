@@ -225,6 +225,22 @@ export class GroqService {
 
     return response.choices[0]?.message?.content?.trim() || 'Previous conversation context';
   }
+  async classifyContent(systemPrompt: string, content: string): Promise<string | null> {
+    const client = this.getClient();
+
+    const response = await client.chat.completions.create({
+      model: this.chatModelName,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content },
+      ],
+      temperature: 0.1,
+      max_completion_tokens: 80,
+      response_format: { type: 'json_object' },
+    });
+
+    return response.choices[0]?.message?.content?.trim() ?? null;
+  }
 
   estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);

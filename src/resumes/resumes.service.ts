@@ -78,11 +78,12 @@ export class ResumesService {
   }
 
   async findAll(page?: number, limit?: number, query?: string, user?: IUser) {
-    const { filter: rawFilter, sort: rawSort, population, projection } = aqp(query);
-    delete rawFilter.page;
-    delete rawFilter.limit;
+    // const { filter: rawFilter, sort: rawSort, population, projection } = aqp(query);
+    const { filter, sort, population, projection } = aqp(query);
+    delete filter.page;
+    delete filter.limit;
 
-    const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
+    // const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
 
     // Role-based scope applied after sanitization — cannot be overridden by query string
     if (user?.role === ERole.HR && user.company?._id) {

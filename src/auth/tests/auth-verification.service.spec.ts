@@ -66,7 +66,7 @@ describe('AuthVerificationService', () => {
       expect(mailerService.sendMail).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'test@example.com',
-          subject: 'Activate your account at IT Job Portal',
+          subject: 'Activate your account at DevLink',
         }),
       );
     });

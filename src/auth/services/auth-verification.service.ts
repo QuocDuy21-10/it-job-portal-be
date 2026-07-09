@@ -38,7 +38,7 @@ export class AuthVerificationService {
     await this.mailerService
       .sendMail({
         to: email,
-        subject: 'Activate your account at IT Job Portal',
+        subject: 'Activate your account at DevLink',
         template: 'verify-email',
         context: {
           name: user.name,

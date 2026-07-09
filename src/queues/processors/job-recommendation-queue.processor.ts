@@ -109,7 +109,7 @@ export class JobRecommendationQueueProcessor extends WorkerHost {
       // 5. Send email
       await this.mailerService.sendMail({
         to: subscriber.email,
-        from: '"Job Portal Team" <support@example.com>',
+        from: '"DevLink Team" <support@example.com>',
         subject: `🎯 ${matchingJobs.length} việc làm phù hợp với bạn!`,
         template: 'job-recommendation',
         context: {

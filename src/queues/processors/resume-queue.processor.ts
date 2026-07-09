@@ -148,7 +148,7 @@ export class ResumeQueueProcessor extends WorkerHost {
             jobId: jobId,
           },
           {
-            priority: 2, // Ưu tiên thấp hơn parse
+            priority: 2,
             attempts: 3,
             backoff: { type: 'exponential', delay: 2000 },
           },
@@ -156,7 +156,6 @@ export class ResumeQueueProcessor extends WorkerHost {
         this.logger.log(`[Parse Job ${job.id}] Queued analysis job for resume ${resumeId}`);
       } catch (queueError) {
         this.logger.error(`[Parse Job ${job.id}] Failed to queue analysis job:`, queueError);
-        // Bạn có thể throw lỗi ở đây nếu muốn job parse này bị coi là failed
       }
 
       return {
@@ -229,10 +228,6 @@ export class ResumeQueueProcessor extends WorkerHost {
     }
   }
 
-  /**
-   * Handle AI analysis job
-   * 🔄 UPDATED: Now uses MatchingService instead of AI for scoring
-   */
   private async handleAnalyzeResume(job: Job<AnalyzeResumeJobData>) {
     const { resumeId, jobId } = job.data;
     let companyId: string | undefined;
@@ -263,11 +258,9 @@ export class ResumeQueueProcessor extends WorkerHost {
       this.logger.log(`[Analysis Job ${job.id}] Data fetched: ${jobData.name}`);
       await job.updateProgress(30);
 
-      // Step 2: Perform HYBRID matching (AI extract + Backend score)
       this.logger.log(`[Analysis Job ${job.id}] Running MatchingService calculation...`);
       await job.updateProgress(40);
 
-      // 🆕 Use MatchingService instead of AI
       const matchResult = await this.matchingService.calculateMatch(resume.parsedData, jobData);
 
       this.logger.log(
@@ -275,7 +268,7 @@ export class ResumeQueueProcessor extends WorkerHost {
       );
       await job.updateProgress(70);
 
-      // Step 3: Convert to AIAnalysis format for backward compatibility
+      // Step 3: Convert to Analysis format for backward compatibility
       const analysis = {
         matchingScore: matchResult.matchingScore,
         skillsMatch: matchResult.skillsMatch,
@@ -303,7 +296,7 @@ export class ResumeQueueProcessor extends WorkerHost {
       await job.updateProgress(100);
 
       this.logger.log(
-        `[Analysis Job ${job.id}] ✅ Successfully analyzed resume ${resumeId} - Score: ${matchResult.matchingScore}, Priority: ${matchResult.priority}}`,
+        `[Analysis Job ${job.id}] Successfully analyzed resume ${resumeId} - Score: ${matchResult.matchingScore}, Priority: ${matchResult.priority}}`,
       );
 
       return {
@@ -318,7 +311,7 @@ export class ResumeQueueProcessor extends WorkerHost {
       const errorMessage = this.getErrorMessage(error);
 
       this.logger.error(
-        `[Analysis Job ${job.id}] ❌ Failed to analyze resume ${resumeId}:`,
+        `[Analysis Job ${job.id}] Failed to analyze resume ${resumeId}:`,
         errorMessage,
       );
 
@@ -330,7 +323,6 @@ export class ResumeQueueProcessor extends WorkerHost {
 
       await this.statisticsCacheService.clearScopedDashboards(companyId);
 
-      // Nếu là lỗi khác (mất mạng, file hỏng...), re-throw để BullMQ retry.
       throw error;
     }
   }

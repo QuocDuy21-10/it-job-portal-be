@@ -49,7 +49,7 @@ async function bootstrap() {
 
   // config swagger
   const config = new DocumentBuilder()
-    .setTitle('Nest Basic Project')
+    .setTitle('DevLink Job Portal API')
     .setDescription('All module APIs')
     .setVersion('1.0')
     .addBearerAuth(
