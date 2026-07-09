@@ -19,6 +19,13 @@ Single NestJS backend for DevLink (a Vietnam IT job portal), covering authentica
 
 ---
 
+## 🖥️ Frontend Repository
+
+The companion frontend application for **DevLink** can be found in the frontend repository:
+👉 **<a href="https://github.com/QuocDuy21-10/it-job-portal-fe" style="color: blue; text-decoration: underline;">DevLink Frontend Repository</a>**
+
+---
+
 ## 🎯 What This Project Solves
 
 **DevLink** centralizes all backend workflows needed by a modern job marketplace:
