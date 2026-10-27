@@ -234,7 +234,9 @@ describe('JobIngestionService', () => {
       const { service, jobSourceModel, queueService } = setup();
       jobSourceModel.find.mockReturnValue({
         select: jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([{ key: 'greenhouse-axon' }, { key: 'lever-ninjavan' }]),
+          lean: jest
+            .fn()
+            .mockResolvedValue([{ key: 'greenhouse-axon' }, { key: 'lever-ninjavan' }]),
         }),
       });
 

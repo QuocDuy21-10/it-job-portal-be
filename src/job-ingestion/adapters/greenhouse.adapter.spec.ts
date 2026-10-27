@@ -9,9 +9,7 @@ const fixture = JSON.parse(
 );
 
 const mockFetch = (status: number, body: unknown) =>
-  jest
-    .spyOn(global, 'fetch')
-    .mockResolvedValue(new Response(JSON.stringify(body), { status }));
+  jest.spyOn(global, 'fetch').mockResolvedValue(new Response(JSON.stringify(body), { status }));
 
 describe('GreenhouseAdapter', () => {
   const adapter = new GreenhouseAdapter();
@@ -37,8 +35,7 @@ describe('GreenhouseAdapter', () => {
       title: 'Backend Software Engineer',
       location: 'Ho Chi Minh City, Ho Chi Minh City, Vietnam',
       sourceUrl: 'https://job-boards.greenhouse.io/axon/jobs/7001',
-      descriptionHtml:
-        '<p>Build services with Node.js and MongoDB.</p><script>alert(1)</script>',
+      descriptionHtml: '<p>Build services with Node.js and MongoDB.</p><script>alert(1)</script>',
       publishedAt: new Date('2026-09-01T10:00:00-04:00'),
     });
     expect(jobs[1].publishedAt).toBeUndefined();

@@ -25,7 +25,8 @@ export class LeverAdapter implements IAtsAdapter {
         sourceUrl: posting.hostedUrl ?? '',
         applyUrl: posting.applyUrl,
         descriptionHtml: this.buildDescriptionHtml(posting),
-        publishedAt: typeof posting.createdAt === 'number' ? new Date(posting.createdAt) : undefined,
+        publishedAt:
+          typeof posting.createdAt === 'number' ? new Date(posting.createdAt) : undefined,
       }),
     );
   }

@@ -7,9 +7,7 @@ import { LeverAdapter } from './lever.adapter';
 const fixture = JSON.parse(readFileSync(join(__dirname, '__fixtures__/lever-board.json'), 'utf8'));
 
 const mockFetch = (status: number, body: unknown) =>
-  jest
-    .spyOn(global, 'fetch')
-    .mockResolvedValue(new Response(JSON.stringify(body), { status }));
+  jest.spyOn(global, 'fetch').mockResolvedValue(new Response(JSON.stringify(body), { status }));
 
 describe('LeverAdapter', () => {
   const adapter = new LeverAdapter();

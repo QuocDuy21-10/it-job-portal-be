@@ -12,6 +12,9 @@ import { JobExpirationQueueProcessor } from './processors/job-expiration-queue.p
 import { JobExpirationQueueService } from './services/job-expiration-queue.service';
 import { AccountDeletionQueueProcessor } from './processors/account-deletion-queue.processor';
 import { AccountDeletionQueueService } from './services/account-deletion-queue.service';
+import { JobIngestionQueueProcessor } from './processors/job-ingestion-queue.processor';
+import { JobIngestionQueueService } from './services/job-ingestion-queue.service';
+import { JobIngestionModule } from 'src/job-ingestion/job-ingestion.module';
 import { AIModule } from 'src/ai/ai.module';
 import { CvParserModule } from 'src/cv-parser/cv-parser.module';
 import { MatchingModule } from 'src/matching/matching.module';
@@ -35,6 +38,7 @@ import {
   APPLICATION_NOTIFICATION_QUEUE,
   JOB_EXPIRATION_NOTIFICATION_QUEUE,
   ACCOUNT_DELETION_QUEUE,
+  JOB_INGESTION_QUEUE,
 } from './queues.constants';
 
 export {
@@ -44,6 +48,7 @@ export {
   APPLICATION_NOTIFICATION_QUEUE,
   JOB_EXPIRATION_NOTIFICATION_QUEUE,
   ACCOUNT_DELETION_QUEUE,
+  JOB_INGESTION_QUEUE,
 };
 
 @Global()
@@ -73,6 +78,9 @@ export class QueuesModule {
           {
             name: ACCOUNT_DELETION_QUEUE,
           },
+          {
+            name: JOB_INGESTION_QUEUE,
+          },
         ),
         MongooseModule.forFeature([
           { name: Resume.name, schema: ResumeSchema },
@@ -91,6 +99,7 @@ export class QueuesModule {
         MailModule,
         SkillsModule,
         StatisticsModule,
+        JobIngestionModule,
       ],
       providers: [
         ResumeQueueProcessor,
@@ -105,6 +114,8 @@ export class QueuesModule {
         JobExpirationQueueService,
         AccountDeletionQueueProcessor,
         AccountDeletionQueueService,
+        JobIngestionQueueProcessor,
+        JobIngestionQueueService,
       ],
       exports: [
         ResumeQueueService,
@@ -113,6 +124,7 @@ export class QueuesModule {
         ApplicationNotificationQueueService,
         JobExpirationQueueService,
         AccountDeletionQueueService,
+        JobIngestionQueueService,
       ],
     };
   }
