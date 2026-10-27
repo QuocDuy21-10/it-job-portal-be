@@ -7,6 +7,7 @@ import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 
 import { Company, CompanyDocument } from 'src/companies/schemas/company.schema';
 import { CvProfile, CvProfileDocument } from 'src/cv-profiles/schemas/cv-profile.schema';
+import { JobSource, JobSourceDocument } from 'src/job-ingestion/schemas/job-source.schema';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 import { Resume, ResumeDocument } from 'src/resumes/schemas/resume.schema';
 import { Skill, SkillDocument } from 'src/skills/schemas/skill.schema';
@@ -14,6 +15,7 @@ import { User, UserDocument } from 'src/users/schemas/user.schema';
 
 import { COMPANIES_SEED_DATA } from './data/companies.data';
 import { CandidateUserRef, createCvProfilesSeedData, CvProfileSeed } from './data/cv-profiles.data';
+import { JOB_SOURCES_SEED_DATA } from './data/job-sources.data';
 import { createJobsSeedData, JobSeed } from './data/jobs.data';
 import { createResumesSeedData, ResumeSeed } from './data/resumes.data';
 import { SKILLS_SEED_DATA } from './data/skills.data';
@@ -49,6 +51,7 @@ export class SeedService {
     @InjectModel(Job.name) private readonly jobModel: SoftDeleteModel<JobDocument>,
     @InjectModel(CvProfile.name) private readonly cvProfileModel: Model<CvProfileDocument>,
     @InjectModel(Resume.name) private readonly resumeModel: Model<ResumeDocument>,
+    @InjectModel(JobSource.name) private readonly jobSourceModel: Model<JobSourceDocument>,
     private readonly configService: ConfigService,
   ) {}
 
@@ -60,6 +63,7 @@ export class SeedService {
     const hashedPassword = hashSync(initPassword, genSaltSync(10));
 
     await this.seedSkills();
+    await this.seedJobSources();
     const companies = await this.seedCompanies();
     await this.seedUsers(adminEmail, hashedPassword, companies);
 
@@ -87,6 +91,20 @@ export class SeedService {
 
     await this.skillModel.insertMany(missingSkills);
     this.logger.log(`Skills seeded: ${missingSkills.length} records`);
+  }
+
+  private async seedJobSources(): Promise<void> {
+    const result = await this.jobSourceModel.bulkWrite(
+      JOB_SOURCES_SEED_DATA.map(source => ({
+        updateOne: {
+          filter: { key: source.key },
+          update: { $setOnInsert: source },
+          upsert: true,
+        },
+      })),
+    );
+
+    this.logger.log(`Job sources seeded: ${result.upsertedCount} new records`);
   }
 
   private async seedCompanies(): Promise<SeedCompanyDocument[]> {
