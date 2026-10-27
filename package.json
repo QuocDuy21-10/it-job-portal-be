@@ -79,7 +79,7 @@
     "redis": "^5.9.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
-    "sanitize-html": "^2.18.1",
+    "sanitize-html": "2.13.1",
     "soft-delete-plugin-mongoose": "1.0.15",
     "swagger-ui-express": "^5.0.0",
     "uuid": "^13.0.0"
