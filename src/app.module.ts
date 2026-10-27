@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { softDeletePlugin } from 'soft-delete-plugin-mongoose';
 import { CompaniesModule } from './companies/companies.module';
 import { JobsModule } from './jobs/jobs.module';
+import { JobIngestionModule } from './job-ingestion/job-ingestion.module';
 import { FilesModule } from './files/files.module';
 import { ResumesModule } from './resumes/resumes.module';
 import { DatabasesModule } from './databases/databases.module';
@@ -74,6 +75,7 @@ import { SkillsModule } from './skills/skills.module';
     AuthModule,
     CompaniesModule,
     JobsModule,
+    JobIngestionModule,
     FilesModule,
     ResumesModule,
     QueuesModule.forRoot(),

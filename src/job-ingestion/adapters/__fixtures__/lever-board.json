@@ -1,0 +1,33 @@
+[
+  {
+    "id": "6ed76ce8-4156-4b60-b120-403538bd66cd",
+    "text": "Software Engineer (Backend)",
+    "categories": {
+      "commitment": "Full-time",
+      "location": "Ho Chi Minh City",
+      "team": "Engineering",
+      "allLocations": ["Ho Chi Minh City"]
+    },
+    "country": "VN",
+    "workplaceType": "onsite",
+    "createdAt": 1786469891368,
+    "description": "<div>Work with <b>Go</b> services.</div>",
+    "lists": [{ "text": "Requirements", "content": "<li>Kotlin</li><li>PostgreSQL</li>" }],
+    "additional": "<div>Benefits apply.</div>",
+    "hostedUrl": "https://jobs.lever.co/ninjavan/6ed76ce8-4156-4b60-b120-403538bd66cd",
+    "applyUrl": "https://jobs.lever.co/ninjavan/6ed76ce8-4156-4b60-b120-403538bd66cd/apply"
+  },
+  {
+    "id": "0b1c2d3e-0000-4000-8000-000000000002",
+    "text": "Operations Associate",
+    "categories": { "location": "Singapore, Singapore", "team": "Operations" },
+    "country": "SG",
+    "workplaceType": "remote",
+    "createdAt": 1786469891368,
+    "description": "<div>Ops.</div>",
+    "lists": [],
+    "additional": "",
+    "hostedUrl": "https://jobs.lever.co/ninjavan/0b1c2d3e-0000-4000-8000-000000000002",
+    "applyUrl": "https://jobs.lever.co/ninjavan/0b1c2d3e-0000-4000-8000-000000000002/apply"
+  }
+]
