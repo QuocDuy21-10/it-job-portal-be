@@ -19,6 +19,8 @@ import {
   isItJob,
   isRemote,
   isVnOrRemote,
+  levelFromExperience,
+  mapSkillsToCatalog,
   resolveLocationCode,
   sanitizeDescription,
 } from './ingestion-filters';
@@ -201,6 +203,7 @@ export class JobIngestionService {
     now: Date,
   ) {
     const descriptionHtml = sanitizeDescription(raw.descriptionHtml);
+    const catalogSkills = raw.skills?.length ? mapSkillsToCatalog(raw.skills, aliasMap) : [];
 
     return {
       sourceKey,
@@ -208,14 +211,19 @@ export class JobIngestionService {
       sourceUrl: raw.sourceUrl,
       applyUrl: raw.applyUrl ?? raw.sourceUrl,
       title: raw.title,
-      companyName,
+      companyName: raw.companyName || companyName,
       location: raw.location,
       locationCode: resolveLocationCode(raw.location),
       isRemote: isRemote(raw),
-      skills: extractSkills(`${raw.title} ${htmlToText(descriptionHtml)}`, aliasMap),
-      level: inferLevel(raw.title),
+      skills:
+        catalogSkills.length > 0
+          ? catalogSkills
+          : extractSkills(`${raw.title} ${htmlToText(descriptionHtml)}`, aliasMap),
+      level: inferLevel(raw.title) ?? levelFromExperience(raw.monthsOfExperience),
       descriptionHtml,
       publishedAt: raw.publishedAt,
+      expiresAt: raw.expiresAt,
+      salaryText: raw.salaryText,
       status: EExternalJobStatus.ACTIVE,
       lastSeenAt: now,
     };

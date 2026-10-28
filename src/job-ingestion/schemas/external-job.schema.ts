@@ -46,6 +46,12 @@ export class ExternalJob {
   @Prop()
   publishedAt?: Date;
 
+  @Prop()
+  expiresAt?: Date;
+
+  @Prop({ trim: true })
+  salaryText?: string;
+
   @Prop({ required: true, enum: EExternalJobStatus, default: EExternalJobStatus.ACTIVE })
   status: EExternalJobStatus;
 

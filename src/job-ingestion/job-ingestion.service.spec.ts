@@ -300,6 +300,47 @@ describe('JobIngestionService', () => {
       expect(update.$unset).toBeUndefined();
     });
 
+    it('maps multi-company fields, catalog skills, experience level, salary and expiry', async () => {
+      const expiresAt = new Date('2026-11-20T00:00:00Z');
+      const { service, externalJobModel } = setup({
+        fetchResult: [
+          buildRaw({
+            title: 'Lập trình viên Backend',
+            companyName: 'FPT IS',
+            skills: ['Java', 'Spring Boot', 'Automation QA'],
+            monthsOfExperience: 40,
+            salaryText: '20.000.000 – 30.000.000 VND',
+            expiresAt,
+          }),
+        ],
+      });
+
+      await service.syncSource('greenhouse-axon');
+
+      expect(externalJobModel.bulkWrite.mock.calls[0][0][0].updateOne.update.$set).toEqual(
+        expect.objectContaining({
+          companyName: 'FPT IS',
+          skills: ['Java', 'Spring Boot'],
+          level: EJobLevel.SENIOR,
+          salaryText: '20.000.000 – 30.000.000 VND',
+          expiresAt,
+        }),
+      );
+    });
+
+    it('falls back to text skill extraction when no raw skill is in the catalog', async () => {
+      const { service, externalJobModel } = setup({
+        fetchResult: [buildRaw({ skills: ['Luật / Pháp Chế'] })],
+      });
+
+      await service.syncSource('greenhouse-axon');
+
+      const stored = externalJobModel.bulkWrite.mock.calls[0][0][0].updateOne.update.$set;
+      expect(stored.skills).toEqual(['Node.js']);
+      expect(stored.companyName).toBe('Axon');
+      expect(stored.level).toBe(EJobLevel.SENIOR);
+    });
+
     it('skips disabled sources', async () => {
       const { service, greenhouseAdapter, jobSourceModel } = setup({
         source: { ...SOURCE, enabled: false },
