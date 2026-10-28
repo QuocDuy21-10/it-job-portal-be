@@ -9,6 +9,7 @@ import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { ApproveJobDto } from './dto/approve-job.dto';
 import { EJobApprovalStatus } from './enums/job-approval-status.enum';
+import { buildPublicJobVisibilityFilter } from './job-visibility.util';
 import { IUser } from 'src/users/user.interface';
 import { Job, JobDocument } from './schemas/job.schema';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
@@ -634,11 +635,7 @@ export class JobsService {
   }
 
   private buildActiveJobFilter(): Record<string, unknown> {
-    return {
-      isActive: true,
-      approvalStatus: EJobApprovalStatus.APPROVED,
-      $or: [{ endDate: { $gte: new Date() } }, { endDate: null }],
-    };
+    return buildPublicJobVisibilityFilter();
   }
 
   private buildKeywordFilter(keyword: string): Record<string, any> {
