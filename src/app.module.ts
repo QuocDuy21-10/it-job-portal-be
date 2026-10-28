@@ -29,6 +29,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { CaslModule } from './casl';
 import { SkillsModule } from './skills/skills.module';
 import { validateEnv } from './config/env.validation';
+import { LoggerModule } from 'nestjs-pino';
+import { resolveRequestId } from './utils/helpers/request-id.helper';
 
 @Module({
   imports: [
@@ -36,6 +38,33 @@ import { validateEnv } from './config/env.validation';
       envFilePath: '.env',
       isGlobal: true,
       validate: validateEnv,
+    }),
+    LoggerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const isProduction = configService.get<string>('NODE_ENV') === 'production';
+        return {
+          pinoHttp: {
+            level: configService.get<string>('LOG_LEVEL') || (isProduction ? 'info' : 'debug'),
+            genReqId: resolveRequestId,
+            redact: [
+              'req.headers.authorization',
+              'req.headers.cookie',
+              'res.headers["set-cookie"]',
+            ],
+            // Docker probes /health every 30s
+            autoLogging: { ignore: req => req.url?.startsWith('/api/v1/health') ?? false },
+            customLogLevel: (_req, res, err) => {
+              if (err || res.statusCode >= 500) return 'error';
+              if (res.statusCode >= 400) return 'warn';
+              return 'info';
+            },
+            transport: isProduction
+              ? undefined
+              : { target: 'pino-pretty', options: { singleLine: true } },
+          },
+        };
+      },
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRootAsync({
