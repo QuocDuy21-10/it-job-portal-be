@@ -51,7 +51,7 @@ export class MailService {
   async sendNewJobNotificationToFollower(data: NewJobNotificationData): Promise<void> {
     const { userName, userEmail, jobName, companyName, jobId } = data;
 
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const frontendUrl = this.configService.get<string>('FE_URL');
     const jobDetailUrl = `${frontendUrl}/jobs/${jobId}`;
 
     await this.mailerService.sendMail({
@@ -74,7 +74,7 @@ export class MailService {
   async sendApplicationStatusUpdate(data: ApplicationStatusUpdateData): Promise<void> {
     const { userName, userEmail, jobName, companyName, newStatus, resumeId } = data;
 
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const frontendUrl = this.configService.get<string>('FE_URL');
     const applicationUrl = `${frontendUrl}/my-applications/${resumeId}`;
 
     const statusMessages: Record<string, string> = {
@@ -110,7 +110,7 @@ export class MailService {
   async sendJobExpiredNotification(data: JobExpiredNotificationData): Promise<void> {
     const { hrEmail, jobName, companyName, jobId } = data;
 
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const frontendUrl = this.configService.get<string>('FE_URL');
     const jobManageUrl = `${frontendUrl}/hr/jobs/${jobId}`;
 
     await this.mailerService.sendMail({

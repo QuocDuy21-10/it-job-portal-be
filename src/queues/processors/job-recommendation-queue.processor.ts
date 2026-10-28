@@ -95,7 +95,7 @@ export class JobRecommendationQueueProcessor extends WorkerHost {
       this.logger.log(`Found ${matchingJobs.length} matching jobs for subscriber ${subscriberId}`);
 
       // 4. Format job data for email template
-      const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+      const frontendUrl = this.configService.get<string>('FE_URL');
 
       const jobs: JobRecommendationData[] = matchingJobs.map(jobDoc => ({
         name: jobDoc.name,

@@ -70,7 +70,7 @@ export class AuthAccountDeletionService {
     await this.cacheManager.set(`cancel_deletion:${cancelToken}`, userId, GRACE_PERIOD_MS);
     await this.cacheManager.set(`cancel_deletion_user:${userId}`, cancelToken, GRACE_PERIOD_MS);
 
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const frontendUrl = this.configService.get<string>('FE_URL');
     const cancelUrl = `${frontendUrl}/account/cancel-deletion?token=${cancelToken}`;
 
     try {

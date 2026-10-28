@@ -144,7 +144,6 @@ export async function createAuthTestingModule(
             GOOGLE_CLIENT_ID: 'mock-google-client-id',
             OTP_SECRET: 'otp-secret',
             FE_URL: 'http://localhost:3000',
-            FRONTEND_URL: 'http://localhost:3000',
           };
 
           return config[key];
