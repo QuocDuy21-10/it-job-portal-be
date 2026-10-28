@@ -39,6 +39,9 @@ export class JobSource {
     upserted: number;
     closed: number;
   };
+
+  @Prop({ type: [String], default: [] })
+  rejectedExternalIds: string[];
 }
 
 export const JobSourceSchema = SchemaFactory.createForClass(JobSource);

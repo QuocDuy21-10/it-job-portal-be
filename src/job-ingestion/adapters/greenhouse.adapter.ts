@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { decode } from 'he';
 import { EJobSourceProvider } from '../enums/job-source-provider.enum';
-import { IAtsAdapter, IRawAtsJob } from './ats-adapter.interface';
+import { IAtsAdapter, IAtsFetchResult, IRawAtsJob } from './ats-adapter.interface';
 import { assertBoardToken, fetchAtsJson } from './ats-http';
 
 @Injectable()
 export class GreenhouseAdapter implements IAtsAdapter {
   readonly provider = EJobSourceProvider.GREENHOUSE;
 
-  async fetchJobs(boardToken: string): Promise<IRawAtsJob[]> {
+  async fetchJobs(boardToken: string): Promise<IAtsFetchResult> {
     const token = assertBoardToken(boardToken);
     const body = await fetchAtsJson(
       `https://boards-api.greenhouse.io/v1/boards/${token}/jobs?content=true`,
@@ -18,7 +18,7 @@ export class GreenhouseAdapter implements IAtsAdapter {
       throw new Error(`Unexpected Greenhouse response for board ${token}`);
     }
 
-    return body.jobs.map(
+    const jobs = body.jobs.map(
       (job): IRawAtsJob => ({
         externalId: job.id != null ? String(job.id) : '',
         title: job.title?.trim() ?? '',
@@ -29,5 +29,7 @@ export class GreenhouseAdapter implements IAtsAdapter {
         publishedAt: job.first_published ? new Date(job.first_published) : undefined,
       }),
     );
+
+    return { jobs, listedIds: jobs.map(job => job.externalId).filter(Boolean) };
   }
 }

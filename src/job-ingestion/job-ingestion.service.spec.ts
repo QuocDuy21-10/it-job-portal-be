@@ -1,6 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { EJobLevel } from 'src/jobs/enums/job-level.enum';
-import { IRawAtsJob } from './adapters/ats-adapter.interface';
+import { IAtsFetchResult, IRawAtsJob } from './adapters/ats-adapter.interface';
 import { EExternalJobStatus } from './enums/external-job-status.enum';
 import { EJobSourceProvider } from './enums/job-source-provider.enum';
 import { ESyncStatus } from './enums/sync-status.enum';
@@ -26,10 +26,16 @@ const buildRaw = (overrides: Partial<IRawAtsJob> = {}): IRawAtsJob => ({
   ...overrides,
 });
 
+const toFetchResult = (jobs: IRawAtsJob[]): IAtsFetchResult => ({
+  jobs,
+  listedIds: jobs.map(job => job.externalId).filter(Boolean),
+});
+
 const setup = ({
-  source = SOURCE as typeof SOURCE | null,
-  fetchResult = [buildRaw()] as IRawAtsJob[] | Error,
+  source = SOURCE as (typeof SOURCE & { rejectedExternalIds?: string[] }) | null,
+  fetchResult = [buildRaw()] as IRawAtsJob[] | IAtsFetchResult | Error,
   activeCount = 0,
+  knownIds = [] as string[],
 } = {}) => {
   const jobSourceModel = {
     findOne: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(source) }),
@@ -41,9 +47,14 @@ const setup = ({
     bulkWrite: jest.fn().mockResolvedValue({ upsertedCount: 1 }),
     updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
     countDocuments: jest.fn().mockResolvedValue(activeCount),
+    distinct: jest.fn().mockResolvedValue(knownIds),
   };
   const skillsService = {
-    getAliasMap: jest.fn().mockResolvedValue({ 'node.js': 'Node.js' }),
+    getAliasMap: jest.fn().mockResolvedValue({
+      'node.js': 'Node.js',
+      java: 'Java',
+      'spring boot': 'Spring Boot',
+    }),
   };
   const queueService = { enqueueSync: jest.fn().mockResolvedValue(undefined) };
   const greenhouseAdapter = {
@@ -51,7 +62,11 @@ const setup = ({
     fetchJobs:
       fetchResult instanceof Error
         ? jest.fn().mockRejectedValue(fetchResult)
-        : jest.fn().mockResolvedValue(fetchResult),
+        : jest
+            .fn()
+            .mockResolvedValue(
+              Array.isArray(fetchResult) ? toFetchResult(fetchResult) : fetchResult,
+            ),
   };
   const leverAdapter = { provider: EJobSourceProvider.LEVER, fetchJobs: jest.fn() };
 
@@ -81,7 +96,7 @@ describe('JobIngestionService', () => {
 
       await service.syncSource('greenhouse-axon');
 
-      expect(greenhouseAdapter.fetchJobs).toHaveBeenCalledWith('axon');
+      expect(greenhouseAdapter.fetchJobs).toHaveBeenCalledWith('axon', new Set());
 
       const [operations, options] = externalJobModel.bulkWrite.mock.calls[0];
       expect(options).toEqual({ ordered: false });
@@ -114,7 +129,7 @@ describe('JobIngestionService', () => {
         {
           sourceKey: 'greenhouse-axon',
           status: EExternalJobStatus.ACTIVE,
-          externalId: { $nin: ['1'] },
+          $or: [{ externalId: { $nin: ['1'] } }, { expiresAt: { $lt: expect.any(Date) } }],
         },
         { $set: { status: EExternalJobStatus.CLOSED } },
       );
@@ -126,6 +141,7 @@ describe('JobIngestionService', () => {
             lastSyncedAt: expect.any(Date),
             lastSyncStatus: ESyncStatus.SUCCESS,
             lastSyncStats: { fetched: 4, kept: 1, skipped: 1, upserted: 1, closed: 0 },
+            rejectedExternalIds: ['2', '3'],
           },
           $unset: { lastSyncError: 1 },
         },
@@ -162,7 +178,9 @@ describe('JobIngestionService', () => {
 
       expect(externalJobModel.bulkWrite).not.toHaveBeenCalled();
       expect(externalJobModel.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({ externalId: { $nin: [] } }),
+        expect.objectContaining({
+          $or: [{ externalId: { $nin: [] } }, { expiresAt: { $lt: expect.any(Date) } }],
+        }),
         { $set: { status: EExternalJobStatus.CLOSED } },
       );
     });
@@ -207,6 +225,79 @@ describe('JobIngestionService', () => {
           }),
         },
       );
+    });
+
+    it('keeps known listed jobs active without refetching and remembers rejected ids', async () => {
+      const { service, externalJobModel, jobSourceModel, greenhouseAdapter } = setup({
+        source: { ...SOURCE, rejectedExternalIds: ['20', '21'] },
+        knownIds: ['10', '11'],
+        fetchResult: {
+          jobs: [
+            buildRaw({ externalId: '1' }),
+            buildRaw({ externalId: '2', title: 'Kế toán tổng hợp' }),
+          ],
+          listedIds: ['1', '2', '10', '20', '30'],
+          rejectedIds: ['30'],
+        },
+      });
+
+      await service.syncSource('greenhouse-axon');
+
+      expect(externalJobModel.distinct).toHaveBeenCalledWith('externalId', {
+        sourceKey: 'greenhouse-axon',
+      });
+      expect(greenhouseAdapter.fetchJobs).toHaveBeenCalledWith(
+        'axon',
+        new Set(['10', '11', '20', '21']),
+      );
+      expect(externalJobModel.updateMany).toHaveBeenNthCalledWith(
+        1,
+        {
+          sourceKey: 'greenhouse-axon',
+          status: EExternalJobStatus.ACTIVE,
+          externalId: { $in: ['10', '20', '30'] },
+        },
+        { $set: { lastSeenAt: expect.any(Date) } },
+      );
+      expect(externalJobModel.updateMany).toHaveBeenNthCalledWith(
+        2,
+        {
+          sourceKey: 'greenhouse-axon',
+          status: EExternalJobStatus.ACTIVE,
+          $or: [
+            { externalId: { $nin: ['1', '10', '20', '30'] } },
+            { expiresAt: { $lt: expect.any(Date) } },
+          ],
+        },
+        { $set: { status: EExternalJobStatus.CLOSED } },
+      );
+      expect(jobSourceModel.updateOne).toHaveBeenCalledWith(
+        { key: 'greenhouse-axon' },
+        {
+          $set: expect.objectContaining({
+            lastSyncStats: { fetched: 2, kept: 1, skipped: 1, upserted: 1, closed: 0 },
+            rejectedExternalIds: ['20', '30', '2'],
+          }),
+          $unset: { lastSyncError: 1 },
+        },
+      );
+    });
+
+    it('records an early stop as a note on a successful sync', async () => {
+      const { service, jobSourceModel } = setup({
+        fetchResult: { jobs: [buildRaw()], listedIds: ['1', '2'], stoppedEarly: '429' },
+      });
+
+      await service.syncSource('greenhouse-axon');
+
+      const [, update] = jobSourceModel.updateOne.mock.calls[0];
+      expect(update.$set).toEqual(
+        expect.objectContaining({
+          lastSyncStatus: ESyncStatus.SUCCESS,
+          lastSyncError: 'stopped early: 429',
+        }),
+      );
+      expect(update.$unset).toBeUndefined();
     });
 
     it('skips disabled sources', async () => {

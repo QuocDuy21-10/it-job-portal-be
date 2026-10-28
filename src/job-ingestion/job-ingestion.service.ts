@@ -86,9 +86,18 @@ export class JobIngestionService {
         throw new UnrecoverableError(`No adapter for provider ${source.provider}`);
       }
 
-      const raws = await adapter.fetchJobs(source.boardToken);
+      const knownIds = new Set<string>([
+        ...(await this.externalJobModel.distinct('externalId', { sourceKey })),
+        ...(source.rejectedExternalIds ?? []),
+      ]);
+      const {
+        jobs: raws,
+        listedIds,
+        rejectedIds = [],
+        stoppedEarly,
+      } = await adapter.fetchJobs(source.boardToken, knownIds);
 
-      if (raws.length === 0) {
+      if (listedIds.length === 0) {
         const activeCount = await this.externalJobModel.countDocuments({
           sourceKey,
           status: EExternalJobStatus.ACTIVE,
@@ -103,6 +112,10 @@ export class JobIngestionService {
 
       const validRaws = raws.filter(hasRequiredFields);
       const keptRaws = validRaws.filter(raw => isItJob(raw.title) && isVnOrRemote(raw));
+      const keptIds = keptRaws.map(raw => raw.externalId);
+      const fetchedIds = new Set(raws.map(raw => raw.externalId));
+      // Listed but not refetched this run (incremental adapters skip known ids).
+      const stillListedIds = listedIds.filter(id => !fetchedIds.has(id));
       const aliasMap = await this.skillsService.getAliasMap();
       const now = new Date();
 
@@ -124,14 +137,35 @@ export class JobIngestionService {
         upserted = writeResult.upsertedCount;
       }
 
+      if (stillListedIds.length > 0) {
+        await this.externalJobModel.updateMany(
+          { sourceKey, status: EExternalJobStatus.ACTIVE, externalId: { $in: stillListedIds } },
+          { $set: { lastSeenAt: now } },
+        );
+      }
+
       const closeResult = await this.externalJobModel.updateMany(
         {
           sourceKey,
           status: EExternalJobStatus.ACTIVE,
-          externalId: { $nin: keptRaws.map(raw => raw.externalId) },
+          $or: [
+            { externalId: { $nin: [...keptIds, ...stillListedIds] } },
+            { expiresAt: { $lt: now } },
+          ],
         },
         { $set: { status: EExternalJobStatus.CLOSED } },
       );
+
+      const keptIdSet = new Set(keptIds);
+      const listedIdSet = new Set(listedIds);
+      // Pruned to listed ids so the list never outgrows the source.
+      const rejectedExternalIds = [
+        ...new Set([
+          ...(source.rejectedExternalIds ?? []),
+          ...rejectedIds,
+          ...raws.map(raw => raw.externalId).filter(id => id && !keptIdSet.has(id)),
+        ]),
+      ].filter(id => listedIdSet.has(id));
 
       await this.jobSourceModel.updateOne(
         { key: sourceKey },
@@ -142,12 +176,14 @@ export class JobIngestionService {
             lastSyncStats: {
               fetched: raws.length,
               kept: keptRaws.length,
-              skipped: raws.length - validRaws.length,
+              skipped: raws.length - validRaws.length + rejectedIds.length,
               upserted,
               closed: closeResult.modifiedCount,
             },
+            rejectedExternalIds,
+            ...(stoppedEarly ? { lastSyncError: `stopped early: ${stoppedEarly}` } : {}),
           },
-          $unset: { lastSyncError: 1 },
+          ...(stoppedEarly ? {} : { $unset: { lastSyncError: 1 } }),
         },
       );
       this.logger.log(`Synced job source ${sourceKey}: ${keptRaws.length} kept of ${raws.length}`);

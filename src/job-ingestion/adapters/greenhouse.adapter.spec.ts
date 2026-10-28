@@ -23,13 +23,14 @@ describe('GreenhouseAdapter', () => {
   it('fetches the board with content and maps every job', async () => {
     const fetchSpy = mockFetch(200, fixture);
 
-    const jobs = await adapter.fetchJobs('axon');
+    const { jobs, listedIds } = await adapter.fetchJobs('axon');
 
     expect(fetchSpy).toHaveBeenCalledWith(
       'https://boards-api.greenhouse.io/v1/boards/axon/jobs?content=true',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(jobs).toHaveLength(3);
+    expect(listedIds).toEqual(['7001', '7002', '7003']);
     expect(jobs[0]).toEqual({
       externalId: '7001',
       title: 'Backend Software Engineer',

@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { EJobSourceProvider } from '../enums/job-source-provider.enum';
-import { IAtsAdapter, IRawAtsJob } from './ats-adapter.interface';
+import { IAtsAdapter, IAtsFetchResult, IRawAtsJob } from './ats-adapter.interface';
 import { assertBoardToken, fetchAtsJson } from './ats-http';
 
 @Injectable()
 export class LeverAdapter implements IAtsAdapter {
   readonly provider = EJobSourceProvider.LEVER;
 
-  async fetchJobs(boardToken: string): Promise<IRawAtsJob[]> {
+  async fetchJobs(boardToken: string): Promise<IAtsFetchResult> {
     const token = assertBoardToken(boardToken);
     const body = await fetchAtsJson(`https://api.lever.co/v0/postings/${token}?mode=json`);
 
@@ -15,7 +15,7 @@ export class LeverAdapter implements IAtsAdapter {
       throw new Error(`Unexpected Lever response for site ${token}`);
     }
 
-    return body.map(
+    const jobs = body.map(
       (posting): IRawAtsJob => ({
         externalId: posting.id ?? '',
         title: posting.text?.trim() ?? '',
@@ -29,6 +29,8 @@ export class LeverAdapter implements IAtsAdapter {
           typeof posting.createdAt === 'number' ? new Date(posting.createdAt) : undefined,
       }),
     );
+
+    return { jobs, listedIds: jobs.map(job => job.externalId).filter(Boolean) };
   }
 
   private buildDescriptionHtml(posting: any): string {

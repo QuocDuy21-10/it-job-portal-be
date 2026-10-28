@@ -21,13 +21,17 @@ describe('LeverAdapter', () => {
   it('fetches postings in json mode and maps every posting', async () => {
     const fetchSpy = mockFetch(200, fixture);
 
-    const jobs = await adapter.fetchJobs('ninjavan');
+    const { jobs, listedIds } = await adapter.fetchJobs('ninjavan');
 
     expect(fetchSpy).toHaveBeenCalledWith(
       'https://api.lever.co/v0/postings/ninjavan?mode=json',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(jobs).toHaveLength(2);
+    expect(listedIds).toEqual([
+      '6ed76ce8-4156-4b60-b120-403538bd66cd',
+      '0b1c2d3e-0000-4000-8000-000000000002',
+    ]);
     expect(jobs[0]).toEqual({
       externalId: '6ed76ce8-4156-4b60-b120-403538bd66cd',
       title: 'Software Engineer (Backend)',
