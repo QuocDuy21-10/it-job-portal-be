@@ -291,7 +291,9 @@ describe('ingestion-filters', () => {
   describe('buildExcerpt', () => {
     it('strips tags, decodes entities and escapes the result', () => {
       expect(
-        buildExcerpt('<p style="x">Build &amp; run <strong>payment</strong>&nbsp;APIs &lt;fast&gt;</p>'),
+        buildExcerpt(
+          '<p style="x">Build &amp; run <strong>payment</strong>&nbsp;APIs &lt;fast&gt;</p>',
+        ),
       ).toBe('<p>Build &amp; run payment APIs &lt;fast&gt;</p>');
     });
 

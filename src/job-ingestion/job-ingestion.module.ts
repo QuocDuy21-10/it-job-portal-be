@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { SkillsModule } from 'src/skills/skills.module';
 import { GreenhouseAdapter } from './adapters/greenhouse.adapter';
 import { LeverAdapter } from './adapters/lever.adapter';
+import { TopDevAdapter } from './adapters/topdev.adapter';
 import { JobIngestionService } from './job-ingestion.service';
 import { JobSourcesController } from './job-sources.controller';
 import { ExternalJob, ExternalJobSchema } from './schemas/external-job.schema';
@@ -18,7 +19,7 @@ import { JobSource, JobSourceSchema } from './schemas/job-source.schema';
     SkillsModule,
   ],
   controllers: [JobSourcesController],
-  providers: [JobIngestionService, GreenhouseAdapter, LeverAdapter],
+  providers: [JobIngestionService, GreenhouseAdapter, LeverAdapter, TopDevAdapter],
   exports: [JobIngestionService],
 })
 export class JobIngestionModule {}

@@ -8,6 +8,7 @@ import { SkillsService } from 'src/skills/skills.service';
 import { IAtsAdapter, IRawAtsJob } from './adapters/ats-adapter.interface';
 import { GreenhouseAdapter } from './adapters/greenhouse.adapter';
 import { LeverAdapter } from './adapters/lever.adapter';
+import { TopDevAdapter } from './adapters/topdev.adapter';
 import { EExternalJobStatus } from './enums/external-job-status.enum';
 import { EJobSourceProvider } from './enums/job-source-provider.enum';
 import { ESyncStatus } from './enums/sync-status.enum';
@@ -43,9 +44,10 @@ export class JobIngestionService {
     private readonly jobIngestionQueueService: JobIngestionQueueService,
     greenhouseAdapter: GreenhouseAdapter,
     leverAdapter: LeverAdapter,
+    topDevAdapter: TopDevAdapter,
   ) {
     this.adapters = new Map<EJobSourceProvider, IAtsAdapter>(
-      [greenhouseAdapter, leverAdapter].map(adapter => [adapter.provider, adapter]),
+      [greenhouseAdapter, leverAdapter, topDevAdapter].map(adapter => [adapter.provider, adapter]),
     );
   }
 

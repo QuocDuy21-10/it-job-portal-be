@@ -69,6 +69,7 @@ const setup = ({
             ),
   };
   const leverAdapter = { provider: EJobSourceProvider.LEVER, fetchJobs: jest.fn() };
+  const topDevAdapter = { provider: EJobSourceProvider.TOPDEV, fetchJobs: jest.fn() };
 
   const service = new JobIngestionService(
     jobSourceModel as any,
@@ -77,6 +78,7 @@ const setup = ({
     queueService as any,
     greenhouseAdapter as any,
     leverAdapter as any,
+    topDevAdapter as any,
   );
 
   return { service, jobSourceModel, externalJobModel, queueService, greenhouseAdapter };

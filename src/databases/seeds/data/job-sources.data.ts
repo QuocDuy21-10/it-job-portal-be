@@ -38,4 +38,12 @@ export const JOB_SOURCES_SEED_DATA: JobSourceSeed[] = [
     companyName: 'Ninja Van',
     enabled: true,
   },
+  // Aggregator: company comes from each posting; boardToken is unused by the adapter.
+  {
+    key: 'topdev',
+    provider: EJobSourceProvider.TOPDEV,
+    boardToken: 'topdev',
+    companyName: 'TopDev',
+    enabled: true,
+  },
 ];
