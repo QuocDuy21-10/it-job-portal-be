@@ -74,7 +74,11 @@ export class JobLifecycleService {
     };
 
     return listedIds
-      .map(id => ({ id, rank: rankOf(id), fetchedAt: known.get(id)?.lastFetchedAt?.getTime() ?? 0 }))
+      .map(id => ({
+        id,
+        rank: rankOf(id),
+        fetchedAt: known.get(id)?.lastFetchedAt?.getTime() ?? 0,
+      }))
       .filter((entry): entry is RankedId => entry.rank !== undefined)
       .sort((a, b) => a.rank - b.rank || a.fetchedAt - b.fetchedAt)
       .map(entry => entry.id);
