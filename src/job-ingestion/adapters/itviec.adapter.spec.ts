@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { EJobSourceProvider } from '../enums/job-source-provider.enum';
+import { ERejectionReason } from '../enums/rejection-reason.enum';
 import { ItviecAdapter } from './itviec.adapter';
 
 const readFixture = (name: string) => readFileSync(join(__dirname, '__fixtures__', name), 'utf8');
@@ -27,6 +28,10 @@ const SITEMAP_ROUTES = {
   [JOBS_URL]: { status: 200, body: readFixture('itviec-sitemap-jobs.xml') },
 };
 
+const skip = (...knownIds: string[]) => ({
+  selectForFetch: (ids: string[]) => ids.filter(id => !knownIds.includes(id)),
+});
+
 describe('ItviecAdapter', () => {
   const adapter = new ItviecAdapter();
 
@@ -46,7 +51,7 @@ describe('ItviecAdapter', () => {
       [BRIDGE_URL]: { status: 200, body: readFixture('itviec-detail.html') },
     });
 
-    const result = await adapter.fetchJobs('itviec', new Set([BA_SLUG]));
+    const result = await adapter.fetchJobs('itviec', skip(BA_SLUG));
 
     // Numeric suffixes repeat across companies on ITviec, so only the slug is unique.
     expect(result.listedIds).toEqual([BRIDGE_SLUG, BA_SLUG]);
@@ -78,7 +83,7 @@ describe('ItviecAdapter', () => {
     );
     mockRoutes({ ...SITEMAP_ROUTES, [BRIDGE_URL]: { status: 200, body: detail } });
 
-    const result = await adapter.fetchJobs('itviec', new Set([BA_SLUG]));
+    const result = await adapter.fetchJobs('itviec', skip(BA_SLUG));
 
     expect(result.jobs[0].salaryText).toBe('1.500 – 2.500 USD');
   });
@@ -88,9 +93,11 @@ describe('ItviecAdapter', () => {
     const expiredPage = `<html><script src="/recaptcha_controller.js"></script>${'x'.repeat(60_000)}</html>`;
     mockRoutes({ ...SITEMAP_ROUTES, [BRIDGE_URL]: { status: 200, body: expiredPage } });
 
-    const result = await adapter.fetchJobs('itviec', new Set([BA_SLUG]));
+    const result = await adapter.fetchJobs('itviec', skip(BA_SLUG));
 
     expect(result.stoppedEarly).toBeUndefined();
-    expect(result.rejectedIds).toEqual([BRIDGE_SLUG]);
+    expect(result.rejected).toEqual([
+      { externalId: BRIDGE_SLUG, reason: ERejectionReason.NO_STRUCTURED_DATA },
+    ]);
   });
 });

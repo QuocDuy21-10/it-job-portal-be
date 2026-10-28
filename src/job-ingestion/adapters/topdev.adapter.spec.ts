@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { UnrecoverableError } from 'bullmq';
 import { EJobSourceProvider } from '../enums/job-source-provider.enum';
+import { ERejectionReason } from '../enums/rejection-reason.enum';
 import { TopDevAdapter } from './topdev.adapter';
 
 const readFixture = (name: string) => readFileSync(join(__dirname, '__fixtures__', name), 'utf8');
@@ -40,6 +41,11 @@ const mockRoutes = (routes: Record<string, Route>) =>
 
 const fetchedUrls = (fetchSpy: jest.SpyInstance) => fetchSpy.mock.calls.map(([url]) => String(url));
 
+const selectAll = { selectForFetch: (ids: string[]) => ids };
+const skip = (...knownIds: string[]) => ({
+  selectForFetch: (ids: string[]) => ids.filter(id => !knownIds.includes(id)),
+});
+
 describe('TopDevAdapter', () => {
   const adapter = new TopDevAdapter();
 
@@ -60,7 +66,7 @@ describe('TopDevAdapter', () => {
       [DATA_URL]: { status: 404 },
     });
 
-    const result = await adapter.fetchJobs('topdev', new Set(['2140004']));
+    const result = await adapter.fetchJobs('topdev', skip('2140004'));
 
     expect(result.listedIds).toEqual(['2140001', '2140004', '2140005']);
     expect(fetchedUrls(fetchSpy)).toEqual([INDEX_URL, PAGE_1_URL, PAGE_2_URL, JAVA_URL, DATA_URL]);
@@ -68,10 +74,13 @@ describe('TopDevAdapter', () => {
       JAVA_URL,
       expect.objectContaining({
         headers: { 'User-Agent': 'DevLinkBot/1.0' },
+        redirect: 'manual',
         signal: expect.any(AbortSignal),
       }),
     );
-    expect(result.rejectedIds).toEqual(['2140005']);
+    expect(result.rejected).toEqual([
+      { externalId: '2140005', reason: ERejectionReason.NOT_FOUND },
+    ]);
     expect(result.stoppedEarly).toBeUndefined();
     expect(result.jobs).toEqual([
       {
@@ -96,7 +105,7 @@ describe('TopDevAdapter', () => {
     const sleepSpy = jest.spyOn(TopDevAdapter.prototype as any, 'sleep');
     mockRoutes({ ...SITEMAP_ROUTES, [JAVA_URL]: { status: 404 } });
 
-    await adapter.fetchJobs('topdev', new Set(['2140004', '2140005']));
+    await adapter.fetchJobs('topdev', skip('2140004', '2140005'));
 
     expect(sleepSpy.mock.calls).toEqual([[500], [500], [1000]]);
   });
@@ -114,21 +123,21 @@ describe('TopDevAdapter', () => {
     urls.forEach(url => (routes[url] = { status: 404 }));
     const fetchSpy = mockRoutes(routes);
 
-    const result = await adapter.fetchJobs('topdev', new Set());
+    const result = await adapter.fetchJobs('topdev', selectAll);
 
     expect(result.listedIds).toHaveLength(160);
     expect(fetchSpy).toHaveBeenCalledTimes(2 + 150);
-    expect(result.rejectedIds).toHaveLength(150);
+    expect(result.rejected).toHaveLength(150);
   });
 
   it.each([403, 429])('stops fetching details on HTTP %i', async status => {
     const fetchSpy = mockRoutes({ ...SITEMAP_ROUTES, [JAVA_URL]: { status } });
 
-    const result = await adapter.fetchJobs('topdev', new Set());
+    const result = await adapter.fetchJobs('topdev', selectAll);
 
     expect(result.stoppedEarly).toBe(String(status));
     expect(result.jobs).toEqual([]);
-    expect(result.rejectedIds).toEqual([]);
+    expect(result.rejected).toEqual([]);
     expect(fetchedUrls(fetchSpy)).not.toContain(QA_URL);
   });
 
@@ -138,7 +147,7 @@ describe('TopDevAdapter', () => {
       [JAVA_URL]: { status: 200, body: '<html><div class="g-recaptcha">captcha</div></html>' },
     });
 
-    const result = await adapter.fetchJobs('topdev', new Set());
+    const result = await adapter.fetchJobs('topdev', selectAll);
 
     expect(result.stoppedEarly).toBe('captcha');
   });
@@ -151,29 +160,55 @@ describe('TopDevAdapter', () => {
       [DATA_URL]: new Error('timeout'),
     });
 
-    const result = await adapter.fetchJobs('topdev', new Set());
+    const result = await adapter.fetchJobs('topdev', selectAll);
 
     expect(result.jobs).toEqual([]);
-    expect(result.rejectedIds).toEqual(['2140001']);
+    expect(result.rejected).toEqual([
+      { externalId: '2140001', reason: ERejectionReason.NO_STRUCTURED_DATA },
+    ]);
     expect(result.stoppedEarly).toBeUndefined();
   });
 
   it('throws when a sitemap page fails so no job gets closed by mistake', async () => {
     mockRoutes({ ...SITEMAP_ROUTES, [PAGE_2_URL]: { status: 500 } });
 
-    await expect(adapter.fetchJobs('topdev', new Set())).rejects.toThrow('status 500');
+    await expect(adapter.fetchJobs('topdev', selectAll)).rejects.toThrow('status 500');
   });
 
   it('throws when the sitemap index lists no job pages', async () => {
     mockRoutes({ [INDEX_URL]: { status: 200, body: '<sitemapindex></sitemapindex>' } });
 
-    await expect(adapter.fetchJobs('topdev', new Set())).rejects.toThrow('no job pages');
+    await expect(adapter.fetchJobs('topdev', selectAll)).rejects.toThrow('no job pages');
+  });
+
+  it('fetches details in the order chosen by selectForFetch', async () => {
+    const fetchSpy = mockRoutes({
+      ...SITEMAP_ROUTES,
+      [JAVA_URL]: { status: 404 },
+      [DATA_URL]: { status: 404 },
+    });
+
+    await adapter.fetchJobs('topdev', { selectForFetch: () => ['2140005', '2140001'] });
+
+    expect(fetchedUrls(fetchSpy).slice(3)).toEqual([DATA_URL, JAVA_URL]);
+  });
+
+  it('retries an oversized detail page next time instead of rejecting it', async () => {
+    mockRoutes({
+      ...SITEMAP_ROUTES,
+      [JAVA_URL]: { status: 200, body: 'x'.repeat(2 * 1024 * 1024 + 1) },
+    });
+
+    const result = await adapter.fetchJobs('topdev', { selectForFetch: () => ['2140001'] });
+
+    expect(result.jobs).toEqual([]);
+    expect(result.rejected).toEqual([]);
   });
 
   it('rejects an invalid board token without calling fetch', async () => {
     const fetchSpy = jest.spyOn(global, 'fetch');
 
-    await expect(adapter.fetchJobs('../evil', new Set())).rejects.toBeInstanceOf(
+    await expect(adapter.fetchJobs('../evil', selectAll)).rejects.toBeInstanceOf(
       UnrecoverableError,
     );
     expect(fetchSpy).not.toHaveBeenCalled();

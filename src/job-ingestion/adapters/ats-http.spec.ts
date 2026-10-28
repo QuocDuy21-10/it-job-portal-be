@@ -35,7 +35,10 @@ describe('ats-http', () => {
         .mockResolvedValueOnce(redirectTo('/b', 301))
         .mockResolvedValueOnce(new Response('done'));
 
-      const response = await safeFetch('https://topdev.vn/a', { allowedHosts: HOSTS, maxBytes: 10 });
+      const response = await safeFetch('https://topdev.vn/a', {
+        allowedHosts: HOSTS,
+        maxBytes: 10,
+      });
 
       expect(response.text).toBe('done');
       expect(String(fetchSpy.mock.calls[1][0])).toBe('https://topdev.vn/b');

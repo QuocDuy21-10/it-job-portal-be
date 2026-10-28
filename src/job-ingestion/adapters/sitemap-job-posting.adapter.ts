@@ -1,8 +1,16 @@
 import { setTimeout as delay } from 'timers/promises';
 import { EJobSourceProvider } from '../enums/job-source-provider.enum';
+import { ERejectionReason } from '../enums/rejection-reason.enum';
 import { buildExcerpt, formatSalaryText } from '../ingestion-filters';
-import { IAtsAdapter, IAtsFetchResult, IRawAtsJob } from './ats-adapter.interface';
-import { assertBoardToken } from './ats-http';
+import { MAX_DETAIL_BYTES, MAX_SITEMAP_BYTES } from '../job-ingestion.constants';
+import {
+  IAtsAdapter,
+  IAtsFetchOptions,
+  IAtsFetchResult,
+  IRawAtsJob,
+  IRejectedAtsJob,
+} from './ats-adapter.interface';
+import { ISafeFetchResponse, assertBoardToken, safeFetch } from './ats-http';
 
 const LOC_PATTERN = /<loc>\s*([^<\s]+)\s*<\/loc>/g;
 // Quote style differs per site (TopDev uses ", ITviec uses ').
@@ -13,14 +21,13 @@ const MAX_CHALLENGE_PAGE_LENGTH = 20_000;
 const BLOCKED_STATUSES = new Set([403, 429]);
 const PLACEHOLDER_ADDRESS_PARTS = new Set(['not available']);
 const USER_AGENT = 'DevLinkBot/1.0';
-const FETCH_TIMEOUT_MS = 15_000;
 const SITEMAP_DELAY_MS = 500;
 const DETAIL_DELAY_MS = 1_000;
 const MAX_DETAIL_FETCHES_PER_SYNC = 150;
 
 type DetailOutcome =
   | { kind: 'job'; job: IRawAtsJob }
-  | { kind: 'rejected' }
+  | { kind: 'rejected'; reason: ERejectionReason }
   | { kind: 'retry-later' }
   | { kind: 'blocked'; reason: string };
 
@@ -61,7 +68,8 @@ const addressPart = (value: unknown): string => {
 
 /**
  * Job boards that publish a sitemap of job pages, each carrying a schema.org JobPosting in JSON-LD.
- * Only new ids are fetched, politely and sequentially; subclasses describe where the pages live.
+ * Detail pages are fetched politely and sequentially, in the order the caller chooses;
+ * subclasses describe where the pages live.
  */
 export abstract class SitemapJobPostingAdapter implements IAtsAdapter {
   abstract readonly provider: EJobSourceProvider;
@@ -76,18 +84,25 @@ export abstract class SitemapJobPostingAdapter implements IAtsAdapter {
     return formatSalaryText(baseSalary);
   }
 
-  async fetchJobs(boardToken: string, knownIds: ReadonlySet<string>): Promise<IAtsFetchResult> {
+  async fetchJobs(
+    boardToken: string,
+    { selectForFetch }: IAtsFetchOptions,
+  ): Promise<IAtsFetchResult> {
     assertBoardToken(boardToken);
 
     const listedUrls = await this.fetchListedJobUrls();
-    const toFetch = [...listedUrls]
-      .filter(([id]) => !knownIds.has(id))
-      .slice(0, MAX_DETAIL_FETCHES_PER_SYNC);
+    const toFetch = selectForFetch([...listedUrls.keys()]).slice(0, MAX_DETAIL_FETCHES_PER_SYNC);
     const jobs: IRawAtsJob[] = [];
-    const rejectedIds: string[] = [];
+    const rejected: IRejectedAtsJob[] = [];
     let stoppedEarly: string | undefined;
 
-    for (const [id, url] of toFetch) {
+    for (const id of toFetch) {
+      const url = listedUrls.get(id);
+
+      if (!url) {
+        continue;
+      }
+
       await this.sleep(DETAIL_DELAY_MS);
       const outcome = await this.fetchDetail(id, url);
 
@@ -99,11 +114,11 @@ export abstract class SitemapJobPostingAdapter implements IAtsAdapter {
       if (outcome.kind === 'job') {
         jobs.push(outcome.job);
       } else if (outcome.kind === 'rejected') {
-        rejectedIds.push(id);
+        rejected.push({ externalId: id, reason: outcome.reason });
       }
     }
 
-    return { jobs, listedIds: [...listedUrls.keys()], rejectedIds, stoppedEarly };
+    return { jobs, listedIds: [...listedUrls.keys()], rejected, stoppedEarly };
   }
 
   protected async sleep(ms: number): Promise<void> {
@@ -137,7 +152,7 @@ export abstract class SitemapJobPostingAdapter implements IAtsAdapter {
   }
 
   private async fetchSitemap(url: string): Promise<string> {
-    const response = await this.request(url);
+    const response = await this.request(url, MAX_SITEMAP_BYTES);
 
     if (!response.ok) {
       throw new Error(
@@ -145,33 +160,32 @@ export abstract class SitemapJobPostingAdapter implements IAtsAdapter {
       );
     }
 
-    return response.text();
+    return response.text;
   }
 
   private async fetchDetail(id: string, url: string): Promise<DetailOutcome> {
-    let html: string;
+    let response: ISafeFetchResponse;
 
     try {
-      const response = await this.request(url);
-
-      if (BLOCKED_STATUSES.has(response.status)) {
-        return { kind: 'blocked', reason: String(response.status) };
-      }
-
-      if (response.status === 404) {
-        return { kind: 'rejected' };
-      }
-
-      if (!response.ok) {
-        return { kind: 'retry-later' };
-      }
-
-      html = await response.text();
+      response = await this.request(url, MAX_DETAIL_BYTES);
     } catch {
-      // Timeouts and network errors: the job stays unknown and is retried next sync.
+      // Timeouts, network errors, oversized or redirected-away pages: retried next sync.
       return { kind: 'retry-later' };
     }
 
+    if (BLOCKED_STATUSES.has(response.status)) {
+      return { kind: 'blocked', reason: String(response.status) };
+    }
+
+    if (response.status === 404) {
+      return { kind: 'rejected', reason: ERejectionReason.NOT_FOUND };
+    }
+
+    if (!response.ok) {
+      return { kind: 'retry-later' };
+    }
+
+    const html = response.text;
     const posting = findJobPosting(html);
 
     if (posting) {
@@ -180,7 +194,7 @@ export abstract class SitemapJobPostingAdapter implements IAtsAdapter {
 
     return html.length < MAX_CHALLENGE_PAGE_LENGTH && BOT_CHALLENGE_PATTERN.test(html)
       ? { kind: 'blocked', reason: 'captcha' }
-      : { kind: 'rejected' };
+      : { kind: 'rejected', reason: ERejectionReason.NO_STRUCTURED_DATA };
   }
 
   private toRawJob(externalId: string, url: string, posting: any): IRawAtsJob {
@@ -218,10 +232,12 @@ export abstract class SitemapJobPostingAdapter implements IAtsAdapter {
     };
   }
 
-  private request(url: string): Promise<Response> {
-    return fetch(url, {
+  private request(url: string, maxBytes: number): Promise<ISafeFetchResponse> {
+    // Listing and detail pages live on the sitemap's own host.
+    return safeFetch(url, {
+      allowedHosts: new Set([new URL(this.sitemapIndexUrl).hostname]),
+      maxBytes,
       headers: { 'User-Agent': USER_AGENT },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
   }
 }
