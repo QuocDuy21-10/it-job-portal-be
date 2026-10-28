@@ -3,16 +3,21 @@ import { ResumesController } from './resumes.controller';
 import { ResumesService } from './resumes.service';
 import { ResumeProcessingService } from './resume-processing.service';
 import { ResumeQueueService } from 'src/queues/services/resume-queue.service';
+import { ThrottlerGuard } from '@nestjs/throttler';
+import { ApplicationSubmissionService } from './services/application-submission.service';
 import mongoose from 'mongoose';
 
 describe('ResumesController', () => {
   let controller: ResumesController;
   let mockResumesService: any;
+  let mockApplicationSubmissionService: any;
 
   beforeEach(async () => {
     mockResumesService = {
-      submitCvOnline: jest.fn(),
       notifyHrNewApplication: jest.fn().mockResolvedValue(undefined),
+    };
+    mockApplicationSubmissionService = {
+      submitCvOnline: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -21,8 +26,12 @@ describe('ResumesController', () => {
         { provide: ResumesService, useValue: mockResumesService },
         { provide: ResumeProcessingService, useValue: {} },
         { provide: ResumeQueueService, useValue: {} },
+        { provide: ApplicationSubmissionService, useValue: mockApplicationSubmissionService },
       ],
-    }).compile();
+    })
+      .overrideGuard(ThrottlerGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<ResumesController>(ResumesController);
   });
@@ -33,7 +42,7 @@ describe('ResumesController', () => {
       const jobId = new mongoose.Types.ObjectId();
       const resumeId = new mongoose.Types.ObjectId();
 
-      mockResumesService.submitCvOnline.mockResolvedValue({
+      mockApplicationSubmissionService.submitCvOnline.mockResolvedValue({
         _id: resumeId,
         jobId,
         jobName: 'Developer',
@@ -77,7 +86,7 @@ describe('ResumesController', () => {
     it('should not fail the request when notification throws', async () => {
       const companyId = new mongoose.Types.ObjectId();
 
-      mockResumesService.submitCvOnline.mockResolvedValue({
+      mockApplicationSubmissionService.submitCvOnline.mockResolvedValue({
         _id: new mongoose.Types.ObjectId(),
         jobId: new mongoose.Types.ObjectId(),
         jobName: 'Developer',

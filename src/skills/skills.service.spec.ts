@@ -4,6 +4,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SkillsService } from './skills.service';
 import { Skill } from './schemas/skill.schema';
+import { Job } from 'src/jobs/schemas/job.schema';
 
 describe('SkillsService', () => {
   let service: SkillsService;
@@ -32,6 +33,7 @@ describe('SkillsService', () => {
         SkillsService,
         { provide: CACHE_MANAGER, useValue: cacheManager },
         { provide: getModelToken(Skill.name), useValue: skillModel },
+        { provide: getModelToken(Job.name), useValue: { aggregate: jest.fn() } },
       ],
     }).compile();
 
