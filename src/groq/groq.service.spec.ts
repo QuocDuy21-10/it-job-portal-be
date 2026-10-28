@@ -241,4 +241,21 @@ describe('GroqService', () => {
       }),
     );
   });
+
+  it('does not trust structured job IDs in streaming mode when no recommend_jobs tool call was accepted', async () => {
+    const { service, create } = createService({ GROQ_API_KEY: 'test-key' });
+    create
+      .mockResolvedValueOnce(createCompletion(null, []))
+      .mockResolvedValueOnce(
+        createCompletion(JSON.stringify({ text: 'General advice.', recommendedJobIds: ['job-1'] })),
+      );
+
+    const generator = service.chatWithContextStreamAndTools('show jobs', [], 'system prompt');
+
+    await generator.next();
+    await expect(generator.next()).resolves.toEqual({
+      done: true,
+      value: expect.objectContaining({ recommendedJobIds: [] }),
+    });
+  });
 });
