@@ -46,4 +46,11 @@ export const JOB_SOURCES_SEED_DATA: JobSourceSeed[] = [
     companyName: 'TopDev',
     enabled: true,
   },
+  {
+    key: 'itviec',
+    provider: EJobSourceProvider.ITVIEC,
+    boardToken: 'itviec',
+    companyName: 'ITviec',
+    enabled: true,
+  },
 ];
