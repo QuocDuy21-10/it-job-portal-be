@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nestjs';
 import { randomUUID } from 'crypto';
 import { IncomingMessage, ServerResponse } from 'http';
 
@@ -10,5 +11,6 @@ export function resolveRequestId(req: IncomingMessage, res: ServerResponse): str
   const id =
     typeof incoming === 'string' && SAFE_REQUEST_ID.test(incoming) ? incoming : randomUUID();
   res.setHeader('X-Request-Id', id);
+  Sentry.getIsolationScope().setTag('request_id', id);
   return id;
 }

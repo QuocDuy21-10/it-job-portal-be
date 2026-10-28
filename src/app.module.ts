@@ -30,10 +30,13 @@ import { CaslModule } from './casl';
 import { SkillsModule } from './skills/skills.module';
 import { validateEnv } from './config/env.validation';
 import { LoggerModule } from 'nestjs-pino';
+import { APP_FILTER } from '@nestjs/core';
+import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
 import { resolveRequestId } from './utils/helpers/request-id.helper';
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
     ConfigModule.forRoot({
       envFilePath: '.env',
       isGlobal: true,
@@ -120,5 +123,7 @@ import { resolveRequestId } from './utils/helpers/request-id.helper';
     StatisticsModule,
     CaslModule,
   ],
+  // Reports unexpected errors; HttpExceptions (4xx) are skipped and the response body is unchanged.
+  providers: [{ provide: APP_FILTER, useClass: SentryGlobalFilter }],
 })
 export class AppModule {}
