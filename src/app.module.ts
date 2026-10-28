@@ -28,9 +28,15 @@ import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CaslModule } from './casl';
 import { SkillsModule } from './skills/skills.module';
+import { validateEnv } from './config/env.validation';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      envFilePath: '.env',
+      isGlobal: true,
+      validate: validateEnv,
+    }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
@@ -61,10 +67,6 @@ import { SkillsModule } from './skills/skills.module';
         },
       }),
       inject: [ConfigService],
-    }),
-    ConfigModule.forRoot({
-      envFilePath: '.env',
-      isGlobal: true,
     }),
     RedisModule,
     CvParserModule,
