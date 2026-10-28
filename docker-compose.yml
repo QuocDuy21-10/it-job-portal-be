@@ -1,3 +1,7 @@
+# Local development: MongoDB + Redis (backend runs on the host with `npm run dev`).
+# `npm run docker:full` also runs the backend in a container with hot reload.
+# Ports are bound to 127.0.0.1 so the databases are never reachable from the network.
+# For a VPS use docker-compose.prod.yml instead.
 services:
   mongodb:
     image: mongo:7.0
@@ -8,14 +12,14 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-123456}
       MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-my-job-portal}
     ports:
-      - '27017:27017'
+      - '127.0.0.1:27017:27017'
     volumes:
       - mongodb_data:/data/db
       - mongodb_config:/data/configdb
     networks:
       - job-portal-network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh -u root -p 123456 --authenticationDatabase admin --quiet
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,7 +30,7 @@ services:
     container_name: job-portal-redis
     restart: unless-stopped
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     volumes:
       - redis_data:/data
     networks:
@@ -43,30 +47,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: ${NODE_ENV:-development}
+      target: development
     container_name: job-portal-backend
     restart: unless-stopped
-    ports:
-      - '${PORT:-8081}:${PORT:-8081}'
+    env_file: .env
     environment:
-      - PORT=${PORT:-8081}
-      - MONGO_URL=mongodb://${MONGO_INITDB_ROOT_USERNAME:-root}:${MONGO_INITDB_ROOT_PASSWORD:-123456}@mongodb:27017/${MONGO_INITDB_DATABASE:-my-job-portal}?authSource=admin
-      - NODE_ENV=${NODE_ENV:-development}
-      - JWT_ACCESS_TOKEN_SECRET=${JWT_ACCESS_TOKEN_SECRET}
-      - JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN}
-      - JWT_REFRESH_TOKEN_SECRET=${JWT_REFRESH_TOKEN_SECRET}
-      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN}
-      - EMAIL_ADMIN=${EMAIL_ADMIN}
-      - INIT_PASSWORD=${INIT_PASSWORD}
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_EMAIL=${SMTP_EMAIL}
-      - SMTP_PASSWORD=${SMTP_PASSWORD}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_QUEUE_DB=0
-      - REDIS_CACHE_DB=1
+      # Override host-only values so the container reaches the compose services
+      MONGO_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME:-root}:${MONGO_INITDB_ROOT_PASSWORD:-123456}@mongodb:27017/${MONGO_INITDB_DATABASE:-my-job-portal}?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - '127.0.0.1:${PORT:-8081}:${PORT:-8081}'
     volumes:
       - .:/app
       - /app/node_modules

@@ -107,7 +107,7 @@ npm install
 
 ### ⚙️ Environment Configuration
 
-Create a `.env` file in the project root. This file is ignored by Git, so keep secrets local and never commit them.
+Copy `.env.example` to `.env` (`cp .env.example .env`) and fill in the secrets. `.env` is ignored by Git. Required keys are checked at boot, so a missing one stops the app with a clear error. For VPS deployment see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 <details>
 <summary><b>🔑 View Minimum Local Environment Variables</b></summary>
@@ -123,6 +123,9 @@ Here are the required variables to spin up local development:
 | `MONGO_INITDB_ROOT_PASSWORD` | Docker MongoDB root password | `123456` |
 | `MONGO_INITDB_DATABASE` | Docker MongoDB database name | `devlink` |
 | `FE_URL` | Frontend URL used by auth/mail flows | `http://localhost:3000` |
+| `CORS_ORIGINS` | Comma-separated origins allowed to call the API with cookies (defaults to `FE_URL`) | `http://localhost:3000` |
+| `TRUST_PROXY` | Set to `1` behind nginx/Caddy so rate limits see the real client IP | *empty locally* |
+| `SWAGGER_ENABLED` | Expose Swagger when `NODE_ENV=production` | `false` |
 | `JWT_ACCESS_TOKEN_SECRET` | Access-token signing secret | `replace-with-local-secret` |
 | `JWT_ACCESS_EXPIRES_IN` | Access-token lifetime | `7d` |
 | `JWT_REFRESH_TOKEN_SECRET` | Refresh-token signing secret | `replace-with-local-secret` |
