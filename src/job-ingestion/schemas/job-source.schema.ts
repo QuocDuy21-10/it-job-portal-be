@@ -35,7 +35,10 @@ export class JobSource {
   lastSyncStats?: {
     fetched: number;
     kept: number;
+    // fetched but missing required fields
     skipped: number;
+    // listed by the source but unusable (404 or no structured data)
+    rejected: number;
     upserted: number;
     closed: number;
   };

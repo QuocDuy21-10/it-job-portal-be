@@ -142,7 +142,7 @@ describe('JobIngestionService', () => {
           $set: {
             lastSyncedAt: expect.any(Date),
             lastSyncStatus: ESyncStatus.SUCCESS,
-            lastSyncStats: { fetched: 4, kept: 1, skipped: 1, upserted: 1, closed: 0 },
+            lastSyncStats: { fetched: 4, kept: 1, skipped: 1, rejected: 0, upserted: 1, closed: 0 },
             rejectedExternalIds: ['2', '3'],
           },
           $unset: { lastSyncError: 1 },
@@ -277,7 +277,7 @@ describe('JobIngestionService', () => {
         { key: 'greenhouse-axon' },
         {
           $set: expect.objectContaining({
-            lastSyncStats: { fetched: 2, kept: 1, skipped: 1, upserted: 1, closed: 0 },
+            lastSyncStats: { fetched: 2, kept: 1, skipped: 0, rejected: 1, upserted: 1, closed: 0 },
             rejectedExternalIds: ['20', '30', '2'],
           }),
           $unset: { lastSyncError: 1 },

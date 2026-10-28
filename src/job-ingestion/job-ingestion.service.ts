@@ -180,7 +180,8 @@ export class JobIngestionService {
             lastSyncStats: {
               fetched: raws.length,
               kept: keptRaws.length,
-              skipped: raws.length - validRaws.length + rejectedIds.length,
+              skipped: raws.length - validRaws.length,
+              rejected: rejectedIds.length,
               upserted,
               closed: closeResult.modifiedCount,
             },
