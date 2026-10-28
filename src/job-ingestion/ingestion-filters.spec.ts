@@ -50,6 +50,11 @@ describe('ingestion-filters', () => {
       ['DevOps Specialist', true],
       ['Principal Product Manager', false],
       ['Administrative Business Partner', false],
+      ['Sales Engineer', false],
+      ['Service Engineer', false],
+      ['Facility Engineer', false],
+      ['Equipment Engineer', false],
+      ['Data Engineer', true],
     ])('%s -> %s', (title, expected) => {
       expect(isItJob(title)).toBe(expected);
     });

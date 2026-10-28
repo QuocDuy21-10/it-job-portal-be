@@ -8,6 +8,9 @@ const IT_TITLE_PATTERN =
   /\b(engineer|engineering|developer|devops|sre|data|qa|test|software|frontend|front-end|backend|back-end|full[- ]?stack|mobile|android|ios|security|architect|machine learning|ml|ai|firmware|embedded)\b/i;
 const IT_TITLE_PATTERN_VI =
   /lập trình|phần mềm|kiểm thử|dữ liệu|quản trị mạng|an ninh mạng|bảo mật|công nghệ thông tin|\bcntt\b/iu;
+// shortcut: only catches "<qualifier> engineer" directly adjacent; extend the list as new non-software titles leak in
+const NON_IT_ENGINEER_PATTERN =
+  /\b(sales|service|facility|equipment|mechanical|electrical|civil|chemical|process|maintenance|field|site|project|production|manufacturing|industrial|hvac|mep|construction)\s+engineer/i;
 // Tokens are matched against whole slug segments so "ba" in "ba-ria" never counts.
 const IT_SLUG_KEYWORDS = [
   'engineer',
@@ -99,6 +102,9 @@ export const hasRequiredFields = (raw: IRawAtsJob): boolean =>
 
 export const isItJob = (title: string): boolean => {
   const normalizedTitle = title.normalize('NFC');
+  if (NON_IT_ENGINEER_PATTERN.test(normalizedTitle)) {
+    return false;
+  }
   return IT_TITLE_PATTERN.test(normalizedTitle) || IT_TITLE_PATTERN_VI.test(normalizedTitle);
 };
 
