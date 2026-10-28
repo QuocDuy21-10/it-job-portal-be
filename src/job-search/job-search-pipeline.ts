@@ -84,6 +84,7 @@ export const buildInternalStages = (
           ],
         },
         postedAt: '$createdAt',
+        endDate: 1,
         applyMode: { $literal: 'INTERNAL' },
         hasSalary: { $literal: 1 },
       },

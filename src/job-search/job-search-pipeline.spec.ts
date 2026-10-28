@@ -232,4 +232,11 @@ describe('job-search-pipeline', () => {
       expect(lastTwo).toEqual(['$sort', '$facet']);
     });
   });
+
+  describe('endDate exposure', () => {
+    it('projects endDate for internal jobs only', () => {
+      expect(projectOf(buildInternalStages(buildSearch(), NOW)).endDate).toBe(1);
+      expect(projectOf(buildExternalStages(buildSearch())).endDate).toBeUndefined();
+    });
+  });
 });

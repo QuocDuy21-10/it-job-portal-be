@@ -28,6 +28,7 @@ export interface IJobSearchItem {
   isRemote: boolean;
   skills: string[];
   postedAt: Date;
+  endDate?: Date;
   applyMode: 'INTERNAL' | 'EXTERNAL_REDIRECT';
   applyUrl?: string;
 }
