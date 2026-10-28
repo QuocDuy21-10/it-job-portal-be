@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 import { EJobLevel } from 'src/jobs/enums/job-level.enum';
+import { EExternalJobCloseReason } from '../enums/external-job-close-reason.enum';
 import { EExternalJobStatus } from '../enums/external-job-status.enum';
 
 export type ExternalJobDocument = HydratedDocument<ExternalJob>;
@@ -59,6 +60,24 @@ export class ExternalJob {
   lastSeenAt: Date;
 
   @Prop()
+  lastFetchedAt?: Date;
+
+  @Prop()
+  lastContentUpdatedAt?: Date;
+
+  @Prop()
+  contentHash?: string;
+
+  @Prop()
+  staleSince?: Date;
+
+  @Prop()
+  closedAt?: Date;
+
+  @Prop({ enum: EExternalJobCloseReason })
+  closeReason?: EExternalJobCloseReason;
+
+  @Prop()
   createdAt?: Date;
 
   @Prop()
@@ -71,3 +90,4 @@ ExternalJobSchema.index({ sourceKey: 1, externalId: 1 }, { unique: true });
 ExternalJobSchema.index({ status: 1, publishedAt: -1 });
 ExternalJobSchema.index({ locationCode: 1, status: 1 });
 ExternalJobSchema.index({ skills: 1 });
+ExternalJobSchema.index({ sourceKey: 1, status: 1, lastFetchedAt: 1 });

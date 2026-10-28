@@ -1,0 +1,6 @@
+export enum EExternalJobCloseReason {
+  GONE_FROM_SOURCE = 'GONE_FROM_SOURCE',
+  NOT_FOUND = 'NOT_FOUND',
+  EXPIRED = 'EXPIRED',
+  NO_LONGER_MATCHES = 'NO_LONGER_MATCHES',
+}

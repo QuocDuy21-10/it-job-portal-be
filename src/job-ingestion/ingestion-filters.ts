@@ -1,8 +1,13 @@
+import { createHash } from 'crypto';
 import { decode, escape } from 'he';
 import sanitizeHtml from 'sanitize-html';
 import { EJobLevel } from 'src/jobs/enums/job-level.enum';
 import { resolveLocationFromInput } from 'src/utils/location-catalog';
 import { IRawAtsJob } from './adapters/ats-adapter.interface';
+import {
+  INormalizeOptions,
+  INormalizedExternalJob,
+} from './interfaces/normalized-external-job.interface';
 
 const IT_TITLE_PATTERN =
   /\b(engineer|engineering|developer|devops|sre|data|qa|test|software|frontend|front-end|backend|back-end|full[- ]?stack|mobile|android|ios|security|architect|machine learning|ml|ai|firmware|embedded)\b/i;
@@ -102,8 +107,20 @@ const ALLOWED_DESCRIPTION_TAGS = [
   'a',
 ];
 
+const isHttpsUrl = (value?: string): boolean => {
+  if (!value) {
+    return false;
+  }
+
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
 export const hasRequiredFields = (raw: IRawAtsJob): boolean =>
-  [raw.externalId, raw.title, raw.sourceUrl].every(value => Boolean(value?.trim()));
+  [raw.externalId, raw.title].every(value => Boolean(value?.trim())) && isHttpsUrl(raw.sourceUrl);
 
 export const isItJob = (title: string): boolean => {
   const normalizedTitle = title.normalize('NFC');
@@ -288,3 +305,53 @@ export const buildExcerpt = (html: string, maxLength = EXCERPT_LENGTH): string =
     text.length > maxLength ? `${text.slice(0, maxLength).replace(/\s+\S*$/, '')}…` : text;
   return `<p>${escape(excerpt)}</p>`;
 };
+
+const CONTENT_HASH_FIELDS: Array<keyof INormalizedExternalJob> = [
+  'title',
+  'companyName',
+  'location',
+  'locationCode',
+  'isRemote',
+  'skills',
+  'level',
+  'descriptionHtml',
+  'publishedAt',
+  'expiresAt',
+  'salaryText',
+  'applyUrl',
+  'sourceUrl',
+];
+
+export const normalizeExternalJob = (
+  raw: IRawAtsJob,
+  { sourceKey, companyName, aliasMap, keepDescription }: INormalizeOptions,
+): INormalizedExternalJob => {
+  const descriptionHtml = sanitizeDescription(raw.descriptionHtml);
+  const catalogSkills = raw.skills?.length ? mapSkillsToCatalog(raw.skills, aliasMap) : [];
+
+  return {
+    sourceKey,
+    externalId: raw.externalId,
+    sourceUrl: raw.sourceUrl,
+    applyUrl: isHttpsUrl(raw.applyUrl) ? (raw.applyUrl as string) : raw.sourceUrl,
+    title: raw.title,
+    companyName: raw.companyName || companyName,
+    location: raw.location,
+    locationCode: resolveLocationCode(raw.location),
+    isRemote: isRemote(raw),
+    skills:
+      catalogSkills.length > 0
+        ? catalogSkills
+        : extractSkills(`${raw.title} ${htmlToText(descriptionHtml)}`, aliasMap),
+    level: inferLevel(raw.title) ?? levelFromExperience(raw.monthsOfExperience),
+    descriptionHtml: keepDescription ? descriptionHtml : '',
+    publishedAt: raw.publishedAt,
+    expiresAt: raw.expiresAt,
+    salaryText: raw.salaryText,
+  };
+};
+
+export const computeContentHash = (job: INormalizedExternalJob): string =>
+  createHash('sha1')
+    .update(JSON.stringify(CONTENT_HASH_FIELDS.map(field => job[field] ?? null)))
+    .digest('hex');

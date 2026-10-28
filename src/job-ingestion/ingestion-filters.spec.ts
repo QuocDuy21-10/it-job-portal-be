@@ -4,6 +4,7 @@ import {
   buildExcerpt,
   extractSkills,
   formatSalaryText,
+  computeContentHash,
   hasRequiredFields,
   htmlToText,
   inferLevel,
@@ -13,6 +14,7 @@ import {
   isVnOrRemote,
   levelFromExperience,
   mapSkillsToCatalog,
+  normalizeExternalJob,
   resolveLocationCode,
   sanitizeDescription,
 } from './ingestion-filters';
@@ -34,12 +36,15 @@ describe('ingestion-filters', () => {
       expect(hasRequiredFields(buildRaw())).toBe(true);
     });
 
-    it.each([{ externalId: '' }, { title: '   ' }, { sourceUrl: '' }])(
-      'rejects missing field %j',
-      overrides => {
-        expect(hasRequiredFields(buildRaw(overrides))).toBe(false);
-      },
-    );
+    it.each([
+      { externalId: '' },
+      { title: '   ' },
+      { sourceUrl: '' },
+      { sourceUrl: 'http://example.com/job' },
+      { sourceUrl: 'javascript:alert(1)' },
+    ])('rejects missing or unsafe field %j', overrides => {
+      expect(hasRequiredFields(buildRaw(overrides))).toBe(false);
+    });
   });
 
   describe('isItJob', () => {
@@ -322,6 +327,106 @@ describe('ingestion-filters', () => {
 
     it('returns an empty string for empty input', () => {
       expect(buildExcerpt('<p> </p>')).toBe('');
+    });
+  });
+
+  describe('normalizeExternalJob', () => {
+    const ALIAS_MAP = { 'node.js': 'Node.js', java: 'Java', 'spring boot': 'Spring Boot' };
+    const OPTIONS = {
+      sourceKey: 'greenhouse-axon',
+      companyName: 'Axon',
+      aliasMap: ALIAS_MAP,
+      keepDescription: true,
+    };
+
+    it('maps a raw job into the stored shape', () => {
+      expect(
+        normalizeExternalJob(
+          buildRaw({
+            title: 'Senior Backend Software Engineer',
+            descriptionHtml: '<p>We use Node.js daily.</p><script>x</script>',
+            publishedAt: new Date('2026-09-01T00:00:00Z'),
+          }),
+          OPTIONS,
+        ),
+      ).toEqual({
+        sourceKey: 'greenhouse-axon',
+        externalId: '1',
+        sourceUrl: 'https://job-boards.greenhouse.io/axon/jobs/1',
+        applyUrl: 'https://job-boards.greenhouse.io/axon/jobs/1',
+        title: 'Senior Backend Software Engineer',
+        companyName: 'Axon',
+        location: HCM,
+        locationCode: 'ho-chi-minh',
+        isRemote: false,
+        skills: ['Node.js'],
+        level: EJobLevel.SENIOR,
+        descriptionHtml: '<p>We use Node.js daily.</p>',
+        publishedAt: new Date('2026-09-01T00:00:00Z'),
+        expiresAt: undefined,
+        salaryText: undefined,
+      });
+    });
+
+    it('maps multi-company fields, catalog skills, experience level, salary and expiry', () => {
+      const expiresAt = new Date('2026-11-20T00:00:00Z');
+
+      expect(
+        normalizeExternalJob(
+          buildRaw({
+            title: 'Lập trình viên Backend',
+            companyName: 'FPT IS',
+            skills: ['Java', 'Spring Boot', 'Automation QA'],
+            monthsOfExperience: 40,
+            salaryText: '20.000.000 – 30.000.000 VND',
+            expiresAt,
+          }),
+          OPTIONS,
+        ),
+      ).toEqual(
+        expect.objectContaining({
+          companyName: 'FPT IS',
+          skills: ['Java', 'Spring Boot'],
+          level: EJobLevel.SENIOR,
+          salaryText: '20.000.000 – 30.000.000 VND',
+          expiresAt,
+        }),
+      );
+    });
+
+    it('falls back to text skill extraction when no raw skill is in the catalog', () => {
+      expect(
+        normalizeExternalJob(buildRaw({ skills: ['Luật / Pháp Chế'] }), OPTIONS).skills,
+      ).toEqual(['Node.js']);
+    });
+
+    it('drops the description but keeps extracted skills when not allowed to keep it', () => {
+      const job = normalizeExternalJob(buildRaw(), { ...OPTIONS, keepDescription: false });
+
+      expect(job.descriptionHtml).toBe('');
+      expect(job.skills).toEqual(['Node.js']);
+    });
+
+    it('falls back to the source URL when the apply URL is not https', () => {
+      expect(
+        normalizeExternalJob(buildRaw({ applyUrl: 'http://apply.example.com' }), OPTIONS).applyUrl,
+      ).toBe('https://job-boards.greenhouse.io/axon/jobs/1');
+    });
+  });
+
+  describe('computeContentHash', () => {
+    const OPTIONS = { sourceKey: 's', companyName: 'C', aliasMap: {}, keepDescription: true };
+
+    it('is stable for equal content and changes with title or salary', () => {
+      const base = normalizeExternalJob(buildRaw(), OPTIONS);
+
+      expect(computeContentHash(base)).toBe(computeContentHash({ ...base }));
+      expect(computeContentHash({ ...base, title: 'Senior Backend' })).not.toBe(
+        computeContentHash(base),
+      );
+      expect(computeContentHash({ ...base, salaryText: '$3,000' })).not.toBe(
+        computeContentHash(base),
+      );
     });
   });
 });

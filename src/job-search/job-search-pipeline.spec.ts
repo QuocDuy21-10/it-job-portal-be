@@ -94,20 +94,32 @@ describe('job-search-pipeline', () => {
   });
 
   describe('buildExternalStages', () => {
-    it('only returns active external jobs', () => {
-      const match = matchOf(buildExternalStages(buildSearch()));
+    it('returns visible, unexpired external jobs', () => {
+      const match = matchOf(buildExternalStages(buildSearch(), NOW, []));
 
-      expect(match).toEqual({ status: EExternalJobStatus.ACTIVE });
+      expect(match).toEqual({
+        status: { $in: [EExternalJobStatus.ACTIVE, EExternalJobStatus.STALE] },
+        $and: [{ $or: [{ expiresAt: { $gt: NOW } }, { expiresAt: null }] }],
+      });
+    });
+
+    it('excludes hidden sources', () => {
+      const match = matchOf(buildExternalStages(buildSearch(), NOW, ['topdev']));
+
+      expect(match.sourceKey).toEqual({ $nin: ['topdev'] });
     });
 
     it('matches keyword, location and level', () => {
       const match = matchOf(
         buildExternalStages(
           buildSearch({ keyword: 'backend', locationCode: 'ho-chi-minh', level: 'Senior' }),
+          NOW,
+          [],
         ),
       );
 
-      expect(match.$or.map((condition: object) => Object.keys(condition)[0])).toEqual([
+      expect(match.$and[0].$or).toHaveLength(2);
+      expect(match.$and[1].$or.map((condition: object) => Object.keys(condition)[0])).toEqual([
         'title',
         'skills',
         'companyName',
@@ -118,7 +130,7 @@ describe('job-search-pipeline', () => {
 
     it('maps the Remote form of work to isRemote', () => {
       const match = matchOf(
-        buildExternalStages(buildSearch({ formOfWork: EJobFormOfWork.REMOTE })),
+        buildExternalStages(buildSearch({ formOfWork: EJobFormOfWork.REMOTE }), NOW, []),
       );
 
       expect(match.isRemote).toBe(true);
@@ -129,11 +141,11 @@ describe('job-search-pipeline', () => {
       [{ salaryMin: 10000000 }],
       [{ salaryMax: 20000000 }],
     ])('excludes external jobs for %j', overrides => {
-      expect(buildExternalStages(buildSearch(overrides))).toBeNull();
+      expect(buildExternalStages(buildSearch(overrides), NOW, [])).toBeNull();
     });
 
     it('projects external jobs into the unified shape', () => {
-      const project = projectOf(buildExternalStages(buildSearch()));
+      const project = projectOf(buildExternalStages(buildSearch(), NOW, []));
 
       expect(project).toEqual(
         expect.objectContaining({
@@ -175,12 +187,14 @@ describe('job-search-pipeline', () => {
     const hasUnionWith = (pipeline: any[]) => pipeline.some(stage => stage.$unionWith);
 
     it('unions both collections for source=all', () => {
-      const plan = buildJobSearchPlan(buildSearch(), NOW, EXTERNAL_COLLECTION) as any;
+      const plan = buildJobSearchPlan(buildSearch(), NOW, EXTERNAL_COLLECTION, []) as any;
       const unionStage = plan.pipeline.find((stage: any) => stage.$unionWith);
 
       expect(plan.target).toBe('internal');
       expect(unionStage.$unionWith.coll).toBe(EXTERNAL_COLLECTION);
-      expect(matchOf(unionStage.$unionWith.pipeline).status).toBe(EExternalJobStatus.ACTIVE);
+      expect(matchOf(unionStage.$unionWith.pipeline).status).toEqual({
+        $in: [EExternalJobStatus.ACTIVE, EExternalJobStatus.STALE],
+      });
     });
 
     it('skips the union when external jobs are excluded by filters', () => {
@@ -188,6 +202,7 @@ describe('job-search-pipeline', () => {
         buildSearch({ salaryMin: 1 }),
         NOW,
         EXTERNAL_COLLECTION,
+        [],
       ) as any;
 
       expect(plan.target).toBe('internal');
@@ -199,6 +214,7 @@ describe('job-search-pipeline', () => {
         buildSearch({ source: 'internal' }),
         NOW,
         EXTERNAL_COLLECTION,
+        [],
       ) as any;
 
       expect(plan.target).toBe('internal');
@@ -210,10 +226,13 @@ describe('job-search-pipeline', () => {
         buildSearch({ source: 'external' }),
         NOW,
         EXTERNAL_COLLECTION,
+        [],
       ) as any;
 
       expect(plan.target).toBe('external');
-      expect(matchOf(plan.pipeline).status).toBe(EExternalJobStatus.ACTIVE);
+      expect(matchOf(plan.pipeline).status).toEqual({
+        $in: [EExternalJobStatus.ACTIVE, EExternalJobStatus.STALE],
+      });
     });
 
     it('returns an empty plan for source=external with a salary filter', () => {
@@ -222,12 +241,13 @@ describe('job-search-pipeline', () => {
           buildSearch({ source: 'external', salaryMin: 1 }),
           NOW,
           EXTERNAL_COLLECTION,
+          [],
         ),
       ).toEqual({ target: 'empty' });
     });
 
     it('ends every pipeline with $sort then $facet', () => {
-      const plan = buildJobSearchPlan(buildSearch(), NOW, EXTERNAL_COLLECTION) as any;
+      const plan = buildJobSearchPlan(buildSearch(), NOW, EXTERNAL_COLLECTION, []) as any;
       const lastTwo = plan.pipeline.slice(-2).map((stage: object) => Object.keys(stage)[0]);
 
       expect(lastTwo).toEqual(['$sort', '$facet']);
@@ -237,7 +257,7 @@ describe('job-search-pipeline', () => {
   describe('endDate exposure', () => {
     it('projects endDate for internal jobs only', () => {
       expect(projectOf(buildInternalStages(buildSearch(), NOW)).endDate).toBe(1);
-      expect(projectOf(buildExternalStages(buildSearch())).endDate).toBeUndefined();
+      expect(projectOf(buildExternalStages(buildSearch(), NOW, [])).endDate).toBeUndefined();
     });
   });
 });

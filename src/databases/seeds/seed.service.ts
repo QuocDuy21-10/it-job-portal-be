@@ -103,8 +103,19 @@ export class SeedService {
         },
       })),
     );
+    // Records seeded before displayPolicy existed get one; an admin's later choice is kept.
+    const backfill = await this.jobSourceModel.bulkWrite(
+      JOB_SOURCES_SEED_DATA.map(({ key, displayPolicy }) => ({
+        updateOne: {
+          filter: { key, displayPolicy: { $exists: false } },
+          update: { $set: { displayPolicy } },
+        },
+      })),
+    );
 
-    this.logger.log(`Job sources seeded: ${result.upsertedCount} new records`);
+    this.logger.log(
+      `Job sources seeded: ${result.upsertedCount} new, ${backfill.modifiedCount} display policies backfilled`,
+    );
   }
 
   private async seedCompanies(): Promise<SeedCompanyDocument[]> {

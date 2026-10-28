@@ -1,7 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
+import { EJobSourceDisplayPolicy } from '../enums/job-source-display-policy.enum';
 import { EJobSourceProvider } from '../enums/job-source-provider.enum';
+import { ERejectionReason } from '../enums/rejection-reason.enum';
 import { ESyncStatus } from '../enums/sync-status.enum';
+import { ICrawlRunStats } from '../interfaces/crawl-run-stats.interface';
+import { ISourceRejection } from '../interfaces/job-lifecycle.interface';
 
 export type JobSourceDocument = HydratedDocument<JobSource>;
 
@@ -31,20 +35,30 @@ export class JobSource {
   @Prop()
   lastSyncError?: string;
 
-  @Prop({ type: Object })
-  lastSyncStats?: {
-    fetched: number;
-    kept: number;
-    // fetched but missing required fields
-    skipped: number;
-    // listed by the source but unusable (404 or no structured data)
-    rejected: number;
-    upserted: number;
-    closed: number;
-  };
+  @Prop({ enum: EJobSourceDisplayPolicy, default: EJobSourceDisplayPolicy.LINK_ONLY })
+  displayPolicy?: EJobSourceDisplayPolicy;
 
-  @Prop({ type: [String], default: [] })
-  rejectedExternalIds: string[];
+  @Prop({ type: Object })
+  lastSyncStats?: ICrawlRunStats;
+
+  @Prop()
+  lastSuccessfulListedCount?: number;
+
+  @Prop({ default: 0 })
+  consecutiveFailures?: number;
+
+  @Prop({
+    type: [
+      {
+        _id: false,
+        externalId: { type: String, required: true },
+        reason: { type: String, enum: ERejectionReason, required: true },
+        retryAt: { type: Date, required: true },
+      },
+    ],
+    default: [],
+  })
+  rejections?: ISourceRejection[];
 }
 
 export const JobSourceSchema = SchemaFactory.createForClass(JobSource);
