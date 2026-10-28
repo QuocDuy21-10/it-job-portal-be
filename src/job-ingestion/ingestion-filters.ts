@@ -1,3 +1,4 @@
+import { decode, escape } from 'he';
 import sanitizeHtml from 'sanitize-html';
 import { EJobLevel } from 'src/jobs/enums/job-level.enum';
 import { resolveLocationFromInput } from 'src/utils/location-catalog';
@@ -5,6 +6,62 @@ import { IRawAtsJob } from './adapters/ats-adapter.interface';
 
 const IT_TITLE_PATTERN =
   /\b(engineer|engineering|developer|devops|sre|data|qa|test|software|frontend|front-end|backend|back-end|full[- ]?stack|mobile|android|ios|security|architect|machine learning|ml|ai|firmware|embedded)\b/i;
+const IT_TITLE_PATTERN_VI =
+  /lập trình|phần mềm|kiểm thử|dữ liệu|quản trị mạng|an ninh mạng|bảo mật|công nghệ thông tin|\bcntt\b/iu;
+// Tokens are matched against whole slug segments so "ba" in "ba-ria" never counts.
+const IT_SLUG_KEYWORDS = [
+  'engineer',
+  'developer',
+  'devops',
+  'devsecops',
+  'sre',
+  'tester',
+  'qa',
+  'software',
+  'frontend',
+  'backend',
+  'fullstack',
+  'full-stack',
+  'java',
+  'python',
+  'golang',
+  'php',
+  'nodejs',
+  'react',
+  'android',
+  'ios',
+  'flutter',
+  'blockchain',
+  'it',
+  'ai',
+  'ml',
+  'machine-learning',
+  'data-engineer',
+  'data-analyst',
+  'data-scientist',
+  'cloud',
+  'automation',
+  'embedded',
+  'firmware',
+  'game',
+  'unity',
+  'dotnet',
+  'net',
+  'sap',
+  'erp',
+  'business-analyst',
+  'lap-trinh',
+  'phan-mem',
+  'kiem-thu',
+  'cntt',
+  'cong-nghe-thong-tin',
+  'bao-mat',
+  'an-ninh-mang',
+  'quan-tri-mang',
+  'he-thong',
+];
+const IT_SLUG_PATTERN = new RegExp(`(?:^|-)(?:${IT_SLUG_KEYWORDS.join('|')})(?:-|$)`);
+const EXCERPT_LENGTH = 300;
 const VN_LOCATION_PATTERN = /viet ?nam|ho chi minh|hcmc|saigon|ha ?noi|da ?nang/i;
 const REMOTE_PATTERN = /remote/i;
 const REMOTE_ONLY_PATTERN = /^\s*remote\s*$/i;
@@ -40,7 +97,13 @@ const ALLOWED_DESCRIPTION_TAGS = [
 export const hasRequiredFields = (raw: IRawAtsJob): boolean =>
   [raw.externalId, raw.title, raw.sourceUrl].every(value => Boolean(value?.trim()));
 
-export const isItJob = (title: string): boolean => IT_TITLE_PATTERN.test(title);
+export const isItJob = (title: string): boolean => {
+  const normalizedTitle = title.normalize('NFC');
+  return IT_TITLE_PATTERN.test(normalizedTitle) || IT_TITLE_PATTERN_VI.test(normalizedTitle);
+};
+
+// shortcut: slug includes company name, so this over-matches; title filter in syncSource is the real gate
+export const isLikelyItSlug = (slug: string): boolean => IT_SLUG_PATTERN.test(slug);
 
 export const isRemote = (job: Pick<IRawAtsJob, 'location' | 'isRemoteHint'>): boolean =>
   Boolean(job.isRemoteHint) || REMOTE_PATTERN.test(job.location);
@@ -76,6 +139,62 @@ export const inferLevel = (title: string): EJobLevel | undefined => {
   return LEVEL_RULES.find(([pattern]) => pattern.test(trimmedTitle))?.[1];
 };
 
+export const levelFromExperience = (months?: number): EJobLevel | undefined => {
+  if (months === undefined || !Number.isFinite(months) || months < 0) {
+    return undefined;
+  }
+
+  if (months < 12) {
+    return EJobLevel.JUNIOR;
+  }
+
+  if (months < 36) {
+    return EJobLevel.MID_LEVEL;
+  }
+
+  return months < 60 ? EJobLevel.SENIOR : EJobLevel.LEAD;
+};
+
+const toAmount = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  return typeof value === 'string' && /^\d+(\.\d+)?$/.test(value.trim())
+    ? Number(value)
+    : undefined;
+};
+
+export const formatSalaryText = (baseSalary: unknown): string | undefined => {
+  const salary = baseSalary as { currency?: unknown; value?: Record<string, unknown> } | null;
+  const value = salary?.value;
+  const currency =
+    typeof salary?.currency === 'string' && salary.currency.trim() ? salary.currency.trim() : 'VND';
+  const formatNumber = (amount: number) => new Intl.NumberFormat('vi-VN').format(amount);
+  const min = toAmount(value?.minValue);
+  const max = toAmount(value?.maxValue);
+
+  if (min !== undefined && max !== undefined) {
+    return `${formatNumber(min)} – ${formatNumber(max)} ${currency}`;
+  }
+
+  if (min !== undefined) {
+    return `Từ ${formatNumber(min)} ${currency}`;
+  }
+
+  if (max !== undefined) {
+    return `Đến ${formatNumber(max)} ${currency}`;
+  }
+
+  const single = toAmount(value?.value);
+
+  if (single !== undefined) {
+    return `${formatNumber(single)} ${currency}`;
+  }
+
+  return typeof value?.value === 'string' && value.value.trim() ? value.value.trim() : undefined;
+};
+
 const normalizeSkillText = (value: string): string =>
   value
     .toLowerCase()
@@ -105,6 +224,26 @@ export const extractSkills = (text: string, aliasMap: Record<string, string>): s
   return [...found];
 };
 
+// Same normalization as SkillsService.normalizeForLookup, which builds the alias map keys.
+const normalizeSkillKey = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s+#.]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+export const mapSkillsToCatalog = (
+  rawSkills: string[],
+  aliasMap: Record<string, string>,
+): string[] => [
+  ...new Set(
+    rawSkills
+      .map(skill => aliasMap[normalizeSkillKey(skill)])
+      .filter((label): label is string => Boolean(label)),
+  ),
+];
+
 export const sanitizeDescription = (html: string): string =>
   sanitizeHtml(html, {
     allowedTags: ALLOWED_DESCRIPTION_TAGS,
@@ -124,3 +263,15 @@ export const htmlToText = (html: string): string =>
     .replace(/<[^>]*>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+export const buildExcerpt = (html: string, maxLength = EXCERPT_LENGTH): string => {
+  const text = decode(htmlToText(html)).replace(/\s+/g, ' ').trim();
+
+  if (!text) {
+    return '';
+  }
+
+  const excerpt =
+    text.length > maxLength ? `${text.slice(0, maxLength).replace(/\s+\S*$/, '')}…` : text;
+  return `<p>${escape(excerpt)}</p>`;
+};

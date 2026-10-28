@@ -1,13 +1,18 @@
 import { EJobLevel } from 'src/jobs/enums/job-level.enum';
 import { IRawAtsJob } from './adapters/ats-adapter.interface';
 import {
+  buildExcerpt,
   extractSkills,
+  formatSalaryText,
   hasRequiredFields,
   htmlToText,
   inferLevel,
   isItJob,
+  isLikelyItSlug,
   isRemote,
   isVnOrRemote,
+  levelFromExperience,
+  mapSkillsToCatalog,
   resolveLocationCode,
   sanitizeDescription,
 } from './ingestion-filters';
@@ -170,6 +175,132 @@ describe('ingestion-filters', () => {
   describe('htmlToText', () => {
     it('keeps words separated when tags are removed', () => {
       expect(htmlToText('<ul><li>React</li><li>Node.js</li></ul>')).toBe('React Node.js');
+    });
+  });
+  describe('isItJob (Vietnamese titles)', () => {
+    it.each([
+      'Lập trình viên Java',
+      'Kỹ sư kiểm thử phần mềm',
+      'CHUYÊN VIÊN QUẢN TRỊ MẠNG - KHỐI CÔNG NGHỆ THÔNG TIN',
+      'Chuyên viên An ninh mạng',
+      'Nhân viên IT (CNTT)',
+      'Chuyên viên phân tích dữ liệu',
+    ])('keeps %s', title => {
+      expect(isItJob(title)).toBe(true);
+    });
+
+    it.each(['Kế toán tổng hợp', 'Chuyên viên khách hàng cá nhân', 'Nhân viên pháp chế'])(
+      'rejects %s',
+      title => {
+        expect(isItJob(title)).toBe(false);
+      },
+    );
+
+    it('matches decomposed (NFD) Vietnamese text', () => {
+      expect(isItJob('Lập trình viên'.normalize('NFD'))).toBe(true);
+    });
+  });
+
+  describe('isLikelyItSlug', () => {
+    it.each([
+      'java-backend-developer-fpt-is',
+      'ky-su-kiem-thu-phan-mem-vivas',
+      'data-engineer-big-data-lakehouse-f88-business-jsc',
+      'lap-trinh-vien-php-cong-ty-abc',
+      'ky-su-phat-trien-va-van-hanh-devops-tong-cong-ty-ha-tang-mang-vnpt-net',
+    ])('matches %s', slug => {
+      expect(isLikelyItSlug(slug)).toBe(true);
+    });
+
+    it.each([
+      'ke-toan-tong-hop-sgp-stavian-chemical',
+      'chuyen-vien-khach-hang-ca-nhan-cn-ba-ria-phuong-ba-ria',
+      'nhan-vien-phap-che-headway',
+      'tap-su-chuyen-vien-khach-hang-ca-nhan-tai-gia-lai',
+    ])('does not match %s', slug => {
+      expect(isLikelyItSlug(slug)).toBe(false);
+    });
+  });
+
+  describe('levelFromExperience', () => {
+    it.each([
+      [0, EJobLevel.JUNIOR],
+      [11, EJobLevel.JUNIOR],
+      [12, EJobLevel.MID_LEVEL],
+      [35, EJobLevel.MID_LEVEL],
+      [36, EJobLevel.SENIOR],
+      [59, EJobLevel.SENIOR],
+      [60, EJobLevel.LEAD],
+    ])('maps %i months to %s', (months, level) => {
+      expect(levelFromExperience(months)).toBe(level);
+    });
+
+    it.each([undefined, -1, Number.NaN])('returns undefined for %p', months => {
+      expect(levelFromExperience(months)).toBeUndefined();
+    });
+  });
+
+  describe('formatSalaryText', () => {
+    it('keeps a textual value', () => {
+      expect(formatSalaryText({ currency: 'VND', value: { value: ' Negotiable ' } })).toBe(
+        'Negotiable',
+      );
+    });
+
+    it('formats a min-max range', () => {
+      expect(
+        formatSalaryText({ currency: 'VND', value: { minValue: 20000000, maxValue: 30000000 } }),
+      ).toBe('20.000.000 – 30.000.000 VND');
+    });
+
+    it('formats a single bound and numeric strings', () => {
+      expect(formatSalaryText({ currency: 'USD', value: { minValue: '1500' } })).toBe(
+        'Từ 1.500 USD',
+      );
+      expect(formatSalaryText({ value: { maxValue: 25000000 } })).toBe('Đến 25.000.000 VND');
+    });
+
+    it('formats a single numeric value', () => {
+      expect(formatSalaryText({ currency: 'VND', value: { value: 18000000 } })).toBe(
+        '18.000.000 VND',
+      );
+    });
+
+    it.each([undefined, null, {}, { value: {} }, { value: { value: '  ' } }])(
+      'returns undefined for %p',
+      baseSalary => {
+        expect(formatSalaryText(baseSalary)).toBeUndefined();
+      },
+    );
+  });
+
+  describe('mapSkillsToCatalog', () => {
+    const aliasMap = { java: 'Java', 'spring boot': 'Spring Boot', 'node.js': 'Node.js' };
+
+    it('maps known skills to catalog labels without duplicates', () => {
+      expect(
+        mapSkillsToCatalog(['Java', ' spring boot ', 'JAVA', 'Node.js', 'Automation QA'], aliasMap),
+      ).toEqual(['Java', 'Spring Boot', 'Node.js']);
+    });
+
+    it('returns an empty list when nothing matches', () => {
+      expect(mapSkillsToCatalog(['Luật / Pháp Chế'], aliasMap)).toEqual([]);
+    });
+  });
+
+  describe('buildExcerpt', () => {
+    it('strips tags, decodes entities and escapes the result', () => {
+      expect(
+        buildExcerpt('<p style="x">Build &amp; run <strong>payment</strong>&nbsp;APIs &lt;fast&gt;</p>'),
+      ).toBe('<p>Build &amp; run payment APIs &lt;fast&gt;</p>');
+    });
+
+    it('cuts at a word boundary and appends an ellipsis', () => {
+      expect(buildExcerpt('<p>alpha beta gamma delta</p>', 12)).toBe('<p>alpha beta…</p>');
+    });
+
+    it('returns an empty string for empty input', () => {
+      expect(buildExcerpt('<p> </p>')).toBe('');
     });
   });
 });
