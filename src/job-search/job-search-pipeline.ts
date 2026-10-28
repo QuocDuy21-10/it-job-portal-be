@@ -134,6 +134,7 @@ export const buildExternalStages = (search: INormalizedJobSearch): SubPipelineSt
         locationCode: 1,
         level: 1,
         skills: 1,
+        salaryText: 1,
         isRemote: 1,
         applyUrl: 1,
         postedAt: { $ifNull: ['$publishedAt', '$createdAt'] },

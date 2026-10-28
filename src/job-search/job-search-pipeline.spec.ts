@@ -143,6 +143,7 @@ describe('job-search-pipeline', () => {
           postedAt: { $ifNull: ['$publishedAt', '$createdAt'] },
           applyMode: { $literal: 'EXTERNAL_REDIRECT' },
           hasSalary: { $literal: 0 },
+          salaryText: 1,
         }),
       );
     });

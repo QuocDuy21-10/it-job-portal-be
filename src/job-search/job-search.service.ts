@@ -15,7 +15,7 @@ import { JOB_SEARCH_DEFAULT_LIMIT, JOB_SEARCH_DEFAULT_PAGE } from './job-search.
 import { buildJobSearchPlan } from './job-search-pipeline';
 
 const EXTERNAL_DETAIL_FIELDS =
-  'sourceKey title companyName location locationCode isRemote skills level descriptionHtml publishedAt createdAt sourceUrl applyUrl status';
+  'sourceKey title companyName location locationCode isRemote skills level descriptionHtml publishedAt createdAt sourceUrl applyUrl status salaryText';
 
 type JobSearchFacet = { items: IJobSearchItem[]; total: Array<{ count: number }> };
 
@@ -83,6 +83,7 @@ export class JobSearchService {
       isRemote: job.isRemote,
       skills: job.skills,
       level: job.level,
+      salaryText: job.salaryText,
       descriptionHtml: job.descriptionHtml,
       postedAt: job.publishedAt ?? job.createdAt,
       sourceUrl: job.sourceUrl,

@@ -23,6 +23,7 @@ export interface IJobSearchItem {
   location: string;
   locationCode?: string;
   salary?: number;
+  salaryText?: string;
   level?: string;
   formOfWork?: string;
   isRemote: boolean;
@@ -55,6 +56,7 @@ export interface IExternalJobDetail {
   isRemote: boolean;
   skills: string[];
   level?: string;
+  salaryText?: string;
   descriptionHtml: string;
   postedAt: Date;
   sourceUrl: string;
