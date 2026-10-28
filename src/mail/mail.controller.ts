@@ -1,4 +1,5 @@
-import { Controller, Get, Logger } from '@nestjs/common';
+import { Controller, Logger, Post } from '@nestjs/common';
+import { ERole, Roles } from 'src/casl';
 import { MailService } from './mail.service';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -20,7 +21,8 @@ export class MailController {
     private readonly subscriberModel: SoftDeleteModel<SubscriberDocument>,
   ) {}
 
-  @Get('send-job-recommendations')
+  @Post('send-job-recommendations')
+  @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Trigger job recommendations manually',
     description: 'Manually trigger job recommendation emails for all subscribers. Use for testing.',

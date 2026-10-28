@@ -7,7 +7,6 @@ import {
   UploadedFile,
   UseInterceptors,
   UseGuards,
-  UseFilters,
 } from '@nestjs/common';
 import { FilesService } from './files.service';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
@@ -25,7 +24,6 @@ import { DeleteFileDto } from './dto/delete-file.dto';
 import { Roles } from 'src/casl/decorators/roles.decorator';
 import { ERole } from 'src/casl/enums/role.enum';
 import { UploadFolderType } from './constants/upload-policy';
-import { HttpExceptionFilter } from 'src/utils/http-exception.filter';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { UploadAuthGuard } from './guards/upload-auth.guard';
 
@@ -37,7 +35,6 @@ export class FilesController {
   @Post('upload')
   @UseGuards(UploadAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
-  @UseFilters(new HttpExceptionFilter())
   @ApiOperation({
     summary: 'Upload a single file',
     description:

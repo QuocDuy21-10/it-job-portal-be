@@ -43,6 +43,7 @@ export class AuthController {
   @Public()
   @UseGuards(LocalAuthGuard)
   @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 300000, limit: 10 } })
   @ApiOperation({
     summary: 'Login',
     description:
@@ -155,6 +156,8 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 300000, limit: 10 } })
   @ApiOperation({
     summary: 'Login with Google',
     description:

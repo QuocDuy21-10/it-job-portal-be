@@ -27,7 +27,7 @@ export class CompaniesController {
     return this.companiesService.create(createCompanyDto, user);
   }
 
-  @Get('cleanup-orphaned-logos')
+  @Post('cleanup-orphaned-logos')
   @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Trigger orphaned logo cleanup manually',
