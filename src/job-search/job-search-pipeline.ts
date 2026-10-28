@@ -1,5 +1,5 @@
 import { PipelineStage } from 'mongoose';
-import { EExternalJobStatus } from 'src/job-ingestion/enums/external-job-status.enum';
+import { VISIBLE_EXTERNAL_JOB_STATUSES } from 'src/job-ingestion/job-ingestion.constants';
 import { EJobFormOfWork } from 'src/jobs/enums/job-form-of-work.enum';
 import { buildPublicJobVisibilityFilter } from 'src/jobs/job-visibility.util';
 import { INormalizedJobSearch } from './interfaces/job-search-item.interface';
@@ -92,7 +92,11 @@ export const buildInternalStages = (
   ];
 };
 
-export const buildExternalStages = (search: INormalizedJobSearch): SubPipelineStage[] | null => {
+export const buildExternalStages = (
+  search: INormalizedJobSearch,
+  now: Date,
+  hiddenSourceKeys: string[],
+): SubPipelineStage[] | null => {
   // External jobs carry no salary or form of work, so they cannot satisfy those filters.
   if (
     hasSalaryFilter(search) ||
@@ -101,11 +105,23 @@ export const buildExternalStages = (search: INormalizedJobSearch): SubPipelineSt
     return null;
   }
 
-  const match: Record<string, any> = { status: EExternalJobStatus.ACTIVE };
+  // Expiry is checked here too, so a job past expiresAt disappears before the next sync closes it.
+  const conditions: Record<string, any>[] = [
+    { $or: [{ expiresAt: { $gt: now } }, { expiresAt: null }] },
+  ];
 
   if (search.keyword) {
     const regex = buildKeywordRegex(search.keyword);
-    match.$or = [{ title: regex }, { skills: regex }, { companyName: regex }];
+    conditions.push({ $or: [{ title: regex }, { skills: regex }, { companyName: regex }] });
+  }
+
+  const match: Record<string, any> = {
+    status: { $in: VISIBLE_EXTERNAL_JOB_STATUSES },
+    $and: conditions,
+  };
+
+  if (hiddenSourceKeys.length > 0) {
+    match.sourceKey = { $nin: hiddenSourceKeys };
   }
 
   if (search.locationCode) {
@@ -163,9 +179,11 @@ export const buildJobSearchPlan = (
   search: INormalizedJobSearch,
   now: Date,
   externalCollectionName: string,
+  hiddenSourceKeys: string[],
 ): JobSearchPlan => {
   const tail = buildTailStages(search);
-  const external = search.source === 'internal' ? null : buildExternalStages(search);
+  const external =
+    search.source === 'internal' ? null : buildExternalStages(search, now, hiddenSourceKeys);
 
   if (search.source === 'external') {
     return external

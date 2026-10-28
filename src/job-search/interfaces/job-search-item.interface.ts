@@ -1,3 +1,4 @@
+import { EJobSourceDisplayPolicy } from 'src/job-ingestion/enums/job-source-display-policy.enum';
 import { JobSearchSort, JobSearchSource } from '../job-search.constants';
 
 export interface INormalizedJobSearch {
@@ -62,4 +63,6 @@ export interface IExternalJobDetail {
   sourceUrl: string;
   applyUrl: string;
   status: 'ACTIVE' | 'CLOSED';
+  // Never HIDDEN: those jobs are not returned at all.
+  displayPolicy: EJobSourceDisplayPolicy;
 }
