@@ -5,8 +5,11 @@ import { IAtsAdapter, IAtsFetchResult, IRawAtsJob } from './ats-adapter.interfac
 import { assertBoardToken } from './ats-http';
 
 const LOC_PATTERN = /<loc>\s*([^<\s]+)\s*<\/loc>/g;
-const JSON_LD_PATTERN = /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g;
+// Quote style differs per site (TopDev uses ", ITviec uses ').
+const JSON_LD_PATTERN = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/g;
 const BOT_CHALLENGE_PATTERN = /captcha|cf-challenge/i;
+// Normal job pages embed reCAPTCHA scripts too, so only a small page can be a challenge page.
+const MAX_CHALLENGE_PAGE_LENGTH = 20_000;
 const BLOCKED_STATUSES = new Set([403, 429]);
 const PLACEHOLDER_ADDRESS_PARTS = new Set(['not available']);
 const USER_AGENT = 'DevLinkBot/1.0';
@@ -175,7 +178,7 @@ export abstract class SitemapJobPostingAdapter implements IAtsAdapter {
       return { kind: 'job', job: this.toRawJob(id, url, posting) };
     }
 
-    return BOT_CHALLENGE_PATTERN.test(html)
+    return html.length < MAX_CHALLENGE_PAGE_LENGTH && BOT_CHALLENGE_PATTERN.test(html)
       ? { kind: 'blocked', reason: 'captcha' }
       : { kind: 'rejected' };
   }

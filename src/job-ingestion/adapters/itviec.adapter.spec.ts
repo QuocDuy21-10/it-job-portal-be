@@ -82,4 +82,15 @@ describe('ItviecAdapter', () => {
 
     expect(result.jobs[0].salaryText).toBe('1.500 – 2.500 USD');
   });
+
+  it('treats a large page with only a reCAPTCHA script as rejected, not blocked', async () => {
+    // Every ITviec page embeds reCAPTCHA; only a small challenge page means a block.
+    const expiredPage = `<html><script src="/recaptcha_controller.js"></script>${'x'.repeat(60_000)}</html>`;
+    mockRoutes({ ...SITEMAP_ROUTES, [BRIDGE_URL]: { status: 200, body: expiredPage } });
+
+    const result = await adapter.fetchJobs('itviec', new Set([BA_SLUG]));
+
+    expect(result.stoppedEarly).toBeUndefined();
+    expect(result.rejectedIds).toEqual([BRIDGE_SLUG]);
+  });
 });
