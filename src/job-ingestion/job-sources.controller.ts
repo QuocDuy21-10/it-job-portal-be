@@ -1,7 +1,19 @@
-import { Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ERole, Roles } from 'src/casl';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
+import { ListCrawlRunsQueryDto } from './dto/list-crawl-runs-query.dto';
+import { UpdateJobSourceDto } from './dto/update-job-source.dto';
 import { JobIngestionService } from './job-ingestion.service';
 
 @ApiTags('Job Source')
@@ -15,6 +27,20 @@ export class JobSourcesController {
   @ResponseMessage('Get list job sources')
   findAll() {
     return this.jobIngestionService.findAllSources();
+  }
+
+  @Patch(':key')
+  @ApiOperation({ summary: 'Enable/disable crawling or change the public display policy' })
+  @ResponseMessage('Job source updated')
+  update(@Param('key') key: string, @Body() dto: UpdateJobSourceDto) {
+    return this.jobIngestionService.updateSource(key, dto);
+  }
+
+  @Get(':key/runs')
+  @ApiOperation({ summary: 'List recent sync runs of one source, newest first' })
+  @ResponseMessage('Get job source sync runs')
+  findRuns(@Param('key') key: string, @Query() query: ListCrawlRunsQueryDto) {
+    return this.jobIngestionService.findRuns(key, query);
   }
 
   @Post(':key/sync')
