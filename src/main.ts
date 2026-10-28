@@ -12,9 +12,24 @@ import { JwtAuthGuard } from './auth/guards';
 import { RolesGuard } from './casl';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger:
+      process.env.NODE_ENV === 'production'
+        ? ['error', 'warn', 'log']
+        : ['error', 'warn', 'log', 'debug', 'verbose'],
+  });
 
   const configService = app.get(ConfigService);
+  const isProduction = configService.get<string>('NODE_ENV') === 'production';
+
+  // config helmet (first, so every response gets security headers)
+  app.use(helmet());
+
+  // behind nginx/Caddy, use the client IP from X-Forwarded-For for throttling and sessions
+  const trustProxy = configService.get<string>('TRUST_PROXY');
+  if (trustProxy) {
+    app.set('trust proxy', /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
+  }
 
   // config jwt guard global
   const reflector = app.get(Reflector);
@@ -31,9 +46,15 @@ async function bootstrap() {
   // config cookie parser
   app.use(cookieParser());
 
-  // config cors
+  // config cors: only allow known frontends to send credentialed requests
+  const corsOrigins = (
+    configService.get<string>('CORS_ORIGINS') || configService.get<string>('FE_URL')
+  )
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
   app.enableCors({
-    origin: true,
+    origin: corsOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     preflightContinue: false,
     optionsSuccessStatus: 204,
@@ -47,35 +68,36 @@ async function bootstrap() {
     defaultVersion: ['1'],
   });
 
-  // config swagger
-  const config = new DocumentBuilder()
-    .setTitle('DevLink Job Portal API')
-    .setDescription('All module APIs')
-    .setVersion('1.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'Bearer',
-        bearerFormat: 'JWT',
-        in: 'header',
+  // config swagger (hidden in production unless explicitly enabled)
+  if (!isProduction || configService.get<string>('SWAGGER_ENABLED') === 'true') {
+    const config = new DocumentBuilder()
+      .setTitle('DevLink Job Portal API')
+      .setDescription('All module APIs')
+      .setVersion('1.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'Bearer',
+          bearerFormat: 'JWT',
+          in: 'header',
+        },
+        'token',
+      )
+      .addSecurityRequirements('token')
+      .build();
+    const documentFactory = () => SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api', app, documentFactory, {
+      swaggerOptions: {
+        persistAuthorization: true,
       },
-      'token',
-    )
-    .addSecurityRequirements('token')
-    .build();
-  const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, documentFactory, {
-    swaggerOptions: {
-      persistAuthorization: true,
-    },
-  });
+    });
+  }
 
-  // config helmet
-  app.use(helmet());
+  // close Mongo, Redis and BullMQ workers cleanly on SIGTERM (docker stop)
+  app.enableShutdownHooks();
 
-  await app.listen(configService.get<string>('PORT'));
-  Logger.log(
-    `Application is running on port http://localhost:${configService.get<string>('PORT')}/api`,
-  );
+  const port = configService.get<string>('PORT');
+  await app.listen(port, '0.0.0.0');
+  Logger.log(`Application is running on port http://localhost:${port}/api`);
 }
 bootstrap();
