@@ -24,7 +24,6 @@ import { DeleteFileDto } from './dto/delete-file.dto';
 import { Roles } from 'src/casl/decorators/roles.decorator';
 import { ERole } from 'src/casl/enums/role.enum';
 import { UploadFolderType } from './constants/upload-policy';
-import { ThrottlerGuard } from '@nestjs/throttler';
 import { UploadAuthGuard } from './guards/upload-auth.guard';
 
 @ApiTags('File')
