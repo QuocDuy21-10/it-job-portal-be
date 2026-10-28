@@ -146,10 +146,7 @@ export class GroqService {
 
     return {
       text: structuredResponse.text,
-      recommendedJobIds: this.resolveRecommendedJobIds(
-        toolRecommendedJobIds,
-        structuredResponse.recommendedJobIds,
-      ),
+      recommendedJobIds: toolRecommendedJobIds,
       provider: AI_PROVIDER_GROQ,
       metadata: this.buildUsageMetadata([firstTurn, secondTurn], Date.now() - startedAt),
     };
@@ -190,10 +187,7 @@ export class GroqService {
     }
 
     return {
-      recommendedJobIds: this.resolveRecommendedJobIds(
-        toolRecommendedJobIds,
-        structuredResponse.recommendedJobIds,
-      ),
+      recommendedJobIds: toolRecommendedJobIds,
       provider: AI_PROVIDER_GROQ,
       model: this.chatModelName,
       metadata: this.buildUsageMetadata([firstTurn, secondTurn], Date.now() - startedAt),
@@ -411,11 +405,6 @@ export class GroqService {
       Array.isArray(response.recommendedJobIds) &&
       response.recommendedJobIds.every(jobId => typeof jobId === 'string')
     );
-  }
-
-  private resolveRecommendedJobIds(toolJobIds: string[], structuredJobIds: string[]): string[] {
-    const combined = [...toolJobIds, ...structuredJobIds];
-    return [...new Set(combined)];
   }
 
   private buildUsageMetadata(responses: unknown[], latencyMs: number): IAIChatUsageMetadata {
