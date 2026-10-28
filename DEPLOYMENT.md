@@ -16,7 +16,7 @@ Both env files start from `.env.example`. The app refuses to boot when a require
 ## 1. Local development
 
 ```bash
-nvm use                      # Node 20 (.nvmrc)
+nvm use                      # Node 24 (.nvmrc)
 npm ci
 cp .env.example .env         # fill JWT/OTP secrets: openssl rand -hex 32
 npm run docker:dev           # MongoDB + Redis
@@ -152,7 +152,8 @@ Copy backups off the server, for example to object storage.
 
 ### 2.8 Operations checklist
 
-- Logs: `docker compose -f docker-compose.prod.yml logs -f backend` (rotated at 5 × 10 MB per container).
+- Logs: `docker compose -f docker-compose.prod.yml logs -f backend` (rotated at 5 × 10 MB per container). Lines are JSON; `req.id` is the request id and every response carries the same value in `X-Request-Id`, so `logs backend | grep <id>` finds one request. Set `LOG_LEVEL` to change verbosity.
+- Errors: set `SENTRY_DSN` to report unexpected (5xx) errors to Sentry; events are tagged `request_id`.
 - Health: point an uptime monitor at `https://api.example.com/api/v1/health` (checks MongoDB and Redis).
 - Secrets: rotate any key that was ever pasted into chat, a ticket or a commit. Rotating `JWT_*` logs everyone out.
 - Scaling beyond one backend container needs the socket.io Redis adapter, because the notifications gateway keeps socket maps in memory.
