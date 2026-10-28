@@ -90,7 +90,7 @@ describe('JobIngestionService', () => {
       const { service, externalJobModel, jobSourceModel, greenhouseAdapter } = setup({
         fetchResult: [
           buildRaw(),
-          buildRaw({ externalId: '2', title: 'Principal Product Manager' }),
+          buildRaw({ externalId: '2', title: 'Office Administrator' }),
           buildRaw({ externalId: '3', location: 'Remote, United States' }),
           buildRaw({ externalId: '', title: 'Broken item' }),
         ],
@@ -173,7 +173,7 @@ describe('JobIngestionService', () => {
 
     it('closes every active job when the board has no matching jobs', async () => {
       const { service, externalJobModel } = setup({
-        fetchResult: [buildRaw({ title: 'Principal Product Manager' })],
+        fetchResult: [buildRaw({ title: 'Office Administrator' })],
       });
 
       await service.syncSource('greenhouse-axon');

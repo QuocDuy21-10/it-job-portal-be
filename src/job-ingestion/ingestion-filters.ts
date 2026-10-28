@@ -6,8 +6,13 @@ import { IRawAtsJob } from './adapters/ats-adapter.interface';
 
 const IT_TITLE_PATTERN =
   /\b(engineer|engineering|developer|devops|sre|data|qa|test|software|frontend|front-end|backend|back-end|full[- ]?stack|mobile|android|ios|security|architect|machine learning|ml|ai|firmware|embedded)\b/i;
+// shortcut: role names are not IT-specific everywhere (e.g. "Finance Business Analyst" on TopDev); accepted for coverage of IT-only boards
+const IT_ROLE_PATTERN =
+  /\b(business analyst|product owner|product manager|project manager|scrum master|tester|dba|database|brse)\b/i;
+// Case-sensitive so the English word "it" in a title never counts.
+const IT_ACRONYM_PATTERN = /\bIT\b/;
 const IT_TITLE_PATTERN_VI =
-  /lập trình|phần mềm|kiểm thử|dữ liệu|quản trị mạng|an ninh mạng|bảo mật|công nghệ thông tin|\bcntt\b/iu;
+  /lập trình|phần mềm|kiểm thử|dữ liệu|quản trị mạng|an ninh mạng|bảo mật|công nghệ thông tin|phân tích nghiệp vụ|kỹ sư cầu nối|\bcntt\b/iu;
 // shortcut: only catches "<qualifier> engineer" directly adjacent; extend the list as new non-software titles leak in
 const NON_IT_ENGINEER_PATTERN =
   /\b(sales|service|facility|equipment|mechanical|electrical|civil|chemical|process|maintenance|field|site|project|production|manufacturing|industrial|hvac|mep|construction)\s+engineer/i;
@@ -105,7 +110,9 @@ export const isItJob = (title: string): boolean => {
   if (NON_IT_ENGINEER_PATTERN.test(normalizedTitle)) {
     return false;
   }
-  return IT_TITLE_PATTERN.test(normalizedTitle) || IT_TITLE_PATTERN_VI.test(normalizedTitle);
+  return [IT_TITLE_PATTERN, IT_ROLE_PATTERN, IT_ACRONYM_PATTERN, IT_TITLE_PATTERN_VI].some(
+    pattern => pattern.test(normalizedTitle),
+  );
 };
 
 // shortcut: slug includes company name, so this over-matches; title filter in syncSource is the real gate
