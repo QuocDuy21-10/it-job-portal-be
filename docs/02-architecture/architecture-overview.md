@@ -64,7 +64,7 @@ Tổng hợp từ các tài liệu trên. Mỗi mục có bằng chứng và m�
 
 | Vấn đề | Tài liệu |
 |---|---|
-| `CACHE_MANAGER` có vẻ chạy trong bộ nhớ thay vì Redis | [data-flow.md](data-flow.md#known-limitation-cache_manager-có-vẻ-đang-chạy-trong-bộ-nhớ) |
+| `CACHE_MANAGER` chạy trong bộ nhớ thay vì Redis (đã kiểm chứng), ảnh hưởng token đặt lại mật khẩu và hủy xóa tài khoản | [data-flow.md](data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis) |
 | Cron và Socket.IO chưa được thiết kế cho nhiều instance | [scalability.md](scalability.md) |
 | File tải lên nằm trên đĩa cục bộ | [scalability.md](scalability.md) |
 | Ba script `package.json` trỏ tới file không tồn tại | [local-development.md](../00-getting-started/local-development.md#known-limitation-script-dev-bị-thiếu) |

@@ -15,7 +15,7 @@ Một container `backend` duy nhất làm cả API, worker và cron ([container-
 | Cron tắt tin hết hạn, dọn logo | Thao tác trực tiếp trên dữ liệu | Chạy lặp. Với `updateMany` đặt `isActive = false` thì lặp là vô hại về kết quả. Chưa đánh giá cho việc dọn logo | Suy luận từ code |
 | Cron gợi ý việc làm | Đưa vào hàng `job-recommendation` từ `mail.controller.ts` | Có thể gửi trùng nếu không có `jobId` cố định | `Chưa xác minh` |
 | Socket.IO | `NotificationsGateway` giữ `userSockets` trong `Map` của tiến trình, không có adapter Redis | Thông báo chỉ tới được socket kết nối với đúng instance phát | Đã xác minh: không có `IoAdapter` hay `redis-adapter` trong `src/` và `package.json` |
-| `CACHE_MANAGER` | Chạy trong bộ nhớ, xem [data-flow.md](data-flow.md#known-limitation-cache_manager-có-vẻ-đang-chạy-trong-bộ-nhớ) | Không chia sẻ giữa instance | Đọc mã, chưa chạy thực nghiệm |
+| `CACHE_MANAGER` | Chạy trong bộ nhớ, xem [data-flow.md](data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis) | Không chia sẻ giữa instance. Token đặt lại mật khẩu và hủy xóa tài khoản không dùng được giữa các instance | Đã kiểm chứng bằng thực nghiệm |
 | File tải lên | Ghi vào `public/` trên đĩa cục bộ (`diskStorage` trong [multer.config.ts](../../src/files/multer.config.ts)) | Instance khác không thấy file nếu không dùng volume dùng chung | Đã xác minh |
 | Rate limit | Lưu trên Redis (`ThrottlerStorageRedisService`) | Dùng chung giữa instance | Đã xác minh |
 | Hàng đợi | BullMQ trên Redis | Nhiều worker cùng lấy việc từ một hàng, không trùng việc | Đặc tính của BullMQ |

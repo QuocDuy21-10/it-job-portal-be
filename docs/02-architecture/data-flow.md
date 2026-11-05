@@ -74,14 +74,23 @@ Chat trả lời dạng stream qua `POST /api/v1/chat/message/stream`, nên ch�
 |---|---|---|
 | MongoDB | Dữ liệu nghiệp vụ bền vững | 17 collection, xóa mềm bằng plugin |
 | Redis DB `REDIS_QUEUE_DB` (mặc định 0) | Trạng thái hàng đợi BullMQ | |
-| Redis DB `REDIS_CACHE_DB` (mặc định 1) | Rate limit, OTP và quota qua `REDIS_CLIENT`, cache danh sách | Xem Known Limitation bên dưới về `CACHE_MANAGER` |
+| Redis DB `REDIS_CACHE_DB` (mặc định 1) | Rate limit, OTP và quota qua `REDIS_CLIENT`, cache danh sách | Xem Known Limitation bên dưới về `CACHE_MANAGER` (cache danh sách dùng `ListCacheService`, chưa kiểm tra) |
 | Ổ đĩa `public/` | File tải lên | Không đồng bộ giữa nhiều instance |
 | Bộ nhớ tiến trình | `CACHE_MANAGER`, bản đồ socket của gateway | Mất khi khởi động lại |
 
-## Known Limitation: `CACHE_MANAGER` có vẻ đang chạy trong bộ nhớ
+## Known Limitation: `CACHE_MANAGER` chạy trong bộ nhớ, không phải Redis
 
-[redis.module.ts](../../src/redis/redis.module.ts) cấu hình `CacheModule` với tùy chọn `store: redisStore`. Phiên bản `@nestjs/cache-manager` đang cài là 3.0.1, và mã nguồn `dist/cache.providers.js` trong gói `@nestjs/cache-manager` chỉ đọc `options.stores`, không đọc `options.store`. Khi không có `stores`, thư viện dùng kho mặc định trong bộ nhớ.
+[redis.module.ts](../../src/redis/redis.module.ts) cấu hình `CacheModule` với tùy chọn `store: redisStore`. Phiên bản `@nestjs/cache-manager` đang cài là 3.0.1 và mã nguồn `dist/cache.providers.js` của gói này chỉ đọc `options.stores`, không đọc `options.store`.
 
-Hệ quả nếu đúng: dữ liệu đi qua `CACHE_MANAGER` không dùng chung giữa các instance và mất khi khởi động lại. Ghi chú kiến trúc cũ (`docs/architecture/01-overview.md`, giữ local) cũng nêu điều này và liệt kê các nơi bị ảnh hưởng.
+**Đã kiểm chứng bằng thực nghiệm (2026-11-05).** Dựng đúng cấu hình `CacheModule` của dự án (cùng `redisStore`, `host`, `db`, `ttl`) trỏ tới một cổng không có Redis, rồi gọi `set` và `get`. Cả hai hoàn tất trong 0 ms và trả đúng giá trị, store là `Keyv`. Nếu dữ liệu thật sự đi qua Redis thì thao tác phải lỗi hoặc quá hạn kết nối. Thực nghiệm không cần chạy MongoDB hay Redis.
 
-Trạng thái: đã đọc mã nguồn của cả hai phía, **chưa chạy thực nghiệm** để xác nhận vì cần Redis. Cần danh sách các nơi dùng `CACHE_MANAGER` để biết tác động chính xác; việc này thuộc `caching-strategy.md` ở Phase 3.
+**Hệ quả:** dữ liệu đi qua `CACHE_MANAGER` nằm trong bộ nhớ của từng tiến trình, mất khi khởi động lại và không chia sẻ giữa các instance. Nơi đang dùng (tìm bằng `grep CACHE_MANAGER src`):
+
+| Nơi dùng | Dữ liệu | Tác động khi mất cache |
+|---|---|---|
+| [auth-credentials.service.ts](../../src/auth/services/auth-credentials.service.ts) | Token đặt lại mật khẩu (`reset_password:<token>`) | Link đặt lại mật khẩu đã gửi mail mất hiệu lực sau khi backend khởi động lại |
+| [auth-account-deletion.service.ts](../../src/auth/services/auth-account-deletion.service.ts) | Token hủy xóa tài khoản (`cancel_deletion:<token>`), sống **30 ngày** | Link hủy xóa trong email mất hiệu lực khi khởi động lại. Người dùng vẫn hủy được khi đã đăng nhập |
+| `src/chat/` (service, context, cache) và `cv-profiles.service.ts` | Cache ngữ cảnh và phản hồi chat | Chỉ chậm hơn, tính lại được |
+| `src/statistics/statistics-cache.service.ts`, `skills.service.ts` | Cache thống kê và kỹ năng | Chỉ chậm hơn |
+
+Hai dòng đầu là thay đổi chức năng chứ không chỉ hiệu năng. Phần OTP, quota và rate limit **không** bị ảnh hưởng vì chúng dùng `REDIS_CLIENT` (ioredis) trực tiếp. Cách khắc phục là `Future Improvement`: truyền `stores` đúng với phiên bản thư viện.
