@@ -59,7 +59,7 @@ System prompt gồm: vai trò ("Expert AI Career Advisor for Dev Link"), ý đ�
 | `recruiter_support` | Chỉ dẫn chung cho nhà tuyển dụng, dặn "Do not expose candidate private data" |
 | `general` | Chỉ trả lời nếu liên quan sự nghiệp IT, việc làm, CV, phỏng vấn, tuyển dụng |
 
-Lịch sử đưa vào tối đa **10 tin gần nhất** (`MAX_HISTORY_MESSAGES`). Ngữ cảnh người dùng cache 5 phút và ngữ cảnh nền tảng 30 phút trong `CACHE_MANAGER` (bộ nhớ), bị xóa khi CV đổi ([caching-strategy](../02-architecture/caching-strategy.md)).
+`ChatService` nạp tối đa **10 tin gần nhất** (`MAX_HISTORY_MESSAGES`); riêng ngân sách gửi cho Groq có giới hạn lịch sử khác, `AI_GROQ_HISTORY_LIMIT` mặc định **6** ([ai.constants.ts](../../src/ai/ai.constants.ts)). Việc giới hạn nào cắt trước khi gửi: `Chưa xác minh`. Ngữ cảnh người dùng cache 5 phút và ngữ cảnh nền tảng 30 phút trong `CACHE_MANAGER` (bộ nhớ), bị xóa khi CV đổi ([caching-strategy](../02-architecture/caching-strategy.md)).
 
 **Dữ liệu cá nhân gửi cho nhà cung cấp AI.** Ngữ cảnh `profile` được tuần tự hóa vào prompt và có `email`, kỹ năng và số năm kinh nghiệm của người dùng ([chat-context.service.ts](../../src/chat/chat-context.service.ts)). Tin nhắn người dùng cũng được gửi. Cả hai tới Groq hoặc Gemini, là bên thứ ba.
 

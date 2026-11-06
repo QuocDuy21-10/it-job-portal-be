@@ -19,6 +19,12 @@ Single NestJS backend for DevLink (a Vietnam IT job portal), covering authentica
 
 ---
 
+## 📚 Documentation
+
+Full documentation (architecture, data dictionary for all 17 MongoDB collections, 116 API routes, workflows, security and operations) is in [`docs/`](docs/README.md). Start with the [table of contents](docs/SUMMARY.md). When this README and `docs/` disagree with the code, the code is right.
+
+---
+
 ## 🖥️ Frontend Repository
 
 The companion frontend application for **DevLink** can be found in the frontend repository:
@@ -44,12 +50,15 @@ The companion frontend application for **DevLink** can be found in the frontend 
   - Multi-device sessions, logout-all, account deletion & deletion cancellation.
 - **👤 Users, Roles, and Authorization:**
   - User CRUD, role-aware access.
-  - CASL/RBAC policies, account lock/unlock.
+  - Role-based access (`@Roles`), account lock/unlock.
   - Saved jobs and followed companies.
 - **🏢 Companies and Jobs:**
   - Company profiles, automatic logo cleanup.
   - Job CRUD, job approval flow, top-hiring companies showcase.
   - Keyword search support, soft-delete patterns for data safety.
+- **🌐 External Jobs and Unified Search:**
+  - Scheduled sync (every 6 hours) from Greenhouse, Lever, TopDev and ITviec with an ACTIVE/STALE/CLOSED lifecycle and per-source display policy.
+  - One search API over internal and external jobs (`GET /api/v1/job-search`).
 - **📄 Resumes and CV Profiles:**
   - Resume application, uploaded CV file store.
   - Online structured CV profiles.
@@ -75,7 +84,7 @@ The companion frontend application for **DevLink** can be found in the frontend 
 
 | Component | Technologies |
 | :--- | :--- |
-| **Runtime & Language** | <a href="https://nodejs.org" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Node.js</a> 20, <a href="https://www.npmjs.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">npm</a>, <a href="https://www.typescriptlang.org" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">TypeScript</a> 5 |
+| **Runtime & Language** | <a href="https://nodejs.org" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Node.js</a> 24, <a href="https://www.npmjs.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">npm</a>, <a href="https://www.typescriptlang.org" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">TypeScript</a> 5 |
 | **Backend Framework** | <a href="https://nestjs.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">NestJS</a> 10 (<a href="https://fastify.dev" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Fastify</a> or <a href="https://expressjs.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Express</a> compatible, using <a href="https://expressjs.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Express</a> here) |
 | **Databases** | <a href="https://www.mongodb.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">MongoDB</a> 7, <a href="https://mongoosejs.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Mongoose</a> (<a href="https://www.npmjs.com/package/soft-delete-plugin-mongoose" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">soft-delete-plugin-mongoose</a>) |
 | **Cache & Queues** | <a href="https://redis.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Redis</a> 7, <a href="https://bullmq.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">BullMQ</a>, <a href="https://github.com/redis/ioredis" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">ioredis</a> |
@@ -91,7 +100,7 @@ The companion frontend application for **DevLink** can be found in the frontend 
 
 ### 📋 Prerequisites
 
-- **Node.js** 20+
+- **Node.js** 24 (see `.nvmrc`; `engines` requires `>=24`)
 - **npm**
 - **Docker & Docker Compose** (highly recommended for running local MongoDB and Redis)
 
@@ -118,16 +127,16 @@ Here are the required variables to spin up local development:
 | :--- | :--- | :--- |
 | `PORT` | HTTP port used by NestJS | `8081` |
 | `NODE_ENV` | Runtime environment | `development` |
-| `MONGO_URL` | MongoDB connection URI | `mongodb://root:123456@localhost:27017/devlink?authSource=admin` |
+| `MONGO_URL` | MongoDB connection URI | `mongodb://root:123456@localhost:27017/my-job-portal?authSource=admin` |
 | `MONGO_INITDB_ROOT_USERNAME` | Docker MongoDB root user | `root` |
 | `MONGO_INITDB_ROOT_PASSWORD` | Docker MongoDB root password | `123456` |
-| `MONGO_INITDB_DATABASE` | Docker MongoDB database name | `devlink` |
+| `MONGO_INITDB_DATABASE` | Docker MongoDB database name | `my-job-portal` |
 | `FE_URL` | Frontend URL used by auth/mail flows | `http://localhost:3000` |
 | `CORS_ORIGINS` | Comma-separated origins allowed to call the API with cookies (defaults to `FE_URL`) | `http://localhost:3000` |
 | `TRUST_PROXY` | Set to `1` behind nginx/Caddy so rate limits see the real client IP | *empty locally* |
 | `SWAGGER_ENABLED` | Expose Swagger when `NODE_ENV=production` | `false` |
 | `JWT_ACCESS_TOKEN_SECRET` | Access-token signing secret | `replace-with-local-secret` |
-| `JWT_ACCESS_EXPIRES_IN` | Access-token lifetime | `7d` |
+| `JWT_ACCESS_EXPIRES_IN` | Access-token lifetime | `15m` |
 | `JWT_REFRESH_TOKEN_SECRET` | Refresh-token signing secret | `replace-with-local-secret` |
 | `JWT_REFRESH_EXPIRES_IN` | Refresh-token lifetime | `7d` |
 | `EMAIL_ADMIN` | Seed/admin email | `admin@example.com` |
@@ -138,7 +147,6 @@ Here are the required variables to spin up local development:
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID | `replace-with-google-client-id` |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | `replace-with-google-client-secret` |
 | `GEMINI_API_KEY` | Gemini API key | `replace-with-gemini-key` |
-| `GEMINI_API_KEY_FALLBACK` | Optional fallback Gemini key | `replace-with-fallback-key` |
 | `GROQ_API_KEY` | Groq API key | `replace-with-groq-key` |
 | `REDIS_HOST` | Redis host | `localhost` |
 | `REDIS_PORT` | Redis port | `6379` |
@@ -223,7 +231,7 @@ Below is a cheat sheet of frequently used workspace commands:
 | `npm run docker:full` | Spin up MongoDB, Redis, and backend in containers |
 | `npm run docker:down` | Stop and tear down all Docker containers |
 | `npm run docker:logs` | Follow Docker container logs |
-| `npm run seed` | Seed initial database collections (roles, permissions, admin) |
+| `npm run seed` | Seed sample data: skills, job sources, companies, an admin account, 20 HR and 75 candidate accounts (all sharing `INIT_PASSWORD`), jobs, CVs and resumes. **Do not run unchanged against production** |
 
 ---
 
@@ -232,18 +240,20 @@ Below is a cheat sheet of frequently used workspace commands:
 ```text
 .
 ├── src/
-│   ├── main.ts                   # App entrypoint (guards, validation, Swagger)
+│   ├── main.ts                   # App entrypoint (Swagger, logger, shutdown hooks)
+│   ├── app.setup.ts              # Global HTTP pipeline (helmet, guards, pipes, CORS, versioning)
 │   ├── app.module.ts             # Global wiring (databases, queues, throttling)
 │   │
 │   ├── auth/                     # Authentication (JWT, login, Google OAuth)
 │   ├── users/                    # User accounts, CRUD operations
-│   ├── roles/                    # Role and permission matrices
 │   ├── sessions/                 # User session tracking (logout all, locks)
-│   ├── casl/                     # CASL authorization logic (RBAC/ABAC policies)
-│   ├── decorator/                # Custom NestJS decorators (@Public, @Roles)
+│   ├── casl/                     # ERole enum, RolesGuard, @Roles (CASL abilities are defined but not enforced)
+│   ├── profile-identity/         # Keeps user and CV-profile identity fields in sync
 │   │
 │   ├── companies/                # Company profile management
-│   ├── jobs/                     # Job listings and filtering
+│   ├── jobs/                     # Job listings, approval and filtering
+│   ├── job-ingestion/           # External job sources, sync and lifecycle
+│   ├── job-search/               # Unified search over internal and external jobs
 │   ├── resumes/                  # Job applications and CV files
 │   ├── cv-profiles/              # Online candidate profiles
 │   │
@@ -260,11 +270,12 @@ Below is a cheat sheet of frequently used workspace commands:
 │   ├── subscribers/              # User skill subscriptions
 │   ├── statistics/               # Analytics & dashboard reporting
 │   │
-│   ├── databases/                # DB setup & mongoose soft-delete plugin
+│   ├── databases/                # Seed data (soft-delete plugin is set up in app.module.ts)
+│   ├── config/                   # Environment validation at boot
 │   ├── redis/                    # Redis adapter setup
 │   ├── health/                   # Terminus health-check endpoints
 │   ├── ai/                       # Generic AI helpers and prompts
-│   ├── skills/                   # Static skills taxonomies
+│   ├── skills/                   # Controlled skills catalog
 │   └── utils/                    # Shared helper utilities
 │
 ├── Dockerfile                    # Multi-stage production container build
@@ -287,7 +298,7 @@ Below is a cheat sheet of frequently used workspace commands:
 - **Authentication & Authorization:** By default, endpoints require JWT access tokens. Protect or expose them using:
   - `@Public()` - Make the endpoint accessible without tokens.
   - `@OptionalAuth()` - Extract user session if present, but do not block.
-  - `@Roles(...)` & `@CheckPolicies(...)` - Enforce specific roles or CASL authorization rules.
+  - `@Roles(...)` - Restrict a route to specific roles (`SUPER ADMIN`, `HR`, `NORMAL USER`). `@CheckPolicies(...)` and `PoliciesGuard` exist but are not used by any route, so CASL abilities are not enforced.
 - **Versioned Endpoints:** All API routes are versioned and prefixed. Example: `/api/v1/auth/login`, `/api/v1/jobs`, `/api/v1/resumes`, and `/api/v1/chat/message`.
 - **Data Validation:** Global validation pipeline validates payloads using class-validator and automatically strips unwhitelisted properties.
 - **Upload Assets:** Uploaded files (like resumes or company logos) are placed in `public/images/` and served statically.

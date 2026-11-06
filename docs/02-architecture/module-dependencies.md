@@ -97,4 +97,4 @@ Sơ đồ có hai chiều giữa nhóm "Tuyển dụng" và "Bất đồng bộ"
 ## Chưa xác minh
 
 - Phát biểu "chạy được vì không cần `forwardRef`" là suy luận từ việc `QueuesModule` là `@Global()` và `grep` không thấy `forwardRef`. Chưa chạy thử để xác nhận không có cảnh báo phụ thuộc vòng khi khởi động, vì cần MongoDB và Redis.
-- Ghi chú kiến trúc cũ `docs/architecture/01-overview.md` (giữ local, không nằm trong git) có bảng phụ thuộc khác bảng này ở nhiều dòng, ví dụ nó ghi `users` phụ thuộc `companies`, `jobs`. Bảng cũ gộp cả schema đăng ký chung, còn bảng này chỉ ghi `imports` thật.
+- Ghi chú kiến trúc cũ `docs/archive/architecture/01-overview.md` (tài liệu cũ, chỉ có ở local) có bảng phụ thuộc khác bảng này ở nhiều dòng, ví dụ nó ghi `users` phụ thuộc `companies`, `jobs`. Bảng cũ gộp cả schema đăng ký chung, còn bảng này chỉ ghi `imports` thật.

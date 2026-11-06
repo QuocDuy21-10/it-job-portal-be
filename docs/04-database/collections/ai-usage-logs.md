@@ -23,8 +23,8 @@ Mỗi bản ghi là nhật ký một lần gọi AI: dùng nhà cung cấp nào,
 | `totalTokens` | Number | Không | — | — | Tổng token |
 | `estimatedPromptTokens` | Number | Không | — | — | Số token đầu vào ước tính phía backend |
 | `latencyMs` | Number | Không | — | — | Độ trễ của lần gọi, mili giây |
-| `estimatedCostUsd` | Number | Không | — | — | Chi phí ước tính, USD |
-| `costEstimated` | Boolean | Không | `false` | — | `true` nếu chi phí là ước tính |
+| `estimatedCostUsd` | Number | Không | — | — | Chi phí ước tính, USD. Bằng 0 nếu chưa cấu hình đơn giá |
+| `costEstimated` | Boolean | Không | `false` | — | `true` khi số token đầu vào là ước tính của backend (nhà cung cấp không báo số thật) |
 | `cacheHit` | Boolean | Không | `false` | — | Phản hồi lấy từ cache, không gọi AI |
 | `cacheCategory` | String | Không | — | — | Nhóm cache được trúng |
 | `requestStartedAt` | Date | Không | — | — | Thời điểm bắt đầu xử lý |
@@ -114,5 +114,6 @@ Các giá trị `operationType`, `model`, `intent`, chi phí trong ví dụ là 
 ## Lưu ý
 
 - **Known Limitation:** không có TTL, bản ghi tăng vô hạn. Với tải chat lớn, đây là collection tăng nhanh nhất.
-- `estimatedCostUsd` là ước tính, `costEstimated` cho biết có phải ước tính hay không. Đơn giá lấy từ biến `AI_COST_*` (xem `.env.example`).
+- `estimatedCostUsd` được tính từ số token và **đơn giá cấu hình**, đọc lần lượt từ các biến `AI_COST_<PROVIDER>_<MODEL>_<PROMPT|COMPLETION>_USD_PER_1K`, `AI_COST_<PROVIDER>_<PROMPT|COMPLETION>_USD_PER_1K`, `AI_COST_<PROMPT|COMPLETION>_USD_PER_1K` ([ai-usage.service.ts](../../../src/chat/ai-usage.service.ts)). **Không đặt biến nào thì đơn giá là 0 và chi phí ghi là 0**, nên con số 0 không có nghĩa là miễn phí. Mẫu ngắn nhất, ví dụ `AI_COST_PROMPT_USD_PER_1K` hoặc `AI_COST_GROQ_COMPLETION_USD_PER_1K`, đủ để bật tính chi phí.
+- `costEstimated = true` khi số token đầu vào là **ước tính của backend** vì nhà cung cấp không báo số thật; không liên quan tới việc đơn giá có được đặt hay không.
 - `quotaRollback` đánh dấu lượt chat bị hoàn quota (ví dụ lỗi nhà cung cấp), xem [chat-quota-policies](chat-quota-policies.md#cách-quota-hoạt-động).

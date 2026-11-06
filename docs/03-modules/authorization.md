@@ -39,11 +39,11 @@ Ma trận này **không được thực thi**, ghi lại để biết ý định
 
 - **CASL không có tác dụng thực tế.** Thêm hoặc sửa quy tắc trong `CaslAbilityFactory` không đổi quyền của bất kỳ route nào. Muốn dùng, phải gắn `@UseGuards(PoliciesGuard)` cùng `@CheckPolicies(...)` hoặc đăng ký guard toàn cục. Trạng thái: đã `grep`, xem [user-roles](../01-product/user-roles.md#known-limitation-casl-được-định-nghĩa-nhưng-không-thực-thi).
 - Quy tắc sở hữu (HR chỉ sửa công ty mình) nằm rải rác trong service, không tập trung ở CASL.
-- `src/roles/` chỉ còn thư mục rỗng, xem [project-structure](../00-getting-started/project-structure.md#known-limitation-thư-mục-còn-sót).
+- `src/roles/` chỉ còn thư mục rỗng sau khi entity `Role` bị bỏ, xem [ADR-0002](../12-decisions/0002-roles-as-enum.md) và [project-structure](../00-getting-started/project-structure.md#known-limitation-thư-mục-còn-sót). `ESubject` còn giữ `'Role'` và `'Permission'` là dấu vết của cấu trúc đó.
 
 ## Testing
 
-`src/casl/` không có file test. `RolesGuard` được ngầm kiểm tra qua e2e nếu có (xem `10-testing`, Phase 4).
+`src/casl/` không có file test. `RolesGuard` không có test riêng và 4 kịch bản e2e hiện chưa kiểm tra `@Roles` ([testing-strategy](../10-testing/testing-strategy.md)).
 
 ## Source References
 

@@ -28,7 +28,7 @@ Nguồn: [ai.constants.ts](../../src/ai/ai.constants.ts) (`DEFAULT_AI_CHAT_PRIMA
 | `AI_CHAT_PRIMARY_PROVIDER`, `AI_SUMMARY_PRIMARY_PROVIDER` | Đổi nhà cung cấp chính | `groq` |
 | `AI_CHAT_GEMINI_FALLBACK_ENABLED`, `AI_SUMMARY_GEMINI_FALLBACK_ENABLED` | Bật tắt dự phòng | bật |
 | `AI_GROQ_*` (lịch sử, token đầu vào, số tin, ...) | Ngân sách ngữ cảnh gửi cho Groq | `.env.example` ghi là bắt buộc, `AIService` kiểm tra |
-| `AI_COST_GROQ_*` | Đơn giá để ước tính chi phí | tùy chọn |
+| `AI_COST_[<PROVIDER>_][<MODEL>_]<PROMPT\|COMPLETION>_USD_PER_1K` | Đơn giá để ước tính chi phí; không đặt thì chi phí ghi 0 | 0 |
 
 Danh sách đầy đủ: `.env.example` và `14-reference` (Phase 4).
 
@@ -45,7 +45,7 @@ Lỗi Groq được coi là đủ điều kiện chuyển sang Gemini: giới h�
 | Dữ liệu | Tới | Ghi chú |
 |---|---|---|
 | Văn bản CV đã làm sạch | Gemini | Dữ liệu cá nhân của ứng viên |
-| Tin nhắn người dùng, hồ sơ (gồm email), tin phù hợp, 10 tin lịch sử | Groq, hoặc Gemini khi dự phòng | Trong system prompt |
+| Tin nhắn người dùng, hồ sơ (gồm email), tin phù hợp, lịch sử gần nhất (6 đến 10 tin) | Groq, hoặc Gemini khi dự phòng | Trong system prompt |
 | Văn bản câu trả lời | Groq | Để phân loại chủ đề |
 
 Điều khoản lưu giữ và huấn luyện của hai nhà cung cấp nằm ngoài repository; cần đối chiếu riêng khi đánh giá quyền riêng tư.

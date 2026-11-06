@@ -78,8 +78,8 @@ Không phải module nào cũng có đủ các phần này. Ví dụ `cv-parser/
 
 | Đường dẫn | Tình trạng |
 |---|---|
-| `src/roles/` | Chỉ có hai thư mục con rỗng `dto/` và `schemas/`, không có file, không có module và không có chỗ nào import. Có vẻ là phần còn lại của một module cũ. Vai trò thực tế nằm ở `casl/` |
+| `src/roles/` | Chỉ có hai thư mục con rỗng `dto/` và `schemas/`, không có file, không có module và không có chỗ nào import. Là phần còn lại của entity `Role` đã bị bỏ ở commit `773dbcd` (2026-06-06, "replace Role entity with ERole enum"). Vai trò thực tế nằm ở `casl/` ([ADR-0002](../12-decisions/0002-roles-as-enum.md)) |
 | `src/databases/migrations/` | Thư mục rỗng. Xem [local-development.md](local-development.md#known-limitation-script-dev-bị-thiếu) |
 | `scripts/` (gốc repo) | Không tồn tại dù `package.json` tham chiếu |
 
-Đây là nhận xét từ việc đọc cây thư mục, chưa kiểm tra lịch sử git để biết lý do.
+`src/roles/` đã được đối chiếu với lịch sử git. Hai mục còn lại (`migrations/`, `scripts/`) chưa kiểm tra lịch sử.

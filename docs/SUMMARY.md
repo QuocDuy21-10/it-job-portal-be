@@ -28,6 +28,7 @@
 - [Khả năng mở rộng](02-architecture/scalability.md)
 - [Chiến lược cache](02-architecture/caching-strategy.md)
 - [Xử lý bất đồng bộ](02-architecture/asynchronous-processing.md)
+- [Những bài toán kỹ thuật chính](02-architecture/technical-challenges.md)
 
 ## 03 · Modules
 
@@ -75,6 +76,51 @@
 - [Nguồn tin tuyển dụng ngoài](07-integrations/job-source-providers.md)
 - [Sentry](07-integrations/sentry.md)
 
+## 08 · Security
+
+- [Xác thực](08-security/authentication.md)
+- [Phân quyền](08-security/authorization.md)
+- [Bảo vệ dữ liệu cá nhân](08-security/data-protection.md)
+- [Checklist bảo mật production](08-security/production-security-checklist.md)
+
+## 09 · Infrastructure
+
+- [Docker và Compose](09-infrastructure/docker.md)
+- [CI/CD](09-infrastructure/ci-cd.md)
+- [Triển khai](09-infrastructure/deployment.md)
+
+## 10 · Testing
+
+- [Chiến lược kiểm thử](10-testing/testing-strategy.md)
+- [Thống kê kiểm thử](10-testing/test-inventory.md)
+
+## 11 · Operations
+
+- [Health check, log và giám sát](11-operations/health-and-logging.md)
+- [Xử lý sự cố](11-operations/troubleshooting.md)
+- [Sao lưu, khôi phục và rollback](11-operations/backup-and-recovery.md)
+
+## 12 · Decisions
+
+- [Mục lục ADR](12-decisions/README.md)
+- [0001 Modular monolith](12-decisions/0001-modular-monolith.md)
+- [0002 Vai trò là enum](12-decisions/0002-roles-as-enum.md)
+- [0003 BullMQ cho xử lý nền](12-decisions/0003-bullmq-background-processing.md)
+- [0004 Hybrid matching](12-decisions/0004-hybrid-matching.md)
+- [0005 Vòng đời tin ngoài](12-decisions/0005-external-job-lifecycle.md)
+- [0006 Chính sách hiển thị theo nguồn](12-decisions/0006-source-display-policy.md)
+- [0007 Quota chat đặt chỗ](12-decisions/0007-reservation-based-chat-quota.md)
+- [0008 Cache danh sách có thẻ](12-decisions/0008-redis-tagged-list-cache.md)
+- [0009 Hành động AI cần xác nhận](12-decisions/0009-confirmed-tool-actions.md)
+
 ## 13 · Contributing
 
 - [Hướng dẫn viết và bảo trì tài liệu](13-contributing/documentation-guide.md)
+- [Quy trình phát triển](13-contributing/development-workflow.md)
+
+## 14 · Reference
+
+- [Biến môi trường](14-reference/environment-variables.md)
+- [Thuật ngữ](14-reference/glossary.md)
+- [Đối chiếu và migration tài liệu cũ](14-reference/legacy-docs-migration.md)
+- [Báo cáo bao phủ tài liệu](14-reference/documentation-coverage.md)
