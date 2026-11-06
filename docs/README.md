@@ -19,12 +19,12 @@ Tài liệu kỹ thuật và nghiệp vụ của DevLink, nền tảng tuyển d
 |---|---|---|
 | `00-getting-started` | Giới thiệu, chạy thử, môi trường local, cấu trúc dự án | Có |
 | `01-product` | Vai trò người dùng, tính năng, quy tắc nghiệp vụ | Có |
-| `02-architecture` | Sơ đồ C4, phụ thuộc module, luồng dữ liệu, công nghệ, quan sát, mở rộng | Có (một phần, thêm cache và hàng đợi ở Phase 3) |
-| `03-modules` | Giải thích từng module | Có (12 tài liệu, thêm job-ingestion, search, matching, chat, queues ở Phase 3) |
+| `02-architecture` | Sơ đồ C4, phụ thuộc module, luồng dữ liệu, cache, bất đồng bộ, công nghệ, quan sát, mở rộng | Có |
+| `03-modules` | Giải thích từng module | Có (17 tài liệu) |
 | `04-database` | Data dictionary 17 collection, quan hệ, index | Có |
-| `05-api` | 116 route theo từng controller | Phase 3 |
-| `06-workflows` | Use case, sequence, state diagram | Phase 3 |
-| `07-integrations` | AI, email, Google, nguồn tin, Sentry | Phase 3 |
+| `05-api` | 116 route theo từng controller, thời gian thực | Có |
+| `06-workflows` | Use case, sequence, state diagram | Có |
+| `07-integrations` | AI, email, Google, nguồn tin, Sentry | Có |
 | `08-security` | Xác thực, phân quyền, bảo vệ dữ liệu, checklist | Phase 4 |
 | `09-infrastructure` | Docker, CI/CD, triển khai | Phase 4 |
 | `10-testing` | Chiến lược và thống kê test | Phase 4 |

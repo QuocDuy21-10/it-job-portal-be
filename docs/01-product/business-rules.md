@@ -21,7 +21,7 @@ Tổng hợp các quy tắc nghiệp vụ quan trọng, mỗi quy tắc kèm nơ
 |---|---|---|
 | Tin mới | `approvalStatus = PENDING`, chưa hiển thị công khai | [job.schema.ts](../../src/jobs/schemas/job.schema.ts) |
 | Hiển thị công khai | `isActive`, `APPROVED`, và chưa quá `endDate` (hoặc không có `endDate`) | [jobs.service.ts](../../src/jobs/jobs.service.ts) |
-| Duyệt tin | Chỉ `SUPER ADMIN`. Không kiểm tra trạng thái trước, mọi chuyển đổi hợp lệ | `approveJob` |
+| Duyệt tin | Chỉ `SUPER ADMIN`, chỉ đặt được `APPROVED` hoặc `REJECTED` (không quay lại `PENDING`); không kiểm tra trạng thái hiện tại | `approveJob`, `ApproveJobDto` |
 | Hết hạn | Cron mỗi giờ đặt `isActive = false` và báo người tạo tin | `handleExpiredJobs` |
 | Kỹ năng của tin | Chuẩn hóa theo danh mục kỹ năng, giá trị không hợp lệ bị từ chối | `normalizeControlledSkills` |
 | Địa điểm | `locationCode` hoặc `location` phải khớp danh mục, nếu không bị từ chối | `resolveLocationOrThrow` |

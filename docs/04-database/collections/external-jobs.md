@@ -29,7 +29,7 @@ Tin tuyển dụng được đồng bộ từ nguồn bên ngoài (ATS của cô
 | `lastSeenAt` | Date | Có | — | — | Lần gần nhất tin xuất hiện trong danh sách nguồn |
 | `lastFetchedAt` | Date | Không | — | — | Lần gần nhất tải chi tiết tin |
 | `lastContentUpdatedAt` | Date | Không | — | — | Lần gần nhất nội dung thay đổi |
-| `contentHash` | String | Không | — | — | Giá trị băm nội dung để phát hiện thay đổi |
+| `contentHash` | String | Không | — | — | SHA-1 của 13 field nội dung, dùng để phát hiện thay đổi |
 | `staleSince` | Date | Không | — | — | Thời điểm chuyển sang `STALE`. Dùng để tính thời gian ân hạn |
 | `closedAt` | Date | Không | — | — | Thời điểm đóng tin |
 | `closeReason` | String | Không | — | enum: `NO_LONGER_MATCHES`, `EXPIRED`, `NOT_FOUND`, `GONE_FROM_SOURCE` | Lý do đóng tin |
@@ -89,7 +89,7 @@ Các quy tắc do [job-lifecycle.service.ts](../../../src/job-ingestion/job-life
 | `NO_LONGER_MATCHES` | Tải lại thấy tin không còn là tin IT hoặc thiếu trường bắt buộc |
 | `EXPIRED` | Tin có `expiresAt` đã qua |
 
-Việc gán `EXPIRED` và chi tiết điều kiện `NO_LONGER_MATCHES` nằm ngoài `computeTransitions`, nên bảng trên cho hai giá trị đó là suy luận từ tên enum và comment. Trạng thái: `Chưa xác minh`. Quy trình đầy đủ ở `job-ingestion.md` (Phase 3).
+`EXPIRED` do `closeExpired` gán cho tin ACTIVE hoặc STALE có `expiresAt` đã qua ([external-job.repository.ts](../../../src/job-ingestion/external-job.repository.ts)). `NO_LONGER_MATCHES` đến từ tin bị loại khi tải lại vì lý do khác `NOT_FOUND` (xem `computeTransitions`). Quy trình đầy đủ ở [job-ingestion](../../03-modules/job-ingestion.md).
 
 ## Ví dụ document
 
@@ -113,7 +113,7 @@ Việc gán `EXPIRED` và chi tiết điều kiện `NO_LONGER_MATCHES` nằm ng
   "status": "ACTIVE",
   "lastSeenAt": "2026-10-05T06:00:00.000Z",
   "lastFetchedAt": "2026-10-05T06:00:00.000Z",
-  "contentHash": "<sha256-hex>",
+  "contentHash": "<sha1-hex>",
   "isDeleted": false
 }
 ```
@@ -122,6 +122,6 @@ Việc gán `EXPIRED` và chi tiết điều kiện `NO_LONGER_MATCHES` nằm ng
 
 ## Lưu ý
 
-- **Known Limitation:** `contentHash` được lưu để phát hiện thay đổi nhưng chưa xác minh thuật toán băm và các field tham gia. Xem `job-ingestion.md` (Phase 3).
+- `contentHash` là SHA-1 của mảng 13 field theo thứ tự cố định: `title`, `companyName`, `location`, `locationCode`, `isRemote`, `skills`, `level`, `descriptionHtml`, `publishedAt`, `expiresAt`, `salaryText`, `applyUrl`, `sourceUrl` ([ingestion-filters.ts](../../../src/job-ingestion/ingestion-filters.ts)). Nếu băm không đổi, đồng bộ chỉ cập nhật `status`, `lastFetchedAt`, `lastSeenAt`, không ghi lại nội dung và không đổi `lastContentUpdatedAt`. Với nguồn `LINK_ONLY`, `descriptionHtml` luôn rỗng nên thay đổi mô tả ở nguồn không làm đổi băm.
 - **Known Limitation:** `sourceKey` là chuỗi, nên đổi `key` của một nguồn sẽ làm tin cũ mất liên kết. Chưa kiểm tra có chặn đổi `key` không.
 - **Migration:** thêm nguồn mới không cần migration. Muốn xóa hẳn tin của một nguồn phải xóa theo `sourceKey`.

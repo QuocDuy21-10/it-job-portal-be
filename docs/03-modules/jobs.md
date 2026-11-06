@@ -32,7 +32,7 @@ Import `queues` (đưa việc vào hàng đợi), `skills` (chuẩn hóa kỹ n�
 
 - Tin mới `PENDING`, công khai chỉ khi `isActive`, `APPROVED` và còn hạn.
 - HR chỉ thấy tin của công ty mình, quản trị viên thấy tất cả.
-- Chỉ `SUPER ADMIN` được duyệt, và không kiểm tra trạng thái trước.
+- Chỉ `SUPER ADMIN` được duyệt; chỉ đặt được `APPROVED` hoặc `REJECTED` và không kiểm tra trạng thái trước, nên không quay lại `PENDING`.
 - Kỹ năng và địa điểm được chuẩn hóa hoặc bị từ chối khi tạo và sửa.
 - Mỗi lần tạo tin, `create` luôn đưa một việc vào hàng đợi `company-follower-notification`. Lỗi khi đưa vào hàng đợi chỉ được log, không làm thất bại việc tạo tin.
 
@@ -66,7 +66,6 @@ Sơ đồ trạng thái chi tiết sẽ nằm ở `06-workflows/state-machines/`
 ## Known Limitation
 
 - Sửa tin đã duyệt không đặt lại `PENDING`.
-- Duyệt không kiểm tra trạng thái trước.
 - **Email "tin mới" gửi trước khi tin được duyệt.** Hàng đợi được kích hoạt ngay trong `create`, và [company-follower-queue.processor.ts](../../src/queues/processors/company-follower-queue.processor.ts) chỉ lọc người theo dõi (`isActive`, chưa xóa mềm), không kiểm tra `approvalStatus` của tin. Người theo dõi có thể nhận email về tin chưa được duyệt hoặc sau đó bị từ chối. Processor cũng nuốt lỗi gửi từng email (`catch` không ném lại), nên email lỗi không được retry.
 - Chi tiết và bằng chứng ở [jobs (collection)](../04-database/collections/jobs.md#lưu-ý).
 

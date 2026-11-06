@@ -87,6 +87,7 @@ Sequence đăng nhập, làm mới token và xác thực OTP nằm ở `06-workf
 | Token đặt lại mật khẩu và hủy xóa tài khoản lưu qua `CACHE_MANAGER` | `CACHE_MANAGER` chạy trong bộ nhớ (đã kiểm chứng), nên các link này mất hiệu lực khi backend khởi động lại và không dùng được giữa nhiều instance. Xem [data-flow](../02-architecture/data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis) |
 | Index trùng ở `sessions` | TTL của `expiresAt` có thể không tồn tại, xem [sessions](../04-database/collections/sessions.md#known-limitation-index-trùng-key-pattern) |
 | Truy vấn người dùng mỗi request | Chi phí đổi lấy khóa tài khoản có hiệu lực tức thì |
+| **Hủy xóa tài khoản bằng đăng nhập không dùng được** | `POST /auth/account/cancel-deletion` yêu cầu JWT, nhưng `JwtStrategy.validate` gọi `assertAuthenticatedAccountState(user, 'access')` và ném `403` khi `scheduledDeletionAt` còn ở tương lai. Người dùng đang chờ xóa vì vậy không qua được guard để hủy. Đường còn lại là `POST /auth/account/cancel-deletion-by-token`, nhưng token nằm trong `CACHE_MANAGER` (bộ nhớ), mất khi backend khởi động lại. Kết luận từ đọc mã ([jwt.strategy.ts](../../src/auth/passport/jwt.strategy.ts), [assert-authenticated-account-state.util.ts](../../src/auth/utils/assert-authenticated-account-state.util.ts), [auth-account-deletion.service.ts](../../src/auth/services/auth-account-deletion.service.ts)), chưa chạy thử vì cần MongoDB. Service có test riêng nhưng không bao quát đường đi qua guard |
 
 ## Testing
 

@@ -74,7 +74,7 @@ Snapshot công ty được tạo khi tạo tin, và khi cập nhật tin có g�
 
 ## Quy tắc nghiệp vụ
 
-**Duyệt tin.** Tin mới có `approvalStatus` mặc định `PENDING`. `PATCH /jobs/:id/approve` của `SUPER ADMIN` đặt `approvalStatus`, `approvalNote`, `approvedBy`, `approvedAt` ([jobs.service.ts](../../../src/jobs/jobs.service.ts)). Code không kiểm tra trạng thái hiện tại nên mọi chuyển trạng thái đều được chấp nhận, kể cả `APPROVED` sang `REJECTED`.
+**Duyệt tin.** Tin mới có `approvalStatus` mặc định `PENDING`. `PATCH /jobs/:id/approve` của `SUPER ADMIN` đặt `approvalStatus`, `approvalNote`, `approvedBy`, `approvedAt` ([jobs.service.ts](../../../src/jobs/jobs.service.ts)). Code không kiểm tra trạng thái hiện tại, nên `APPROVED` sang `REJECTED` và ngược lại đều được chấp nhận; tuy vậy `ApproveJobDto` chỉ nhận `APPROVED` hoặc `REJECTED`, nên **không thể quay về `PENDING`** (xem [job-approval](../../06-workflows/state-machines/job-approval.md)).
 
 **Ai thấy tin nào** (`findAll`):
 
@@ -115,4 +115,4 @@ Snapshot công ty được tạo khi tạo tin, và khi cập nhật tin có g�
 ## Lưu ý
 
 - **Known Limitation:** sửa tin không đặt lại `approvalStatus` về `PENDING`. `UpdateJobDto` mở rộng `CreateJobDto` và không chứa `approvalStatus`, cộng với `ValidationPipe({ whitelist: true })` nên client không tự đổi được trạng thái duyệt qua API sửa tin. Nhưng nội dung tin đã duyệt có thể được HR sửa mà không qua duyệt lại. Đã đọc `update` trong [jobs.service.ts](../../../src/jobs/jobs.service.ts) và `grep` DTO.
-- **Known Limitation:** vòng đời duyệt không có kiểm tra chuyển trạng thái (xem trên). Sơ đồ nằm ở `06-workflows/state-machines/` (Phase 3).
+- Sơ đồ vòng đời duyệt: [job-approval](../../06-workflows/state-machines/job-approval.md). Duyệt không có lịch sử, chỉ lần duyệt cuối được giữ.

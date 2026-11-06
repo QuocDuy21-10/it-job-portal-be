@@ -26,6 +26,8 @@
 - [Công nghệ và lý do lựa chọn](02-architecture/technology-decisions.md)
 - [Quan sát hệ thống](02-architecture/observability.md)
 - [Khả năng mở rộng](02-architecture/scalability.md)
+- [Chiến lược cache](02-architecture/caching-strategy.md)
+- [Xử lý bất đồng bộ](02-architecture/asynchronous-processing.md)
 
 ## 03 · Modules
 
@@ -41,12 +43,37 @@
 - [Notifications, Mail và Subscribers](03-modules/notifications-and-mail.md)
 - [Statistics](03-modules/statistics.md)
 - [Hạ tầng dùng chung](03-modules/platform-infrastructure.md)
+- [Job Ingestion và vòng đời tin ngoài](03-modules/job-ingestion.md)
+- [Job Search (tìm kiếm hợp nhất)](03-modules/job-search.md)
+- [CV Parsing và Hybrid Matching](03-modules/cv-parsing-and-matching.md)
+- [AI Chat](03-modules/ai-chat.md)
+- [Queues (BullMQ)](03-modules/queues.md)
 
 ## 04 · Database
 
 - [Tổng quan cơ sở dữ liệu](04-database/database-overview.md)
 - [Quan hệ giữa các collection](04-database/collection-relationships.md)
 - Collection: [users](04-database/collections/users.md), [sessions](04-database/collections/sessions.md), [notifications](04-database/collections/notifications.md), [subscribers](04-database/collections/subscribers.md), [companies](04-database/collections/companies.md), [jobs](04-database/collections/jobs.md), [resumes](04-database/collections/resumes.md), [cv-profiles](04-database/collections/cv-profiles.md), [skills](04-database/collections/skills.md), [job-sources](04-database/collections/job-sources.md), [external-jobs](04-database/collections/external-jobs.md), [crawl-runs](04-database/collections/crawl-runs.md), [chat-sessions](04-database/collections/chat-sessions.md), [chat-messages](04-database/collections/chat-messages.md), [chat-tool-actions](04-database/collections/chat-tool-actions.md), [chat-quota-policies](04-database/collections/chat-quota-policies.md), [ai-usage-logs](04-database/collections/ai-usage-logs.md)
+
+## 05 · API
+
+- [Tổng quan API](05-api/api-overview.md)
+- [Thời gian thực: Socket.IO và stream chat](05-api/realtime.md)
+- Endpoint: [auth](05-api/endpoints/auth.md), [users](05-api/endpoints/users.md), [companies](05-api/endpoints/companies.md), [jobs](05-api/endpoints/jobs.md), [resumes](05-api/endpoints/resumes.md), [cv-profiles](05-api/endpoints/cv-profiles.md), [skills](05-api/endpoints/skills.md), [subscribers](05-api/endpoints/subscribers.md), [notifications](05-api/endpoints/notifications.md), [chat](05-api/endpoints/chat.md), [job-search](05-api/endpoints/job-search.md), [job-sources](05-api/endpoints/job-sources.md), [files](05-api/endpoints/files.md), [statistics](05-api/endpoints/statistics.md), [mail](05-api/endpoints/mail.md), [health](05-api/endpoints/health.md)
+
+## 06 · Workflows
+
+- Use case: [tổng quan](06-workflows/use-cases/use-case-overview.md), [xác thực](06-workflows/use-cases/authentication.md), [đăng tin và duyệt](06-workflows/use-cases/job-posting-and-approval.md), [nộp hồ sơ](06-workflows/use-cases/job-application.md), [quản lý CV](06-workflows/use-cases/cv-management.md), [xóa tài khoản](06-workflows/use-cases/account-deletion.md)
+- Sequence: [xử lý CV](06-workflows/sequences/cv-processing.md), [đồng bộ tin ngoài](06-workflows/sequences/job-ingestion.md), [tìm kiếm hợp nhất](06-workflows/sequences/unified-job-search.md), [làm mới token](06-workflows/sequences/refresh-token.md), [chat AI stream](06-workflows/sequences/ai-chat-streaming.md)
+- State machine: [vòng đời tin ngoài](06-workflows/state-machines/external-job-lifecycle.md), [duyệt tin](06-workflows/state-machines/job-approval.md), [trạng thái hồ sơ](06-workflows/state-machines/resume-status.md)
+
+## 07 · Integrations
+
+- [Nhà cung cấp AI](07-integrations/ai-providers.md)
+- [Email (SMTP)](07-integrations/email-delivery.md)
+- [Google đăng nhập](07-integrations/google-oauth.md)
+- [Nguồn tin tuyển dụng ngoài](07-integrations/job-source-providers.md)
+- [Sentry](07-integrations/sentry.md)
 
 ## 13 · Contributing
 
