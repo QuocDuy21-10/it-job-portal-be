@@ -11,6 +11,10 @@
   <img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis" />
   <img src="https://img.shields.io/badge/Google_Gemini-8E75C2?style=for-the-badge&logo=googlegemini&logoColor=white" alt="Gemini" />
   <img src="https://img.shields.io/badge/Swagger-85EA2D?style=for-the-badge&logo=swagger&logoColor=black" alt="Swagger" />
+  <img src="https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socketdotio&logoColor=white" alt="Socket.IO" />
+  <img src="https://img.shields.io/badge/Sentry-362D59?style=for-the-badge&logo=sentry&logoColor=white" alt="Sentry" />
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
+  <a href="https://quocduy21-10.github.io/it-job-portal-be/"><img src="https://img.shields.io/badge/Docs-Docusaurus-3ECC5F?style=for-the-badge&logo=docusaurus&logoColor=white" alt="Documentation" /></a>
 </div>
 
 <br />
@@ -21,7 +25,11 @@ Single NestJS backend for DevLink (a Vietnam IT job portal), covering authentica
 
 ## 📚 Documentation
 
-Full documentation (architecture, data dictionary for all 17 MongoDB collections, 116 API routes, workflows, security and operations) is in [`docs/`](docs/README.md). Start with the [table of contents](docs/SUMMARY.md). When this README and `docs/` disagree with the code, the code is right.
+👉 **Detailed documentation site: [quocduy21-10.github.io/it-job-portal-be](https://quocduy21-10.github.io/it-job-portal-be/)**
+
+It covers architecture, the data dictionary for all 17 MongoDB collections, 116 API routes, workflows, integrations, security and operations. The site is built with Docusaurus (source in [`docs-site/`](docs-site)) and deployed to GitHub Pages by `.github/workflows/docs.yml`.
+
+The Markdown sources are also in [`docs/`](docs/README.md); start with the [table of contents](docs/SUMMARY.md). When this README and the docs disagree with the code, the code is right.
 
 ---
 
@@ -67,16 +75,20 @@ The companion frontend application for **DevLink** can be found in the frontend 
   - Text extraction (PDF, DOC, DOCX, TXT).
   - Google Gemini CV parsing into JSON structured data.
   - Deterministic job-match score calculation.
-  - Groq/Gemini career chatbot, AI usage tracking, and safe fallback behavior.
+  - Groq/Gemini career chatbot with intent detection, input/output topic guardrails, response formatting and FAQ caching.
+  - Chat tool actions, per-user AI quota policies, AI usage logs, and safe fallback behavior.
 - **🔔 Notifications and Subscribers:**
-  - In-app real-time notifications with unread counts.
+  - In-app real-time notifications over Socket.IO (WebSocket gateway) with unread counts.
   - Email subscribers, skill-based subscriptions.
   - Follower notifications and job recommendation emails.
 - **⚙️ Infrastructure and Operations:**
   - Redis cache & BullMQ background job queues.
   - SMTP mail templates (using Handlebars).
-  - Swagger/OpenAPI interactive docs.
-  - Health checks, statistics dashboards, validation pipes, response envelopes, CORS, and Helmet security.
+  - Swagger/OpenAPI interactive docs and a [Docusaurus documentation site](https://quocduy21-10.github.io/it-job-portal-be/).
+  - Structured JSON logging (Pino) and error tracking (Sentry).
+  - Redis-backed rate limiting (Throttler), Helmet, CORS, validation pipes, and response envelopes.
+  - Health checks (Terminus) and statistics dashboards.
+  - CI/CD: GitHub Actions (lint, type-check, test, build, `npm audit`, Docker build) and GitHub Pages docs deploy.
 
 ---
 
@@ -88,11 +100,14 @@ The companion frontend application for **DevLink** can be found in the frontend 
 | **Backend Framework** | <a href="https://nestjs.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">NestJS</a> 10 (<a href="https://fastify.dev" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Fastify</a> or <a href="https://expressjs.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Express</a> compatible, using <a href="https://expressjs.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Express</a> here) |
 | **Databases** | <a href="https://www.mongodb.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">MongoDB</a> 7, <a href="https://mongoosejs.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Mongoose</a> (<a href="https://www.npmjs.com/package/soft-delete-plugin-mongoose" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">soft-delete-plugin-mongoose</a>) |
 | **Cache & Queues** | <a href="https://redis.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Redis</a> 7, <a href="https://bullmq.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">BullMQ</a>, <a href="https://github.com/redis/ioredis" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">ioredis</a> |
-| **Security & Auth** | <a href="https://www.passportjs.org" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Passport</a>, <a href="https://jwt.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">JWT</a>, <a href="https://developers.google.com/identity/protocols/oauth2" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Google OAuth</a>, <a href="https://casl.js.org" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">CASL</a>, <a href="https://www.npmjs.com/package/bcryptjs" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">bcryptjs</a>, <a href="https://helmetjs.github.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Helmet</a>, <a href="https://docs.nestjs.com/security/rate-limiting" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Throttler</a> |
+| **Realtime** | <a href="https://socket.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Socket.IO</a> via <a href="https://docs.nestjs.com/websockets/gateways" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">@nestjs/websockets</a> |
+| **Security & Auth** | <a href="https://www.passportjs.org" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Passport</a>, <a href="https://jwt.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">JWT</a>, <a href="https://developers.google.com/identity/protocols/oauth2" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Google OAuth</a>, <a href="https://casl.js.org" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">CASL</a>, <a href="https://www.npmjs.com/package/bcryptjs" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">bcryptjs</a>, <a href="https://helmetjs.github.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Helmet</a>, <a href="https://docs.nestjs.com/security/rate-limiting" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Throttler</a> (Redis storage) |
+| **Observability** | <a href="https://getpino.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Pino</a> (<a href="https://github.com/iamolegga/nestjs-pino" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">nestjs-pino</a>), <a href="https://sentry.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Sentry</a>, <a href="https://docs.nestjs.com/recipes/terminus" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Terminus</a> health checks |
 | **AI Processing** | <a href="https://ai.google.dev" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Google Gemini</a> (Gemini 3.1 Flash Lite), <a href="https://groq.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Groq</a> |
 | **APIs & Documentation** | <a href="https://swagger.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Swagger</a>/<a href="https://www.openapis.org" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">OpenAPI</a> via <a href="https://docs.nestjs.com/openapi/introduction" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">@nestjs/swagger</a> |
 | **Files & Email** | <a href="https://github.com/expressjs/multer" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Multer</a>, <a href="https://www.npmjs.com/package/pdf-parse" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">pdf-parse</a>, <a href="https://www.npmjs.com/package/mammoth" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">mammoth</a>, <a href="https://nodemailer.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Nodemailer</a>, <a href="https://handlebarsjs.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Handlebars</a> |
-| **Testing & Tooling** | <a href="https://www.docker.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Docker</a>, <a href="https://jestjs.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Jest</a>, <a href="https://eslint.org" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">ESLint</a>, <a href="https://prettier.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Prettier</a> |
+| **Docs** | <a href="https://docusaurus.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Docusaurus</a> on <a href="https://pages.github.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">GitHub Pages</a> |
+| **Testing & Tooling** | <a href="https://github.com/features/actions" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">GitHub Actions</a>, <a href="https://typicode.github.io/husky" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Husky</a>, <a href="https://commitlint.js.org" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">commitlint</a>, <a href="https://github.com/lint-staged/lint-staged" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">lint-staged</a>, <a href="https://www.docker.com" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Docker</a>, <a href="https://jestjs.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Jest</a>, <a href="https://eslint.org" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">ESLint</a>, <a href="https://prettier.io" target="_blank" rel="noopener noreferrer" style="color: blue; text-decoration: underline;">Prettier</a> |
 
 ---
 
@@ -231,6 +246,8 @@ Below is a cheat sheet of frequently used workspace commands:
 | `npm run docker:full` | Spin up MongoDB, Redis, and backend in containers |
 | `npm run docker:down` | Stop and tear down all Docker containers |
 | `npm run docker:logs` | Follow Docker container logs |
+| `npm run dev:services` / `npm run dev:stop` | Start / stop local dev services via `scripts/` |
+| `npm run migrate:locations` | One-off migration that standardizes job/company locations |
 | `npm run seed` | Seed sample data: skills, job sources, companies, an admin account, 20 HR and 75 candidate accounts (all sharing `INIT_PASSWORD`), jobs, CVs and resumes. **Do not run unchanged against production** |
 
 ---
@@ -246,6 +263,7 @@ Below is a cheat sheet of frequently used workspace commands:
 │   │
 │   ├── auth/                     # Authentication (JWT, login, Google OAuth)
 │   ├── users/                    # User accounts, CRUD operations
+│   ├── roles/                    # Role schemas and DTOs
 │   ├── sessions/                 # User session tracking (logout all, locks)
 │   ├── casl/                     # ERole enum, RolesGuard, @Roles (CASL abilities are defined but not enforced)
 │   ├── profile-identity/         # Keeps user and CV-profile identity fields in sync
@@ -266,7 +284,7 @@ Below is a cheat sheet of frequently used workspace commands:
 │   │
 │   ├── files/                    # Local storage & file upload management
 │   ├── mail/                     # SMTP integration and Handlebars mailers
-│   ├── notifications/            # In-app notifications
+│   ├── notifications/            # In-app notifications (REST + Socket.IO gateway)
 │   ├── subscribers/              # User skill subscriptions
 │   ├── statistics/               # Analytics & dashboard reporting
 │   │
@@ -276,8 +294,15 @@ Below is a cheat sheet of frequently used workspace commands:
 │   ├── health/                   # Terminus health-check endpoints
 │   ├── ai/                       # Generic AI helpers and prompts
 │   ├── skills/                   # Controlled skills catalog
+│   ├── scripts/                  # Ad-hoc scripts (performance benchmark)
+│   ├── instrument.ts             # Sentry initialization
 │   └── utils/                    # Shared helper utilities
 │
+├── docs/                         # Markdown documentation (00-getting-started ... 14-reference)
+├── docs-site/                    # Docusaurus site published to GitHub Pages
+├── agent_docs/                   # Task-specific guidance for AI coding agents
+├── test/                         # E2E test config
+├── .github/workflows/            # ci.yml (checks) and docs.yml (docs deploy)
 ├── Dockerfile                    # Multi-stage production container build
 ├── docker-compose.yml            # MongoDB, Redis, and backend docker orchestration
 └── package.json                  # Main workspace manifest
