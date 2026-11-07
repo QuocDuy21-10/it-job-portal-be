@@ -2,7 +2,11 @@
 /dist
 /node_modules
 /build
-/docs
+/docs/*
+!/docs/README.md
+!/docs/SUMMARY.md
+!/docs/[0-9][0-9]-*/
+!/docs/assets/
 /scripts
 /public
 
