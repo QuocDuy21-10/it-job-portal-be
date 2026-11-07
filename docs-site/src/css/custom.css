@@ -1,0 +1,21 @@
+/* Màu brand đồng bộ với docs frontend (DevLink): #2563eb ở chế độ sáng, #60a5fa ở chế độ tối.
+   Sắc độ tối = nhân 0.9 / 0.85 / 0.7; sắc độ sáng = trộn trắng 10% / 18% / 30%. */
+:root {
+  --ifm-color-primary: #2563eb;
+  --ifm-color-primary-dark: #2159d4;
+  --ifm-color-primary-darker: #1f54c8;
+  --ifm-color-primary-darkest: #1a45a4;
+  --ifm-color-primary-light: #3b73ed;
+  --ifm-color-primary-lighter: #4c7fef;
+  --ifm-color-primary-lightest: #6692f1;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #60a5fa;
+  --ifm-color-primary-dark: #5694e1;
+  --ifm-color-primary-darker: #528cd4;
+  --ifm-color-primary-darkest: #4373af;
+  --ifm-color-primary-light: #70aefa;
+  --ifm-color-primary-lighter: #7db5fb;
+  --ifm-color-primary-lightest: #90c0fc;
+}
