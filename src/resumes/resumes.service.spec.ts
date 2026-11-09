@@ -1,11 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import * as path from 'path';
+import * as fs from 'fs';
+import { RESUME_STORAGE_DIR } from './resume-storage.util';
 import { ResumesService } from './resumes.service';
 import { ResumeRepository } from './repositories/resume.repository';
 import { ApplicationNotificationService } from './services/application-notification.service';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
 import { ERole } from 'src/casl/enums/role.enum';
 import { IUser } from 'src/users/user.interface';
+
+jest.mock('fs', () => ({ ...jest.requireActual('fs'), existsSync: jest.fn() }));
 
 const RESUME_ID = '507f1f77bcf86cd799439011';
 const baseUser = {
@@ -33,6 +38,8 @@ const resumeOf = (companyId: string, userId = 'cand-1') => ({
 describe('ResumesService', () => {
   let service: ResumesService;
   let repo: Record<string, jest.Mock>;
+
+  afterEach(() => jest.clearAllMocks());
 
   beforeEach(async () => {
     repo = {
@@ -178,6 +185,34 @@ describe('ResumesService', () => {
       await expect(service.findOneForRead(RESUME_ID, candidate('cand-2'))).rejects.toThrow(
         ForbiddenException,
       );
+    });
+  });
+  describe('getFileForRead', () => {
+    it('returns the private path and content type for an allowed reader', async () => {
+      repo.findById.mockResolvedValue({ ...resumeOf('c1'), url: 'images/resumes/a.PDF' });
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+      await expect(service.getFileForRead(RESUME_ID, hr('c1'))).resolves.toEqual({
+        filePath: path.join(RESUME_STORAGE_DIR, 'a.PDF'),
+        contentType: 'application/pdf',
+        fileName: 'a.PDF',
+      });
+    });
+
+    it('checks access before touching the filesystem', async () => {
+      repo.findById.mockResolvedValue({ ...resumeOf('c2'), url: 'a.pdf' });
+
+      await expect(service.getFileForRead(RESUME_ID, hr('c1'))).rejects.toThrow(ForbiddenException);
+      expect(fs.existsSync).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the resume has no file or the file is missing', async () => {
+      repo.findById.mockResolvedValue({ ...resumeOf('c1'), url: undefined });
+      await expect(service.getFileForRead(RESUME_ID, admin)).rejects.toThrow(NotFoundException);
+
+      repo.findById.mockResolvedValue({ ...resumeOf('c1'), url: 'gone.pdf' });
+      (fs.existsSync as jest.Mock).mockReturnValue(false);
+      await expect(service.getFileForRead(RESUME_ID, admin)).rejects.toThrow(NotFoundException);
     });
   });
 });

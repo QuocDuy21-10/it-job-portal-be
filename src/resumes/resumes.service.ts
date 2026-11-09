@@ -11,12 +11,15 @@ import { IUser } from 'src/users/user.interface';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
 import { ERole } from 'src/casl/enums/role.enum';
 import aqp from 'api-query-params';
+import * as fs from 'fs';
+import * as path from 'path';
 import mongoose from 'mongoose';
 import { EResumeStatus } from './enums/resume-status.enum';
 import { ResumeRepository } from './repositories/resume.repository';
 import { ApplicationNotificationService } from './services/application-notification.service';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
 import { assertCompanyAccess } from 'src/companies/company-access.util';
+import { RESUME_FILE_CONTENT_TYPES, resolveResumeFilePath } from './resume-storage.util';
 
 // Fixed server-side population: the list UI only needs these names, and client-controlled
 // populate/projection would let callers read any referenced collection.
@@ -149,6 +152,27 @@ export class ResumesService {
     }
 
     return resume;
+  }
+
+  async getFileForRead(id: string, user: IUser) {
+    const resume = await this.findOneForRead(id, user);
+    if (!resume.url) {
+      throw new NotFoundException('No CV file found for this resume');
+    }
+
+    const filePath = resolveResumeFilePath(resume.url);
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('CV file not found');
+    }
+
+    const fileName = path.basename(filePath);
+    return {
+      filePath,
+      fileName,
+      contentType:
+        RESUME_FILE_CONTENT_TYPES[path.extname(fileName).toLowerCase()] ??
+        'application/octet-stream',
+    };
   }
 
   async update(id: string, updateResumeDto: UpdateResumeDto, user?: IUser) {

@@ -6,7 +6,10 @@ import { ResumeQueueService } from 'src/queues/services/resume-queue.service';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { ApplicationSubmissionService } from './services/application-submission.service';
 import mongoose from 'mongoose';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, StreamableFile } from '@nestjs/common';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { ERole } from 'src/casl/enums/role.enum';
 
 describe('ResumesController', () => {
@@ -21,6 +24,7 @@ describe('ResumesController', () => {
       notifyHrNewApplication: jest.fn().mockResolvedValue(undefined),
       findOne: jest.fn(),
       findOneForRead: jest.fn(),
+      getFileForRead: jest.fn(),
     };
     mockResumeProcessingService = { validateResumeForAnalysis: jest.fn() };
     mockResumeQueueService = { addAnalyzeResumeJob: jest.fn() };
@@ -169,6 +173,28 @@ describe('ResumesController', () => {
       const result = await controller.getAnalysis('r1', hr);
 
       expect(result.notes).toEqual({ adminNotes: 'internal admin', hrNotes: 'internal hr' });
+    });
+  });
+  describe('getResumeFile', () => {
+    it('streams the file with inline disposition and RFC 5987 filename', async () => {
+      const tmp = path.join(os.tmpdir(), `cv-${Date.now()}.txt`);
+      fs.writeFileSync(tmp, 'hello');
+      mockResumesService.getFileForRead.mockResolvedValue({
+        filePath: tmp,
+        contentType: 'text/plain; charset=utf-8',
+        fileName: 'Đinh Duy.txt',
+      });
+      const res = { set: jest.fn() } as any;
+
+      const file = await controller.getResumeFile('r1', { _id: 'u' } as any, res);
+
+      expect(res.set).toHaveBeenCalledWith({
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent('Đinh Duy.txt')}`,
+      });
+      expect(file).toBeInstanceOf(StreamableFile);
+      file.getStream().destroy();
+      fs.unlinkSync(tmp);
     });
   });
 });

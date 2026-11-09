@@ -12,7 +12,11 @@ import {
   BadRequestException,
   Logger,
   UseGuards,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
+import type { Response } from 'express';
+import { SkipTransform } from 'src/utils/decorators/skip-transform.decorator';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { BulkDeleteDto } from 'src/utils/dto/bulk-delete.dto';
 import { ResumesService } from './resumes.service';
@@ -260,6 +264,27 @@ export class ResumesController {
   }
 
   // Analysis & Queue Management
+
+  @Get(':id/file')
+  @SkipTransform()
+  @ApiOperation({
+    summary: 'Download CV file',
+    description:
+      'Streams the CV file. Allowed: the candidate, HR of the same company, SUPER ADMIN.',
+  })
+  async getResumeFile(
+    @Param('id') id: string,
+    @User() user: IUser,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { filePath, contentType, fileName } = await this.resumesService.getFileForRead(id, user);
+    res.set({
+      'Content-Type': contentType,
+      // Legacy filenames contain Vietnamese characters, which are invalid in a plain header value.
+      'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+    });
+    return new StreamableFile(fs.createReadStream(filePath));
+  }
 
   @Get(':id/analysis')
   @ApiOperation({

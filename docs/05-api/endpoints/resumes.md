@@ -19,6 +19,7 @@ Hai nhóm người dùng: **ứng viên** nộp và xem hồ sơ của mình (`c
 | `POST /api/v1/resumes/cv-online` | Đăng nhập (mọi vai trò) | Nộp hồ sơ bằng CV trực tuyến, chấm điểm ngay trong request |
 | `POST /api/v1/resumes/upload-cv` | Đăng nhập (mọi vai trò) | Tải file CV và nộp hồ sơ. Việc đọc và phân tích đi qua hàng đợi |
 | `GET /api/v1/resumes/:id/analysis` | Đăng nhập (mọi vai trò) | Xem kết quả đọc và phân tích CV (chủ hồ sơ, HR cùng công ty hoặc quản trị viên). Ứng viên không thấy `notes` |
+| `GET /api/v1/resumes/:id/file` | Đăng nhập (mọi vai trò) | Tải file CV (stream, không bọc envelope). Chủ hồ sơ, HR cùng công ty hoặc quản trị viên; sai quyền `403`, thiếu file `404` |
 | `GET /api/v1/resumes/queue/stats` | Đăng nhập, vai trò: SUPER ADMIN | Thống kê hàng đợi xử lý hồ sơ (quản trị viên) |
 | `POST /api/v1/resumes/:id/reparse` | Đăng nhập, vai trò: SUPER ADMIN, HR | Đọc lại file CV bằng hàng đợi (quản trị viên hoặc HR) |
 | `POST /api/v1/resumes/:id/reanalyze` | Đăng nhập, vai trò: SUPER ADMIN, HR | Chấm điểm lại hồ sơ bằng hàng đợi (quản trị viên hoặc HR) |
