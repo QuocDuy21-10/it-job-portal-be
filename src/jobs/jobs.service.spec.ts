@@ -345,6 +345,30 @@ describe('JobsService', () => {
         service.update('job-1', { name: 'X' } as any, hrUser('my-company')),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('rejects HR moving their own job to another company', async () => {
+      mockJobRepository.findById.mockResolvedValue(activeApprovedJob('my-company') as any);
+
+      await expect(
+        service.update('job-1', { company: { _id: 'other-company' } } as any, hrUser('my-company')),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockJobRepository.getCompanySnapshot).not.toHaveBeenCalled();
+      expect(mockJobRepository.updateOne).not.toHaveBeenCalled();
+    });
+
+    it('allows SUPER_ADMIN to move a job to another company', async () => {
+      mockJobRepository.findById.mockResolvedValue(activeApprovedJob('a') as any);
+      mockJobRepository.getCompanySnapshot.mockResolvedValue({ _id: 'b', name: 'B' } as any);
+      mockJobRepository.updateOne.mockResolvedValue({ modifiedCount: 1 } as any);
+
+      await service.update('job-1', { company: { _id: 'b' } } as any, superAdminUser());
+
+      expect(mockJobRepository.updateOne).toHaveBeenCalledWith(
+        { _id: 'job-1' },
+        expect.objectContaining({ company: { _id: 'b', name: 'B' } }),
+      );
+    });
   });
 
   describe('remove', () => {
@@ -467,6 +491,36 @@ describe('JobsService', () => {
       await expect(
         service.create({ company: { _id: 'c1' }, location: 'Ha Noi' } as any, hrUser('c1')),
       ).resolves.toBeDefined();
+    });
+
+    it('rejects HR creating a job for another company before touching the DB', async () => {
+      await expect(
+        service.create({ company: { _id: 'other' }, locationCode: 'ha-noi' } as any, hrUser('c1')),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockJobRepository.getCompanySnapshot).not.toHaveBeenCalled();
+      expect(mockJobRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects HR without a company', async () => {
+      const hrWithoutCompany = { ...hrUser('c1'), company: undefined };
+
+      await expect(
+        service.create({ company: { _id: 'c1' }, locationCode: 'ha-noi' } as any, hrWithoutCompany),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('allows SUPER_ADMIN to create a job for any company', async () => {
+      mockJobRepository.getCompanySnapshot.mockResolvedValue({ _id: 'c9', name: 'Y' } as any);
+      mockJobRepository.create.mockResolvedValue({
+        _id: 'j9',
+        createdAt: new Date(),
+        company: { _id: 'c9', name: 'Y' },
+      } as any);
+
+      await expect(
+        service.create({ company: { _id: 'c9' }, locationCode: 'ha-noi' } as any, superAdminUser()),
+      ).resolves.toEqual(expect.objectContaining({ _id: 'j9' }));
     });
   });
 

@@ -23,6 +23,7 @@ import {
   buildEmbeddedCompanyIdFilter,
 } from 'src/companies/company-snapshot.util';
 import { JobRepository } from './repositories/job.repository';
+import { assertCompanyAccess } from 'src/companies/company-access.util';
 import { SkillsService } from 'src/skills/skills.service';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
 import { ListCacheService } from 'src/redis/list-cache.service';
@@ -86,6 +87,12 @@ export class JobsService {
     private readonly listCacheService: ListCacheService,
   ) {}
   async create(createJobDto: CreateJobDto, user: IUser) {
+    assertCompanyAccess(
+      user,
+      createJobDto.company?._id,
+      'You can only create jobs for your own company',
+    );
+
     const normalizedSkills = await this.skillsService.normalizeControlledSkills(
       createJobDto.skills ?? [],
     );
@@ -231,6 +238,13 @@ export class JobsService {
     // Load the job first so we can enforce HR company ownership before mutating.
     const job = await this.jobRepository.findById(id);
     await this.assertHrOwnership(job, id, user);
+    if (updateJobDto.company?._id) {
+      assertCompanyAccess(
+        user,
+        updateJobDto.company._id,
+        'You can only move jobs to your own company',
+      );
+    }
 
     // Destructure company out so it is not included verbatim in the update
     // payload; the snapshot is fetched below via getCompanySnapshot instead.
@@ -625,12 +639,11 @@ export class JobsService {
     }
 
     if (user.role === ERole.HR) {
-      if (!user.company?._id) {
-        throw new ForbiddenException('HR user must be associated with a company');
-      }
-      if (job.company._id.toString() !== user.company._id.toString()) {
-        throw new ForbiddenException('You can only modify jobs that belong to your company');
-      }
+      assertCompanyAccess(
+        user,
+        job.company?._id,
+        'You can only modify jobs that belong to your company',
+      );
     }
   }
 
