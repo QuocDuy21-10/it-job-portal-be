@@ -9,6 +9,7 @@
 !/docs/assets/
 /scripts
 /public
+/storage
 
 # Logs
 logs

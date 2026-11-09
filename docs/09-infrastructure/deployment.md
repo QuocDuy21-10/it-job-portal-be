@@ -91,6 +91,17 @@ docker image prune -f
 
 `SIGTERM` từ `docker stop` kích hoạt shutdown hook của Nest nên hàng đợi và kết nối database đóng gọn (`app.enableShutdownHooks()` trong [main.ts](../../src/main.ts)). Quá trình này **có thời gian ngừng** ngắn vì chỉ có một container, và các token trong `CACHE_MANAGER` (đặt lại mật khẩu, hủy xóa tài khoản) mất khi khởi động lại ([data-flow](../02-architecture/data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis)).
 
+### Nâng cấp Phase 1 (chạy một lần)
+
+Sau khi khởi động backend mới, dời file CV cũ sang volume private:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production exec backend \
+  node dist/databases/migrations/move-cv-files-to-private-storage.js
+```
+
+Exit code 1 nghĩa là có file trùng tên khác nội dung; file đó vẫn nằm ở `public/images/...` và cần xử lý tay.
+
 ### 7. Sao lưu
 
 Xem [backup-and-recovery](../11-operations/backup-and-recovery.md).

@@ -11,7 +11,7 @@ Một `Dockerfile` đa tầng và hai file compose: một cho phát triển, m�
 | `build` | `base` | Biên dịch | `npm ci`, `npm run build`, rồi `npm prune --omit=dev` |
 | `production` | `node:24-alpine` | Chạy thật | `NODE_ENV=production`, người dùng `nestjs` (uid 1001) không phải root, chỉ chép `dist/` và `node_modules` đã prune, `CMD node dist/main` |
 
-- Thư mục `public/images` được tạo sẵn và giao cho `nestjs`; cần gắn volume để giữ file tải lên qua các lần triển khai.
+- Thư mục `public/images` (ảnh public) và `storage` (file CV private) được tạo sẵn và giao cho `nestjs`; cần gắn volume cho cả hai để giữ file qua các lần triển khai.
 - `HEALTHCHECK` mỗi 30 giây, timeout 5 giây, chờ khởi động 40 giây, thử lại 3 lần, gọi `wget` tới `/api/v1/health`.
 - Cổng lấy từ biến `PORT` (mặc định 8081).
 
@@ -29,7 +29,7 @@ Cổng chỉ gắn vào loopback nên không truy cập được từ mạng ngo
 
 | Dịch vụ | Image | Cổng | Ghi chú |
 |---|---|---|---|
-| `backend` | build target `production`, gắn tag `job-portal-be:latest` | `127.0.0.1:${PORT:-8081}` | `env_file: .env.production`; tự dựng `MONGO_URL` từ biến Mongo; volume `uploads` tại `/app/public/images`; chờ Mongo và Redis khỏe |
+| `backend` | build target `production`, gắn tag `job-portal-be:latest` | `127.0.0.1:${PORT:-8081}` | `env_file: .env.production`; tự dựng `MONGO_URL` từ biến Mongo; volume `uploads` tại `/app/public/images` và `cv_storage` tại `/app/storage`; chờ Mongo và Redis khỏe |
 | `mongodb` | `mongo:7.0` | Không publish | Biến root bắt buộc (`:?`), volume `mongodb_data`, `mongodb_config` |
 | `redis` | `redis:7-alpine` | Không publish | `--requirepass`, `--appendonly yes`, volume `redis_data` |
 

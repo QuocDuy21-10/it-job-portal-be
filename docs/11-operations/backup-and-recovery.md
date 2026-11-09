@@ -7,7 +7,8 @@ Tình trạng hiện có: repository chỉ chứa **lệnh sao lưu mẫu** tron
 | Dữ liệu | Nơi | Tầm quan trọng |
 |---|---|---|
 | MongoDB | volume `mongodb_data` | Toàn bộ dữ liệu nghiệp vụ, **bắt buộc** |
-| File tải lên (ảnh, CV, logo) | volume `uploads` tại `/app/public/images` | Đường dẫn lưu trong MongoDB, nhưng file nằm riêng; thiếu file thì bản ghi trỏ vào chỗ trống |
+| File tải lên (ảnh, logo) | volume `uploads` tại `/app/public/images` | Đường dẫn lưu trong MongoDB, nhưng file nằm riêng; thiếu file thì bản ghi trỏ vào chỗ trống |
+| File CV | volume `cv_storage` tại `/app/storage` | CV ứng viên (dữ liệu cá nhân). Chỉ đọc qua `GET /resumes/:id/file`; **bắt buộc** sao lưu và giới hạn quyền đọc bản sao lưu |
 | Redis | volume `redis_data` (AOF) | Hàng đợi chờ xử lý (kể cả lịch xóa tài khoản), quota, cache danh sách. Có thể tái tạo phần lớn, nhưng việc đang chờ sẽ mất |
 | `.env.production` | VPS | Bí mật; lưu riêng và an toàn, **không** để chung với sao lưu dữ liệu |
 | Cấu hình nginx, chứng chỉ | VPS | Ngoài repository |
@@ -25,6 +26,10 @@ docker compose -f docker-compose.prod.yml --env-file .env.production exec -T mon
 # File tải lên
 docker run --rm -v my-job-portal-be_uploads:/data -v /var/backups:/backup alpine \
   tar czf /backup/uploads-$(date +%F).tgz -C /data .
+
+# File CV (private)
+docker run --rm -v my-job-portal-be_cv_storage:/data -v /var/backups:/backup alpine \
+  tar czf /backup/cv-storage-$(date +%F).tgz -C /data .
 ```
 
 Tên volume phụ thuộc tên thư mục dự án (`<thư-mục>_uploads`); kiểm tra bằng `docker volume ls`. Hướng dẫn gốc nhắc chép bản sao lưu ra khỏi máy chủ; repository không có lịch chạy (cron) cho các lệnh này.
@@ -57,6 +62,7 @@ Repository **không định nghĩa** RPO (lượng dữ liệu chấp nhận m�
 |---|---|---|
 | Mất Redis | Mất hàng đợi chờ, quota, cache; lịch xóa tài khoản mất nên người đã yêu cầu xóa không bị xóa | AOF đã bật; sao lưu volume `redis_data`; yêu cầu người dùng gửi lại |
 | Mất volume `uploads` | Bản ghi trỏ tới file không còn | Sao lưu volume định kỳ |
+| Mất volume `cv_storage` | Hồ sơ không mở được file CV | Sao lưu volume định kỳ |
 | Backend khởi động lại | Mất token trong bộ nhớ; việc đang chạy được BullMQ xử lý theo cơ chế của thư viện | Cho người dùng yêu cầu lại link |
 | Lỗi khi đồng bộ nguồn | Dữ liệu tin ngoài không đổi; không mất | Kiểm tra `crawl_runs` |
 

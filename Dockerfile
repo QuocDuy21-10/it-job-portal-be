@@ -31,8 +31,8 @@ COPY --from=build --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=build --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/package*.json ./
 
-# Uploads are written here; mount a volume on /app/public/images to keep them across deploys
-RUN mkdir -p public/images && chown -R nestjs:nodejs public
+# Uploads: mount volumes on /app/public/images (public assets) and /app/storage (private CV files)
+RUN mkdir -p public/images storage && chown -R nestjs:nodejs public storage
 
 USER nestjs
 
