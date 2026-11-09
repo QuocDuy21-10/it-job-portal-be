@@ -93,14 +93,30 @@ docker image prune -f
 
 ### Nâng cấp Phase 1 (chạy một lần)
 
-Sau khi khởi động backend mới, dời file CV cũ sang volume private:
+Sao lưu MongoDB và hai volume `uploads`, `cv_storage` **trước** (xem [backup-and-recovery](../11-operations/backup-and-recovery.md)).
 
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production exec backend \
-  node dist/databases/migrations/move-cv-files-to-private-storage.js
-```
+1. Build image mới, **chưa** khởi động lại backend. Chạy dedupe và tạo unique index bằng image mới:
 
-Exit code 1 nghĩa là có file trùng tên khác nội dung; file đó vẫn nằm ở `public/images/...` và cần xử lý tay.
+   ```bash
+   docker compose -f docker-compose.prod.yml --env-file .env.production build backend
+   docker compose -f docker-compose.prod.yml --env-file .env.production run --rm backend \
+     node dist/databases/migrations/application-unique-index.js
+   ```
+
+   Đơn trùng bị soft-delete (giữ đơn mới nhất) và có `deletedBy.email = "system:dedupe-migration"`. Chạy bước này trước khi code mới khởi động để `autoIndex` không build index trên dữ liệu còn trùng. Chạy lại an toàn.
+
+2. Khởi động backend mới: `docker compose -f docker-compose.prod.yml --env-file .env.production up -d backend`.
+
+3. Dời file CV cũ sang volume private:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml --env-file .env.production exec backend \
+     node dist/databases/migrations/move-cv-files-to-private-storage.js
+   ```
+
+   Exit code 1 nghĩa là có file trùng tên khác nội dung; file đó vẫn nằm ở `public/images/...` và cần xử lý tay. Từ bước 2 đến bước 3, CV cũ chưa mở được (`404`).
+
+4. Deploy frontend (nút "Xem CV" gọi `GET /resumes/:id/file`).
 
 ### 7. Sao lưu
 
