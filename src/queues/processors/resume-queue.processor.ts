@@ -65,7 +65,22 @@ export class ResumeQueueProcessor extends WorkerHost {
    * Handle CV parsing job
    */
   private async handleParseResume(job: Job<ParseResumeJobData>) {
-    const { resumeId, jobId } = job.data;
+    const result = await this.parseResume(job);
+    // A quota-delayed parse reschedules itself; analysis follows that retry, not this run.
+    if ((result as { delayed?: boolean } | null)?.delayed) return result;
+
+    // Outside parseResume's catch: an enqueue failure must not overwrite a successful parse
+    // with parseError. Throwing makes BullMQ retry the parse, which then hits the parse cache.
+    await this.resumeQueueService.addAnalyzeResumeJob({
+      resumeId: job.data.resumeId,
+      jobId: job.data.jobId,
+    });
+    this.logger.log(`[Parse Job ${job.id}] Queued analysis job for resume ${job.data.resumeId}`);
+    return result;
+  }
+
+  private async parseResume(job: Job<ParseResumeJobData>) {
+    const { resumeId } = job.data;
 
     try {
       this.logger.log(`[Parse Job ${job.id}] Starting CV parsing for resume ${resumeId}`);
@@ -146,24 +161,6 @@ export class ResumeQueueProcessor extends WorkerHost {
       await job.updateProgress(100);
 
       this.logger.log(`[Parse Job ${job.id}] Successfully parsed CV for resume ${resumeId}`);
-
-      try {
-        await this.resumeQueue.add(
-          'analyze-resume',
-          {
-            resumeId: resumeId,
-            jobId: jobId,
-          },
-          {
-            priority: 2,
-            attempts: 3,
-            backoff: { type: 'exponential', delay: 2000 },
-          },
-        );
-        this.logger.log(`[Parse Job ${job.id}] Queued analysis job for resume ${resumeId}`);
-      } catch (queueError) {
-        this.logger.error(`[Parse Job ${job.id}] Failed to queue analysis job:`, queueError);
-      }
 
       return {
         success: true,

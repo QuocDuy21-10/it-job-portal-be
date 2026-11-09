@@ -29,7 +29,9 @@ Hai nhóm người dùng: **ứng viên** nộp và xem hồ sơ của mình (`c
 | Đường | Route | Giới hạn | Phản hồi |
 |---|---|---|---|
 | CV trực tuyến | `POST /resumes/cv-online` | 10 lần mỗi 5 phút | Kết quả chấm điểm ngay |
-| Tải file | `POST /resumes/upload-cv` | 20 lần mỗi giờ | `status: "processing"`, kèm `jobs.parseJobId`, `jobs.analysisJobId`, `estimatedTime: "30-60 seconds"` (chuỗi trong code) |
+| Tải file | `POST /resumes/upload-cv` | 20 lần mỗi giờ | `status: "processing"`, kèm `jobs.parseJobId`, `estimatedTime: "30-60 seconds"` (chuỗi trong code) |
+
+Chấm điểm được processor tự xếp hàng sau khi đọc CV xong; response chỉ có `parseJobId`.
 
 `upload-cv` nhận `multipart/form-data` với file CV và `jobId`. Quy tắc nghiệp vụ (trùng đơn, CV bị tắt): [resumes](../../03-modules/resumes.md#business-rules).
 

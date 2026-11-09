@@ -43,11 +43,6 @@ export class ResumeProcessingService {
       jobId: uploadCvDto.jobId,
     });
 
-    const analysisJob = await resumeQueueService.addAnalyzeResumeJob({
-      resumeId: resume._id.toString(),
-      jobId: uploadCvDto.jobId,
-    });
-
     return {
       resumeId: resume._id.toString(),
       jobName: job.name,
@@ -59,7 +54,7 @@ export class ResumeProcessingService {
         jobName: job.name,
         companyName: job.company.name,
         status: 'processing',
-        jobs: { parseJobId: parseJob.id, analysisJobId: analysisJob.id },
+        jobs: { parseJobId: parseJob.id },
         file: this.getFileMetadata(file),
         message:
           'Your CV has been uploaded and is being processed. You will be notified when analysis is complete.',
