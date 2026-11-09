@@ -7,6 +7,8 @@ jest.mock('fs', () => ({
   },
 }));
 
+import { ConflictException } from '@nestjs/common';
+import * as fs from 'fs';
 import { ResumeProcessingService } from './resume-processing.service';
 
 const file = {
@@ -51,5 +53,32 @@ describe('ResumeProcessingService.handleUploadAndQueue', () => {
     expect(queue.addParseResumeJob).toHaveBeenCalledWith({ resumeId: 'r1', jobId: JOB_ID });
     expect(queue.addAnalyzeResumeJob).not.toHaveBeenCalled();
     expect(result.response.jobs).toEqual({ parseJobId: 'p1' });
+  });
+  it('returns 409 and deletes the uploaded file when the candidate already applied', async () => {
+    resumeModel.findOne.mockResolvedValue({ _id: 'existing' });
+
+    await expect(
+      service.handleUploadAndQueue(file, { jobId: JOB_ID }, user, queue as any),
+    ).rejects.toThrow(ConflictException);
+    expect(fs.promises.unlink).toHaveBeenCalledWith(file.path);
+    expect(queue.addParseResumeJob).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 and deletes the file when a concurrent request wins the unique index', async () => {
+    resumeModel.create.mockRejectedValue({ code: 11000 });
+
+    await expect(
+      service.handleUploadAndQueue(file, { jobId: JOB_ID }, user, queue as any),
+    ).rejects.toThrow(ConflictException);
+    expect(fs.promises.unlink).toHaveBeenCalledWith(file.path);
+  });
+
+  it('keeps the file once the resume exists, even if queueing fails', async () => {
+    queue.addParseResumeJob.mockRejectedValue(new Error('redis down'));
+
+    await expect(
+      service.handleUploadAndQueue(file, { jobId: JOB_ID }, user, queue as any),
+    ).rejects.toThrow('redis down');
+    expect(fs.promises.unlink).not.toHaveBeenCalled();
   });
 });

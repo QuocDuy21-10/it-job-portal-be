@@ -209,4 +209,9 @@ ResumeSchema.index({ 'aiAnalysis.matchingScore': -1 });
 ResumeSchema.index({ jobId: 1, status: 1 });
 ResumeSchema.index({ userId: 1, createdAt: -1 });
 ResumeSchema.index({ isParsed: 1, isAnalyzed: 1 });
-ResumeSchema.index({ userId: 1, jobId: 1, isDeleted: 1 });
+// One active application per candidate and job. Soft-deleted rows and job-less manual resumes
+// are outside the partial filter. Existing data must go through migrate:application-unique-index first.
+ResumeSchema.index(
+  { userId: 1, jobId: 1 },
+  { unique: true, partialFilterExpression: { isDeleted: false, jobId: { $type: 'objectId' } } },
+);

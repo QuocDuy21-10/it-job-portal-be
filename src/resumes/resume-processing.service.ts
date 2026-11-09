@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import * as fs from 'fs';
@@ -9,6 +15,10 @@ import { JobsService } from 'src/jobs/jobs.service';
 import { UploadCvDto } from './dto/upload-cv.dto';
 import { ResumeQueueService } from 'src/queues/services/resume-queue.service';
 import { resolveResumeFilePath } from './resume-storage.util';
+import {
+  DUPLICATE_APPLICATION_MESSAGE,
+  rethrowDuplicateApplication,
+} from './duplicate-application.util';
 
 @Injectable()
 export class ResumeProcessingService {
@@ -25,13 +35,24 @@ export class ResumeProcessingService {
     user: IUser,
     resumeQueueService: ResumeQueueService,
   ) {
-    this.validateFile(file);
-
-    const job = await this.validateJob(uploadCvDto.jobId);
-
-    await this.checkDuplicateApplication(user._id.toString(), uploadCvDto.jobId);
-
-    const resume = await this.createResume(file, uploadCvDto.jobId, user);
+    let job: Awaited<ReturnType<ResumeProcessingService['validateJob']>>;
+    let resume: ResumeDocument;
+    try {
+      this.validateFile(file);
+      job = await this.validateJob(uploadCvDto.jobId);
+      await this.checkDuplicateApplication(user._id.toString(), uploadCvDto.jobId);
+      resume = await this.createResume(file, uploadCvDto.jobId, user);
+    } catch (error) {
+      // Multer already wrote the file; a rejected upload must not leave an orphan CV on disk.
+      if (file?.path) {
+        await fs.promises
+          .unlink(file.path)
+          .catch(err =>
+            this.logger.warn(`Could not remove rejected upload ${file.filename}: ${err.message}`),
+          );
+      }
+      throw error;
+    }
 
     const fullFilePath = resolveResumeFilePath(resume.url);
     if (!fs.existsSync(fullFilePath)) {
@@ -120,9 +141,7 @@ export class ResumeProcessingService {
       isDeleted: { $ne: true },
     });
     if (existing) {
-      throw new BadRequestException(
-        'You have already applied to this job. Duplicate applications are not allowed.',
-      );
+      throw new ConflictException(DUPLICATE_APPLICATION_MESSAGE);
     }
   }
 
@@ -133,24 +152,26 @@ export class ResumeProcessingService {
   ): Promise<ResumeDocument> {
     const job = await this.jobsService.findOne(jobId);
 
-    const resume = await this.resumeModel.create({
-      email: user.email,
-      userId: user._id,
-      jobId: jobId,
-      companyId: job.company._id,
-      url: file.filename,
-      status: EResumeStatus.PENDING,
-      isParsed: false,
-      isAnalyzed: false,
-      histories: [
-        {
-          status: EResumeStatus.PENDING,
-          updatedAt: new Date(),
-          updatedBy: { _id: user._id, email: user.email },
-        },
-      ],
-      createdBy: { _id: user._id, email: user.email },
-    });
+    const resume = await this.resumeModel
+      .create({
+        email: user.email,
+        userId: user._id,
+        jobId: jobId,
+        companyId: job.company._id,
+        url: file.filename,
+        status: EResumeStatus.PENDING,
+        isParsed: false,
+        isAnalyzed: false,
+        histories: [
+          {
+            status: EResumeStatus.PENDING,
+            updatedAt: new Date(),
+            updatedBy: { _id: user._id, email: user.email },
+          },
+        ],
+        createdBy: { _id: user._id, email: user.email },
+      })
+      .catch(rethrowDuplicateApplication);
 
     this.logger.log(`Resume created: ${resume._id} for job ${jobId}`);
     return resume;

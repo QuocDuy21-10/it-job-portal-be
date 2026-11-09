@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import mongoose from 'mongoose';
 import { ResumeRepository } from '../repositories/resume.repository';
 import { JobsService } from 'src/jobs/jobs.service';
@@ -9,6 +14,10 @@ import { SubmitCvOnlineDto } from '../dto/submit-cv-online.dto';
 import { ParsedDataDto } from '../dto/parsed-data.dto';
 import { EResumeStatus } from '../enums/resume-status.enum';
 import { CvProfile } from 'src/cv-profiles/schemas/cv-profile.schema';
+import {
+  DUPLICATE_APPLICATION_MESSAGE,
+  rethrowDuplicateApplication,
+} from '../duplicate-application.util';
 
 @Injectable()
 export class ApplicationSubmissionService {
@@ -36,35 +45,37 @@ export class ApplicationSubmissionService {
     const parsedData = this.mapCvProfileToParsedData(cvProfile);
     const matchResult = await this.matchingService.calculateMatch(parsedData, job);
 
-    const newResume = await this.resumeRepository.create({
-      email: user.email,
-      userId: user._id,
-      jobId: new mongoose.Types.ObjectId(jobId),
-      companyId: job.company._id,
-      status: EResumeStatus.PENDING,
-      parsedData,
-      aiAnalysis: {
-        matchingScore: matchResult.matchingScore,
-        skillsMatch: matchResult.skillsMatch,
-        strengths: matchResult.strengths,
-        weaknesses: matchResult.weaknesses,
-        summary: matchResult.summary,
-        recommendation: matchResult.recommendation,
-        analyzedAt: matchResult.analyzedAt,
-      },
-      priority: matchResult.priority,
-      isParsed: true,
-      isAnalyzed: true,
-      cvStructuredData: cvProfile,
-      histories: [
-        {
-          status: EResumeStatus.PENDING,
-          updatedAt: new Date(),
-          updatedBy: { _id: user._id, email: user.email },
+    const newResume = await this.resumeRepository
+      .create({
+        email: user.email,
+        userId: user._id,
+        jobId: new mongoose.Types.ObjectId(jobId),
+        companyId: job.company._id,
+        status: EResumeStatus.PENDING,
+        parsedData,
+        aiAnalysis: {
+          matchingScore: matchResult.matchingScore,
+          skillsMatch: matchResult.skillsMatch,
+          strengths: matchResult.strengths,
+          weaknesses: matchResult.weaknesses,
+          summary: matchResult.summary,
+          recommendation: matchResult.recommendation,
+          analyzedAt: matchResult.analyzedAt,
         },
-      ],
-      createdBy: { _id: user._id, email: user.email },
-    });
+        priority: matchResult.priority,
+        isParsed: true,
+        isAnalyzed: true,
+        cvStructuredData: cvProfile,
+        histories: [
+          {
+            status: EResumeStatus.PENDING,
+            updatedAt: new Date(),
+            updatedBy: { _id: user._id, email: user.email },
+          },
+        ],
+        createdBy: { _id: user._id, email: user.email },
+      })
+      .catch(rethrowDuplicateApplication);
 
     return {
       _id: newResume._id,
@@ -101,9 +112,7 @@ export class ApplicationSubmissionService {
   async checkDuplicateApplication(userId: string, jobId: string): Promise<void> {
     const existing = await this.resumeRepository.findDuplicateApplication(userId, jobId);
     if (existing) {
-      throw new BadRequestException(
-        'You have already applied to this job. Duplicate applications are not allowed.',
-      );
+      throw new ConflictException(DUPLICATE_APPLICATION_MESSAGE);
     }
   }
 

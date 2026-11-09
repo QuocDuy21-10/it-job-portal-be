@@ -31,6 +31,8 @@ Hai nhóm người dùng: **ứng viên** nộp và xem hồ sơ của mình (`c
 | CV trực tuyến | `POST /resumes/cv-online` | 10 lần mỗi 5 phút | Kết quả chấm điểm ngay |
 | Tải file | `POST /resumes/upload-cv` | 20 lần mỗi giờ | `status: "processing"`, kèm `jobs.parseJobId`, `estimatedTime: "30-60 seconds"` (chuỗi trong code) |
 
+Nộp trùng (cùng ứng viên, cùng job, đơn cũ chưa xóa) trả `409 Conflict`, kể cả khi hai request đến đồng thời (unique index `userId + jobId`). Upload bị từ chối thì file vừa tải lên bị xóa.
+
 Chấm điểm được processor tự xếp hàng sau khi đọc CV xong; response chỉ có `parseJobId`.
 
 `upload-cv` nhận `multipart/form-data` với file CV và `jobId`. Quy tắc nghiệp vụ (trùng đơn, CV bị tắt): [resumes](../../03-modules/resumes.md#business-rules).
