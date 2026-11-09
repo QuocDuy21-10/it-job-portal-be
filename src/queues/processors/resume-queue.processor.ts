@@ -18,6 +18,7 @@ import { SkillsService } from 'src/skills/skills.service';
 import { GeminiQuotaDeniedException } from 'src/gemini/gemini-quota-denied.exception';
 import { ResumeQueueService } from '../services/resume-queue.service';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
+import { resolveResumeFilePath } from 'src/resumes/resume-storage.util';
 
 const RESUME_QUEUE_GEMINI_RPM_LIMIT = 15;
 
@@ -64,7 +65,7 @@ export class ResumeQueueProcessor extends WorkerHost {
    * Handle CV parsing job
    */
   private async handleParseResume(job: Job<ParseResumeJobData>) {
-    const { resumeId, filePath, jobId } = job.data;
+    const { resumeId, jobId } = job.data;
 
     try {
       this.logger.log(`[Parse Job ${job.id}] Starting CV parsing for resume ${resumeId}`);
@@ -78,6 +79,13 @@ export class ResumeQueueProcessor extends WorkerHost {
         await job.updateProgress(100);
         return cached;
       }
+
+      // Resolve from the DB record, never from the job payload.
+      const resumeRecord = await this.resumeModel.findById(resumeId).select('url').lean();
+      if (!resumeRecord?.url) {
+        throw new Error(`Resume ${resumeId} has no CV file`);
+      }
+      const filePath = resolveResumeFilePath(resumeRecord.url);
 
       // Step 1: Extract text from file
       this.logger.log(`[Parse Job ${job.id}] Extracting text from: ${filePath}`);
@@ -96,7 +104,6 @@ export class ResumeQueueProcessor extends WorkerHost {
       // Step 3: Clean text
       await job.updateProgress(40);
       const cleanedText = this.cvParserService.cleanText(cvText);
-      this.logger.log('cleanedText:', cleanedText);
       this.logger.log(`[Parse Job ${job.id}] Cleaned text length: ${cleanedText.length}`);
 
       this.logger.log(`[Parse Job ${job.id}] Text cleaned and validated`);

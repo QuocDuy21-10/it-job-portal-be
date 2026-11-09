@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
-import * as path from 'path';
 import * as fs from 'fs';
 import { Resume, ResumeDocument } from './schemas/resume.schema';
 import { IUser } from 'src/users/user.interface';
@@ -9,6 +8,7 @@ import { EResumeStatus } from './enums/resume-status.enum';
 import { JobsService } from 'src/jobs/jobs.service';
 import { UploadCvDto } from './dto/upload-cv.dto';
 import { ResumeQueueService } from 'src/queues/services/resume-queue.service';
+import { resolveResumeFilePath } from './resume-storage.util';
 
 @Injectable()
 export class ResumeProcessingService {
@@ -33,14 +33,13 @@ export class ResumeProcessingService {
 
     const resume = await this.createResume(file, uploadCvDto.jobId, user);
 
-    const fullFilePath = this.getFullFilePath(resume.url);
+    const fullFilePath = resolveResumeFilePath(resume.url);
     if (!fs.existsSync(fullFilePath)) {
       throw new BadRequestException('File not found after upload. Please try again.');
     }
 
     const parseJob = await resumeQueueService.addParseResumeJob({
       resumeId: resume._id.toString(),
-      filePath: fullFilePath,
       jobId: uploadCvDto.jobId,
     });
 
@@ -144,7 +143,7 @@ export class ResumeProcessingService {
       userId: user._id,
       jobId: jobId,
       companyId: job.company._id,
-      url: `images/resumes/${file.filename}`,
+      url: file.filename,
       status: EResumeStatus.PENDING,
       isParsed: false,
       isAnalyzed: false,
@@ -160,20 +159,6 @@ export class ResumeProcessingService {
 
     this.logger.log(`Resume created: ${resume._id} for job ${jobId}`);
     return resume;
-  }
-
-  getFullFilePath(relativeUrl: string): string {
-    const cleanPath = relativeUrl.replace(/^images\/resumes\//, '');
-    const fullPath = path.join(process.cwd(), 'public', 'images', 'resumes', cleanPath);
-
-    // Guard: resolved path must stay within the upload directory
-    const uploadDir = path.join(process.cwd(), 'public', 'images', 'resumes');
-    if (!fullPath.startsWith(uploadDir)) {
-      throw new BadRequestException('Invalid file path');
-    }
-
-    this.logger.log(`Resolved file path: ${relativeUrl} -> ${fullPath}`);
-    return fullPath;
   }
 
   getFileMetadata(file: Express.Multer.File) {

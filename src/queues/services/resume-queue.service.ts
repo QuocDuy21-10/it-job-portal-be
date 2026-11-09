@@ -8,8 +8,9 @@ const DEFAULT_GEMINI_QUOTA_RETRY_JITTER_MS = 1000;
 
 export interface ParseResumeJobData {
   resumeId: string;
-  filePath: string;
-  jobId: string; // <-- THÊM DÒNG NÀY
+  jobId: string;
+  /** @deprecated Ignored; the processor resolves the path from `resume.url`. Kept so jobs queued before the deploy still type-check. */
+  filePath?: string;
 }
 
 export interface AnalyzeResumeJobData {

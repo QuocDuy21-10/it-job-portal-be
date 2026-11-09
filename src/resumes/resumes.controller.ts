@@ -29,6 +29,8 @@ import { ResumeQueueService } from 'src/queues/services/resume-queue.service';
 import { ApplicationSubmissionService } from './services/application-submission.service';
 import { diskStorage } from 'multer';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
+import { RESUME_STORAGE_DIR } from './resume-storage.util';
 import * as fs from 'fs';
 import { SubmitCvOnlineDto } from './dto/submit-cv-online.dto';
 import { Roles, ERole } from 'src/casl';
@@ -180,17 +182,12 @@ export class ResumesController {
     FileInterceptor('file', {
       storage: diskStorage({
         destination: (req, file, cb) => {
-          const uploadPath = path.join(process.cwd(), 'public', 'images', 'resumes');
-          if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
-          }
-          cb(null, uploadPath);
+          fs.mkdirSync(RESUME_STORAGE_DIR, { recursive: true });
+          cb(null, RESUME_STORAGE_DIR);
         },
         filename: (req, file, cb) => {
-          const extName = path.extname(file.originalname);
-          const baseName = path.basename(file.originalname, extName);
-          const finalName = `${baseName}-${Date.now()}${extName}`;
-          cb(null, finalName);
+          // Opaque name: original filenames usually contain the candidate's name.
+          cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`);
         },
       }),
       fileFilter: (req, file, cb) => {
@@ -321,11 +318,8 @@ export class ResumesController {
       throw new BadRequestException('No CV file found for this resume');
     }
 
-    const fullFilePath = this.resumeProcessingService.getFullFilePath(resume.url);
-
     const job = await this.resumeQueueService.addParseResumeJob({
       resumeId: id,
-      filePath: fullFilePath,
       jobId: resume.jobId.toString(),
     });
 
