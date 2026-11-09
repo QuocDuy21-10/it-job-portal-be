@@ -271,16 +271,8 @@ export class ResumesController {
   })
   @ResponseMessage('Analysis results retrieved successfully')
   async getAnalysis(@Param('id') id: string, @User() user: IUser) {
-    const resume = await this.resumesService.findOne(id, user);
-
-    if (!resume) {
-      throw new BadRequestException('Resume not found');
-    }
-
-    // Candidates may only view their own analysis; SUPER_ADMIN sees all
-    if (resume.userId.toString() !== user._id.toString() && user.role !== ERole.SUPER_ADMIN) {
-      throw new BadRequestException('You do not have permission to view this resume');
-    }
+    const resume = await this.resumesService.findOneForRead(id, user);
+    const canSeeNotes = user.role === ERole.SUPER_ADMIN || user.role === ERole.HR;
 
     return {
       resumeId: resume._id,
@@ -296,10 +288,9 @@ export class ResumesController {
       parsedData: resume.parsedData,
       aiAnalysis: resume.aiAnalysis,
       priority: resume.priority,
-      notes: {
-        adminNotes: resume.adminNotes,
-        hrNotes: resume.hrNotes,
-      },
+      ...(canSeeNotes && {
+        notes: { adminNotes: resume.adminNotes, hrNotes: resume.hrNotes },
+      }),
       uploadedAt: resume.createdAt,
       lastUpdated: resume.updatedAt,
     };
@@ -348,7 +339,9 @@ export class ResumesController {
     description: 'Trigger re-analysis of a parsed CV against the job',
   })
   @ResponseMessage('Re-analysis queued successfully')
-  async reanalyzeCV(@Param('id') id: string) {
+  async reanalyzeCV(@Param('id') id: string, @User() user: IUser) {
+    // Company scope check first; validateResumeForAnalysis has no notion of the caller.
+    await this.resumesService.findOne(id, user);
     const resume = await this.resumeProcessingService.validateResumeForAnalysis(id);
 
     if (!resume.jobId) {

@@ -6,16 +6,24 @@ import { ResumeQueueService } from 'src/queues/services/resume-queue.service';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { ApplicationSubmissionService } from './services/application-submission.service';
 import mongoose from 'mongoose';
+import { ForbiddenException } from '@nestjs/common';
+import { ERole } from 'src/casl/enums/role.enum';
 
 describe('ResumesController', () => {
   let controller: ResumesController;
   let mockResumesService: any;
   let mockApplicationSubmissionService: any;
+  let mockResumeProcessingService: any;
+  let mockResumeQueueService: any;
 
   beforeEach(async () => {
     mockResumesService = {
       notifyHrNewApplication: jest.fn().mockResolvedValue(undefined),
+      findOne: jest.fn(),
+      findOneForRead: jest.fn(),
     };
+    mockResumeProcessingService = { validateResumeForAnalysis: jest.fn() };
+    mockResumeQueueService = { addAnalyzeResumeJob: jest.fn() };
     mockApplicationSubmissionService = {
       submitCvOnline: jest.fn(),
     };
@@ -24,8 +32,8 @@ describe('ResumesController', () => {
       controllers: [ResumesController],
       providers: [
         { provide: ResumesService, useValue: mockResumesService },
-        { provide: ResumeProcessingService, useValue: {} },
-        { provide: ResumeQueueService, useValue: {} },
+        { provide: ResumeProcessingService, useValue: mockResumeProcessingService },
+        { provide: ResumeQueueService, useValue: mockResumeQueueService },
         { provide: ApplicationSubmissionService, useValue: mockApplicationSubmissionService },
       ],
     })
@@ -119,6 +127,48 @@ describe('ResumesController', () => {
       await new Promise(resolve => setImmediate(resolve));
 
       expect(result).toHaveProperty('companyId');
+    });
+  });
+  describe('reanalyzeCV', () => {
+    it('checks company access before queueing', async () => {
+      mockResumesService.findOne.mockRejectedValue(new ForbiddenException());
+      const hr = { _id: 'hr', role: ERole.HR, company: { _id: 'c1' } } as any;
+
+      await expect(controller.reanalyzeCV('r1', hr)).rejects.toThrow(ForbiddenException);
+
+      expect(mockResumesService.findOne).toHaveBeenCalledWith('r1', hr);
+      expect(mockResumeProcessingService.validateResumeForAnalysis).not.toHaveBeenCalled();
+      expect(mockResumeQueueService.addAnalyzeResumeJob).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getAnalysis', () => {
+    const resume = {
+      _id: 'r1',
+      jobId: 'j1',
+      companyId: 'c1',
+      status: 'PENDING',
+      adminNotes: 'internal admin',
+      hrNotes: 'internal hr',
+    };
+
+    it('hides internal notes from the candidate', async () => {
+      mockResumesService.findOneForRead.mockResolvedValue(resume);
+      const candidate = { _id: 'cand', role: ERole.NORMAL_USER } as any;
+
+      const result = await controller.getAnalysis('r1', candidate);
+
+      expect(mockResumesService.findOneForRead).toHaveBeenCalledWith('r1', candidate);
+      expect(result).not.toHaveProperty('notes');
+    });
+
+    it('shows notes to HR of the company', async () => {
+      mockResumesService.findOneForRead.mockResolvedValue(resume);
+      const hr = { _id: 'hr', role: ERole.HR, company: { _id: 'c1' } } as any;
+
+      const result = await controller.getAnalysis('r1', hr);
+
+      expect(result.notes).toEqual({ adminNotes: 'internal admin', hrNotes: 'internal hr' });
     });
   });
 });

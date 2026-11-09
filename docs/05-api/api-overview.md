@@ -70,7 +70,7 @@ Dự án **không** có exception filter tùy biến cho nội dung lỗi. `Sent
 
 Lỗi validate dạng mảng, ví dụ: `{ "message": ["email must be an email"], "error": "Bad Request", "statusCode": 400 }`.
 
-**Known Limitation:** một số nơi dùng `400` cho lỗi thiếu quyền (ví dụ `GET /resumes/:id/analysis` và HR xem công ty khác) thay vì `403`, nên client không nên dựa vào `403` để nhận biết thiếu quyền. Với route stream, lỗi sau khi đã gửi header không đổi được mã HTTP; xem [realtime.md](realtime.md).
+**Known Limitation:** một số nơi dùng `400` cho lỗi thiếu quyền (ví dụ HR xem job của công ty khác qua `GET /jobs/:id`) thay vì `403`, nên client không nên dựa vào `403` để nhận biết thiếu quyền. Với route stream, lỗi sau khi đã gửi header không đổi được mã HTTP; xem [realtime.md](realtime.md).
 
 ## Validation
 
@@ -115,10 +115,10 @@ Mức lọc đầu vào **không đồng nhất** giữa các service:
 | Service | Allowlist trường lọc/sắp xếp | Chặn toán tử nguy hiểm |
 |---|---|---|
 | `jobs`, `users`, `companies` | Có (`ALLOWED_FILTER_FIELDS`, `ALLOWED_SORT_FIELDS`) | Có (`$where`, `$function`, `$expr`, `$accumulator`, `$jsReduce`) |
-| `resumes` | Có định nghĩa, nhưng lời gọi `sanitizeAqpQuery` **bị comment** ([resumes.service.ts](../../src/resumes/resumes.service.ts)) | Không áp dụng |
+| `resumes` | Có, kèm giới hạn toán tử trong giá trị về so sánh (`$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`); `populate`/`fields` từ client bị bỏ qua ([resumes.service.ts](../../src/resumes/resumes.service.ts)) | Có |
 | `skills`, `notifications` | Không | Không |
 
-**Known Limitation (mức trung bình, chưa kiểm chứng khai thác):** `GET /resumes` nhận bộ lọc, `populate` và `projection` thô từ query string. Route chỉ cho `HR` và `SUPER ADMIN`, và phạm vi công ty của HR được gán **sau** khi parse (`filter.companyId = user.company._id`), nên HR không đổi được công ty qua query. Tuy vậy việc không lọc toán tử và cho phép `populate` tùy ý là bề mặt tấn công không cần thiết. `GET /notifications` cũng giữ `filter.userId` sau parse nhưng nhận `populate` và `projection` thô. Chưa thử khai thác thực tế vì chưa chạy được MongoDB.
+**Known Limitation (mức trung bình, chưa kiểm chứng khai thác):** `GET /notifications` giữ `filter.userId` sau parse nhưng nhận `populate` và `projection` thô. Chưa thử khai thác thực tế vì chưa chạy được MongoDB.
 
 ## Giới hạn tốc độ
 

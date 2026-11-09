@@ -18,7 +18,7 @@ Hai nhóm người dùng: **ứng viên** nộp và xem hồ sơ của mình (`c
 | `POST /api/v1/resumes/my-resumes` | Đăng nhập (mọi vai trò) | Lấy danh sách URL file CV của chính người gọi (dùng POST, không có body) |
 | `POST /api/v1/resumes/cv-online` | Đăng nhập (mọi vai trò) | Nộp hồ sơ bằng CV trực tuyến, chấm điểm ngay trong request |
 | `POST /api/v1/resumes/upload-cv` | Đăng nhập (mọi vai trò) | Tải file CV và nộp hồ sơ. Việc đọc và phân tích đi qua hàng đợi |
-| `GET /api/v1/resumes/:id/analysis` | Đăng nhập (mọi vai trò) | Xem kết quả đọc và phân tích CV (chủ hồ sơ hoặc quản trị viên) |
+| `GET /api/v1/resumes/:id/analysis` | Đăng nhập (mọi vai trò) | Xem kết quả đọc và phân tích CV (chủ hồ sơ, HR cùng công ty hoặc quản trị viên). Ứng viên không thấy `notes` |
 | `GET /api/v1/resumes/queue/stats` | Đăng nhập, vai trò: SUPER ADMIN | Thống kê hàng đợi xử lý hồ sơ (quản trị viên) |
 | `POST /api/v1/resumes/:id/reparse` | Đăng nhập, vai trò: SUPER ADMIN, HR | Đọc lại file CV bằng hàng đợi (quản trị viên hoặc HR) |
 | `POST /api/v1/resumes/:id/reanalyze` | Đăng nhập, vai trò: SUPER ADMIN, HR | Chấm điểm lại hồ sơ bằng hàng đợi (quản trị viên hoặc HR) |
@@ -35,11 +35,12 @@ Hai nhóm người dùng: **ứng viên** nộp và xem hồ sơ của mình (`c
 ## Phạm vi theo vai trò
 
 - `HR` chỉ thấy và sửa hồ sơ có `companyId` trùng công ty của mình; ngược lại `403`.
-- `GET /resumes/:id/analysis` chỉ chủ hồ sơ hoặc `SUPER ADMIN`; sai quyền trả **`400`** ("You do not have permission to view this resume") chứ không phải `403`. `HR` không xem được qua route này.
+- `GET /resumes/:id/analysis` cho chủ hồ sơ, HR cùng công ty và `SUPER ADMIN`; sai quyền trả `403`. Chỉ HR và quản trị viên thấy `notes`.
+- `HR` chưa gắn công ty bị từ chối (`403`) ở mọi route hồ sơ.
 
 ## Lọc và sắp xếp
 
-`GET /resumes` đọc bộ lọc, `populate` và `projection` từ query string. Sắp xếp được định nghĩa giới hạn ở `status`, `priority`, `createdAt`, `updatedAt`, `aiAnalysis.matchingScore` nhưng **bước lọc đầu vào đang bị tắt**, xem [api-overview](../api-overview.md#lọc-và-sắp-xếp-bằng-query-string). Phạm vi công ty của HR được gán sau khi parse nên vẫn có hiệu lực.
+`GET /resumes` chỉ nhận bộ lọc trên `status`, `priority`, `companyId`, `jobId`, `userId`, `isParsed`, `isAnalyzed`, `email`, `createdAt`, `updatedAt`, `aiAnalysis.matchingScore`; toán tử trong giá trị giới hạn ở so sánh (`$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`); regex được coi là chuỗi con (đã escape). `populate`/`fields` từ client bị bỏ qua, server luôn populate `companyId.name` và `jobId.name`. Phạm vi công ty của HR được gán sau bước lọc.
 
 ## Known Limitation
 
