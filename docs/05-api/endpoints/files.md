@@ -16,9 +16,9 @@ Tiền tố `/api/v1/files`. Controller: [files.controller.ts](../../../src/file
 | `folder_type` | Loại file | Tối đa | Ai được phép |
 |---|---|---|---|
 | `avatar` | jpg, jpeg, png, gif, webp | 5 MB | Người dùng đăng nhập |
-| `cv` | pdf, doc, docx | 5 MB | Người dùng đăng nhập |
-| `resumes` | pdf, doc, docx, txt | 5 MB | Người dùng đăng nhập |
 | `company` | jpg, jpeg, png, gif | 5 MB | Chỉ `HR` và `SUPER ADMIN` |
+
+File CV không đi qua route này: `POST /resumes/upload-cv` lưu vào thư mục private và chỉ đọc được qua `GET /resumes/:id/file`.
 
 Phản hồi (`data`) theo `getFileInfo` ([files.service.ts](../../../src/files/files.service.ts)):
 

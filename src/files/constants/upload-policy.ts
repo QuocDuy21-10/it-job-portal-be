@@ -2,8 +2,6 @@ import { ERole } from 'src/casl/enums/role.enum';
 
 export enum UploadFolderType {
   AVATAR = 'avatar',
-  CV = 'cv',
-  RESUMES = 'resumes',
   COMPANY = 'company',
 }
 
@@ -20,27 +18,6 @@ export const UPLOAD_POLICIES: Readonly<Record<UploadFolderType, UploadPolicy>> =
     folder: UploadFolderType.AVATAR,
     allowedMimeTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
     allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-    maxSizeBytes: 5 * 1024 * 1024,
-  },
-  [UploadFolderType.CV]: {
-    folder: UploadFolderType.CV,
-    allowedMimeTypes: [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ],
-    allowedExtensions: ['pdf', 'doc', 'docx'],
-    maxSizeBytes: 5 * 1024 * 1024,
-  },
-  [UploadFolderType.RESUMES]: {
-    folder: UploadFolderType.RESUMES,
-    allowedMimeTypes: [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain',
-    ],
-    allowedExtensions: ['pdf', 'doc', 'docx', 'txt'],
     maxSizeBytes: 5 * 1024 * 1024,
   },
   [UploadFolderType.COMPANY]: {

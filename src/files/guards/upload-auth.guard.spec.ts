@@ -26,13 +26,9 @@ describe('UploadAuthGuard', () => {
       expect(guard.canActivate(ctx)).toBe(true);
     });
 
-    it('allows cv folder for normal user', () => {
-      expect(guard.canActivate(buildContext(UploadFolderType.CV, ERole.NORMAL_USER))).toBe(true);
-    });
-
-    it('allows resumes folder for normal user', () => {
-      expect(guard.canActivate(buildContext(UploadFolderType.RESUMES, ERole.NORMAL_USER))).toBe(
-        true,
+    it.each(['cv', 'resumes'])('rejects the removed public CV folder %s', folder => {
+      expect(() => guard.canActivate(buildContext(folder, ERole.NORMAL_USER))).toThrow(
+        BadRequestException,
       );
     });
 
