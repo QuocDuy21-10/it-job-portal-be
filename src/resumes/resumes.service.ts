@@ -16,6 +16,16 @@ import { EResumeStatus } from './enums/resume-status.enum';
 import { ResumeRepository } from './repositories/resume.repository';
 import { ApplicationNotificationService } from './services/application-notification.service';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
+import { assertCompanyAccess } from 'src/companies/company-access.util';
+
+// Fixed server-side population: the list UI only needs these names, and client-controlled
+// populate/projection would let callers read any referenced collection.
+const RESUME_LIST_POPULATION = [
+  { path: 'companyId', select: { name: 1 } },
+  { path: 'jobId', select: { name: 1 } },
+];
+
+const SAFE_VALUE_OPERATORS = new Set(['$eq', '$ne', '$gt', '$gte', '$lt', '$lte', '$in', '$nin']);
 
 @Injectable()
 export class ResumesService {
@@ -32,6 +42,7 @@ export class ResumesService {
     'email',
     'createdAt',
     'updatedAt',
+    'aiAnalysis.matchingScore',
   ]);
 
   private readonly DANGEROUS_OPERATORS = new Set([
@@ -78,15 +89,12 @@ export class ResumesService {
   }
 
   async findAll(page?: number, limit?: number, query?: string, user?: IUser) {
-    // const { filter: rawFilter, sort: rawSort, population, projection } = aqp(query);
-    const { filter, sort, population, projection } = aqp(query);
-    delete filter.page;
-    delete filter.limit;
-
-    // const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
+    const { filter: rawFilter, sort: rawSort } = aqp(query);
+    const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
 
     // Role-based scope applied after sanitization — cannot be overridden by query string
-    if (user?.role === ERole.HR && user.company?._id) {
+    if (user?.role === ERole.HR) {
+      assertCompanyAccess(user, user.company?._id);
       filter.companyId = user.company._id;
     }
 
@@ -98,8 +106,7 @@ export class ResumesService {
       safeOffset,
       safeLimit,
       sort,
-      population,
-      projection,
+      RESUME_LIST_POPULATION,
     );
 
     return {
@@ -125,10 +132,20 @@ export class ResumesService {
     }
 
     // HR users may only view resumes belonging to their company
-    if (user?.role === ERole.HR && user.company?._id) {
-      if (resume.companyId?.toString() !== user.company._id.toString()) {
-        throw new ForbiddenException('You can only view resumes of your own company');
-      }
+    if (user?.role === ERole.HR) {
+      assertCompanyAccess(user, resume.companyId, 'You can only view resumes of your own company');
+    }
+
+    return resume;
+  }
+
+  /** Read access for candidate-facing routes: owner, HR of the resume's company, or SUPER_ADMIN. */
+  async findOneForRead(id: string, user: IUser) {
+    const resume = await this.findOne(id);
+    const isOwner = resume.userId?.toString() === user._id.toString();
+
+    if (!isOwner) {
+      assertCompanyAccess(user, resume.companyId, 'You do not have permission to view this resume');
     }
 
     return resume;
@@ -143,10 +160,12 @@ export class ResumesService {
       throw new NotFoundException(`Resume with ID ${id} not found`);
     }
 
-    if (user?.role === ERole.HR && user.company?._id) {
-      if (existing.companyId?.toString() !== user.company._id.toString()) {
-        throw new ForbiddenException('You can only update resumes that belong to your company');
-      }
+    if (user?.role === ERole.HR) {
+      assertCompanyAccess(
+        user,
+        existing.companyId,
+        'You can only update resumes that belong to your company',
+      );
     }
 
     const { status } = updateResumeDto;
@@ -191,10 +210,12 @@ export class ResumesService {
       throw new NotFoundException(`Resume with ID ${id} not found`);
     }
 
-    if (user?.role === ERole.HR && user.company?._id) {
-      if (existing.companyId?.toString() !== user.company._id.toString()) {
-        throw new ForbiddenException('You can only delete resumes that belong to your company');
-      }
+    if (user?.role === ERole.HR) {
+      assertCompanyAccess(
+        user,
+        existing.companyId,
+        'You can only delete resumes that belong to your company',
+      );
     }
 
     const result = await this.resumeRepository.softDeleteById(id, {
@@ -269,7 +290,8 @@ export class ResumesService {
     for (const [key, value] of Object.entries(rawFilter)) {
       if (this.DANGEROUS_OPERATORS.has(key)) continue;
       if (!this.ALLOWED_FILTER_FIELDS.has(key)) continue;
-      filter[key] = value;
+      const safeValue = this.sanitizeFilterValue(value);
+      if (safeValue !== undefined) filter[key] = safeValue;
     }
 
     const sort: Record<string, any> = {};
@@ -282,6 +304,22 @@ export class ResumesService {
     }
 
     return { filter, sort };
+  }
+
+  private sanitizeFilterValue(value: unknown): unknown {
+    if (value instanceof RegExp) {
+      // Treat client regex as a literal substring search to avoid ReDoS.
+      return new RegExp(this.escapeRegex(value.source), value.flags.includes('i') ? 'i' : '');
+    }
+    if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+      const entries = Object.entries(value).filter(([op]) => SAFE_VALUE_OPERATORS.has(op));
+      return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+    }
+    return value;
+  }
+
+  private escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   private validateObjectId(id: string): void {
