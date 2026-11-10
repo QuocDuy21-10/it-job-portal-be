@@ -394,7 +394,7 @@ export class JobsService {
         isActive: true,
         endDate: { $ne: null, $lte: now },
       },
-      '_id name company createdBy',
+      '_id name company createdBy endDate',
     );
 
     if (expiredJobs.length === 0) {
@@ -421,6 +421,7 @@ export class JobsService {
               jobName: job.name,
               companyName: job.company?.name ?? 'Unknown Company',
               hrEmail: job.createdBy.email,
+              endDate: new Date(job.endDate).toISOString(),
             })
             .catch((error: unknown) => {
               this.logger.error(

@@ -39,11 +39,10 @@ export class ResumeQueueService {
    */
   async addParseResumeJob(data: ParseResumeJobData) {
     try {
-      const job = await this.resumeQueue.add(
-        'parse-resume',
-        data,
-        this.buildParseResumeJobOptions(),
-      );
+      const job = await this.resumeQueue.add('parse-resume', data, {
+        ...this.buildParseResumeJobOptions(),
+        deduplication: { id: `parse:${data.resumeId}` },
+      });
 
       this.logger.log(`Parse resume job added: ${job.id} for resume ${data.resumeId}`);
       return job;
@@ -82,11 +81,10 @@ export class ResumeQueueService {
    */
   async addAnalyzeResumeJob(data: AnalyzeResumeJobData) {
     try {
-      const job = await this.resumeQueue.add(
-        'analyze-resume',
-        data,
-        this.buildAnalyzeResumeJobOptions(),
-      );
+      const job = await this.resumeQueue.add('analyze-resume', data, {
+        ...this.buildAnalyzeResumeJobOptions(),
+        deduplication: { id: `analyze:${data.resumeId}` },
+      });
 
       this.logger.log(`Analyze resume job added: ${job.id} for resume ${data.resumeId}`);
       return job;

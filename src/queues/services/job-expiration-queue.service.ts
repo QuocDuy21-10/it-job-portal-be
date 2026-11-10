@@ -1,13 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { JOB_EXPIRATION_NOTIFICATION_QUEUE } from '../queues.constants';
+import { JOB_EXPIRATION_NOTIFICATION_QUEUE, QUEUE_DEDUP_TTL_MS } from '../queues.constants';
 
 export interface JobExpiredNotificationPayload {
   jobId: string;
   jobName: string;
   companyName: string;
   hrEmail: string;
+  endDate: string;
 }
 
 @Injectable()
@@ -26,6 +27,10 @@ export class JobExpirationQueueService {
         backoff: { type: 'exponential', delay: 5000 },
         removeOnComplete: true,
         removeOnFail: false,
+        deduplication: {
+          id: `job-expired:${payload.jobId}:${Date.parse(payload.endDate)}`,
+          ttl: QUEUE_DEDUP_TTL_MS.JOB_EXPIRED,
+        },
       });
       this.logger.log(`Queued expiration notification for job: ${payload.jobId}`);
     } catch (error) {

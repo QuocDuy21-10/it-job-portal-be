@@ -82,4 +82,31 @@ describe('ResumeQueueService', () => {
       delayMs: 60500,
     });
   });
+
+  it('dedupes parse and analyze jobs per resume while they are in flight', async () => {
+    const { service, queueMock } = await createTestingModule();
+    queueMock.add.mockResolvedValue({ id: 'job-id' });
+
+    await service.addParseResumeJob({
+      resumeId: 'resume-1',
+      filePath: '/tmp/cv.pdf',
+      jobId: 'job-1',
+    });
+    await service.addAnalyzeResumeJob({ resumeId: 'resume-1', jobId: 'job-1' });
+
+    expect(queueMock.add.mock.calls[0][2].deduplication).toEqual({ id: 'parse:resume-1' });
+    expect(queueMock.add.mock.calls[1][2].deduplication).toEqual({ id: 'analyze:resume-1' });
+  });
+
+  it('does not dedupe quota retries, since the original parse job is still active', async () => {
+    const { service, queueMock } = await createTestingModule();
+    queueMock.add.mockResolvedValue({ id: 'job-id' });
+
+    await service.scheduleParseResumeRetry(
+      { resumeId: 'resume-1', filePath: '/tmp/cv.pdf', jobId: 'job-1' },
+      1000,
+    );
+
+    expect(queueMock.add.mock.calls[0][2].deduplication).toBeUndefined();
+  });
 });

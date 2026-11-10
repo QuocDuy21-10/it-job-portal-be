@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { APPLICATION_NOTIFICATION_QUEUE } from '../queues.constants';
+import { APPLICATION_NOTIFICATION_QUEUE, QUEUE_DEDUP_TTL_MS } from '../queues.constants';
 
 export interface ApplicationStatusEmailPayload {
   userName: string;
@@ -41,6 +41,10 @@ export class ApplicationNotificationQueueService {
         backoff: { type: 'exponential', delay: 5000 },
         removeOnComplete: true,
         removeOnFail: false,
+        deduplication: {
+          id: `status:${payload.resumeId}:${payload.newStatus}`,
+          ttl: QUEUE_DEDUP_TTL_MS.STATUS_UPDATE,
+        },
       });
       this.logger.log(
         `Queued status update email for ${payload.userEmail} (status: ${payload.newStatus})`,
@@ -60,6 +64,10 @@ export class ApplicationNotificationQueueService {
         backoff: { type: 'exponential', delay: 5000 },
         removeOnComplete: true,
         removeOnFail: false,
+        deduplication: {
+          id: `new-application:${payload.resumeId}`,
+          ttl: QUEUE_DEDUP_TTL_MS.NEW_APPLICATION,
+        },
       });
       this.logger.log(
         `Queued new application email for HR ${payload.hrEmail} (resume: ${payload.resumeId})`,

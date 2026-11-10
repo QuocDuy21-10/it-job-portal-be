@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { JOB_RECOMMENDATION_QUEUE } from '../queues.constants';
+import { JOB_RECOMMENDATION_QUEUE, QUEUE_DEDUP_TTL_MS } from '../queues.constants';
+import { isoWeekKey } from '../iso-week.util';
 
 export interface JobRecommendationPayload {
   subscriberId: string;
@@ -15,6 +16,13 @@ export class JobRecommendationQueueService {
     @InjectQueue(JOB_RECOMMENDATION_QUEUE)
     private readonly jobRecommendationQueue: Queue<JobRecommendationPayload>,
   ) {}
+
+  private buildDeduplication(subscriberId: string, weekKey: string) {
+    return {
+      id: `rec:${subscriberId}:${weekKey}`,
+      ttl: QUEUE_DEDUP_TTL_MS.JOB_RECOMMENDATION,
+    };
+  }
 
   /**
    * Add a single subscriber to the job recommendation queue
@@ -37,6 +45,7 @@ export class JobRecommendationQueueService {
           removeOnFail: {
             age: 604800, // Keep failed jobs for 7 days
           },
+          deduplication: this.buildDeduplication(subscriberId, isoWeekKey()),
         },
       );
       this.logger.debug(`Added subscriber ${subscriberId} to queue`);
@@ -59,6 +68,7 @@ export class JobRecommendationQueueService {
       `Adding ${subscriberIds.length} subscribers to queue in batches of ${batchSize}`,
     );
 
+    const weekKey = isoWeekKey();
     const jobs = subscriberIds.map(subscriberId => ({
       name: 'send-job-recommendations',
       data: { subscriberId },
@@ -75,6 +85,7 @@ export class JobRecommendationQueueService {
         removeOnFail: {
           age: 604800,
         },
+        deduplication: this.buildDeduplication(subscriberId, weekKey),
       },
     }));
 
