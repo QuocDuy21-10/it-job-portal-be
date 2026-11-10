@@ -27,6 +27,7 @@ import {
   buildEmbeddedCompanyIdFilter,
 } from 'src/companies/company-snapshot.util';
 import { JobRepository } from './repositories/job.repository';
+import { CronLockService } from 'src/redis/cron-lock.service';
 import { assertCompanyAccess } from 'src/companies/company-access.util';
 import { SkillsService } from 'src/skills/skills.service';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
@@ -42,6 +43,8 @@ import {
   resolveLocationFromInput,
   resolveLocationPayload,
 } from 'src/utils/location-catalog';
+
+const EXPIRED_JOBS_CRON = 'deactivate-expired-jobs';
 
 @Injectable()
 export class JobsService {
@@ -81,6 +84,7 @@ export class JobsService {
     private readonly jobExpirationQueueService: JobExpirationQueueService,
     private readonly statisticsCacheService: StatisticsCacheService,
     private readonly listCacheService: ListCacheService,
+    private readonly cronLockService: CronLockService,
   ) {}
   async create(createJobDto: CreateJobDto, user: IUser) {
     assertCompanyAccess(
@@ -383,9 +387,13 @@ export class JobsService {
   }
 
   @Cron('0 * * * *', {
-    name: 'deactivate-expired-jobs',
+    name: EXPIRED_JOBS_CRON,
     timeZone: 'Asia/Ho_Chi_Minh',
   })
+  async runExpiredJobsCron(): Promise<void> {
+    await this.cronLockService.runExclusive(EXPIRED_JOBS_CRON, () => this.handleExpiredJobs());
+  }
+
   async handleExpiredJobs(): Promise<void> {
     const now = new Date();
 

@@ -5,6 +5,7 @@ import { CompaniesService } from './companies.service';
 import { CompanyRepository } from './repositories/company.repository';
 import { FilesService } from 'src/files/files.service';
 import { ERole } from 'src/casl';
+import { CronLockService } from 'src/redis/cron-lock.service';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
 import { ListCacheService } from 'src/redis/list-cache.service';
 import { LIST_CACHE_SCOPES, LIST_CACHE_TAGS } from 'src/redis/list-cache.constants';
@@ -57,6 +58,7 @@ describe('CompaniesService', () => {
         { provide: FilesService, useValue: mockFilesService },
         { provide: StatisticsCacheService, useValue: mockStatisticsCacheService },
         { provide: ListCacheService, useValue: mockListCacheService },
+        { provide: CronLockService, useValue: { runExclusive: jest.fn() } },
       ],
     }).compile();
 

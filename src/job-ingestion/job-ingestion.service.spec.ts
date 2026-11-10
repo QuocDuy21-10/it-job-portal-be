@@ -26,16 +26,24 @@ const setup = ({
   const queueService = { enqueueSync: jest.fn().mockResolvedValue(undefined) };
   const coordinator = { run: jest.fn().mockResolvedValue(undefined) };
 
+  const cronLock = {
+    runExclusive: jest.fn(async (_name: string, fn: () => Promise<unknown>) => {
+      await fn();
+    }),
+  };
+
   const service = new JobIngestionService(
     jobSourceModel as any,
     crawlRunModel as any,
     repository as any,
     queueService as any,
     coordinator as any,
+    cronLock as any,
   );
 
   return {
     service,
+    cronLock,
     jobSourceModel,
     crawlRunModel,
     runsQuery,
@@ -70,6 +78,21 @@ describe('JobIngestionService', () => {
       expect(jobSourceModel.find).toHaveBeenCalledWith({ enabled: true });
       expect(queueService.enqueueSync).toHaveBeenCalledWith('greenhouse-axon');
       expect(queueService.enqueueSync).toHaveBeenCalledWith('lever-acme');
+    });
+
+    it('runs the scheduled sync through the cron lock', async () => {
+      const { service, jobSourceModel, cronLock } = setup();
+      jobSourceModel.find.mockReturnValue({
+        select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }),
+      });
+
+      await service.runSourceSyncCron();
+
+      expect(cronLock.runExclusive).toHaveBeenCalledWith(
+        'sync-external-job-sources',
+        expect.any(Function),
+      );
+      expect(jobSourceModel.find).toHaveBeenCalledWith({ enabled: true });
     });
   });
 

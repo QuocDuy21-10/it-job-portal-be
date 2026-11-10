@@ -6,6 +6,7 @@ import { redisStore } from 'cache-manager-redis-store';
 import type { RedisClientOptions } from 'redis';
 import Redis from 'ioredis';
 import { ListCacheService } from './list-cache.service';
+import { CronLockService } from './cron-lock.service';
 import { REDIS_CLIENT } from './redis.constants';
 
 export { REDIS_CLIENT } from './redis.constants';
@@ -71,7 +72,8 @@ export { REDIS_CLIENT } from './redis.constants';
         }),
     },
     ListCacheService,
+    CronLockService,
   ],
-  exports: [BullModule, CacheModule, REDIS_CLIENT, ListCacheService],
+  exports: [BullModule, CacheModule, REDIS_CLIENT, ListCacheService, CronLockService],
 })
 export class RedisModule {}

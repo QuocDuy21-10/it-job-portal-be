@@ -7,7 +7,10 @@ import { Cron } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import { Subscriber, SubscriberDocument } from 'src/subscribers/schemas/subscriber.schema';
+import { CronLockService } from 'src/redis/cron-lock.service';
 import { JobRecommendationQueueService } from 'src/queues/services/job-recommendation-queue.service';
+
+const WEEKLY_RECOMMENDATIONS_CRON = 'weekly-job-recommendations';
 
 @ApiTags('Mail')
 @Controller('mail')
@@ -19,6 +22,7 @@ export class MailController {
     private readonly jobRecommendationQueueService: JobRecommendationQueueService,
     @InjectModel(Subscriber.name)
     private readonly subscriberModel: SoftDeleteModel<SubscriberDocument>,
+    private readonly cronLockService: CronLockService,
   ) {}
 
   @Post('send-job-recommendations')
@@ -38,7 +42,7 @@ export class MailController {
   }
 
   @Cron('0 9 * * 1', {
-    name: 'weekly-job-recommendations',
+    name: WEEKLY_RECOMMENDATIONS_CRON,
     timeZone: 'Asia/Ho_Chi_Minh',
   })
   @ApiOperation({
@@ -47,9 +51,11 @@ export class MailController {
       'Runs every Monday at 9:00 AM (Vietnam timezone). Queues job recommendation tasks for all active subscribers.',
   })
   async handleWeeklyJobRecommendations() {
-    this.logger.log('Starting weekly job recommendation cron job');
-    await this.queueJobRecommendations();
-    this.logger.log('Weekly job recommendation cron job completed');
+    await this.cronLockService.runExclusive(WEEKLY_RECOMMENDATIONS_CRON, async () => {
+      this.logger.log('Starting weekly job recommendation cron job');
+      await this.queueJobRecommendations();
+      this.logger.log('Weekly job recommendation cron job completed');
+    });
   }
 
   /**
