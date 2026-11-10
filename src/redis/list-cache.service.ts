@@ -2,6 +2,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import Redis from 'ioredis';
 import { REDIS_CLIENT } from './redis.constants';
+import { SingleFlight } from './single-flight';
+import { withTtlJitter } from './cache-ttl.util';
 
 export interface ListCacheKeyInput {
   endpoint: string;
@@ -16,11 +18,23 @@ interface ListCacheOptions<T> {
   loader: () => Promise<T>;
 }
 
+// Writes the entry only if no invalidation bumped the epoch while the loader ran.
+const SET_IF_EPOCH_UNCHANGED_SCRIPT = `
+local current = redis.call('GET', KEYS[1]) or '0'
+if current ~= ARGV[1] then
+  return 0
+end
+redis.call('PSETEX', KEYS[2], ARGV[2], ARGV[3])
+return 1
+`;
+
 @Injectable()
 export class ListCacheService {
   private readonly logger = new Logger(ListCacheService.name);
   private readonly keyPrefix = 'list-cache';
   private readonly indexTtlPaddingMs = 5 * 60 * 1000;
+  private readonly epochKey = `${this.keyPrefix}:epoch`;
+  private readonly singleFlight = new SingleFlight();
 
   constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
 
@@ -43,11 +57,27 @@ export class ListCacheService {
       this.logger.warn(`List cache read failed: ${this.getErrorMessage(error)}`);
     }
 
+    return this.singleFlight.run(cacheKey, () => this.loadAndStore(cacheKey, options));
+  }
+
+  private async loadAndStore<T>(cacheKey: string, options: ListCacheOptions<T>): Promise<T> {
+    let epochBefore: string | null = null;
+    try {
+      epochBefore = (await this.redis.get(this.epochKey)) ?? '0';
+    } catch (error) {
+      this.logger.warn(`List cache epoch read failed: ${this.getErrorMessage(error)}`);
+    }
+
     const value = await options.loader();
+
+    // Without a known epoch the write could not be guarded against a concurrent reclaim.
+    if (epochBefore === null) {
+      return value;
+    }
 
     try {
       const tags = typeof options.tags === 'function' ? options.tags(value) : options.tags;
-      await this.store(cacheKey, value, tags, options.ttlMs);
+      await this.store(cacheKey, value, tags, options.ttlMs, epochBefore);
     } catch (error) {
       this.logger.warn(`List cache write failed: ${this.getErrorMessage(error)}`);
     }
@@ -61,7 +91,10 @@ export class ListCacheService {
       return;
     }
 
+    this.singleFlight.clear();
+
     try {
+      await this.redis.incr(this.epochKey);
       const tagIndexKeys = uniqueTags.map(tag => this.tagIndexKey(tag));
       const keyGroups = await Promise.all(tagIndexKeys.map(tagKey => this.redis.smembers(tagKey)));
       const cacheKeys = this.uniqueValues(keyGroups.flat());
@@ -94,28 +127,42 @@ export class ListCacheService {
     }
   }
 
-  private async store<T>(cacheKey: string, value: T, tags: string[], ttlMs: number): Promise<void> {
+  private async store<T>(
+    cacheKey: string,
+    value: T,
+    tags: string[],
+    ttlMs: number,
+    epochBefore: string,
+  ): Promise<void> {
     const uniqueTags = this.uniqueValues(tags);
-    const indexTtlMs = ttlMs + this.indexTtlPaddingMs;
+    const ttl = withTtlJitter(ttlMs);
+    const indexTtlMs = ttl + this.indexTtlPaddingMs;
     const entryTagsKey = this.entryTagsKey(cacheKey);
 
-    await this.redis.psetex(cacheKey, ttlMs, JSON.stringify(value));
-
-    if (uniqueTags.length === 0) {
-      return;
+    // Index tags first so a reclaim that runs after the value write always finds the key.
+    if (uniqueTags.length > 0) {
+      await Promise.all([
+        ...uniqueTags.flatMap(tag => {
+          const tagIndexKey = this.tagIndexKey(tag);
+          return [
+            this.redis.sadd(tagIndexKey, cacheKey),
+            this.redis.pexpire(tagIndexKey, indexTtlMs),
+          ];
+        }),
+        this.redis.sadd(entryTagsKey, ...uniqueTags),
+        this.redis.pexpire(entryTagsKey, indexTtlMs),
+      ]);
     }
 
-    await Promise.all([
-      ...uniqueTags.flatMap(tag => {
-        const tagIndexKey = this.tagIndexKey(tag);
-        return [
-          this.redis.sadd(tagIndexKey, cacheKey),
-          this.redis.pexpire(tagIndexKey, indexTtlMs),
-        ];
-      }),
-      this.redis.sadd(entryTagsKey, ...uniqueTags),
-      this.redis.pexpire(entryTagsKey, indexTtlMs),
-    ]);
+    await this.redis.eval(
+      SET_IF_EPOCH_UNCHANGED_SCRIPT,
+      2,
+      this.epochKey,
+      cacheKey,
+      epochBefore,
+      String(ttl),
+      JSON.stringify(value),
+    );
   }
 
   private tagIndexKey(tag: string): string {
