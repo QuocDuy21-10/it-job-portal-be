@@ -24,6 +24,7 @@ import { CreateUserCvDto } from './dto/create-resume.dto';
 import { UpdateResumeDto } from './dto/update-resume.dto';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
+import { PaginationQueryDto } from 'src/utils/dto/pagination-query.dto';
 import { IUser } from 'src/users/user.interface';
 import { ApiOperation, ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -68,13 +69,8 @@ export class ResumesController {
     description: 'Retrieves a paginated list of all resumes. Supports filtering and sorting.',
   })
   @ResponseMessage('Resumes have been retrieved successfully')
-  findAll(
-    @Query('page') page: string,
-    @Query('limit') limit: string,
-    @Query() query: string,
-    @User() user: IUser,
-  ) {
-    return this.resumesService.findAll(+page, +limit, query, user);
+  findAll(@Query() pagination: PaginationQueryDto, @Query() query: string, @User() user: IUser) {
+    return this.resumesService.findAll(pagination.page, pagination.limit, query, user);
   }
 
   @Get(':id')

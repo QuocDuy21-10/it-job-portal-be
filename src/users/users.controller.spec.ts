@@ -54,14 +54,14 @@ describe('UsersController', () => {
     expect(result).toBe(expected);
   });
 
-  it('should coerce findAll params and forward the query object', async () => {
+  it('should forward pagination and the raw query object to the service', async () => {
     const query = { page: '2', limit: '5', name: 'alice' } as any;
     const expected = { result: [], meta: {} };
     mockUsersService.findAll.mockResolvedValue(expected as any);
 
-    const result = await controller.findAll('2', '5', query);
+    const result = await controller.findAll({ page: '2', limit: '5' }, query);
 
-    expect(mockUsersService.findAll).toHaveBeenCalledWith(2, 5, query);
+    expect(mockUsersService.findAll).toHaveBeenCalledWith('2', '5', query);
     expect(result).toBe(expected);
   });
 
@@ -99,7 +99,7 @@ describe('UsersController', () => {
     const expected = { result: [], meta: { current: 1 } };
     mockUsersService.getSavedJobs.mockResolvedValue(expected as any);
 
-    const result = await (controller as any).getSavedJobs(currentUser);
+    const result = await (controller as any).getSavedJobs(currentUser, {});
 
     expect(mockUsersService.getSavedJobs).toHaveBeenCalledWith(currentUser._id, 1, 10);
     expect(result).toBe(expected);

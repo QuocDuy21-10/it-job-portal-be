@@ -262,6 +262,24 @@ describe('UsersService', () => {
   });
 
   describe('findAll', () => {
+    it('should clamp limit to 100 and ignore client population', async () => {
+      mockUserRepository.findPaginated.mockResolvedValue({
+        result: [],
+        totalItems: 0,
+        totalPages: 0,
+      } as any);
+
+      await service.findAll(1, 1000, 'populate=company&name=alice');
+
+      expect(mockUserRepository.findPaginated).toHaveBeenCalledWith(
+        { name: 'alice' },
+        0,
+        100,
+        {},
+        undefined,
+      );
+    });
+
     it('should strip page and limit from filters and return pagination metadata', async () => {
       const repositoryResult = {
         result: [{ _id: new mongoose.Types.ObjectId() }],

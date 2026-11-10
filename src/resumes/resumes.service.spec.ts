@@ -66,6 +66,22 @@ describe('ResumesService', () => {
   });
 
   describe('findAll', () => {
+    it('returns normalized pagination and clamps limit to 100', async () => {
+      repo.findPaginated.mockResolvedValue({ result: [], totalItems: 0, totalPages: 0 });
+
+      const response = await service.findAll(Number.NaN, 1000, {} as any, admin);
+
+      const [, offset, limit] = repo.findPaginated.mock.calls[0];
+      expect(offset).toBe(0);
+      expect(limit).toBe(100);
+      expect(response.meta.pagination).toEqual({
+        current_page: 1,
+        per_page: 100,
+        total_pages: 0,
+        total: 0,
+      });
+    });
+
     it('rejects HR without a company instead of returning every resume', async () => {
       await expect(service.findAll(1, 10, {} as any, hr())).rejects.toThrow(ForbiddenException);
       expect(repo.findPaginated).not.toHaveBeenCalled();

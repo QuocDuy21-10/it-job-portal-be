@@ -4,7 +4,11 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UserDocument } from './schemas/user.schema';
 import { compareSync, genSaltSync, hashSync } from 'bcryptjs';
 import { IUser } from './user.interface';
-import aqp from 'api-query-params';
+import {
+  buildPaginationMeta,
+  parseListQuery,
+  resolvePagination,
+} from 'src/utils/helpers/list-query.helper';
 import { ConfigService } from '@nestjs/config';
 import { ERole } from 'src/casl/enums/role.enum';
 import { AuthRegisterDto } from 'src/auth/dto/auth-register.dto';
@@ -41,16 +45,6 @@ export class UsersService {
     'createdAt',
     'updatedAt',
   ]);
-
-  private readonly DANGEROUS_OPERATORS = new Set([
-    '$where',
-    '$function',
-    '$expr',
-    '$accumulator',
-    '$jsReduce',
-  ]);
-
-  private readonly TEXT_FILTER_FIELDS = new Set(['name', 'email', 'company.name']);
 
   constructor(
     private readonly userRepository: UserRepository,
@@ -115,35 +109,22 @@ export class UsersService {
     return this.userAccountService.updateUnverifiedUser(id, dto);
   }
 
-  async findAll(page: number, limit: number, query: string) {
-    const { filter: rawFilter, sort: rawSort, population } = aqp(query);
-    delete rawFilter.page;
-    delete rawFilter.limit;
+  async findAll(page: unknown, limit: unknown, query: string) {
+    const { filter, sort } = parseListQuery(query, {
+      filterFields: this.ALLOWED_FILTER_FIELDS,
+      sortFields: this.ALLOWED_SORT_FIELDS,
+    });
+    const pagination = resolvePagination(page, limit);
 
-    const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
-    const safeLimit = limit > 0 ? limit : 10;
-    const safePage = page > 0 ? page : 1;
-    const offset = (safePage - 1) * safeLimit;
-
-    const { result, totalItems, totalPages } = await this.userRepository.findPaginated(
+    const { result, totalItems } = await this.userRepository.findPaginated(
       filter,
-      offset,
-      safeLimit,
+      pagination.offset,
+      pagination.limit,
       sort,
-      population,
+      undefined,
     );
 
-    return {
-      result,
-      meta: {
-        pagination: {
-          current_page: safePage,
-          per_page: safeLimit,
-          total_pages: totalPages,
-          total: totalItems,
-        },
-      },
-    };
+    return { result, meta: buildPaginationMeta(pagination.page, pagination.limit, totalItems) };
   }
 
   findOne(id: string) {
@@ -357,34 +338,6 @@ export class UsersService {
     return this.userPreferencesService.getFollowingCompanies(userId);
   }
 
-  private sanitizeAqpQuery(
-    rawFilter: Record<string, any>,
-    rawSort: Record<string, any>,
-  ): { filter: Record<string, any>; sort: Record<string, any> } {
-    const filter: Record<string, any> = {};
-
-    for (const [key, value] of Object.entries(rawFilter)) {
-      if (this.DANGEROUS_OPERATORS.has(key)) continue;
-      if (!this.ALLOWED_FILTER_FIELDS.has(key)) continue;
-
-      const sanitizedValue = this.sanitizeFilterValue(key, value);
-      if (typeof sanitizedValue === 'undefined') continue;
-
-      filter[key] = sanitizedValue;
-    }
-
-    const sort: Record<string, any> = {};
-    if (rawSort && typeof rawSort === 'object') {
-      for (const [key, value] of Object.entries(rawSort)) {
-        if (!this.ALLOWED_SORT_FIELDS.has(key)) continue;
-        if (value !== 1 && value !== -1) continue;
-        sort[key] = value;
-      }
-    }
-
-    return { filter, sort };
-  }
-
   private assertEmailIsUnchanged(incomingEmail: string | undefined, currentEmail: string): void {
     if (!incomingEmail) {
       return;
@@ -397,46 +350,6 @@ export class UsersService {
 
   private normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
-  }
-
-  private sanitizeFilterValue(field: string, value: any): any {
-    if (value instanceof RegExp && this.TEXT_FILTER_FIELDS.has(field)) {
-      return new RegExp(this.escapeRegex(value.source), this.normalizeRegexFlags(value.flags));
-    }
-
-    if (!value || typeof value !== 'object' || value instanceof Date || Array.isArray(value)) {
-      return value;
-    }
-
-    const sanitizedValue: Record<string, any> = {};
-    for (const [nestedKey, nestedValue] of Object.entries(value)) {
-      if (this.DANGEROUS_OPERATORS.has(nestedKey)) continue;
-
-      if (nestedKey === '$regex' && this.TEXT_FILTER_FIELDS.has(field)) {
-        const source = nestedValue instanceof RegExp ? nestedValue.source : String(nestedValue);
-        sanitizedValue.$regex = this.escapeRegex(source);
-
-        const normalizedFlags = this.normalizeRegexFlags(
-          typeof value.$options === 'string' ? value.$options : '',
-        );
-        if (normalizedFlags) {
-          sanitizedValue.$options = normalizedFlags;
-        }
-        continue;
-      }
-
-      sanitizedValue[nestedKey] = nestedValue;
-    }
-
-    return Object.keys(sanitizedValue).length > 0 ? sanitizedValue : undefined;
-  }
-
-  private normalizeRegexFlags(flags: string): string {
-    return flags.includes('i') ? 'i' : '';
-  }
-
-  private escapeRegex(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   async lockUser(id: string, dto: LockUserDto, adminUser: IUser) {
