@@ -6,6 +6,17 @@ export const JOB_EXPIRATION_NOTIFICATION_QUEUE = 'job-expiration-notification';
 export const ACCOUNT_DELETION_QUEUE = 'account-deletion';
 export const JOB_INGESTION_QUEUE = 'job-ingestion';
 
+/** Every registered BullMQ queue; metrics read job counts from each. Add new queues here. */
+export const ALL_QUEUES = [
+  RESUME_QUEUE,
+  COMPANY_FOLLOWER_NOTIFICATION_QUEUE,
+  JOB_RECOMMENDATION_QUEUE,
+  APPLICATION_NOTIFICATION_QUEUE,
+  JOB_EXPIRATION_NOTIFICATION_QUEUE,
+  ACCOUNT_DELETION_QUEUE,
+  JOB_INGESTION_QUEUE,
+] as const;
+
 const HOUR_MS = 60 * 60 * 1000;
 
 export const QUEUE_DEDUP_TTL_MS = {

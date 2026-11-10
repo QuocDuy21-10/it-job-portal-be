@@ -99,6 +99,8 @@
 - [Health check, log và giám sát](11-operations/health-and-logging.md)
 - [Xử lý sự cố](11-operations/troubleshooting.md)
 - [Sao lưu, khôi phục và rollback](11-operations/backup-and-recovery.md)
+- [Cảnh báo và runbook](11-operations/alerts.md)
+- [Deploy và rollback](11-operations/rollback.md)
 
 ## 12 · Decisions
 

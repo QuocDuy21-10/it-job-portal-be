@@ -12,7 +12,7 @@ Một `Dockerfile` đa tầng và hai file compose: một cho phát triển, m�
 | `production` | `node:24-alpine` | Chạy thật | `NODE_ENV=production`, người dùng `nestjs` (uid 1001) không phải root, chỉ chép `dist/` và `node_modules` đã prune, `CMD node dist/main` |
 
 - Thư mục `public/images` (ảnh public) và `storage` (file CV private) được tạo sẵn và giao cho `nestjs`; cần gắn volume cho cả hai để giữ file qua các lần triển khai.
-- `HEALTHCHECK` mỗi 30 giây, timeout 5 giây, chờ khởi động 40 giây, thử lại 3 lần, gọi `wget` tới `/api/v1/health`.
+- `HEALTHCHECK` mỗi 30 giây, timeout 5 giây, chờ khởi động 40 giây, thử lại 3 lần, gọi `wget` tới `/api/v1/health/live`.
 - Cổng lấy từ biến `PORT` (mặc định 8081).
 
 ## Compose phát triển (`docker-compose.yml`)
@@ -29,9 +29,11 @@ Cổng chỉ gắn vào loopback nên không truy cập được từ mạng ngo
 
 | Dịch vụ | Image | Cổng | Ghi chú |
 |---|---|---|---|
-| `backend` | build target `production`, gắn tag `job-portal-be:latest` | `127.0.0.1:${PORT:-8081}` | `env_file: .env.production`; tự dựng `MONGO_URL` từ biến Mongo; volume `uploads` tại `/app/public/images` và `cv_storage` tại `/app/storage`; chờ Mongo và Redis khỏe |
+| `backend` | build target `production`, gắn tag `job-portal-be:${IMAGE_TAG:-latest}` | `127.0.0.1:${PORT:-8081}` | `env_file: .env.production`; `METRICS_PORT=9464` nội bộ; tự dựng `MONGO_URL` từ biến Mongo; volume `uploads` tại `/app/public/images` và `cv_storage` tại `/app/storage`; chờ Mongo và Redis khỏe |
 | `mongodb` | `mongo:7.0` | Không publish | Biến root bắt buộc (`:?`), volume `mongodb_data`, `mongodb_config` |
 | `redis` | `redis:7-alpine` | Không publish | `--requirepass`, `--appendonly yes`, volume `redis_data` |
+| `prometheus` (profile `monitoring`) | `prom/prometheus:v3.13.5` | `127.0.0.1:9090` | Đọc `monitoring/prometheus.yml`, `alerts.yml`; giữ 15 ngày trong volume `prometheus_data` |
+| `alertmanager` (profile `monitoring`) | `prom/alertmanager:v0.34.2` | không publish | Đọc `monitoring/alertmanager.yml` (không commit); volume `alertmanager_data` |
 
 Tất cả dịch vụ nằm trong mạng `backend` riêng; log dùng driver `json-file` giữ 5 file mỗi file 10 MB.
 

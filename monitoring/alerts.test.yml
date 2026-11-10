@@ -1,0 +1,151 @@
+# promtool test rules monitoring/alerts.test.yml
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: BackendDown fires after 2m without a scrape
+    interval: 1m
+    input_series:
+      - series: 'up{job="backend", instance="backend:9464"}'
+        values: '1 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BackendDown
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: BackendDown
+        exp_alerts:
+          - exp_labels: { severity: critical, job: backend, instance: 'backend:9464' }
+            exp_annotations:
+              summary: Prometheus cannot scrape the backend metrics endpoint
+              runbook: docs/11-operations/alerts.md#backenddown
+
+  - name: DependencyDown fires per dependency
+    interval: 1m
+    input_series:
+      - series: 'app_dependency_up{dependency="mongodb", job="backend", instance="backend:9464"}'
+        values: '1 1 1 1 1'
+      - series: 'app_dependency_up{dependency="redis", job="backend", instance="backend:9464"}'
+        values: '1 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: DependencyDown
+        exp_alerts:
+          - exp_labels:
+              { severity: critical, dependency: redis, job: backend, instance: 'backend:9464' }
+            exp_annotations:
+              summary: Backend lost its redis connection
+              runbook: docs/11-operations/alerts.md#dependencydown
+
+  - name: HighErrorRate fires on 9% errors with real traffic
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_count{route="/api/v1/jobs", method="GET", status_code="200"}'
+        values: '0+100x20'
+      - series: 'http_request_duration_seconds_count{route="/api/v1/jobs", method="GET", status_code="500"}'
+        values: '0+10x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: HighErrorRate
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              summary: More than 5% of requests return 5xx
+              runbook: docs/11-operations/alerts.md#higherrorrate
+
+  - name: HighErrorRate stays quiet under 0.1 req/s
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_count{route="/api/v1/jobs", method="GET", status_code="200"}'
+        values: '0+2x20'
+      - series: 'http_request_duration_seconds_count{route="/api/v1/jobs", method="GET", status_code="500"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: HighErrorRate
+        exp_alerts: []
+
+  - name: HighLatency fires on slow routes and ignores chat streams
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_bucket{route="/api/v1/jobs", le="1"}'
+        values: '0+0x20'
+      - series: 'http_request_duration_seconds_bucket{route="/api/v1/jobs", le="2"}'
+        values: '0+0x20'
+      - series: 'http_request_duration_seconds_bucket{route="/api/v1/jobs", le="5"}'
+        values: '0+100x20'
+      - series: 'http_request_duration_seconds_bucket{route="/api/v1/jobs", le="+Inf"}'
+        values: '0+100x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: HighLatency
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: p95 request latency is above 2s
+              runbook: docs/11-operations/alerts.md#highlatency
+
+  - name: HighLatency ignores slow chat streams
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_bucket{route="/api/v1/chat/message/stream", le="5"}'
+        values: '0+0x20'
+      - series: 'http_request_duration_seconds_bucket{route="/api/v1/chat/message/stream", le="+Inf"}'
+        values: '0+100x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: HighLatency
+        exp_alerts: []
+
+  - name: EventLoopLag fires after 5m of lag
+    interval: 1m
+    input_series:
+      - series: 'nodejs_eventloop_lag_p99_seconds{job="backend", instance="backend:9464"}'
+        values: '0.9x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: EventLoopLag
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: EventLoopLag
+        exp_alerts:
+          - exp_labels: { severity: warning, job: backend, instance: 'backend:9464' }
+            exp_annotations:
+              summary: Node.js event loop p99 lag is above 500ms
+              runbook: docs/11-operations/alerts.md#eventlooplag
+
+  - name: QueueBacklog fires only for the backed-up queue
+    interval: 1m
+    input_series:
+      - series: 'bullmq_jobs{queue="resume-processing", state="waiting"}'
+        values: '300x20'
+      - series: 'bullmq_jobs{queue="account-deletion", state="waiting"}'
+        values: '50x20'
+    alert_rule_test:
+      - eval_time: 17m
+        alertname: QueueBacklog
+        exp_alerts:
+          - exp_labels: { severity: warning, queue: resume-processing, state: waiting }
+            exp_annotations:
+              summary: Queue resume-processing has more than 200 waiting jobs
+              runbook: docs/11-operations/alerts.md#queuebacklog
+
+  - name: QueueFailedJobs fires on new failures, not on a stable or trimmed count
+    interval: 1m
+    input_series:
+      - series: 'bullmq_jobs{queue="application-notification", state="failed"}'
+        values: '0+1x40'
+      - series: 'bullmq_jobs{queue="resume-processing", state="failed"}'
+        values: '500x40'
+      - series: 'bullmq_jobs{queue="job-recommendation", state="failed"}'
+        values: '500-2x40'
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: QueueFailedJobs
+        exp_alerts:
+          - exp_labels: { severity: warning, queue: application-notification, state: failed }
+            exp_annotations:
+              summary: Queue application-notification gained more than 5 failed jobs in 30m
+              runbook: docs/11-operations/alerts.md#queuefailedjobs

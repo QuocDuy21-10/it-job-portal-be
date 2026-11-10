@@ -68,18 +68,8 @@ Repository **không định nghĩa** RPO (lượng dữ liệu chấp nhận m�
 
 ## Rollback
 
-Không có quy trình được ghi lại. Cách khả thi theo cấu trúc hiện tại (suy ra, chưa thử):
-
-1. Ghi lại commit hiện tại, sao lưu MongoDB và `uploads` **trước** khi cập nhật.
-2. Cập nhật bằng `git pull` và `up -d --build backend`.
-3. Nếu lỗi: `git checkout <commit-trước>` và chạy lại `up -d --build backend`.
-
-Giới hạn:
-
-- Image luôn gắn tag `job-portal-be:latest`, bản cũ bị ghi đè; muốn quay lại nhanh cần tự gắn tag phiên bản trước khi cập nhật.
-- Repository không có migration; thay đổi dữ liệu do phiên bản mới (ghi field mới, tạo index) không tự hoàn tác. Quay lại mã cũ thường chịu được field thừa, nhưng index mới vẫn còn.
-- Khôi phục dữ liệu bằng bản sao lưu làm mất mọi thay đổi sau thời điểm đó.
+Xem [Deploy và rollback](rollback.md). Luôn sao lưu MongoDB và `uploads` trước khi deploy; khôi phục bản sao lưu là biện pháp cuối vì mất dữ liệu ghi sau thời điểm đó.
 
 ## Future Improvement
 
-Đề xuất, chưa có: kịch bản sao lưu có lịch và mã hóa, kiểm tra khôi phục định kỳ, tag image theo phiên bản, quy trình rollback có kiểm thử, và ghi RPO/RTO.
+Đề xuất, chưa có: kịch bản sao lưu có lịch và mã hóa, kiểm tra khôi phục định kỳ, và ghi RPO/RTO.

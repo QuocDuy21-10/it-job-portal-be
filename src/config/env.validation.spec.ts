@@ -27,4 +27,14 @@ describe('validateEnv', () => {
   it('requires FE_URL and CORS_ORIGINS in production', () => {
     expect(() => validateEnv({ ...base, NODE_ENV: 'production' })).toThrow('FE_URL, CORS_ORIGINS');
   });
+
+  it('accepts an empty or valid METRICS_PORT', () => {
+    expect(() => validateEnv({ ...base, METRICS_PORT: '' })).not.toThrow();
+    expect(() => validateEnv({ ...base, METRICS_PORT: '9464' })).not.toThrow();
+  });
+
+  it('rejects an invalid METRICS_PORT', () => {
+    expect(() => validateEnv({ ...base, METRICS_PORT: 'abc' })).toThrow('METRICS_PORT');
+    expect(() => validateEnv({ ...base, METRICS_PORT: '70000' })).toThrow('METRICS_PORT');
+  });
 });

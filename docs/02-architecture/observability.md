@@ -10,8 +10,9 @@ Tài liệu này mô tả những gì backend hiện có để theo dõi hoạt 
 | Request id xuyên suốt | Có, gắn vào log, header phản hồi và Sentry | [request-id.helper.ts](../../src/utils/helpers/request-id.helper.ts) |
 | Che thông tin nhạy cảm trong log | Có, ba header | [app.module.ts](../../src/app.module.ts) |
 | Báo cáo lỗi | Có, Sentry, tắt khi không có DSN | [instrument.ts](../../src/instrument.ts) |
-| Health check | Có, `GET /api/v1/health` | [health.controller.ts](../../src/health/health.controller.ts) |
-| Metric (Prometheus, v.v.) | Không có trong dependency | [package.json](../../package.json) |
+| Health check | Có, `/api/v1/health/live`, `/api/v1/health/ready` (`/api/v1/health` là alias của ready) | [health.controller.ts](../../src/health/health.controller.ts) |
+| Metric Prometheus | Có, `prom-client` trên `METRICS_PORT` (nội bộ) | [src/metrics](../../src/metrics) |
+| Cảnh báo | Có, Prometheus + Alertmanager (email), profile compose `monitoring` | [monitoring/](../../monitoring), [alerts](../11-operations/alerts.md) |
 | Tracing phân tán | Chỉ Sentry tracing, tỷ lệ mặc định 0 | [instrument.ts](../../src/instrument.ts) |
 
 ## Log
@@ -47,23 +48,32 @@ Lý do kiểm tra mẫu được ghi trong comment: header do client kiểm soá
 
 ## Health check
 
-`GET /api/v1/health` công khai (`@Public()`, `@SkipThrottle()`), kiểm tra:
+| Route | Kiểm tra | Dùng bởi |
+|---|---|---|
+| `GET /api/v1/health/live` | Không kiểm tra phụ thuộc | `HEALTHCHECK` trong `Dockerfile` (30 giây, timeout 5 giây, khởi động 40 giây, thử lại 3 lần) |
+| `GET /api/v1/health/ready` | `MongooseHealthIndicator.pingCheck` (`database`) và `redis.ping()` (`redis`); lỗi trả 503 | Uptime monitor, bước deploy và rollback |
+| `GET /api/v1/health` | Như `ready` | Monitor cũ |
 
-| Chỉ số | Cách kiểm tra |
-|---|---|
-| `database` | `MongooseHealthIndicator.pingCheck` |
-| `redis` | `redis.ping()` trên `REDIS_CLIENT` |
+Cả ba công khai (`@Public()`, `@SkipThrottle()`). Health check không kiểm tra BullMQ, AI hay SMTP; hàng đợi được theo dõi qua metric `bullmq_jobs`.
 
-`Dockerfile` ở stage `production` có `HEALTHCHECK` chu kỳ 30 giây, timeout 5 giây, thời gian khởi động 40 giây, thử lại 3 lần.
+## Metric
 
-Health check **không** kiểm tra hàng đợi BullMQ, dịch vụ AI hay SMTP. Một worker bị kẹt không làm health check thất bại.
+Server riêng trên `METRICS_PORT` (trống thì tắt; compose production đặt `9464`, không publish ra host) phục vụ `GET /metrics` từ một registry `prom-client` riêng:
+
+| Metric | Label | Ghi chú |
+|---|---|---|
+| Mặc định của Node (`process_*`, `nodejs_*`) | — | CPU, RSS, heap, event loop lag, GC |
+| `http_request_duration_seconds` | `method`, `route`, `status_code` | `route` là pattern Express (`/api/v1/jobs/:id`); không khớp route là `unmatched`; không ghi `/api/v1/health*` |
+| `bullmq_jobs` | `queue`, `state` | `waiting`, `active`, `delayed`, `failed`, đọc lúc scrape |
+| `app_dependency_up` | `dependency` | `mongodb`, `redis`; theo trạng thái kết nối, không ping |
+
+Cảnh báo và cách xử lý: [alerts](../11-operations/alerts.md).
 
 ## Known Limitation
 
-- Không có metric về độ dài hàng đợi hay job thất bại ngoài việc đọc trực tiếp BullMQ. Controller `resumes` và `mail` có endpoint trả số liệu hàng đợi (`getQueueStats` và `getQueueMetrics` trong service), nhưng chưa phải hệ thống giám sát tự động. Chưa đối chiếu quyền truy cập của các endpoint này.
 - Nội dung Sentry có thể chứa dữ liệu từ request. Chưa xác minh cấu hình `sendDefaultPii` và bộ lọc dữ liệu cá nhân, vì `Sentry.init` trong `instrument.ts` không đặt tùy chọn này và dùng giá trị mặc định của SDK.
 
 ## Future Improvement
 
-- Health check riêng cho hàng đợi (độ trễ, số job thất bại).
-- Xuất metric để dựng dashboard cảnh báo.
+- Health check riêng cho từng hàng đợi (độ trễ xử lý).
+- node_exporter cho disk và RAM của VPS; Grafana nếu cần dashboard.

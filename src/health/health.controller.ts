@@ -25,11 +25,33 @@ export class HealthController {
 
   @Get()
   @ApiOperation({
-    summary: 'Health Check',
-    description: 'Checks MongoDB and Redis connectivity. Used by Docker and uptime monitors.',
+    summary: 'Health Check (alias of /health/ready)',
+    description: 'Kept for existing uptime monitors. Same checks and response as /health/ready.',
   })
   @HealthCheck()
   check() {
+    return this.ready();
+  }
+
+  @Get('live')
+  @ApiOperation({
+    summary: 'Liveness',
+    description:
+      'Process is up and serving HTTP. Checks no dependency. Used by the Docker HEALTHCHECK.',
+  })
+  @HealthCheck()
+  live() {
+    return this.health.check([]);
+  }
+
+  @Get('ready')
+  @ApiOperation({
+    summary: 'Readiness',
+    description:
+      'Checks MongoDB and Redis connectivity; 503 when either is down. Used by uptime monitors and deploys.',
+  })
+  @HealthCheck()
+  ready() {
     return this.health.check([
       () => this.db.pingCheck('database'),
       async () => {

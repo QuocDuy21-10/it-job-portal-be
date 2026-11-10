@@ -61,7 +61,7 @@ kèm các biến `SMTP_*`, `GOOGLE_*`, `GEMINI_*`, `GROQ_*`, `AI_GROQ_*`, `EMAIL
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 docker compose -f docker-compose.prod.yml ps          # backend sẽ chuyển "healthy"
-curl -s http://127.0.0.1:8081/api/v1/health
+curl -s http://127.0.0.1:8081/api/v1/health/ready
 ```
 
 ### 4. Dữ liệu ban đầu (cân nhắc kỹ)
@@ -82,6 +82,8 @@ Cấu hình nginx mẫu trong `DEPLOYMENT.md` trỏ tới `127.0.0.1:8081` và c
 Cấp chứng chỉ bằng certbot. Cấu hình proxy không nằm trong repository nên không kiểm chứng được.
 
 ### 6. Cập nhật phiên bản
+
+Quy trình đầy đủ (gắn tag image, kiểm tra readiness, điều kiện rollback): [rollback](../11-operations/rollback.md). Lệnh tối thiểu khi chưa dùng `IMAGE_TAG`:
 
 ```bash
 git pull
@@ -124,10 +126,9 @@ Xem [backup-and-recovery](../11-operations/backup-and-recovery.md).
 
 ## Rollback
 
-Repository **không có quy trình rollback** được ghi lại. Cách khả thi theo cấu trúc hiện tại (suy ra, chưa thử): `git checkout` về commit trước rồi chạy lại lệnh `up -d --build backend`; image mới ghi đè tag `job-portal-be:latest` nên bản cũ không còn nếu không gắn tag riêng. Thay đổi schema hay index đã áp dụng không tự hoàn tác (Mongoose tạo index khi khởi động và không có migration). Xem [backup-and-recovery](../11-operations/backup-and-recovery.md#rollback).
+Xem [Deploy và rollback](../11-operations/rollback.md): image gắn tag theo commit qua `IMAGE_TAG`, rollback bằng `up -d --no-build backend` với tag cũ.
 
 ## Known Limitation
 
 - Không có CD, không có staging; mọi bước là tay.
 - Một container, không có nhân bản; cần xử lý cron, Socket.IO, cache và file trước khi chạy nhiều instance ([scalability](../02-architecture/scalability.md)).
-- Image dùng tag `latest`, không có phiên bản.

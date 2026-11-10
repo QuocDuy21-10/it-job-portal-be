@@ -1,0 +1,77 @@
+# Runbook for every alert: docs/11-operations/alerts.md. Thresholds are initial guesses; tune with real data.
+groups:
+  - name: backend
+    rules:
+      - alert: BackendDown
+        expr: up{job="backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Prometheus cannot scrape the backend metrics endpoint
+          runbook: docs/11-operations/alerts.md#backenddown
+
+      - alert: DependencyDown
+        expr: app_dependency_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Backend lost its {{ $labels.dependency }} connection'
+          runbook: docs/11-operations/alerts.md#dependencydown
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_request_duration_seconds_count{status_code=~"5.."}[5m]))
+              / sum(rate(http_request_duration_seconds_count[5m])) > 0.05
+          )
+          and sum(rate(http_request_duration_seconds_count[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: More than 5% of requests return 5xx
+          runbook: docs/11-operations/alerts.md#higherrorrate
+
+      - alert: HighLatency
+        # Chat SSE routes stay open for the whole answer, so they are excluded.
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(http_request_duration_seconds_bucket{route!~".*/stream"}[5m]))
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: p95 request latency is above 2s
+          runbook: docs/11-operations/alerts.md#highlatency
+
+      - alert: EventLoopLag
+        expr: nodejs_eventloop_lag_p99_seconds > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Node.js event loop p99 lag is above 500ms
+          runbook: docs/11-operations/alerts.md#eventlooplag
+
+  - name: queues
+    rules:
+      - alert: QueueBacklog
+        expr: bullmq_jobs{state="waiting"} > 200
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Queue {{ $labels.queue }} has more than 200 waiting jobs'
+          runbook: docs/11-operations/alerts.md#queuebacklog
+
+      - alert: QueueFailedJobs
+        # failed is a gauge (BullMQ trims old failures), so delta, not increase.
+        expr: delta(bullmq_jobs{state="failed"}[30m]) > 5
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Queue {{ $labels.queue }} gained more than 5 failed jobs in 30m'
+          runbook: docs/11-operations/alerts.md#queuefailedjobs

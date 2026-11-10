@@ -2,7 +2,7 @@
 
 Tham chiếu mọi biến môi trường trong [.env.example](../../.env.example) và các biến mà code đọc thêm. **Không có giá trị thật nào** trong tài liệu này; không đọc file `.env`. Cột "Mặc định" là giá trị trong code khi không đặt biến.
 
-Cách nạp: `ConfigModule.forRoot({ envFilePath: '.env', isGlobal: true, validate: validateEnv })` ([app.module.ts](../../src/app.module.ts)). Biến đặt trong môi trường tiến trình được ưu tiên hơn file `.env`. Hàm kiểm tra [env.validation.ts](../../src/config/env.validation.ts) chỉ kiểm tra **tồn tại**, không kiểm tra định dạng.
+Cách nạp: `ConfigModule.forRoot({ envFilePath: '.env', isGlobal: true, validate: validateEnv })` ([app.module.ts](../../src/app.module.ts)). Biến đặt trong môi trường tiến trình được ưu tiên hơn file `.env`. Hàm kiểm tra [env.validation.ts](../../src/config/env.validation.ts) kiểm tra **tồn tại**; riêng `METRICS_PORT` được kiểm tra định dạng.
 
 Ký hiệu cột "Bắt buộc": `Boot` = thiếu thì ứng dụng không khởi động; `Prod` = bắt buộc thêm ở `NODE_ENV=production`; `Seed` = bắt buộc khi chạy `npm run seed`; `Compose` = bắt buộc bởi `docker-compose.prod.yml`; `Không` = tùy chọn.
 
@@ -16,6 +16,7 @@ Ký hiệu cột "Bắt buộc": `Boot` = thiếu thì ứng dụng không khở
 | `CORS_ORIGINS` | Prod | rơi về `FE_URL` | Danh sách origin cho phép, cách nhau bằng dấu phẩy |
 | `TRUST_PROXY` | Không | không đặt | Số bước proxy tin cậy (số nguyên) hoặc giá trị Express; cần khi chạy sau nginx |
 | `SWAGGER_ENABLED` | Không | tắt ở production | `true` để mở Swagger ở production |
+| `IMAGE_TAG` | Không | `latest` | Chỉ dùng bởi `docker-compose.prod.yml` (tag image backend); đặt trong `.env.production`, xem [rollback](../11-operations/rollback.md) |
 
 ## Log và giám sát
 
@@ -24,6 +25,7 @@ Ký hiệu cột "Bắt buộc": `Boot` = thiếu thì ứng dụng không khở
 | `LOG_LEVEL` | Không | `info` (production), `debug` | Mức log pino |
 | `SENTRY_DSN` | Không | trống: tắt Sentry | Đích báo lỗi |
 | `SENTRY_TRACES_SAMPLE_RATE` | Không | `0` | Tỷ lệ trace |
+| `METRICS_PORT` | Không | trống: tắt | Port server `/metrics` nội bộ; phải là số nguyên 1–65535. Compose production đặt `9464` |
 
 ## MongoDB
 
