@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
 import { Model } from 'mongoose';
+import { CronLockService } from 'src/redis/cron-lock.service';
 import { JobIngestionQueueService } from 'src/queues/services/job-ingestion-queue.service';
 import { ListCrawlRunsQueryDto } from './dto/list-crawl-runs-query.dto';
 import { UpdateJobSourceDto } from './dto/update-job-source.dto';
@@ -11,6 +12,8 @@ import { CRAWL_RUNS_DEFAULT_LIMIT, CRAWL_RUNS_MAX_LIMIT } from './job-ingestion.
 import { CrawlRun, CrawlRunDocument } from './schemas/crawl-run.schema';
 import { JobSource, JobSourceDocument } from './schemas/job-source.schema';
 import { SourceSyncCoordinator } from './source-sync-coordinator';
+
+const SOURCE_SYNC_CRON = 'sync-external-job-sources';
 
 @Injectable()
 export class JobIngestionService {
@@ -22,12 +25,17 @@ export class JobIngestionService {
     private readonly externalJobRepository: ExternalJobRepository,
     private readonly jobIngestionQueueService: JobIngestionQueueService,
     private readonly sourceSyncCoordinator: SourceSyncCoordinator,
+    private readonly cronLockService: CronLockService,
   ) {}
 
   @Cron('0 */6 * * *', {
-    name: 'sync-external-job-sources',
+    name: SOURCE_SYNC_CRON,
     timeZone: 'Asia/Ho_Chi_Minh',
   })
+  async runSourceSyncCron(): Promise<void> {
+    await this.cronLockService.runExclusive(SOURCE_SYNC_CRON, () => this.enqueueEnabledSources());
+  }
+
   async enqueueEnabledSources(): Promise<void> {
     const sources = await this.jobSourceModel.find({ enabled: true }).select('key').lean();
     await Promise.all(sources.map(source => this.jobIngestionQueueService.enqueueSync(source.key)));

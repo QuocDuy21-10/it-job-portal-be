@@ -29,6 +29,9 @@ import {
   LIST_CACHE_TTL,
 } from 'src/redis/list-cache.constants';
 
+const ORPHANED_LOGO_CLEANUP_CRON = 'cleanup-orphaned-company-logos';
+import { CronLockService } from 'src/redis/cron-lock.service';
+
 @Injectable()
 export class CompaniesService {
   private readonly logger = new Logger(CompaniesService.name);
@@ -54,6 +57,7 @@ export class CompaniesService {
     private readonly filesService: FilesService,
     private readonly statisticsCacheService: StatisticsCacheService,
     private readonly listCacheService: ListCacheService,
+    private readonly cronLockService: CronLockService,
   ) {}
 
   async create(createCompanyDto: CreateCompanyDto, user: IUser) {
@@ -125,17 +129,11 @@ export class CompaniesService {
 
   async findTopHiringCompanies(limit?: number): Promise<TopHiringCompanyDto[]> {
     const safeLimit = this.normalizeTopHiringLimit(limit);
-    const cachedData =
-      await this.statisticsCacheService.getTopHiringCompanies<TopHiringCompanyDto[]>(safeLimit);
+    const { value } = await this.statisticsCacheService.getOrSetTopHiringCompanies(safeLimit, () =>
+      this.companyRepository.findTopHiringCompanies(safeLimit),
+    );
 
-    if (cachedData) {
-      return cachedData;
-    }
-
-    const companies = await this.companyRepository.findTopHiringCompanies(safeLimit);
-    await this.statisticsCacheService.setTopHiringCompanies(safeLimit, companies);
-
-    return companies;
+    return value;
   }
 
   async findOne(id: string, user?: IUser) {
@@ -219,9 +217,15 @@ export class CompaniesService {
   }
 
   @Cron('0 2 * * *', {
-    name: 'cleanup-orphaned-company-logos',
+    name: ORPHANED_LOGO_CLEANUP_CRON,
     timeZone: 'Asia/Ho_Chi_Minh',
   })
+  async runOrphanedLogoCleanupCron(): Promise<void> {
+    await this.cronLockService.runExclusive(ORPHANED_LOGO_CLEANUP_CRON, () =>
+      this.cleanupOrphanedLogos(),
+    );
+  }
+
   async cleanupOrphanedLogos(): Promise<{ scanned: number; deleted: number; errors: number }> {
     this.logger.log('Starting orphaned company logo cleanup');
 

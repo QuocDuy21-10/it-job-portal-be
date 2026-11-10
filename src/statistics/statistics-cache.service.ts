@@ -1,38 +1,53 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable } from '@nestjs/common';
 import { Cache } from 'cache-manager';
+import { withTtlJitter } from 'src/redis/cache-ttl.util';
+import { SingleFlight } from 'src/redis/single-flight';
 import { CACHE_KEYS, CACHE_TTL, LIMITS } from './constants/statistics.constants';
+
+export interface CachedResult<T> {
+  value: T;
+  fromCache: boolean;
+}
 
 @Injectable()
 export class StatisticsCacheService {
+  private readonly singleFlight = new SingleFlight();
+
   constructor(@Inject(CACHE_MANAGER) private readonly cacheManager: Cache) {}
 
-  async getAdminDashboard<T>(): Promise<T | undefined> {
-    return this.cacheManager.get<T>(CACHE_KEYS.ADMIN_DASHBOARD);
+  getOrSetAdminDashboard<T>(loader: () => Promise<T>): Promise<CachedResult<T>> {
+    return this.getOrSet(CACHE_KEYS.ADMIN_DASHBOARD, CACHE_TTL.ADMIN_DASHBOARD, loader);
   }
 
-  async setAdminDashboard<T>(value: T): Promise<void> {
-    await this.cacheManager.set(CACHE_KEYS.ADMIN_DASHBOARD, value, CACHE_TTL.ADMIN_DASHBOARD);
+  getOrSetHrDashboard<T>(companyId: string, loader: () => Promise<T>): Promise<CachedResult<T>> {
+    return this.getOrSet(CACHE_KEYS.hrDashboard(companyId), CACHE_TTL.HR_DASHBOARD, loader);
   }
 
-  async getHrDashboard<T>(companyId: string): Promise<T | undefined> {
-    return this.cacheManager.get<T>(CACHE_KEYS.hrDashboard(companyId));
-  }
-
-  async setHrDashboard<T>(companyId: string, value: T): Promise<void> {
-    await this.cacheManager.set(CACHE_KEYS.hrDashboard(companyId), value, CACHE_TTL.HR_DASHBOARD);
-  }
-
-  async getTopHiringCompanies<T>(limit: number): Promise<T | undefined> {
-    return this.cacheManager.get<T>(CACHE_KEYS.topHiringCompanies(limit));
-  }
-
-  async setTopHiringCompanies<T>(limit: number, value: T): Promise<void> {
-    await this.cacheManager.set(
+  getOrSetTopHiringCompanies<T>(limit: number, loader: () => Promise<T>): Promise<CachedResult<T>> {
+    return this.getOrSet(
       CACHE_KEYS.topHiringCompanies(limit),
-      value,
       CACHE_TTL.TOP_HIRING_COMPANIES,
+      loader,
     );
+  }
+
+  // shortcut: no epoch guard, so a load racing an invalidation can cache stale stats for one TTL (3-15 min); port ListCacheService's epoch write if dashboards must be exact.
+  private async getOrSet<T>(
+    key: string,
+    ttlMs: number,
+    loader: () => Promise<T>,
+  ): Promise<CachedResult<T>> {
+    const cached = await this.cacheManager.get<T>(key);
+    if (cached !== undefined && cached !== null) {
+      return { value: cached, fromCache: true };
+    }
+
+    return this.singleFlight.run(key, async () => {
+      const value = await loader();
+      await this.cacheManager.set(key, value, withTtlJitter(ttlMs));
+      return { value, fromCache: false };
+    });
   }
 
   async clearAdminDashboard(): Promise<void> {

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { COMPANY_FOLLOWER_NOTIFICATION_QUEUE } from '../queues.constants';
+import { COMPANY_FOLLOWER_NOTIFICATION_QUEUE, QUEUE_DEDUP_TTL_MS } from '../queues.constants';
 
 export interface NewJobNotificationPayload {
   jobId: string;
@@ -33,6 +33,7 @@ export class CompanyFollowerQueueService {
         },
         removeOnComplete: true, // Clean up completed jobs
         removeOnFail: false, // Keep failed jobs for debugging
+        deduplication: { id: `new-job:${payload.jobId}`, ttl: QUEUE_DEDUP_TTL_MS.NEW_JOB },
       });
 
       this.logger.log(

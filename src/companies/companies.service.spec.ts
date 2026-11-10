@@ -5,6 +5,7 @@ import { CompaniesService } from './companies.service';
 import { CompanyRepository } from './repositories/company.repository';
 import { FilesService } from 'src/files/files.service';
 import { ERole } from 'src/casl';
+import { CronLockService } from 'src/redis/cron-lock.service';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
 import { ListCacheService } from 'src/redis/list-cache.service';
 import { LIST_CACHE_SCOPES, LIST_CACHE_TAGS } from 'src/redis/list-cache.constants';
@@ -39,8 +40,10 @@ describe('CompaniesService', () => {
     } as any;
 
     mockStatisticsCacheService = {
-      getTopHiringCompanies: jest.fn(),
-      setTopHiringCompanies: jest.fn(),
+      getOrSetTopHiringCompanies: jest.fn(async (_limit, loader) => ({
+        value: await loader(),
+        fromCache: false,
+      })),
       clearTopHiringCompanies: jest.fn(),
     } as any;
     mockListCacheService = {
@@ -55,6 +58,7 @@ describe('CompaniesService', () => {
         { provide: FilesService, useValue: mockFilesService },
         { provide: StatisticsCacheService, useValue: mockStatisticsCacheService },
         { provide: ListCacheService, useValue: mockListCacheService },
+        { provide: CronLockService, useValue: { runExclusive: jest.fn() } },
       ],
     }).compile();
 
@@ -227,7 +231,10 @@ describe('CompaniesService', () => {
       await service.findTopHiringCompanies(NaN);
 
       expect(mockCompanyRepository.findTopHiringCompanies).toHaveBeenCalledWith(8);
-      expect(mockStatisticsCacheService.setTopHiringCompanies).toHaveBeenCalledWith(8, companies);
+      expect(mockStatisticsCacheService.getOrSetTopHiringCompanies).toHaveBeenCalledWith(
+        8,
+        expect.any(Function),
+      );
     });
 
     it('should clamp limit to the configured maximum when input exceeds it', async () => {
@@ -236,28 +243,31 @@ describe('CompaniesService', () => {
       await service.findTopHiringCompanies(99);
 
       expect(mockCompanyRepository.findTopHiringCompanies).toHaveBeenCalledWith(12);
-      expect(mockStatisticsCacheService.setTopHiringCompanies).toHaveBeenCalledWith(12, companies);
+      expect(mockStatisticsCacheService.getOrSetTopHiringCompanies).toHaveBeenCalledWith(
+        12,
+        expect.any(Function),
+      );
     });
 
     it('should return cached data without querying the repository', async () => {
-      mockStatisticsCacheService.getTopHiringCompanies.mockResolvedValue(companies);
+      mockStatisticsCacheService.getOrSetTopHiringCompanies.mockResolvedValueOnce({
+        value: companies,
+        fromCache: true,
+      });
 
       const result = await service.findTopHiringCompanies(8);
 
       expect(result).toEqual(companies);
-      expect(mockStatisticsCacheService.getTopHiringCompanies).toHaveBeenCalledWith(8);
       expect(mockCompanyRepository.findTopHiringCompanies).not.toHaveBeenCalled();
     });
 
-    it('should cache repository results on cache miss', async () => {
-      mockStatisticsCacheService.getTopHiringCompanies.mockResolvedValue(undefined);
+    it('should load from the repository on cache miss', async () => {
       mockCompanyRepository.findTopHiringCompanies.mockResolvedValue(companies);
 
       const result = await service.findTopHiringCompanies(5);
 
       expect(result).toEqual(companies);
       expect(mockCompanyRepository.findTopHiringCompanies).toHaveBeenCalledWith(5);
-      expect(mockStatisticsCacheService.setTopHiringCompanies).toHaveBeenCalledWith(5, companies);
     });
   });
 

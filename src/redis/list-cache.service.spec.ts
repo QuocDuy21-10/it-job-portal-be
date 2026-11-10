@@ -3,6 +3,7 @@ import { ListCacheService } from './list-cache.service';
 class FakeRedis {
   readonly values = new Map<string, string>();
   readonly sets = new Map<string, Set<string>>();
+  readonly calls: string[] = [];
 
   async get(key: string): Promise<string | null> {
     return this.values.get(key) ?? null;
@@ -13,7 +14,32 @@ class FakeRedis {
     return 'OK';
   }
 
+  async incr(key: string): Promise<number> {
+    const next = Number(this.values.get(key) ?? '0') + 1;
+    this.values.set(key, String(next));
+    return next;
+  }
+
+  // Emulates the epoch-guarded PSETEX script: KEYS = [epochKey, cacheKey], ARGV = [epoch, ttl, value].
+  async eval(
+    _script: string,
+    _numKeys: number,
+    epochKey: string,
+    cacheKey: string,
+    expectedEpoch: string,
+    _ttlMs: string,
+    value: string,
+  ): Promise<number> {
+    this.calls.push('eval');
+    if ((this.values.get(epochKey) ?? '0') !== expectedEpoch) {
+      return 0;
+    }
+    this.values.set(cacheKey, value);
+    return 1;
+  }
+
   async sadd(key: string, ...members: string[]): Promise<number> {
+    this.calls.push('sadd');
     const set = this.sets.get(key) ?? new Set<string>();
     let added = 0;
 
@@ -140,5 +166,75 @@ describe('ListCacheService', () => {
 
     expect(redis.values.has(service.buildKey(firstInput))).toBe(false);
     expect(redis.values.has(service.buildKey(secondInput))).toBe(true);
+  });
+
+  it('calls the loader once for concurrent misses on the same key', async () => {
+    const keyInput = { endpoint: 'jobs', scope: 'public', payload: { page: 1 } };
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => (release = resolve));
+    const loader = jest.fn(async () => {
+      await gate;
+      return { result: ['fresh'] };
+    });
+
+    const calls = Array.from({ length: 20 }, () =>
+      service.getOrSet({ keyInput, ttlMs: 1000, tags: ['tag:a'], loader }),
+    );
+    release();
+    const results = await Promise.all(calls);
+
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(results).toEqual(Array(20).fill({ result: ['fresh'] }));
+  });
+
+  it('does not cache a value whose load raced with an invalidation', async () => {
+    const keyInput = { endpoint: 'jobs', scope: 'public', payload: { page: 1 } };
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => (release = resolve));
+
+    const pending = service.getOrSet({
+      keyInput,
+      ttlMs: 1000,
+      tags: ['tag:a'],
+      loader: async () => {
+        await gate;
+        return { result: ['stale'] };
+      },
+    });
+
+    await new Promise(resolve => setImmediate(resolve));
+    await service.reclaimByTags(['tag:a']);
+    release();
+
+    await expect(pending).resolves.toEqual({ result: ['stale'] });
+    expect(redis.values.has(service.buildKey(keyInput))).toBe(false);
+  });
+
+  it('indexes tags before writing the value', async () => {
+    await service.getOrSet({
+      keyInput: { endpoint: 'jobs', scope: 'public', payload: { page: 1 } },
+      ttlMs: 1000,
+      tags: ['tag:a'],
+      loader: jest.fn().mockResolvedValue({ result: [] }),
+    });
+
+    expect(redis.calls.indexOf('sadd')).toBeGreaterThanOrEqual(0);
+    expect(redis.calls.indexOf('sadd')).toBeLessThan(redis.calls.indexOf('eval'));
+  });
+
+  it('returns the loader value without caching when Redis reads fail', async () => {
+    jest.spyOn(redis, 'get').mockRejectedValue(new Error('redis down'));
+    const loader = jest.fn().mockResolvedValue({ result: ['db'] });
+
+    const result = await service.getOrSet({
+      keyInput: { endpoint: 'jobs', scope: 'public', payload: { page: 1 } },
+      ttlMs: 1000,
+      tags: ['tag:a'],
+      loader,
+    });
+
+    expect(result).toEqual({ result: ['db'] });
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(redis.calls).not.toContain('eval');
   });
 });

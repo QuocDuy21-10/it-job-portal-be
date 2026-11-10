@@ -10,6 +10,7 @@ import { SkillsService } from 'src/skills/skills.service';
 import { ERole } from 'src/casl/enums/role.enum';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
 import { ListCacheService } from 'src/redis/list-cache.service';
+import { CronLockService } from 'src/redis/cron-lock.service';
 import { LIST_CACHE_SCOPES, LIST_CACHE_TAGS } from 'src/redis/list-cache.constants';
 
 const hrUser = (companyId: string): IUser => ({
@@ -55,6 +56,7 @@ describe('JobsService', () => {
   let mockJobExpirationQueueService: jest.Mocked<Partial<JobExpirationQueueService>>;
   let mockStatisticsCacheService: jest.Mocked<Partial<StatisticsCacheService>>;
   let mockListCacheService: jest.Mocked<Partial<ListCacheService>>;
+  let mockCronLockService: { runExclusive: jest.Mock };
 
   beforeEach(async () => {
     mockJobRepository = {
@@ -98,6 +100,12 @@ describe('JobsService', () => {
       reclaimByTags: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockCronLockService = {
+      runExclusive: jest.fn(async (_name: string, fn: () => Promise<unknown>) => {
+        await fn();
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         JobsService,
@@ -107,6 +115,7 @@ describe('JobsService', () => {
         { provide: JobExpirationQueueService, useValue: mockJobExpirationQueueService },
         { provide: StatisticsCacheService, useValue: mockStatisticsCacheService },
         { provide: ListCacheService, useValue: mockListCacheService },
+        { provide: CronLockService, useValue: mockCronLockService },
       ],
     }).compile();
 
@@ -558,6 +567,69 @@ describe('JobsService', () => {
         { createdAt: -1 },
         10,
       );
+    });
+  });
+
+  describe('runExpiredJobsCron', () => {
+    it('runs expired job handling through the cron lock', async () => {
+      mockJobRepository.findExpiredJobsLean.mockResolvedValue([]);
+
+      await service.runExpiredJobsCron();
+
+      expect(mockCronLockService.runExclusive).toHaveBeenCalledWith(
+        'deactivate-expired-jobs',
+        expect.any(Function),
+      );
+      expect(mockJobRepository.findExpiredJobsLean).toHaveBeenCalled();
+    });
+  });
+
+  describe('handleExpiredJobs', () => {
+    const expiredJob = (id: string) => ({
+      _id: id,
+      name: `Job ${id}`,
+      company: { _id: 'company-1', name: 'Acme' },
+      createdBy: { email: 'hr@example.com' },
+      endDate: new Date('2026-11-01T00:00:00.000Z'),
+    });
+
+    it('deactivates expired jobs batch by batch until none remain', async () => {
+      mockJobRepository.findExpiredJobsLean
+        .mockResolvedValueOnce([expiredJob('a'), expiredJob('b')] as any)
+        .mockResolvedValueOnce([expiredJob('c')] as any)
+        .mockResolvedValueOnce([]);
+      mockJobRepository.updateMany
+        .mockResolvedValueOnce({ modifiedCount: 2 } as any)
+        .mockResolvedValueOnce({ modifiedCount: 1 } as any);
+
+      await service.handleExpiredJobs();
+
+      expect(mockJobRepository.findExpiredJobsLean).toHaveBeenCalledTimes(3);
+      expect(mockJobRepository.findExpiredJobsLean).toHaveBeenCalledWith(
+        expect.objectContaining({ isActive: true }),
+        '_id name company createdBy endDate',
+        500,
+      );
+      expect(mockJobRepository.updateMany).toHaveBeenNthCalledWith(
+        1,
+        { _id: { $in: ['a', 'b'] } },
+        { isActive: false },
+      );
+      expect(mockListCacheService.reclaimByTags).toHaveBeenCalledTimes(2);
+      expect(mockJobExpirationQueueService.addExpiredJobNotification).toHaveBeenCalledTimes(3);
+      expect(mockJobExpirationQueueService.addExpiredJobNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: 'a', endDate: '2026-11-01T00:00:00.000Z' }),
+      );
+    });
+
+    it('stops instead of looping when a batch cannot be deactivated', async () => {
+      mockJobRepository.findExpiredJobsLean.mockResolvedValue([expiredJob('a')] as any);
+      mockJobRepository.updateMany.mockResolvedValue({ modifiedCount: 0 } as any);
+
+      await service.handleExpiredJobs();
+
+      expect(mockJobRepository.findExpiredJobsLean).toHaveBeenCalledTimes(1);
+      expect(mockJobExpirationQueueService.addExpiredJobNotification).not.toHaveBeenCalled();
     });
   });
 });

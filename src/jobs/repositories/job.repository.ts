@@ -142,8 +142,18 @@ export class JobRepository {
       .exec() as unknown as Job[];
   }
 
-  async findExpiredJobsLean(filter: Record<string, any>, select: string): Promise<JobDocument[]> {
-    return this.jobModel.find(filter).select(select).lean().exec() as unknown as JobDocument[];
+  async findExpiredJobsLean(
+    filter: Record<string, any>,
+    select: string,
+    limit: number,
+  ): Promise<JobDocument[]> {
+    return this.jobModel
+      .find(filter)
+      .select(select)
+      .sort({ _id: 1 })
+      .limit(limit)
+      .lean()
+      .exec() as unknown as JobDocument[];
   }
 
   async aggregate(pipeline: any[]): Promise<any[]> {
