@@ -76,3 +76,6 @@ AGENTS.md
 !.github/workflows/
 !.github/dependabot.yml
 CLAUDE.md
+
+# Alertmanager config with real SMTP credentials (copy of monitoring/alertmanager.example.yml)
+/monitoring/alertmanager.yml

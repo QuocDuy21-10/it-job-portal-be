@@ -67,3 +67,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:e2e
+
+  monitoring-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Prometheus config and alert rules
+        run: |
+          docker run --rm -v "$PWD/monitoring":/m -w /m --entrypoint promtool prom/prometheus:v3.13.5 check config prometheus.yml
+          docker run --rm -v "$PWD/monitoring":/m -w /m --entrypoint promtool prom/prometheus:v3.13.5 test rules alerts.test.yml
+      - name: Alertmanager example config
+        run: docker run --rm -v "$PWD/monitoring":/m -w /m --entrypoint amtool prom/alertmanager:v0.34.2 check-config alertmanager.example.yml
+      - name: Production compose file
+        env:
+          MONGO_INITDB_ROOT_USERNAME: ci
+          MONGO_INITDB_ROOT_PASSWORD: ci
+          REDIS_PASSWORD: ci
+        run: |
+          touch .env.production
+          docker compose -f docker-compose.prod.yml --profile monitoring config -q

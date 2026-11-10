@@ -1,0 +1,17 @@
+# Scrapes the backend's internal metrics port (METRICS_PORT, never published to the host).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+  - job_name: backend
+    static_configs:
+      - targets: ['backend:9464']

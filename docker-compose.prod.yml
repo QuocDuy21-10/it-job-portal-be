@@ -2,6 +2,7 @@
 #   cp .env.example .env.production   # fill real secrets
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 # Only the backend is published, and only on 127.0.0.1: put nginx/Caddy (TLS) in front.
+# Monitoring: add --profile monitoring (see docs/11-operations/alerts.md). Set IMAGE_TAG in .env.production (docs/11-operations/rollback.md).
 x-logging: &default-logging
   driver: json-file
   options:
@@ -13,7 +14,7 @@ services:
     build:
       context: .
       target: production
-    image: job-portal-be:latest
+    image: job-portal-be:${IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file: .env.production
     environment:
@@ -21,6 +22,8 @@ services:
       MONGO_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME:?}:${MONGO_INITDB_ROOT_PASSWORD:?}@mongodb:27017/${MONGO_INITDB_DATABASE:-my-job-portal}?authSource=admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # Internal only (not in ports): scraped by the monitoring profile's Prometheus.
+      METRICS_PORT: 9464
     ports:
       - '127.0.0.1:${PORT:-8081}:${PORT:-8081}'
     volumes:
@@ -73,6 +76,41 @@ services:
       start_period: 20s
     logging: *default-logging
 
+  # Monitoring (opt-in): docker compose ... --profile monitoring up -d
+  # Needs monitoring/alertmanager.yml (copy monitoring/alertmanager.example.yml). Runbook: docs/11-operations/alerts.md
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    profiles: [monitoring]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    # Loopback only: open with ssh -L 9090:127.0.0.1:9090
+    ports:
+      - '127.0.0.1:9090:9090'
+    networks:
+      - backend
+    logging: *default-logging
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.2
+    profiles: [monitoring]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    networks:
+      - backend
+    logging: *default-logging
+
 networks:
   backend:
     driver: bridge
@@ -83,3 +121,5 @@ volumes:
   redis_data:
   uploads:
   cv_storage:
+  prometheus_data:
+  alertmanager_data:
