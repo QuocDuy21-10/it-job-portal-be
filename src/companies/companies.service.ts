@@ -125,17 +125,11 @@ export class CompaniesService {
 
   async findTopHiringCompanies(limit?: number): Promise<TopHiringCompanyDto[]> {
     const safeLimit = this.normalizeTopHiringLimit(limit);
-    const cachedData =
-      await this.statisticsCacheService.getTopHiringCompanies<TopHiringCompanyDto[]>(safeLimit);
+    const { value } = await this.statisticsCacheService.getOrSetTopHiringCompanies(safeLimit, () =>
+      this.companyRepository.findTopHiringCompanies(safeLimit),
+    );
 
-    if (cachedData) {
-      return cachedData;
-    }
-
-    const companies = await this.companyRepository.findTopHiringCompanies(safeLimit);
-    await this.statisticsCacheService.setTopHiringCompanies(safeLimit, companies);
-
-    return companies;
+    return value;
   }
 
   async findOne(id: string, user?: IUser) {

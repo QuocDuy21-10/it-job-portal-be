@@ -45,14 +45,20 @@ export class StatisticsService {
 
   async getAdminDashboardStats(): Promise<AdminDashboardStatsDto> {
     const startTime = Date.now();
-    const cachedData =
-      await this.statisticsCacheService.getAdminDashboard<AdminDashboardStatsDto>();
+    const { value, fromCache } = await this.statisticsCacheService.getOrSetAdminDashboard(() =>
+      this.computeAdminDashboardStats(),
+    );
 
-    if (cachedData) {
+    if (fromCache) {
       this.logger.debug(`Admin dashboard stats served from cache in ${Date.now() - startTime}ms`);
-      return this.hydrateCachedDashboard(cachedData);
+      return this.hydrateCachedDashboard(value);
     }
 
+    this.logger.log(`Admin dashboard stats computed and cached in ${Date.now() - startTime}ms`);
+    return value;
+  }
+
+  private async computeAdminDashboardStats(): Promise<AdminDashboardStatsDto> {
     const [
       countJobs24h,
       countActiveJobs,
@@ -77,7 +83,7 @@ export class StatisticsService {
       this.getResumeProcessingHealth(),
     ]);
 
-    const stats: AdminDashboardStatsDto = {
+    return {
       countJobs24h,
       countActiveJobs,
       countPendingApprovalJobs,
@@ -91,12 +97,6 @@ export class StatisticsService {
       generatedAt: new Date(),
       fromCache: false,
     };
-
-    await this.statisticsCacheService.setAdminDashboard(stats);
-
-    this.logger.log(`Admin dashboard stats computed and cached in ${Date.now() - startTime}ms`);
-
-    return stats;
   }
 
   async getHrDashboardStats(companyId?: string): Promise<HrDashboardStatsDto> {
@@ -105,14 +105,21 @@ export class StatisticsService {
     }
 
     const startTime = Date.now();
-    const cachedData =
-      await this.statisticsCacheService.getHrDashboard<HrDashboardStatsDto>(companyId);
+    const { value, fromCache } = await this.statisticsCacheService.getOrSetHrDashboard(
+      companyId,
+      () => this.computeHrDashboardStats(companyId),
+    );
 
-    if (cachedData) {
+    if (fromCache) {
       this.logger.debug(`HR dashboard stats served from cache in ${Date.now() - startTime}ms`);
-      return this.hydrateCachedDashboard(cachedData);
+      return this.hydrateCachedDashboard(value);
     }
 
+    this.logger.log(`HR dashboard stats computed and cached in ${Date.now() - startTime}ms`);
+    return value;
+  }
+
+  private async computeHrDashboardStats(companyId: string): Promise<HrDashboardStatsDto> {
     const [
       countActiveJobs,
       countPendingApprovalJobs,
@@ -139,7 +146,7 @@ export class StatisticsService {
       this.getAverageMatchingScore(companyId),
     ]);
 
-    const stats: HrDashboardStatsDto = {
+    return {
       countActiveJobs,
       countPendingApprovalJobs,
       countExpiredJobs,
@@ -154,12 +161,6 @@ export class StatisticsService {
       generatedAt: new Date(),
       fromCache: false,
     };
-
-    await this.statisticsCacheService.setHrDashboard(companyId, stats);
-
-    this.logger.log(`HR dashboard stats computed and cached in ${Date.now() - startTime}ms`);
-
-    return stats;
   }
 
   async clearAdminDashboardCache(): Promise<void> {
