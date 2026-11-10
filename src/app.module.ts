@@ -18,6 +18,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import Redis from 'ioredis';
 import { HealthModule } from './health/health.module';
+import { MetricsModule } from './metrics/metrics.module';
 import { RedisModule } from './redis/redis.module';
 import { CvParserModule } from './cv-parser/cv-parser.module';
 import { QueuesModule } from './queues/queues.module';
@@ -121,6 +122,7 @@ import { resolveRequestId } from './utils/helpers/request-id.helper';
     SubscribersModule,
     MailModule,
     HealthModule,
+    MetricsModule,
     StatisticsModule,
     CaslModule,
   ],

@@ -16,5 +16,12 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
+  const metricsPort = config.METRICS_PORT;
+  if (metricsPort !== undefined && metricsPort !== '') {
+    const port = Number(metricsPort);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error(`METRICS_PORT must be an integer between 1 and 65535, got "${metricsPort}"`);
+    }
+  }
   return { PORT: '8081', NODE_ENV: 'development', FE_URL: 'http://localhost:3000', ...config };
 }

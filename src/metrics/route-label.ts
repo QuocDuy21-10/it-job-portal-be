@@ -12,5 +12,7 @@ export interface RouteLabelRequest {
 export function resolveRouteLabel(req: RouteLabelRequest): string | null {
   if (req.originalUrl?.startsWith(HEALTH_PATH_PREFIX)) return null;
   const path = req.route?.path;
-  return typeof path === 'string' ? `${req.baseUrl ?? ''}${path}` : UNMATCHED_ROUTE;
+  // With the global prefix Nest mounts this middleware as the `/api/*` route; it stays in req.route only when no handler matched.
+  if (typeof path !== 'string' || path.endsWith('*')) return UNMATCHED_ROUTE;
+  return `${req.baseUrl ?? ''}${path}`;
 }

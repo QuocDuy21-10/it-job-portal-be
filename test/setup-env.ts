@@ -25,6 +25,7 @@ const defaults: Record<string, string> = {
   CORS_ORIGINS: 'http://localhost:3000',
   LOG_LEVEL: 'silent',
   SENTRY_DSN: '',
+  METRICS_PORT: '19464',
 };
 for (const [key, value] of Object.entries(defaults)) {
   process.env[key] ??= value;

@@ -21,6 +21,12 @@ describe('resolveRouteLabel', () => {
     expect(resolveRouteLabel({ originalUrl: '/api/v1/nope', baseUrl: '' })).toBe(UNMATCHED_ROUTE);
   });
 
+  it('labels the middleware wildcard route as unmatched', () => {
+    expect(
+      resolveRouteLabel({ originalUrl: '/api/v1/nope', baseUrl: '', route: { path: '/api/*' } }),
+    ).toBe(UNMATCHED_ROUTE);
+  });
+
   it('skips health probes', () => {
     expect(
       resolveRouteLabel({
