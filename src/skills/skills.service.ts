@@ -1,7 +1,6 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import aqp from 'api-query-params';
 import { Cache } from 'cache-manager';
 import mongoose, { Model } from 'mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
@@ -9,6 +8,11 @@ import { EJobApprovalStatus } from 'src/jobs/enums/job-approval-status.enum';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
 import { IUser } from 'src/users/user.interface';
 import { bulkSoftDelete } from 'src/utils/helpers/bulk-soft-delete.helper';
+import {
+  buildPaginationMeta,
+  parseListQuery,
+  resolvePagination,
+} from 'src/utils/helpers/list-query.helper';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
 import { CreateSkillDto } from './dto/create-skill.dto';
 import { UpdateSkillDto } from './dto/update-skill.dto';
@@ -18,6 +22,9 @@ type NormalizedExtractedSkills = {
   normalizedSkills: string[];
   unmappedSkills: string[];
 };
+
+const SKILL_FILTER_FIELDS = new Set(['label', 'slug', 'category', 'isActive']);
+const SKILL_SORT_FIELDS = new Set(['label', 'slug', 'category', 'createdAt', 'updatedAt']);
 
 @Injectable()
 export class SkillsService {
@@ -49,40 +56,24 @@ export class SkillsService {
     return { _id: newSkill._id, createdAt: newSkill.createdAt };
   }
 
-  async findAll(page?: number, limit?: number, query?: string) {
-    const { filter, sort, projection } = aqp(query);
-    delete filter.page;
-    delete filter.limit;
-
+  async findAll(page?: unknown, limit?: unknown, query?: string) {
+    const { filter, sort } = parseListQuery(query, {
+      filterFields: SKILL_FILTER_FIELDS,
+      sortFields: SKILL_SORT_FIELDS,
+    });
     filter.isDeleted = { $ne: true };
 
-    const safePage = page > 0 ? page : 1;
-    const safeLimit = limit > 0 ? Math.min(limit, 100) : 10;
-    const offset = (safePage - 1) * safeLimit;
-
+    const pagination = resolvePagination(page, limit);
     const totalItems = await this.skillModel.countDocuments(filter);
-    const totalPages = Math.ceil(totalItems / safeLimit);
-
     const result = await this.skillModel
       .find(filter)
-      .skip(offset)
-      .limit(safeLimit)
-      .sort(sort as any)
-      .select(projection as any)
+      .skip(pagination.offset)
+      .limit(pagination.limit)
+      .sort(sort)
       .lean()
       .exec();
 
-    return {
-      result,
-      meta: {
-        pagination: {
-          current_page: safePage,
-          per_page: safeLimit,
-          total_pages: totalPages,
-          total: totalItems,
-        },
-      },
-    };
+    return { result, meta: buildPaginationMeta(pagination.page, pagination.limit, totalItems) };
   }
 
   async findOne(id: string) {

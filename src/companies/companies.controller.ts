@@ -7,6 +7,7 @@ import { IUser } from 'src/users/user.interface';
 import { OptionalAuth } from 'src/utils/decorators/optional-auth.decorator';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
+import { PaginationQueryDto } from 'src/utils/dto/pagination-query.dto';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Roles, ERole } from 'src/casl';
 import { TopHiringCompaniesQueryDto, TopHiringCompanyDto } from './dto/top-hiring-company.dto';
@@ -46,28 +47,9 @@ export class CompaniesController {
     description:
       'Public API to get a list of all companies with pagination and search. Does not require authentication.',
   })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    description: 'Page number (default: 1)',
-    example: '1',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Number of items per page (default: 10)',
-    example: '10',
-  })
   @ResponseMessage('Get list companies')
-  findAll(
-    @Query('page') page: string,
-    @Query('limit') limit: string,
-    @Query() query: string,
-    @User() user: IUser,
-  ) {
-    return this.companiesService.findAll(+page, +limit, query, user);
+  findAll(@Query() pagination: PaginationQueryDto, @Query() query: string, @User() user: IUser) {
+    return this.companiesService.findAll(pagination.page, pagination.limit, query, user);
   }
 
   @OptionalAuth()

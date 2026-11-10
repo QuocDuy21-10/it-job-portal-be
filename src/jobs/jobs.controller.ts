@@ -7,6 +7,7 @@ import { ApproveJobDto } from './dto/approve-job.dto';
 import { OptionalAuth } from 'src/utils/decorators/optional-auth.decorator';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
+import { PaginationQueryDto } from 'src/utils/dto/pagination-query.dto';
 import { IUser } from 'src/users/user.interface';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Roles } from 'src/casl';
@@ -36,20 +37,6 @@ export class JobsController {
       'Retrieves a paginated list of all active job postings. Supports filtering and sorting.',
   })
   @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    description: 'Page number (starts from 1)',
-    example: 1,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Number of items per page',
-    example: 10,
-  })
-  @ApiQuery({
     name: 'keyword',
     required: false,
     type: String,
@@ -58,13 +45,12 @@ export class JobsController {
   })
   @ResponseMessage('Get list jobs')
   findAll(
-    @Query('page') page: string,
-    @Query('limit') limit: string,
+    @Query() pagination: PaginationQueryDto,
     @Query('keyword') keyword: string,
     @Query() query: string,
     @User() user: IUser,
   ) {
-    return this.jobsService.findAll(+page, +limit, query, user, keyword);
+    return this.jobsService.findAll(pagination.page, pagination.limit, query, user, keyword);
   }
 
   @OptionalAuth()

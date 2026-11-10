@@ -11,6 +11,8 @@ import {
   UploadedFile,
   BadRequestException,
   Logger,
+  HttpCode,
+  HttpStatus,
   UseGuards,
   Res,
   StreamableFile,
@@ -24,8 +26,9 @@ import { CreateUserCvDto } from './dto/create-resume.dto';
 import { UpdateResumeDto } from './dto/update-resume.dto';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
+import { PaginationQueryDto } from 'src/utils/dto/pagination-query.dto';
 import { IUser } from 'src/users/user.interface';
-import { ApiOperation, ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiConsumes, ApiBody, ApiResponse } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadCvDto } from './dto/upload-cv.dto';
 import { ResumeProcessingService } from './resume-processing.service';
@@ -68,13 +71,8 @@ export class ResumesController {
     description: 'Retrieves a paginated list of all resumes. Supports filtering and sorting.',
   })
   @ResponseMessage('Resumes have been retrieved successfully')
-  findAll(
-    @Query('page') page: string,
-    @Query('limit') limit: string,
-    @Query() query: string,
-    @User() user: IUser,
-  ) {
-    return this.resumesService.findAll(+page, +limit, query, user);
+  findAll(@Query() pagination: PaginationQueryDto, @Query() query: string, @User() user: IUser) {
+    return this.resumesService.findAll(pagination.page, pagination.limit, query, user);
   }
 
   @Get(':id')
@@ -125,6 +123,8 @@ export class ResumesController {
   }
 
   @Post('by-user')
+  @HttpCode(HttpStatus.OK)
+  @ApiResponse({ status: HttpStatus.OK, description: 'Read-only: returns data of the caller' })
   @ApiOperation({
     summary: 'Get resume by user',
     description: 'Retrieves resume associated with the authenticated user.',
@@ -135,6 +135,8 @@ export class ResumesController {
   }
 
   @Post('my-resumes')
+  @HttpCode(HttpStatus.OK)
+  @ApiResponse({ status: HttpStatus.OK, description: 'Read-only: returns data of the caller' })
   @ApiOperation({
     summary: 'Get resume of user',
     description: 'Gets the resume associated with the authenticated user.',
@@ -352,6 +354,8 @@ export class ResumesController {
   }
 
   @Post(':id/reanalyze')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiResponse({ status: HttpStatus.ACCEPTED, description: 'Re-analysis queued' })
   @Roles(ERole.SUPER_ADMIN, ERole.HR)
   @ApiOperation({
     summary: 'Re-analyze a CV',

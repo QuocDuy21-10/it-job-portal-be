@@ -149,6 +149,15 @@ describe('CompaniesService', () => {
       expect(offset).toBe(0); // (1 - 1) * 10
     });
 
+    it('clamps limit to 100 and escapes regex filters', async () => {
+      await service.findAll(1, 500, 'name=/a.*/i');
+
+      const [filter, offset, limit] = mockCompanyRepository.findPaginated.mock.calls[0];
+      expect(offset).toBe(0);
+      expect(limit).toBe(100);
+      expect(filter.name.source).toBe('a\\.\\*');
+    });
+
     it('should not propagate non-allowed filter fields to the repository', async () => {
       // Even if aqp somehow produces an unknown field, it must be stripped
       await service.findAll(1, 10, 'unknownField=value&name=ACME');

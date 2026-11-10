@@ -10,7 +10,11 @@ import { UpdateResumeDto } from './dto/update-resume.dto';
 import { IUser } from 'src/users/user.interface';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
 import { ERole } from 'src/casl/enums/role.enum';
-import aqp from 'api-query-params';
+import {
+  buildPaginationMeta,
+  parseListQuery,
+  resolvePagination,
+} from 'src/utils/helpers/list-query.helper';
 import * as fs from 'fs';
 import * as path from 'path';
 import mongoose from 'mongoose';
@@ -29,8 +33,6 @@ const RESUME_LIST_POPULATION = [
   { path: 'jobId', select: { name: 1 } },
 ];
 
-const SAFE_VALUE_OPERATORS = new Set(['$eq', '$ne', '$gt', '$gte', '$lt', '$lte', '$in', '$nin']);
-
 @Injectable()
 export class ResumesService {
   private readonly logger = new Logger(ResumesService.name);
@@ -47,14 +49,6 @@ export class ResumesService {
     'createdAt',
     'updatedAt',
     'aiAnalysis.matchingScore',
-  ]);
-
-  private readonly DANGEROUS_OPERATORS = new Set([
-    '$where',
-    '$function',
-    '$expr',
-    '$accumulator',
-    '$jsReduce',
   ]);
 
   private readonly ALLOWED_SORT_FIELDS = new Set([
@@ -94,38 +88,29 @@ export class ResumesService {
     return { _id: newResume?._id, createdAt: newResume?.createdAt };
   }
 
-  async findAll(page?: number, limit?: number, query?: string, user?: IUser) {
-    const { filter: rawFilter, sort: rawSort } = aqp(query);
-    const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
+  async findAll(page?: unknown, limit?: unknown, query?: string, user?: IUser) {
+    const { filter, sort } = parseListQuery(query, {
+      filterFields: this.ALLOWED_FILTER_FIELDS,
+      sortFields: this.ALLOWED_SORT_FIELDS,
+    });
 
-    // Role-based scope applied after sanitization — cannot be overridden by query string
+    // Role-based scope applied after parsing — cannot be overridden by query string
     if (user?.role === ERole.HR) {
       assertCompanyAccess(user, user.company?._id);
       filter.companyId = user.company._id;
     }
 
-    const safeLimit = limit > 0 ? limit : 10;
-    const safeOffset = ((page > 0 ? page : 1) - 1) * safeLimit;
+    const pagination = resolvePagination(page, limit);
 
-    const { result, totalItems, totalPages } = await this.resumeRepository.findPaginated(
+    const { result, totalItems } = await this.resumeRepository.findPaginated(
       filter,
-      safeOffset,
-      safeLimit,
+      pagination.offset,
+      pagination.limit,
       sort,
       RESUME_LIST_POPULATION,
     );
 
-    return {
-      result,
-      meta: {
-        pagination: {
-          current_page: page,
-          per_page: safeLimit,
-          total_pages: totalPages,
-          total: totalItems,
-        },
-      },
-    };
+    return { result, meta: buildPaginationMeta(pagination.page, pagination.limit, totalItems) };
   }
 
   async findOne(id: string, user?: IUser) {
@@ -308,46 +293,6 @@ export class ResumesService {
   }
 
   // Private helpers
-
-  private sanitizeAqpQuery(
-    rawFilter: Record<string, any>,
-    rawSort: Record<string, any>,
-  ): { filter: Record<string, any>; sort: Record<string, any> } {
-    const filter: Record<string, any> = {};
-    for (const [key, value] of Object.entries(rawFilter)) {
-      if (this.DANGEROUS_OPERATORS.has(key)) continue;
-      if (!this.ALLOWED_FILTER_FIELDS.has(key)) continue;
-      const safeValue = this.sanitizeFilterValue(value);
-      if (safeValue !== undefined) filter[key] = safeValue;
-    }
-
-    const sort: Record<string, any> = {};
-    if (rawSort && typeof rawSort === 'object') {
-      for (const [key, value] of Object.entries(rawSort)) {
-        if (!this.ALLOWED_SORT_FIELDS.has(key)) continue;
-        if (value !== 1 && value !== -1) continue;
-        sort[key] = value;
-      }
-    }
-
-    return { filter, sort };
-  }
-
-  private sanitizeFilterValue(value: unknown): unknown {
-    if (value instanceof RegExp) {
-      // Treat client regex as a literal substring search to avoid ReDoS.
-      return new RegExp(this.escapeRegex(value.source), value.flags.includes('i') ? 'i' : '');
-    }
-    if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
-      const entries = Object.entries(value).filter(([op]) => SAFE_VALUE_OPERATORS.has(op));
-      return entries.length > 0 ? Object.fromEntries(entries) : undefined;
-    }
-    return value;
-  }
-
-  private escapeRegex(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
 
   private validateObjectId(id: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {

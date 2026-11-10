@@ -49,7 +49,7 @@ Chấm điểm được processor tự xếp hàng sau khi đọc CV xong; respo
 
 ## Known Limitation
 
-- `by-user` và `my-resumes` là `POST` dù chỉ đọc dữ liệu, và không nhận body.
+- `by-user` và `my-resumes` là `POST` dù chỉ đọc dữ liệu, không nhận body, và trả `200`.
 - `PATCH /resumes/:id` đổi `status` mà không kiểm tra thứ tự chuyển; mỗi lần đổi thêm một phần tử vào `histories` và gửi thông báo cho ứng viên.
 - Điểm phù hợp chỉ ảnh hưởng `priority`; trạng thái tự động đã bị tắt trong processor ([resumes (collection)](../../04-database/collections/resumes.md#quy-tắc-nghiệp-vụ)).
 
@@ -83,8 +83,8 @@ Danh sách hồ sơ có phân trang. HR chỉ thấy hồ sơ công ty mình
 
 | Tên | Bắt buộc | Mô tả | Ví dụ |
 |---|---|---|---|
-| `page` | Không |  |  |
-| `limit` | Không |  |  |
+| `page` | Không |  | Trang, bắt đầu từ 1 |
+| `limit` | Không |  | Số mục mỗi trang, mặc định 10, tối đa 100 |
 | *(toàn bộ query string)* | — | Đọc bằng `api-query-params`: hỗ trợ lọc và sắp xếp (xem [api-overview](../api-overview.md#phân-trang-lọc-và-sắp-xếp)) | |
 
 ### `GET /api/v1/resumes/:id`
@@ -191,7 +191,7 @@ Lấy các hồ sơ ứng tuyển của chính người gọi (dùng POST, khôn
 
 - **Auth:** Đăng nhập (mọi vai trò)
 - **Handler:** `getResumeByUser` trong [resumes.controller.ts](../../../src/resumes/resumes.controller.ts)
-- **Mã thành công:** 201, `message` = "Resume has been retrieved successfully"
+- **Mã thành công:** 200, `message` = "Resume has been retrieved successfully"
 
 ### `POST /api/v1/resumes/my-resumes`
 
@@ -199,7 +199,7 @@ Lấy danh sách URL file CV của chính người gọi (dùng POST, không có
 
 - **Auth:** Đăng nhập (mọi vai trò)
 - **Handler:** `getResumeOfMe` trong [resumes.controller.ts](../../../src/resumes/resumes.controller.ts)
-- **Mã thành công:** 201, `message` = "Resume has been retrieved successfully"
+- **Mã thành công:** 200, `message` = "Resume has been retrieved successfully"
 
 ### `POST /api/v1/resumes/cv-online`
 
@@ -275,7 +275,7 @@ Chấm điểm lại hồ sơ bằng hàng đợi (quản trị viên hoặc HR)
 
 - **Auth:** Đăng nhập, vai trò: SUPER ADMIN, HR
 - **Handler:** `reanalyzeCV` trong [resumes.controller.ts](../../../src/resumes/resumes.controller.ts)
-- **Mã thành công:** 201, `message` = "Re-analysis queued successfully"
+- **Mã thành công:** 202, `message` = "Re-analysis queued successfully"
 
 **Path params**
 

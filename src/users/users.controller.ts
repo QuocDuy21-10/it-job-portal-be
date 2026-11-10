@@ -17,8 +17,10 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { LockUserDto } from './dto/lock-user.dto';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
+import { PaginationQueryDto } from 'src/utils/dto/pagination-query.dto';
+import { resolvePagination } from 'src/utils/helpers/list-query.helper';
 import { IUser } from './user.interface';
-import { ApiTags, ApiOperation, ApiQuery, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { SaveJobDto } from './dto/save-job.dto';
 import { FollowCompanyDto } from './dto/follow-company.dto';
 import { Roles, ERole } from 'src/casl';
@@ -48,23 +50,9 @@ export class UsersController {
     description:
       'API to get a list of all users with pagination and search. Supports filtering by fields.',
   })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: String,
-    description: 'Page number (default: 1)',
-    example: '1',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: String,
-    description: 'Number of items per page (default: 10)',
-    example: '10',
-  })
   @ResponseMessage('Get list users')
-  findAll(@Query('page') page: string, @Query('limit') limit: string, @Query() query: string) {
-    return this.usersService.findAll(+page, +limit, query);
+  findAll(@Query() pagination: PaginationQueryDto, @Query() query: string) {
+    return this.usersService.findAll(pagination.page, pagination.limit, query);
   }
 
   @Patch(':id')
@@ -110,27 +98,10 @@ export class UsersController {
     summary: "Get user's saved jobs",
     description: 'Retrieve all jobs that the user has saved with pagination support.',
   })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    description: 'Page number (default: 1)',
-    example: 1,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Number of items per page (default: 10)',
-    example: 10,
-  })
   @ResponseMessage('Get saved jobs successfully')
-  async getSavedJobs(
-    @User() user: IUser,
-    @Query('page') page: string = '1',
-    @Query('limit') limit: string = '10',
-  ) {
-    return this.usersService.getSavedJobs(user._id, +page, +limit);
+  async getSavedJobs(@User() user: IUser, @Query() pagination: PaginationQueryDto) {
+    const { page, limit } = resolvePagination(pagination.page, pagination.limit);
+    return this.usersService.getSavedJobs(user._id, page, limit);
   }
 
   @Post('follow-company')

@@ -31,7 +31,8 @@ import { SkillsModule } from './skills/skills.module';
 import { validateEnv } from './config/env.validation';
 import { LoggerModule } from 'nestjs-pino';
 import { APP_FILTER } from '@nestjs/core';
-import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
+import { SentryModule } from '@sentry/nestjs/setup';
+import { AppExceptionFilter } from './utils/filters/app-exception.filter';
 import { resolveRequestId } from './utils/helpers/request-id.helper';
 
 @Module({
@@ -123,7 +124,7 @@ import { resolveRequestId } from './utils/helpers/request-id.helper';
     StatisticsModule,
     CaslModule,
   ],
-  // Reports unexpected errors; HttpExceptions (4xx) are skipped and the response body is unchanged.
-  providers: [{ provide: APP_FILTER, useClass: SentryGlobalFilter }],
+  // Unified HTTP error envelope; unexpected errors are still reported to Sentry.
+  providers: [{ provide: APP_FILTER, useClass: AppExceptionFilter }],
 })
 export class AppModule {}
