@@ -583,4 +583,53 @@ describe('JobsService', () => {
       expect(mockJobRepository.findExpiredJobsLean).toHaveBeenCalled();
     });
   });
+
+  describe('handleExpiredJobs', () => {
+    const expiredJob = (id: string) => ({
+      _id: id,
+      name: `Job ${id}`,
+      company: { _id: 'company-1', name: 'Acme' },
+      createdBy: { email: 'hr@example.com' },
+      endDate: new Date('2026-11-01T00:00:00.000Z'),
+    });
+
+    it('deactivates expired jobs batch by batch until none remain', async () => {
+      mockJobRepository.findExpiredJobsLean
+        .mockResolvedValueOnce([expiredJob('a'), expiredJob('b')] as any)
+        .mockResolvedValueOnce([expiredJob('c')] as any)
+        .mockResolvedValueOnce([]);
+      mockJobRepository.updateMany
+        .mockResolvedValueOnce({ modifiedCount: 2 } as any)
+        .mockResolvedValueOnce({ modifiedCount: 1 } as any);
+
+      await service.handleExpiredJobs();
+
+      expect(mockJobRepository.findExpiredJobsLean).toHaveBeenCalledTimes(3);
+      expect(mockJobRepository.findExpiredJobsLean).toHaveBeenCalledWith(
+        expect.objectContaining({ isActive: true }),
+        '_id name company createdBy endDate',
+        500,
+      );
+      expect(mockJobRepository.updateMany).toHaveBeenNthCalledWith(
+        1,
+        { _id: { $in: ['a', 'b'] } },
+        { isActive: false },
+      );
+      expect(mockListCacheService.reclaimByTags).toHaveBeenCalledTimes(2);
+      expect(mockJobExpirationQueueService.addExpiredJobNotification).toHaveBeenCalledTimes(3);
+      expect(mockJobExpirationQueueService.addExpiredJobNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: 'a', endDate: '2026-11-01T00:00:00.000Z' }),
+      );
+    });
+
+    it('stops instead of looping when a batch cannot be deactivated', async () => {
+      mockJobRepository.findExpiredJobsLean.mockResolvedValue([expiredJob('a')] as any);
+      mockJobRepository.updateMany.mockResolvedValue({ modifiedCount: 0 } as any);
+
+      await service.handleExpiredJobs();
+
+      expect(mockJobRepository.findExpiredJobsLean).toHaveBeenCalledTimes(1);
+      expect(mockJobExpirationQueueService.addExpiredJobNotification).not.toHaveBeenCalled();
+    });
+  });
 });

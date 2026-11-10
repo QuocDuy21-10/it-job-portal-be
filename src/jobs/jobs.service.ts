@@ -66,6 +66,7 @@ export class JobsService {
     'createdAt',
   ]);
 
+  private readonly EXPIRED_JOBS_BATCH_SIZE = 500;
   private readonly ALLOWED_SORT_FIELDS = new Set([
     'name',
     'salary',
@@ -396,29 +397,46 @@ export class JobsService {
 
   async handleExpiredJobs(): Promise<void> {
     const now = new Date();
+    let deactivatedCount = 0;
 
-    const expiredJobs = await this.jobRepository.findExpiredJobsLean(
-      {
-        isActive: true,
-        endDate: { $ne: null, $lte: now },
-      },
-      '_id name company createdBy endDate',
-    );
+    for (;;) {
+      const expiredJobs = await this.jobRepository.findExpiredJobsLean(
+        { isActive: true, endDate: { $ne: null, $lte: now } },
+        '_id name company createdBy endDate',
+        this.EXPIRED_JOBS_BATCH_SIZE,
+      );
 
-    if (expiredJobs.length === 0) {
-      return;
+      if (expiredJobs.length === 0) {
+        break;
+      }
+
+      const { modifiedCount } = await this.jobRepository.updateMany(
+        { _id: { $in: expiredJobs.map(job => job._id) } },
+        { isActive: false },
+      );
+
+      // Deactivated jobs drop out of the filter; if none changed, the next query would repeat forever.
+      if (modifiedCount === 0) {
+        this.logger.warn(
+          `Stopped expired job batch: ${expiredJobs.length} job(s) were not updated`,
+        );
+        break;
+      }
+
+      deactivatedCount += modifiedCount;
+
+      await this.clearJobRelatedCachesForCompanies(
+        expiredJobs.map(job => job.company?._id?.toString()).filter(Boolean),
+      );
+      await this.notifyExpiredJobs(expiredJobs);
     }
 
-    const expiredIds = expiredJobs.map(job => job._id);
-    await this.jobRepository.updateMany({ _id: { $in: expiredIds } }, { isActive: false });
+    if (deactivatedCount > 0) {
+      this.logger.log(`Deactivated ${deactivatedCount} expired job(s)`);
+    }
+  }
 
-    await this.clearJobRelatedCachesForCompanies(
-      expiredJobs.map(job => job.company?._id?.toString()).filter(Boolean),
-    );
-
-    this.logger.log(`Deactivated ${expiredJobs.length} expired job(s)`);
-
-    // Dispatch notifications in parallel instead of sequentially
+  private async notifyExpiredJobs(expiredJobs: JobDocument[]): Promise<void> {
     await Promise.allSettled(
       expiredJobs
         .filter(job => job.createdBy?.email)
