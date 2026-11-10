@@ -126,6 +126,7 @@ export function createJobBody(companyId: string): Record<string, unknown> {
     level: EJobLevel.JUNIOR,
     formOfWork: EJobFormOfWork.FULL_TIME,
     description: 'Created by e2e',
+    isActive: true,
     startDate: new Date().toISOString(),
     endDate: new Date(Date.now() + 30 * DAY_MS).toISOString(),
   };
