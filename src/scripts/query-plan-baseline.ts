@@ -1,6 +1,6 @@
 // Phase 0 baseline: run real service read paths, capture the Mongo queries they issue
 // (via mongoose debug hook) and record explain('executionStats') for each.
-// Usage: npx ts-node -r tsconfig-paths/register src/scripts/query-plan-baseline.ts
+// Usage: [OUT_FILE=path.json] npx ts-node -r tsconfig-paths/register src/scripts/query-plan-baseline.ts
 import { NestFactory } from '@nestjs/core';
 import { getConnectionToken, getModelToken } from '@nestjs/mongoose';
 import { Connection, Model } from 'mongoose';
@@ -123,14 +123,21 @@ async function collectIndexes(conn: Connection) {
       .toArray()
       .catch(() => []);
     const ops = Object.fromEntries(stats.map(s => [s.name, Number(s.accesses?.ops ?? 0)]));
+    const [storage] = await coll
+      .aggregate([{ $collStats: { storageStats: {} } }])
+      .toArray()
+      .catch(() => []);
+    const indexSizes: Record<string, number> = storage?.storageStats?.indexSizes ?? {};
     result.push({
       collection: name,
       documents: await coll.estimatedDocumentCount(),
+      totalIndexSizeBytes: storage?.storageStats?.totalIndexSize ?? null,
       indexes: indexes.map(i => ({
         name: i.name,
         key: i.key,
         unique: !!i.unique,
         accessOps: ops[i.name] ?? null,
+        sizeBytes: indexSizes[i.name] ?? null,
       })),
       prefixRedundant: findPrefixRedundant(indexes),
     });
@@ -209,6 +216,14 @@ async function run() {
   const scenarios: { name: string; run: () => Promise<unknown> }[] = [
     { name: 'GET /jobs (page 1)', run: () => jobs.findAll(1, 10, '', undefined, '') },
     {
+      name: 'GET /jobs?isActive=true&sort=-createdAt (home, page 1)',
+      run: () => jobs.findAll(1, 10, 'isActive=true&sort=-createdAt', undefined, ''),
+    },
+    {
+      name: 'GET /jobs?isActive=true&sort=-createdAt (home, page 50)',
+      run: () => jobs.findAll(50, 10, 'isActive=true&sort=-createdAt', undefined, ''),
+    },
+    {
       name: 'GET /jobs?keyword=developer',
       run: () => jobs.findAll(1, 10, '', undefined, 'developer'),
     },
@@ -265,8 +280,11 @@ async function run() {
     console.log(`${s.name}: ${serviceMs}ms, ${queries.length} queries`);
   }
 
-  const outDir = path.join(process.cwd(), 'docs/review-code/baseline');
-  fs.mkdirSync(outDir, { recursive: true });
+  // OUT_FILE keeps later runs from overwriting the Phase 0 baseline.
+  const outFile = path.resolve(
+    process.env.OUT_FILE ?? 'docs/review-code/baseline/query-plans.json',
+  );
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
   // accessOps counts since mongod start, so they only reflect usage on this dev instance
   const indexes = await collectIndexes(conn);
   const out = {
@@ -276,8 +294,8 @@ async function run() {
     results,
     indexes,
   };
-  fs.writeFileSync(path.join(outDir, 'query-plans.json'), JSON.stringify(out, null, 2));
-  console.log(`Saved ${path.join(outDir, 'query-plans.json')}`);
+  fs.writeFileSync(outFile, JSON.stringify(out, null, 2));
+  console.log(`Saved ${outFile}`);
   // BullMQ/Redis handles can keep the context alive; don't let shutdown hang the script
   await Promise.race([app.close(), new Promise(r => setTimeout(r, 5000))]);
   process.exit(0);
