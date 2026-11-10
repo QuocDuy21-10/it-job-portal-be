@@ -7,7 +7,6 @@ import { Connection, Model } from 'mongoose';
 import * as mongoose from 'mongoose';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AppModule } from '../app.module';
 import { JobsService } from '../jobs/jobs.service';
 import { CompaniesService } from '../companies/companies.service';
 import { ResumesService } from '../resumes/resumes.service';
@@ -176,6 +175,8 @@ async function explainOp(conn: Connection, op: CapturedOp): Promise<PlanSummary 
 }
 
 async function run() {
+  // Lazy import: AppModule validates env at load time, which would break unit tests of the helpers above.
+  const { AppModule } = await import('../app.module');
   const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error', 'warn'] });
   const conn = app.get<Connection>(getConnectionToken());
   const listCache = app.get(ListCacheService);
