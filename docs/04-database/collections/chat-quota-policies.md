@@ -23,7 +23,6 @@ Cấu hình giới hạn số lượt chat mỗi ngày theo vai trò. Có thể 
 
 | Keys | Thuộc tính | Mục đích |
 |---|---|---|
-| `{ roleName: 1 }` | — | Tìm chính sách theo vai trò |
 | `{ isActive: 1 }` | — | Lọc chính sách đang bật |
 | `{ roleName: 1, isActive: 1 }` | — | Truy vấn chính: chính sách đang bật của một vai trò |
 

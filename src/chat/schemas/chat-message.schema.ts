@@ -14,7 +14,6 @@ export class ChatMessage {
     type: Types.ObjectId,
     ref: 'ChatSession',
     required: true,
-    index: true,
   })
   sessionId: Types.ObjectId;
 
@@ -22,7 +21,6 @@ export class ChatMessage {
     type: Types.ObjectId,
     ref: 'User',
     required: true,
-    index: true,
   })
   userId: Types.ObjectId;
 

@@ -27,7 +27,6 @@ Mỗi bản ghi là một phiên đăng nhập trên một thiết bị, gắn v
 
 | Keys | Thuộc tính | Mục đích |
 |---|---|---|
-| `{ userId: 1 }` | — | Tìm phiên theo người dùng |
 | `{ refreshToken: 1 }` | unique | Ràng buộc unique trên token đã băm |
 | `{ refreshTokenHash: 1 }` | — | Tra cứu phiên theo hash (khai báo thường, xem Known Limitation) |
 | `{ expiresAt: 1 }` | — | Index thường từ `index: true` (xem Known Limitation) |

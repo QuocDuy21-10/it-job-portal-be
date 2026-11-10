@@ -28,8 +28,6 @@ Hành động mà trợ lý AI **đề xuất** và người dùng phải **xác
 
 | Keys | Thuộc tính | Mục đích |
 |---|---|---|
-| `{ userId: 1 }` | — | Tìm hành động theo người dùng |
-| `{ sessionId: 1 }` | — | Tìm hành động theo phiên |
 | `{ type: 1 }` | — | Lọc theo loại |
 | `{ status: 1 }` | — | Lọc theo trạng thái |
 | `{ expiresAt: 1 }` | — | Lọc theo hạn. Index thường, không phải TTL |

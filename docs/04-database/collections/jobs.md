@@ -50,18 +50,16 @@ Hai điểm khai báo kiểu cần lưu ý:
 | `{ company._id: 1, isActive: 1, isDeleted: 1 }` | — | Liệt kê tin đang mở của một công ty |
 | `{ isActive: 1, endDate: 1, isDeleted: 1 }` | — | Cron tìm tin hết hạn |
 | `{ approvalStatus: 1, isActive: 1, isDeleted: 1, endDate: 1, company._id: 1 }` | — | Truy vấn công khai: tin đã duyệt, đang mở, còn hạn, theo công ty |
+| `{ approvalStatus: 1, isActive: 1, createdAt: -1, isDeleted: 1, endDate: 1 }` | — | Trang chủ: tin công khai, mới nhất trước. `isDeleted` đứng sau `createdAt` vì plugin xóa mềm lọc bằng `$ne` |
 | `{ skills: 1 }` | — | Lọc theo kỹ năng |
 | `{ level: 1 }` | — | Lọc theo cấp bậc |
 | `{ location: 1 }` | — | Lọc theo tên địa điểm |
 | `{ locationCode: 1 }` | — | Lọc theo mã địa điểm |
 | `{ createdAt: -1 }` | — | Sắp xếp mới nhất trước |
-| `{ approvalStatus: 1 }` | — | Lọc theo trạng thái duyệt |
-| `{ approvalStatus: 1, isActive: 1, isDeleted: 1 }` | — | Lọc tin theo duyệt và đang mở |
-| `{ name: text, description: text }` | text | Tìm kiếm toàn văn theo tên và mô tả |
 | `{ name: 1 }` | — | Sắp xếp và lọc theo tên |
 | `{ company.name: 1 }` | — | Lọc theo tên công ty |
 
-Collection có 13 index. Nhiều index trùng tiền tố (ví dụ `approvalStatus` đơn lẻ và các index ghép bắt đầu bằng `approvalStatus`). Chưa đo xem tất cả có được dùng hay không. Trạng thái: `Chưa xác minh`.
+Collection có 11 index sau Phase 3a. Các index trùng tiền tố và text index không dùng đã bị xóa, xem [phase-3-index-audit.md](../../review-code/phase-3-index-audit.md).
 
 ## Quan hệ
 

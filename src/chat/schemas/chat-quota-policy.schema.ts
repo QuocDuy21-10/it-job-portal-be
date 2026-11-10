@@ -8,7 +8,7 @@ export type ChatQuotaPolicyDocument = ChatQuotaPolicy & Document;
   collection: 'chat_quota_policies',
 })
 export class ChatQuotaPolicy {
-  @Prop({ required: true, type: String, index: true })
+  @Prop({ required: true, type: String })
   roleName: string;
 
   @Prop({ type: Number, default: null })

@@ -13,7 +13,6 @@ export class ChatSession {
     type: Types.ObjectId,
     ref: 'User',
     required: true,
-    index: true,
   })
   userId: Types.ObjectId;
 
