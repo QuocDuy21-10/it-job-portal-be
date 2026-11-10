@@ -50,15 +50,19 @@ Mã thành công mặc định của Nest: `201` cho `POST`, `200` cho các meth
 
 ## Định dạng lỗi
 
-Dự án **không** có exception filter tùy biến cho nội dung lỗi. `SentryGlobalFilter` chỉ báo lỗi không phải `HttpException` lên Sentry và giữ nguyên phản hồi ([app.module.ts](../../src/app.module.ts)). Vì vậy lỗi theo dạng mặc định của NestJS:
+Mọi lỗi HTTP đi qua `AppExceptionFilter` ([app-exception.filter.ts](../../src/utils/filters/app-exception.filter.ts)), đăng ký tại `APP_FILTER` trong [app.module.ts](../../src/app.module.ts). Body lỗi luôn có `message` ở cấp ngoài cùng (chuỗi, hoặc mảng với lỗi validate), cộng `statusCode`, `data: null` và `requestId` (trùng header `X-Request-Id`):
 
 ```json
 {
   "message": "Job with ID 665f1a2b3c4d5e6f70819301 not found",
   "error": "Not Found",
-  "statusCode": 404
+  "statusCode": 404,
+  "data": null,
+  "requestId": "3f1c9a52-6a0e-4c1e-9d6f-0b8f6f2f9a11"
 }
 ```
+
+Field riêng của từng exception (ví dụ `errors` khi đăng nhập sai định dạng) được giữ nguyên. Lỗi MongoDB được chuyển như sau: trùng khóa unique → `409` `"Resource already exists"` (không lộ giá trị trùng); sai kiểu (`CastError`) → `400`; `ValidationError` của Mongoose → `400` với `message` là mảng. Lỗi không xác định → `500` `"Internal server error"`, chỉ lỗi loại này được gửi lên Sentry. WebSocket giữ hành vi mặc định của `SentryGlobalFilter`.
 
 | Mã | Nguyên nhân thường gặp |
 |---|---|
@@ -66,9 +70,10 @@ Dự án **không** có exception filter tùy biến cho nội dung lỗi. `Sent
 | `401` | Thiếu hoặc sai token, tài khoản bị khóa hoặc vô hiệu |
 | `403` | Sai vai trò, hoặc tài khoản đang chờ xóa |
 | `404` | Không tìm thấy bản ghi |
+| `409` | Trùng dữ liệu unique |
 | `429` | Vượt giới hạn tốc độ |
 
-Lỗi validate dạng mảng, ví dụ: `{ "message": ["email must be an email"], "error": "Bad Request", "statusCode": 400 }`.
+Lỗi validate dạng mảng, ví dụ: `{ "message": ["email must be an email"], "error": "Bad Request", "statusCode": 400, "data": null, "requestId": "…" }`.
 
 **Known Limitation:** một số nơi dùng `400` cho lỗi thiếu quyền (ví dụ HR xem job của công ty khác qua `GET /jobs/:id`) thay vì `403`, nên client không nên dựa vào `403` để nhận biết thiếu quyền. Với route stream, lỗi sau khi đã gửi header không đổi được mã HTTP; xem [realtime.md](realtime.md).
 
@@ -77,7 +82,7 @@ Lỗi validate dạng mảng, ví dụ: `{ "message": ["email must be an email"]
 `ValidationPipe({ whitelist: true })` toàn cục ([app.setup.ts](../../src/app.setup.ts)):
 
 - Field **không có** decorator trong DTO bị **loại bỏ im lặng** khỏi body, không báo lỗi (`forbidNonWhitelisted` không bật).
-- `transform` không bật, nên query string vẫn là chuỗi khi vào handler (nhiều service tự ép `+page`, `+limit`).
+- `transform` không bật, nên query string vẫn là chuỗi khi vào handler. `page`/`limit` được chuẩn hóa bởi `resolvePagination` trong [list-query.helper.ts](../../src/utils/helpers/list-query.helper.ts).
 - DTO dùng `class-validator`; bảng DTO trong từng endpoint liệt kê decorator của mỗi field.
 
 ## Phân trang, lọc và sắp xếp
@@ -104,21 +109,19 @@ Các route danh sách phân trang nhận `page` (từ 1) và `limit`, và trả:
 }
 ```
 
-Dạng `result` + `meta.pagination` có ở `jobs`, `skills`, `subscribers`, `resumes`, `users`, `job-search` và các danh sách tương tự. **Ngoại lệ:** `GET /cv-profiles` trả `{ data, total, page, limit }` ([cv-profiles.service.ts](../../src/cv-profiles/cv-profiles.service.ts)). Giá trị mặc định `limit` thường là 10; trần tối đa khác nhau theo route và được ghi ở bảng query của từng endpoint.
+Dạng `result` + `meta.pagination` có ở `jobs`, `skills`, `subscribers`, `resumes`, `users`, `job-search` và các danh sách tương tự. **Ngoại lệ:** `GET /cv-profiles` trả `{ data, total, page, limit }` ([cv-profiles.service.ts](../../src/cv-profiles/cv-profiles.service.ts)). `limit` mặc định 10, tối đa 100: giá trị lớn hơn được **tự hạ xuống 100**, không báo lỗi; `page`/`limit` không phải số nguyên dương được thay bằng mặc định. Ngoại lệ có trần riêng: `GET /companies/top-hiring` (tối đa 12), `GET /skills/catalog`, `GET /skills/popular`, `GET /job-search` và `GET /subscribers` (xem bảng query của từng endpoint).
 
 ### Lọc và sắp xếp bằng query string
 
 Nhiều route danh sách đọc bộ lọc từ toàn bộ query string bằng thư viện [`api-query-params`](https://www.npmjs.com/package/api-query-params) (`aqp`). Ví dụ `GET /api/v1/jobs?level=Senior&sort=-createdAt&page=1&limit=10`. Cú pháp cụ thể (toán tử so sánh, regex, `sort=-field`) do thư viện quy định; tài liệu này không liệt kê lại.
 
-Mức lọc đầu vào **không đồng nhất** giữa các service:
+Mọi route danh sách dùng aqp đều đi qua `parseListQuery` ([list-query.helper.ts](../../src/utils/helpers/list-query.helper.ts)) với allowlist trường lọc/sắp xếp riêng của từng service (`jobs`, `companies`, `resumes`, `users`, `notifications`, `skills`):
 
-| Service | Allowlist trường lọc/sắp xếp | Chặn toán tử nguy hiểm |
-|---|---|---|
-| `jobs`, `users`, `companies` | Có (`ALLOWED_FILTER_FIELDS`, `ALLOWED_SORT_FIELDS`) | Có (`$where`, `$function`, `$expr`, `$accumulator`, `$jsReduce`) |
-| `resumes` | Có, kèm giới hạn toán tử trong giá trị về so sánh (`$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`); `populate`/`fields` từ client bị bỏ qua ([resumes.service.ts](../../src/resumes/resumes.service.ts)) | Có |
-| `skills`, `notifications` | Không | Không |
-
-**Known Limitation (mức trung bình, chưa kiểm chứng khai thác):** `GET /notifications` giữ `filter.userId` sau parse nhưng nhận `populate` và `projection` thô. Chưa thử khai thác thực tế vì chưa chạy được MongoDB.
+- Trường ngoài allowlist và mọi key bắt đầu bằng `$` bị bỏ qua im lặng.
+- Toán tử trong giá trị chỉ giữ `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`.
+- Regex từ client (`name=/abc/i`) bị escape thành tìm chuỗi literal, chỉ giữ cờ `i`.
+- `populate`, `fields`, `projection` từ client luôn bị bỏ qua.
+- `sort` chỉ nhận trường trong allowlist; `GET /notifications` mặc định `-createdAt`.
 
 ## Giới hạn tốc độ
 
