@@ -8,14 +8,16 @@ Công khai (`@Public`) và không giới hạn tốc độ (`@SkipThrottle`). Lo
 
 | Route | Auth | Mô tả |
 |---|---|---|
-| `GET /api/v1/health` | Công khai | Kiểm tra kết nối MongoDB và Redis |
+| `GET /api/v1/health/live` | Công khai | Process còn phục vụ HTTP, không kiểm tra phụ thuộc |
+| `GET /api/v1/health/ready` | Công khai | Kiểm tra kết nối MongoDB và Redis; 503 khi một trong hai lỗi |
+| `GET /api/v1/health` | Công khai | Alias của `ready`, giữ cho monitor cũ |
 
 ## Ghi chú
 
-- Kiểm tra `database` (MongoDB `pingCheck`) và `redis` (`ping`).
+- `ready` (và `/health`) kiểm tra `database` (MongoDB `pingCheck`) và `redis` (`ping`); `live` không kiểm tra gì.
 - Dùng `@nestjs/terminus`. Route không có `@SkipTransform` (chỉ hai route stream chat có), nên kết quả của Terminus nằm trong `data` của envelope `{ statusCode, message, data }`, với `message` là `null`. Chưa chạy thử để xác nhận cấu trúc bên trong `data`.
 - Không kiểm tra hàng đợi BullMQ, dịch vụ AI hay SMTP.
-- Docker `HEALTHCHECK` gọi route này mỗi 30 giây ([Dockerfile](../../../Dockerfile)).
+- Docker `HEALTHCHECK` gọi `/health/live` mỗi 30 giây ([Dockerfile](../../../Dockerfile)).
 
 ## Chi tiết từng route
 

@@ -66,7 +66,7 @@ Cần người vận hành tự xác nhận các mục `Chưa xác minh` trên h
 | Seed không tạo tài khoản mẫu ở production | **Chưa có** | Xem bên dưới |
 | Sao lưu có lịch và đã thử khôi phục | Chưa xác minh | Chỉ có lệnh mẫu trong `DEPLOYMENT.md` |
 | Sao lưu được mã hóa, giữ ngoài máy chủ | Chưa xác minh | `DEPLOYMENT.md` chỉ nói "copy off the server" |
-| Giám sát, cảnh báo | Một phần | Health check, Sentry (nếu có DSN); không có metric hay cảnh báo hàng đợi |
+| Giám sát, cảnh báo | Một phần | Health check, Sentry (nếu có DSN), metric Prometheus và alert email qua profile `monitoring` ([alerts](../11-operations/alerts.md)) |
 | Quét phụ thuộc | Một phần | CI `npm audit --omit=dev --audit-level=critical` (chỉ mức critical) và Dependabot hằng tuần |
 | Tuân thủ quy định bảo vệ dữ liệu | Chưa xác minh | Ngoài phạm vi tài liệu |
 
@@ -84,4 +84,4 @@ Cách giảm thiểu hiện có: đặt `INIT_PASSWORD` mạnh và xóa các tà
 4. Reverse proxy có TLS; `TRUST_PROXY=1`; đóng mọi cổng ngoài SSH và 80/443.
 5. Xử lý rủi ro `cv-profiles` ([authorization](authorization.md)) trước khi có người dùng thật.
 6. Có lịch sao lưu đã thử khôi phục.
-7. Có `SENTRY_DSN` và theo dõi `GET /api/v1/health`.
+7. Có `SENTRY_DSN` và theo dõi `GET /api/v1/health/ready`.

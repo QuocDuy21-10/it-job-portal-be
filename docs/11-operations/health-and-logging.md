@@ -6,11 +6,12 @@ Mô tả nền tảng nằm ở [observability](../02-architecture/observability
 
 | Cách | Lệnh | Ý nghĩa |
 |---|---|---|
-| HTTP | `curl -s http://127.0.0.1:8081/api/v1/health` | Kiểm tra MongoDB (`database`) và Redis (`redis`) |
-| Docker | `docker compose -f docker-compose.prod.yml ps` | Trạng thái `healthy` của `backend`, `mongodb`, `redis` |
-| Giám sát ngoài | Trỏ uptime monitor tới `https://<domain-api>/api/v1/health` | Khuyến nghị trong `DEPLOYMENT.md` |
+| Liveness | `curl -s http://127.0.0.1:8081/api/v1/health/live` | Process còn phục vụ HTTP |
+| Readiness | `curl -s http://127.0.0.1:8081/api/v1/health/ready` | MongoDB (`database`) và Redis (`redis`); 503 nếu một trong hai lỗi |
+| Docker | `docker compose -f docker-compose.prod.yml ps` | `healthy` của `backend` dựa trên liveness |
+| Giám sát ngoài | Trỏ uptime monitor tới `https://<domain-api>/api/v1/health/ready` | Báo khi cả VPS chết |
 
-Health check **không** phản ánh: hàng đợi BullMQ, dịch vụ AI, SMTP, nguồn tin ngoài. Backend khỏe nhưng worker kẹt vẫn báo khỏe.
+Health check **không** phản ánh hàng đợi BullMQ, dịch vụ AI, SMTP, nguồn tin ngoài; hàng đợi được theo dõi qua metric và alert `QueueBacklog`, `QueueFailedJobs`.
 
 ## Log
 
@@ -51,6 +52,8 @@ Log có thể chứa dữ liệu cá nhân (văn bản CV, email lúc xóa tài 
 | Chat AI | `GET /api/v1/chat/admin/usage/*` |
 | Việc lỗi trong Redis | Không có giao diện trong repository; kiểm tra bằng công cụ BullMQ ngoài. Hàng đợi `job-ingestion` không giữ việc lỗi |
 
-## Chưa có
+## Metric và cảnh báo
 
-Metric (Prometheus), dashboard, cảnh báo qua email hay Slack, health check riêng cho hàng đợi. Xem [observability](../02-architecture/observability.md#future-improvement).
+Prometheus scrape `backend:9464`, Alertmanager gửi email. Cài đặt, danh sách alert và cách xử lý: [alerts](alerts.md). Deploy và rollback: [rollback](rollback.md).
+
+Chưa có: dashboard (Grafana), metric disk và RAM của VPS.

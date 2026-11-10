@@ -12,7 +12,7 @@ Bảng triệu chứng, nguyên nhân khả dĩ và cách kiểm tra. Mọi thô
 | Không kết nối MongoDB | Sai `MONGO_URL`; container chưa khỏe; mật khẩu có ký tự `@ / :` | `docker compose ps`; dùng mật khẩu hex ([deployment](../09-infrastructure/deployment.md)) |
 | Không kết nối Redis | Sai `REDIS_HOST`, `REDIS_PASSWORD` | Kiểm tra Redis; compose prod bắt buộc `REDIS_PASSWORD` |
 | `npm run dev:services` / `dev:stop` / `migrate:locations` lỗi | Script trỏ tới file không tồn tại | Dùng `npm run docker:dev` / `docker:down`; xem [local-development](../00-getting-started/local-development.md#known-limitation-script-dev-bị-thiếu) |
-| Container `unhealthy` | `GET /api/v1/health` thất bại: Mongo hoặc Redis lỗi | `docker compose logs backend`; thử `curl` health trong container |
+| Container `unhealthy` | `GET /api/v1/health/live` thất bại: process không còn phục vụ HTTP (Mongo hoặc Redis lỗi thì xem `/health/ready` và alert `DependencyDown`) | `docker compose logs backend`; thử `curl` health trong container |
 
 ## Đăng nhập và phiên
 
