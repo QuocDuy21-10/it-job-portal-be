@@ -14,7 +14,11 @@ import { IUser } from 'src/users/user.interface';
 import { Job, JobDocument } from './schemas/job.schema';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
 import { ERole } from 'src/casl';
-import aqp from 'api-query-params';
+import {
+  buildPaginationMeta,
+  parseListQuery,
+  resolvePagination,
+} from 'src/utils/helpers/list-query.helper';
 import { Cron } from '@nestjs/schedule';
 import { CompanyFollowerQueueService } from 'src/queues/services/company-follower-queue.service';
 import { JobExpirationQueueService } from 'src/queues/services/job-expiration-queue.service';
@@ -57,14 +61,6 @@ export class JobsService {
     'startDate',
     'endDate',
     'createdAt',
-  ]);
-
-  private readonly DANGEROUS_OPERATORS = new Set([
-    '$where',
-    '$function',
-    '$expr',
-    '$accumulator',
-    '$jsReduce',
   ]);
 
   private readonly ALLOWED_SORT_FIELDS = new Set([
@@ -132,9 +128,11 @@ export class JobsService {
     return { _id: newJob._id, createdAt: newJob.createdAt };
   }
 
-  async findAll(page?: number, limit?: number, query?: string, user?: IUser, keyword?: string) {
-    const { filter: rawFilter, sort: rawSort } = aqp(query);
-    const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
+  async findAll(page?: unknown, limit?: unknown, query?: string, user?: IUser, keyword?: string) {
+    const { filter, sort } = parseListQuery(query, {
+      filterFields: this.ALLOWED_FILTER_FIELDS,
+      sortFields: this.ALLOWED_SORT_FIELDS,
+    });
     await this.normalizeSkillsFilter(filter);
     this.normalizeLocationFilter(filter);
 
@@ -160,9 +158,7 @@ export class JobsService {
       }
     }
 
-    const safeLimit = limit > 0 ? limit : 10;
-    const safePage = page > 0 ? page : 1;
-    const safeOffset = (safePage - 1) * safeLimit;
+    const { page: safePage, limit: safeLimit, offset: safeOffset } = resolvePagination(page, limit);
     const cacheScope = this.resolveJobsListCacheScope(user);
     const cacheFilter = this.buildJobsListCacheFilterSignature(filter);
 
@@ -182,24 +178,14 @@ export class JobsService {
       tags: response =>
         this.buildJobsListCacheTags(cacheScope, filter, trimmedKeyword, response.result),
       loader: async () => {
-        const { result, totalItems, totalPages } = await this.jobRepository.findPaginated(
+        const { result, totalItems } = await this.jobRepository.findPaginated(
           filter,
           safeOffset,
           safeLimit,
           sort,
         );
 
-        return {
-          result,
-          meta: {
-            pagination: {
-              current_page: safePage,
-              per_page: safeLimit,
-              total_pages: totalPages,
-              total: totalItems,
-            },
-          },
-        };
+        return { result, meta: buildPaginationMeta(safePage, safeLimit, totalItems) };
       },
     });
   }
@@ -552,29 +538,6 @@ export class JobsService {
   }
 
   // Private helpers
-
-  private sanitizeAqpQuery(
-    rawFilter: Record<string, any>,
-    rawSort: Record<string, any>,
-  ): { filter: Record<string, any>; sort: Record<string, any> } {
-    const filter: Record<string, any> = {};
-    for (const [key, value] of Object.entries(rawFilter)) {
-      if (this.DANGEROUS_OPERATORS.has(key)) continue;
-      if (!this.ALLOWED_FILTER_FIELDS.has(key)) continue;
-      filter[key] = value;
-    }
-
-    const sort: Record<string, any> = {};
-    if (rawSort && typeof rawSort === 'object') {
-      for (const [key, value] of Object.entries(rawSort)) {
-        if (!this.ALLOWED_SORT_FIELDS.has(key)) continue;
-        if (value !== 1 && value !== -1) continue;
-        sort[key] = value;
-      }
-    }
-
-    return { filter, sort };
-  }
 
   private async normalizeSkillsFilter(filter: Record<string, any>): Promise<void> {
     if (typeof filter.skills === 'undefined') {

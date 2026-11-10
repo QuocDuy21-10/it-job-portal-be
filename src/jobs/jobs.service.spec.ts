@@ -182,6 +182,26 @@ describe('JobsService', () => {
       expect(limit).toBe(10);
     });
 
+    it('clamps limit to 100', async () => {
+      mockJobRepository.findPaginated.mockResolvedValue(paginatedResponse([]));
+
+      const response = await service.findAll(1, 1000, '', publicUser());
+
+      const [, offset, limit] = (mockJobRepository.findPaginated as jest.Mock).mock.calls[0];
+      expect(offset).toBe(0);
+      expect(limit).toBe(100);
+      expect(response.meta.pagination.per_page).toBe(100);
+    });
+
+    it('escapes client regex in name filters', async () => {
+      mockJobRepository.findPaginated.mockResolvedValue(paginatedResponse([]));
+
+      await service.findAll(1, 10, 'name=/(a%2B)%2B$/i', publicUser());
+
+      const passedFilter = (mockJobRepository.findPaginated as jest.Mock).mock.calls[0][0];
+      expect(passedFilter.name.source).toBe('\\(a\\+\\)\\+\\$');
+    });
+
     it('returns correct pagination meta', async () => {
       mockJobRepository.findPaginated.mockResolvedValue({
         result: [],

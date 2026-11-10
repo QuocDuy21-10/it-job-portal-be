@@ -9,7 +9,11 @@ import { Cron } from '@nestjs/schedule';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { IUser } from 'src/users/user.interface';
-import aqp from 'api-query-params';
+import {
+  buildPaginationMeta,
+  parseListQuery,
+  resolvePagination,
+} from 'src/utils/helpers/list-query.helper';
 import { FilesService } from 'src/files/files.service';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
 import { ERole } from 'src/casl';
@@ -35,14 +39,6 @@ export class CompaniesService {
     'address',
     'website',
     'numberOfEmployees',
-  ]);
-
-  private readonly DANGEROUS_OPERATORS = new Set([
-    '$where',
-    '$function',
-    '$expr',
-    '$accumulator',
-    '$jsReduce',
   ]);
 
   private readonly ALLOWED_SORT_FIELDS = new Set([
@@ -76,23 +72,18 @@ export class CompaniesService {
     return company;
   }
 
-  async findAll(page?: number, limit?: number, query?: string, user?: IUser) {
-    const { filter: rawFilter, sort: rawSort } = aqp(query);
-    delete rawFilter.page;
-    delete rawFilter.limit;
-
-    // Sanitize: strip dangerous operators and unknown fields before hitting Mongoose
-    const { filter, sort } = this.sanitizeAqpQuery(rawFilter, rawSort);
+  async findAll(page?: unknown, limit?: unknown, query?: string, user?: IUser) {
+    const { filter, sort } = parseListQuery(query, {
+      filterFields: this.ALLOWED_FILTER_FIELDS,
+      sortFields: this.ALLOWED_SORT_FIELDS,
+    });
 
     // HR role restriction: restrict listing to the HR's own company
     if (user && user.role === ERole.HR && user.company?._id) {
       filter._id = user.company._id;
     }
 
-    // Guard against NaN / non-positive values coming from the controller's `+page` / `+limit`
-    const safeLimit = limit > 0 ? limit : 10;
-    const safePage = page > 0 ? page : 1;
-    const offset = (safePage - 1) * safeLimit;
+    const { page: safePage, limit: safeLimit, offset } = resolvePagination(page, limit);
     const cacheScope = this.resolveCompaniesListCacheScope(user);
 
     return this.listCacheService.getOrSet({
@@ -109,7 +100,7 @@ export class CompaniesService {
       ttlMs: LIST_CACHE_TTL.COMPANIES,
       tags: response => this.buildCompaniesListCacheTags(cacheScope, filter, response.result),
       loader: async () => {
-        const { result, totalItems, totalPages } = await this.companyRepository.findPaginated(
+        const { result, totalItems } = await this.companyRepository.findPaginated(
           filter,
           offset,
           safeLimit,
@@ -126,14 +117,7 @@ export class CompaniesService {
 
         return {
           result: resultWithCount,
-          meta: {
-            pagination: {
-              current_page: safePage,
-              per_page: safeLimit,
-              total_pages: totalPages,
-              total: totalItems,
-            },
-          },
+          meta: buildPaginationMeta(safePage, safeLimit, totalItems),
         };
       },
     });
@@ -293,29 +277,6 @@ export class CompaniesService {
     }
 
     return Math.min(parsedLimit, this.MAX_TOP_HIRING_LIMIT);
-  }
-
-  private sanitizeAqpQuery(
-    rawFilter: Record<string, any>,
-    rawSort: Record<string, any>,
-  ): { filter: Record<string, any>; sort: Record<string, any> } {
-    const filter: Record<string, any> = {};
-    for (const [key, value] of Object.entries(rawFilter)) {
-      if (this.DANGEROUS_OPERATORS.has(key)) continue;
-      if (!this.ALLOWED_FILTER_FIELDS.has(key)) continue;
-      filter[key] = value;
-    }
-
-    const sort: Record<string, any> = {};
-    if (rawSort && typeof rawSort === 'object') {
-      for (const [key, value] of Object.entries(rawSort)) {
-        if (!this.ALLOWED_SORT_FIELDS.has(key)) continue;
-        if (value !== 1 && value !== -1) continue;
-        sort[key] = value;
-      }
-    }
-
-    return { filter, sort };
   }
 
   private async assertHrOwnership(
