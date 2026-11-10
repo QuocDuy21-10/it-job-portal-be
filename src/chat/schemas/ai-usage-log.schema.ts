@@ -12,7 +12,6 @@ export class AiUsageLog {
     type: Types.ObjectId,
     ref: 'User',
     required: true,
-    index: true,
   })
   userId: Types.ObjectId;
 
@@ -26,11 +25,10 @@ export class AiUsageLog {
   @Prop({
     type: Types.ObjectId,
     ref: 'ChatSession',
-    index: true,
   })
   sessionId?: Types.ObjectId;
 
-  @Prop({ required: true, type: String, index: true })
+  @Prop({ required: true, type: String })
   operationType: string;
 
   @Prop({ type: String })
@@ -66,7 +64,7 @@ export class AiUsageLog {
   @Prop({ type: Boolean, default: false })
   costEstimated?: boolean;
 
-  @Prop({ type: Boolean, default: false, index: true })
+  @Prop({ type: Boolean, default: false })
   cacheHit?: boolean;
 
   @Prop({ type: String, index: true })
@@ -90,7 +88,7 @@ export class AiUsageLog {
   @Prop({ type: String, index: true })
   errorCategory?: string;
 
-  @Prop({ type: Boolean, default: false, index: true })
+  @Prop({ type: Boolean, default: false })
   quotaConsumed?: boolean;
 
   @Prop({ type: Number })

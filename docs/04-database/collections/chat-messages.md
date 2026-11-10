@@ -28,8 +28,6 @@ Từng tin nhắn trong một [chat-sessions](chat-sessions.md), gồm lời ng�
 
 | Keys | Thuộc tính | Mục đích |
 |---|---|---|
-| `{ sessionId: 1 }` | — | Tìm tin nhắn theo phiên |
-| `{ userId: 1 }` | — | Tìm tin nhắn theo người dùng |
 | `{ sessionId: 1, sequence: 1 }` | — | Đọc hội thoại theo đúng thứ tự |
 | `{ userId: 1, createdAt: -1 }` | — | Tin nhắn gần đây của một người |
 

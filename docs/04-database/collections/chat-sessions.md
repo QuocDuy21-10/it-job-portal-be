@@ -27,7 +27,6 @@ Một cuộc hội thoại giữa người dùng và trợ lý AI. Tin nhắn n�
 
 | Keys | Thuộc tính | Mục đích |
 |---|---|---|
-| `{ userId: 1 }` | — | Tìm phiên theo chủ |
 | `{ userRole: 1 }` | — | Lọc theo vai trò |
 | `{ type: 1 }` | — | Lọc theo loại phiên |
 | `{ isActive: 1 }` | — | Lọc phiên đang mở |

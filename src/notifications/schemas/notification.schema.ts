@@ -6,7 +6,7 @@ export type NotificationDocument = HydratedDocument<Notification>;
 
 @Schema({ timestamps: true })
 export class Notification {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   userId: mongoose.Schema.Types.ObjectId;
 
   @Prop({ required: true, enum: ENotificationType })

@@ -46,24 +46,19 @@ Mỗi bản ghi là nhật ký một lần gọi AI: dùng nhà cung cấp nào,
 | `isDeleted` | Boolean | Có | `false` | thêm bởi plugin xóa mềm | Cờ xóa mềm. `true` nghĩa là bản ghi đã bị xóa khỏi nghiệp vụ nhưng vẫn còn trong database |
 | `deletedAt` | Date | Không | `null` | thêm bởi plugin xóa mềm | Thời điểm xóa mềm |
 
-Hầu hết các field có `index: true` ở mức field (21 index). Với collection ghi nhiều như nhật ký, số index lớn làm chậm ghi và tốn bộ nhớ. Chưa đo xem index nào thật sự được dùng. Trạng thái: `Chưa xác minh`.
+Hầu hết các field có `index: true` ở mức field (16 index sau Phase 3a, đã xóa 5 index trùng tiền tố). Với collection ghi nhiều như nhật ký, số index lớn làm chậm ghi và tốn bộ nhớ. Chưa đo xem index nào thật sự được dùng. Trạng thái: `Chưa xác minh`.
 
 ## Indexes
 
 | Keys | Thuộc tính | Mục đích |
 |---|---|---|
-| `{ userId: 1 }` | — | Index đơn lẻ từ `index: true` trên field |
 | `{ conversationId: 1 }` | — | Index đơn lẻ trên field kế thừa |
-| `{ sessionId: 1 }` | — | Index đơn lẻ từ `index: true` trên field |
-| `{ operationType: 1 }` | — | Index đơn lẻ từ `index: true` trên field |
 | `{ intent: 1 }` | — | Index đơn lẻ từ `index: true` trên field |
-| `{ cacheHit: 1 }` | — | Index đơn lẻ từ `index: true` trên field |
 | `{ cacheCategory: 1 }` | — | Index đơn lẻ từ `index: true` trên field |
 | `{ requestStartedAt: 1 }` | — | Index đơn lẻ từ `index: true` trên field |
 | `{ requestCompletedAt: 1 }` | — | Index đơn lẻ từ `index: true` trên field |
 | `{ success: 1 }` | — | Index đơn lẻ từ `index: true` trên field |
 | `{ errorCategory: 1 }` | — | Index đơn lẻ từ `index: true` trên field |
-| `{ quotaConsumed: 1 }` | — | Index đơn lẻ từ `index: true` trên field |
 | `{ quotaRollback: 1 }` | — | Index đơn lẻ từ `index: true` trên field |
 | `{ topicGuardBlocked: 1 }` | — | Index đơn lẻ từ `index: true` trên field |
 | `{ createdAt: -1 }` | — | Xem nhật ký mới nhất |

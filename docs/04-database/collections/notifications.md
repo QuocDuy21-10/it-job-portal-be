@@ -29,7 +29,6 @@ Thông báo trong ứng dụng gửi tới từng người dùng. Cùng với th
 
 | Keys | Thuộc tính | Mục đích |
 |---|---|---|
-| `{ userId: 1 }` | — | Tìm thông báo theo người nhận |
 | `{ isRead: 1 }` | — | Lọc theo trạng thái đọc |
 | `{ userId: 1, isRead: 1, createdAt: -1 }` | — | Danh sách thông báo chưa đọc của một người, mới nhất trước |
 

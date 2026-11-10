@@ -6,7 +6,7 @@ export type SessionDocument = HydratedDocument<Session>;
 
 @Schema({ timestamps: true })
 export class Session {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: User.name, required: true })
   userId: mongoose.Schema.Types.ObjectId;
 
   @Prop({ required: true, unique: true, index: true, select: false })
