@@ -39,6 +39,6 @@ USER nestjs
 EXPOSE ${PORT:-8081}
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD wget -qO- "http://127.0.0.1:${PORT:-8081}/api/v1/health" > /dev/null || exit 1
+  CMD wget -qO- "http://127.0.0.1:${PORT:-8081}/api/v1/health/live" > /dev/null || exit 1
 
 CMD ["node", "dist/main"]
