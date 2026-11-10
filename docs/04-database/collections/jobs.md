@@ -59,7 +59,7 @@ Hai điểm khai báo kiểu cần lưu ý:
 | `{ name: 1 }` | — | Sắp xếp và lọc theo tên |
 | `{ company.name: 1 }` | — | Lọc theo tên công ty |
 
-Collection có 11 index sau Phase 3a. Các index trùng tiền tố và text index không dùng đã bị xóa, xem [phase-3-index-audit.md](../../review-code/phase-3-index-audit.md).
+Collection có 11 index sau Phase 3a. Các index trùng tiền tố và text index không dùng đã bị xóa, xem báo cáo Phase 3a (`docs/review-code/phase-3-index-audit.md`, chỉ có trên máy, không nằm trong git).
 
 ## Quan hệ
 
