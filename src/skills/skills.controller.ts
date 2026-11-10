@@ -16,6 +16,7 @@ import { IUser } from 'src/users/user.interface';
 import { Public } from 'src/utils/decorators/public.decorator';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
+import { PaginationQueryDto } from 'src/utils/dto/pagination-query.dto';
 import { BulkDeleteDto } from 'src/utils/dto/bulk-delete.dto';
 import { CreateSkillDto } from './dto/create-skill.dto';
 import { UpdateSkillDto } from './dto/update-skill.dto';
@@ -70,8 +71,8 @@ export class SkillsController {
     description: 'Retrieves a paginated list of skill catalog entries for admin management.',
   })
   @ResponseMessage('Skills have been retrieved successfully')
-  findAll(@Query('page') page: string, @Query('limit') limit: string, @Query() query: string) {
-    return this.skillsService.findAll(+page, +limit, query);
+  findAll(@Query() pagination: PaginationQueryDto, @Query() query: string) {
+    return this.skillsService.findAll(pagination.page, pagination.limit, query);
   }
 
   @Get(':id')

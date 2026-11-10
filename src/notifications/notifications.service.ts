@@ -2,11 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import mongoose from 'mongoose';
-import aqp from 'api-query-params';
+import {
+  buildPaginationMeta,
+  parseListQuery,
+  resolvePagination,
+} from 'src/utils/helpers/list-query.helper';
 import { Notification, NotificationDocument } from './schemas/notification.schema';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { NotificationsGateway } from './notifications.gateway';
 import { IUser } from 'src/users/user.interface';
+
+const NOTIFICATION_FILTER_FIELDS = new Set(['isRead', 'type']);
+const NOTIFICATION_SORT_FIELDS = new Set(['createdAt']);
 
 @Injectable()
 export class NotificationsService {
@@ -50,40 +57,26 @@ export class NotificationsService {
   /**
    * Get paginated notifications for a user
    */
-  async findAllByUser(userId: string, page?: number, limit?: number, query?: string) {
-    const { filter, sort, population, projection } = aqp(query);
-    delete filter.page;
-    delete filter.limit;
+  async findAllByUser(userId: string, page?: unknown, limit?: unknown, query?: string) {
+    const { filter, sort } = parseListQuery(query, {
+      filterFields: NOTIFICATION_FILTER_FIELDS,
+      sortFields: NOTIFICATION_SORT_FIELDS,
+      defaultSort: { createdAt: -1 },
+    });
 
     // Always scope to the authenticated user
     filter.userId = new mongoose.Types.ObjectId(userId);
 
-    const defaultLimit = limit || 10;
-    const offset = ((page || 1) - 1) * defaultLimit;
-
+    const pagination = resolvePagination(page, limit);
     const totalItems = await this.notificationModel.countDocuments(filter);
-    const totalPages = Math.ceil(totalItems / defaultLimit);
-
     const result = await this.notificationModel
       .find(filter)
-      .skip(offset)
-      .limit(defaultLimit)
-      .sort((sort as any) || { createdAt: -1 })
-      .populate(population)
-      .select(projection as any)
+      .skip(pagination.offset)
+      .limit(pagination.limit)
+      .sort(sort)
       .exec();
 
-    return {
-      result,
-      meta: {
-        pagination: {
-          current_page: page || 1,
-          per_page: defaultLimit,
-          total_pages: totalPages,
-          total: totalItems,
-        },
-      },
-    };
+    return { result, meta: buildPaginationMeta(pagination.page, pagination.limit, totalItems) };
   }
 
   /**

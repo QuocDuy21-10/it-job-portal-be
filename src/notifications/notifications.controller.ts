@@ -3,6 +3,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
+import { PaginationQueryDto } from 'src/utils/dto/pagination-query.dto';
 import { IUser } from 'src/users/user.interface';
 
 @ApiTags('Notifications')
@@ -16,13 +17,13 @@ export class NotificationsController {
     description: 'Retrieves paginated notifications for the authenticated user',
   })
   @ResponseMessage('Notifications retrieved successfully')
-  findAll(
-    @Query('page') page: string,
-    @Query('limit') limit: string,
-    @Query() query: string,
-    @User() user: IUser,
-  ) {
-    return this.notificationsService.findAllByUser(user._id, +page, +limit, query);
+  findAll(@Query() pagination: PaginationQueryDto, @Query() query: string, @User() user: IUser) {
+    return this.notificationsService.findAllByUser(
+      user._id,
+      pagination.page,
+      pagination.limit,
+      query,
+    );
   }
 
   @Get('unread-count')

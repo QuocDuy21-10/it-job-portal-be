@@ -20,7 +20,6 @@ import {
   ApiResponse,
   ApiBody,
   ApiParam,
-  ApiQuery,
   ApiConsumes,
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -30,6 +29,8 @@ import * as fs from 'fs';
 import { CvProfilesService } from './cv-profiles.service';
 import { CreateCvProfileDto } from './dto/create-cv-profile.dto';
 import { User } from '../utils/decorators/user.decorator';
+import { PaginationQueryDto } from '../utils/dto/pagination-query.dto';
+import { resolvePagination } from '../utils/helpers/list-query.helper';
 import { IUser } from '../users/user.interface';
 import { JwtAuthGuard } from 'src/auth/guards';
 import { FilesService } from '../files/files.service';
@@ -474,18 +475,6 @@ export class CvProfilesController {
     description:
       'Retrieve all CV Profiles with pagination. This endpoint is intended for administrators only. Implement RBAC guard before production use.',
   })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    description: 'Page number (default: 1)',
-    example: 1,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Items per page (default: 10)',
-    example: 10,
-  })
   @ApiResponse({
     status: 200,
     description: 'CV Profiles retrieved successfully',
@@ -531,9 +520,8 @@ export class CvProfilesController {
     description: 'Forbidden - Admin access required',
   })
   @ResponseMessage('CV Profiles retrieved successfully')
-  async getAllCvProfiles(@Query('page') page: string = '1', @Query('limit') limit: string = '10') {
-    const pageNum = parseInt(page, 10) || 1;
-    const limitNum = parseInt(limit, 10) || 10;
+  async getAllCvProfiles(@Query() pagination: PaginationQueryDto) {
+    const { page: pageNum, limit: limitNum } = resolvePagination(pagination.page, pagination.limit);
 
     const result = await this.cvProfilesService.findAll(pageNum, limitNum);
 
