@@ -19,8 +19,8 @@ Cần người vận hành tự xác nhận các mục `Chưa xác minh` trên h
 | `.env.example` không chứa khóa thật | Đã có | Đã quét mẫu khóa; chỉ có mật khẩu dev mẫu `123456` |
 | App từ chối khởi động khi thiếu secret | Đã có | [env.validation.ts](../../src/config/env.validation.ts) |
 | Ở production bắt buộc `FE_URL`, `CORS_ORIGINS` | Đã có | như trên |
-| Secret JWT, OTP đủ mạnh | Chưa xác minh | Không kiểm tra độ dài; hướng dẫn dùng `openssl rand -hex 32` |
-| Hai secret JWT khác nhau cho access và refresh | Đã có | Hai biến riêng |
+| Secret JWT, OTP đủ mạnh | Đã có | Ở production `validateEnv` từ chối khởi động khi secret ngắn hơn 32 ký tự ([env.validation.ts](../../src/config/env.validation.ts)) |
+| Hai secret JWT khác nhau cho access và refresh | Đã có | Hai biến riêng; ở production `validateEnv` từ chối hai giá trị trùng nhau |
 | Mật khẩu Mongo, Redis ngẫu nhiên và mạnh | Một phần | Compose prod bắt buộc đặt (`:?`); độ mạnh do người vận hành. Mẫu local dùng `123456` |
 | Ứng dụng kết nối MongoDB bằng quyền tối thiểu | Chưa có | Compose prod dùng tài khoản root cho `MONGO_URL` |
 | Xoay vòng khóa | Chưa có | `DEPLOYMENT.md` chỉ nhắc xoay vòng, không có quy trình; đổi `JWT_*` đăng xuất mọi người |
