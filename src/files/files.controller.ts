@@ -59,10 +59,12 @@ export class FilesController {
   }
 
   @Delete('remove')
-  @Roles(ERole.SUPER_ADMIN, ERole.HR)
+  // HR is excluded: files carry no owner, so HR could delete any company's logo by name.
+  // Logos an HR uploads and then abandons are removed by the orphaned-logo cleanup cron.
+  @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Delete a previously uploaded file',
-    description: 'Requires HR or SUPER_ADMIN role.',
+    description: 'Requires SUPER_ADMIN role.',
   })
   @ResponseMessage('Delete file')
   @ApiResponse({ status: 200, description: 'File deleted successfully.' })

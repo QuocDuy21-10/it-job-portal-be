@@ -14,7 +14,6 @@ Mô hình và ma trận quyền ở [user-roles](../01-product/user-roles.md); c
 | 3 | Seed tạo 96 tài khoản mẫu dùng chung `INIT_PASSWORD` mà `DEPLOYMENT.md` hướng dẫn chạy ở production | Seed không có chặn môi trường | Trung bình đến cao | [production-security-checklist](production-security-checklist.md) |
 | 4 | `GET /resumes` nhận bộ lọc, `populate`, `projection` thô | `sanitizeAqpQuery` bị comment | Trung bình | [api-overview](../05-api/api-overview.md#lọc-và-sắp-xếp-bằng-query-string) |
 | 5 | CASL định nghĩa nhưng không thực thi, dễ gây tin nhầm rằng quyền được bảo đảm | `grep` | Trung bình (hiểu nhầm) | [authorization](../03-modules/authorization.md) |
-| 6 | `DELETE /files/remove` cho HR xóa file bất kỳ biết tên | Không thấy kiểm tra sở hữu | Thấp đến trung bình | [files](../03-modules/files.md#known-limitation) |
 | 7 | Mã lỗi quyền không nhất quán (`400` thay vì `403`) | Nhiều nơi | Thấp | [api-overview](../05-api/api-overview.md#định-dạng-lỗi) |
 | 8 | Email gợi ý và email tin mới có thể nhắc tới tin chưa duyệt | Processor không lọc `approvalStatus` | Thấp (nghiệp vụ) | [queues](../03-modules/queues.md#job-recommendation) |
 

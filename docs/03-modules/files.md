@@ -39,7 +39,7 @@ Nguồn: [upload-policy.ts](../../src/files/constants/upload-policy.ts).
 
 - Đường dẫn ghi: `<thư mục chạy>/public/images/<folder_type>/`.
 - Đuôi file lấy từ bảng MIME khi có, nếu không thì dùng đuôi của tên gốc.
-- `DELETE /files/remove` chỉ `HR` và `SUPER ADMIN`.
+- `DELETE /files/remove` chỉ `SUPER ADMIN`. Logo HR tải lên rồi không dùng do cron `cleanupOrphanedLogos` dọn (02:00 hằng ngày, file cũ hơn 24 giờ).
 
 ## Data Model
 
@@ -61,7 +61,6 @@ Không có collection. Đường dẫn file được lưu ở field của collec
 
 - File lưu trên đĩa cục bộ, không dùng chung giữa nhiều instance, xem [scalability](../02-architecture/scalability.md).
 - Chỉ kiểm tra MIME do client khai báo và đuôi file (theo cấu hình Multer), chưa thấy kiểm tra nội dung thật (magic bytes). Trạng thái: `Chưa xác minh`.
-- `DELETE /files/remove` cho phép HR xóa file; chưa kiểm tra có giới hạn HR chỉ xóa file thuộc công ty mình không.
 - Thư mục `public/` nằm trong `.gitignore`, nên file tải lên không thuộc repository.
 
 ## Testing

@@ -103,6 +103,23 @@ describe('Tenant authorization (e2e)', () => {
     expect(companyIds).toEqual([world.companyA]);
   });
 
+  it('HR cannot delete uploaded files', async () => {
+    await request(t.server)
+      .delete('/api/v1/files/remove')
+      .set(auth('hrA'))
+      .send({ fileName: 'does-not-exist.png', folderType: 'company' })
+      .expect(403);
+  });
+
+  it('SUPER ADMIN can delete uploaded files', async () => {
+    const res = await request(t.server)
+      .delete('/api/v1/files/remove')
+      .set(auth('admin'))
+      .send({ fileName: 'does-not-exist.png', folderType: 'company' })
+      .expect(200);
+    expect(res.body.data).toEqual({ deleted: true });
+  });
+
   describe('CV profiles of other users', () => {
     let otherProfileId: string;
 
