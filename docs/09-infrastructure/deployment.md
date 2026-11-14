@@ -1,6 +1,6 @@
 # Triển khai
 
-Hướng dẫn triển khai lên một VPS bằng Docker Compose. Nội dung được chuyển từ `DEPLOYMENT.md` (tiếng Anh, nay chỉ còn trỏ tới đây), đã đối chiếu với [docker-compose.prod.yml](../../docker-compose.prod.yml) và [Dockerfile](../../Dockerfile). Các lệnh dưới đây **chưa được chạy** khi tạo tài liệu (không có Docker daemon và không có VPS): `Chưa xác minh`.
+Hướng dẫn triển khai lên một VPS bằng Docker Compose. Nội dung được chuyển từ `DEPLOYMENT.md` (tiếng Anh, nay chỉ còn trỏ tới đây), đã đối chiếu với [docker-compose.prod.yml](../../docker-compose.prod.yml) và [Dockerfile](../../Dockerfile). Stack compose production (thứ tự khởi động, tự phục hồi, seed, `scripts/deploy.sh`, `scripts/backup-mongo.sh`) đã chạy thử trên Docker cục bộ. **Chưa xác minh trên VPS thật:** chứng chỉ TLS, workflow đẩy image và mức RAM dưới tải.
 
 ## Hai cách chạy
 
@@ -8,9 +8,9 @@ Hướng dẫn triển khai lên một VPS bằng Docker Compose. Nội dung đ�
 |---|---|---|
 | File compose | `docker-compose.yml` | `docker-compose.prod.yml` |
 | File môi trường | `.env` | `.env.production` |
-| Backend | `npm run dev` trên máy | Image `production`, không phải root, có healthcheck |
+| Backend | `npm run dev` trên máy | Image `production` kéo từ Docker Hub (build ở CI), không phải root, có healthcheck |
 | MongoDB và Redis | Gắn vào `127.0.0.1` | Mạng Docker riêng, không publish, Redis có mật khẩu |
-| HTTPS | Không | nginx (hoặc Caddy) ngoài repository |
+| HTTPS | Không | Caddy trong compose, tự cấp chứng chỉ Let's Encrypt |
 | Swagger | `http://localhost:8081/api` | Tắt (đặt `SWAGGER_ENABLED=true` để mở) |
 
 Chạy local: [quick-start](../00-getting-started/quick-start.md).
@@ -21,11 +21,13 @@ Cấu hình mẫu trong `DEPLOYMENT.md`: Ubuntu 22.04 trở lên, 2 vCPU, 4 GB R
 
 ## Các bước
 
+Hướng dẫn từng bước cho VPS nhỏ (1.5GB RAM) kèm FE trên Vercel: [vps-production-guide](vps-production-guide.md). Các mục dưới đây là tham chiếu.
+
 ### 1. Chuẩn bị máy chủ
 
 - Tường lửa chỉ mở SSH, 80, 443 (ví dụ `ufw`).
-- Cài Docker Engine, nginx và certbot.
-- **Lưu ý:** cổng do Docker publish bỏ qua `ufw`. Vì vậy mọi cổng trong compose production gắn vào `127.0.0.1`; không đổi điều này.
+- Cài Docker Engine kèm Compose plugin. Caddy chạy trong compose nên không cần nginx hay certbot.
+- **Lưu ý:** cổng do Docker publish bỏ qua `ufw`. Vì vậy compose production chỉ publish 80 và 443 (Caddy); backend, MongoDB, Redis không publish cổng nào. Không đổi điều này.
 
 ### 2. Cấu hình môi trường
 
@@ -59,10 +61,11 @@ kèm các biến `SMTP_*`, `GOOGLE_*`, `GEMINI_*`, `GROQ_*`, `AI_GROQ_*`, `EMAIL
 ### 3. Khởi động
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
-docker compose -f docker-compose.prod.yml ps          # backend sẽ chuyển "healthy"
-curl -s http://127.0.0.1:8081/api/v1/health/ready
+./scripts/deploy.sh                     # pull image theo IMAGE_TAG rồi up -d --wait
+curl -s https://<API_DOMAIN>/api/v1/health/ready
 ```
+
+Cần thêm `DOCKERHUB_USER`, `IMAGE_NAME`, `IMAGE_TAG`, `API_DOMAIN` vào `.env.production` (xem `.env.example`).
 
 ### 4. Dữ liệu ban đầu
 
@@ -70,25 +73,24 @@ curl -s http://127.0.0.1:8081/api/v1/health/ready
 
 ### 5. Reverse proxy và TLS
 
-Cấu hình nginx mẫu trong `DEPLOYMENT.md` trỏ tới `127.0.0.1:8081` và có các điểm quan trọng:
+Caddy chạy trong compose, cấu hình ở [Caddyfile](../../Caddyfile), tự cấp và gia hạn chứng chỉ Let's Encrypt cho `API_DOMAIN`:
 
 | Thiết lập | Lý do |
 |---|---|
-| `client_max_body_size 10m` | Ứng dụng giới hạn upload 5 MB |
-| `proxy_set_header X-Forwarded-For ...` và `TRUST_PROXY=1` | Để rate limit và phiên dùng IP thật; thiếu thì mọi người dùng chung IP của proxy |
-| `Upgrade` và `Connection "upgrade"` | Socket.IO ở `/notifications` cần WebSocket |
-| `proxy_buffering off`, `proxy_read_timeout 300s` | Stream chat SSE không bị gom đệm hay cắt |
+| `request_body max_size 10MB` | Ứng dụng giới hạn upload 5 MB |
+| `TRUST_PROXY=1` trong `.env.production` | Caddy gửi `X-Forwarded-For`; thiếu thì rate limit và phiên dùng chung IP của proxy |
+| WebSocket | Caddy chuyển tiếp mặc định; Socket.IO ở `/notifications` cần |
+| `flush_interval -1` | Stream chat SSE không bị gom đệm |
 
-Cấp chứng chỉ bằng certbot. Cấu hình proxy không nằm trong repository nên không kiểm chứng được.
+DNS của `API_DOMAIN` phải trỏ về VPS và cổng 80, 443 mở **trước** khi khởi động Caddy. Chưa kiểm chứng với DNS và chứng chỉ thật.
 
 ### 6. Cập nhật phiên bản
 
 Quy trình đầy đủ (gắn tag image, kiểm tra readiness, điều kiện rollback): [rollback](../11-operations/rollback.md). Lệnh tối thiểu khi chưa dùng `IMAGE_TAG`:
 
 ```bash
-git pull
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build backend
-docker image prune -f
+# sửa IMAGE_TAG trong .env.production rồi:
+./scripts/deploy.sh
 ```
 
 `SIGTERM` từ `docker stop` kích hoạt shutdown hook của Nest nên hàng đợi và kết nối database đóng gọn (`app.enableShutdownHooks()` trong [main.ts](../../src/main.ts)). Quá trình này **có thời gian ngừng** ngắn vì chỉ có một container, và các token trong `CACHE_MANAGER` (đặt lại mật khẩu, hủy xóa tài khoản) mất khi khởi động lại ([data-flow](../02-architecture/data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis)).
@@ -97,10 +99,10 @@ docker image prune -f
 
 Sao lưu MongoDB và hai volume `uploads`, `cv_storage` **trước** (xem [backup-and-recovery](../11-operations/backup-and-recovery.md)).
 
-1. Build image mới, **chưa** khởi động lại backend. Chạy dedupe và tạo unique index bằng image mới:
+1. Kéo image mới (build sẵn ở CI), **chưa** khởi động lại backend. Chạy dedupe và tạo unique index bằng image mới:
 
    ```bash
-   docker compose -f docker-compose.prod.yml --env-file .env.production build backend
+   docker compose -f docker-compose.prod.yml --env-file .env.production pull backend
    docker compose -f docker-compose.prod.yml --env-file .env.production run --rm backend \
      node dist/databases/migrations/application-unique-index.js
    ```
@@ -126,7 +128,7 @@ Xem [backup-and-recovery](../11-operations/backup-and-recovery.md).
 
 ## Rollback
 
-Xem [Deploy và rollback](../11-operations/rollback.md): image gắn tag theo commit qua `IMAGE_TAG`, rollback bằng `up -d --no-build backend` với tag cũ.
+Xem [Deploy và rollback](../11-operations/rollback.md): image gắn tag do CI đẩy lên Docker Hub, chọn bằng `IMAGE_TAG`; rollback bằng cách đặt lại tag cũ rồi chạy `./scripts/deploy.sh`.
 
 ## Known Limitation
 

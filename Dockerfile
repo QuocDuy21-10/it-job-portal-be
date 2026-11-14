@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Base image
 FROM node:24-alpine AS base
 WORKDIR /app
@@ -12,7 +13,7 @@ CMD ["npm", "run", "start:dev"]
 
 # Build stage
 FROM base AS build
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 COPY . .
 RUN npm run build
 RUN npm prune --omit=dev
@@ -21,6 +22,8 @@ RUN npm prune --omit=dev
 FROM node:24-alpine AS production
 WORKDIR /app
 ENV NODE_ENV=production
+# Cap the V8 heap so the container stays inside its mem_limit on a 1.5 GB VPS
+ENV NODE_OPTIONS=--max-old-space-size=384
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \

@@ -1,6 +1,6 @@
 # CI/CD
 
-Quy trình tích hợp liên tục chạy bằng GitHub Actions. **Không có quy trình triển khai tự động (CD)** trong repository: triển khai là thao tác tay trên VPS ([deployment](deployment.md)).
+Quy trình tích hợp liên tục chạy bằng GitHub Actions. Workflow `docker-publish.yml` build và đẩy image lên Docker Hub khi có tag `v*` (mục cuối). **Không có triển khai tự động (CD)** lên VPS: chạy tay `./scripts/deploy.sh` ([deployment](deployment.md)).
 
 ## GitHub Actions
 
@@ -27,7 +27,7 @@ Các bước dùng action `checkout`, `setup-node`, `setup-buildx-action`, `buil
 - Không đo độ bao phủ test hay đặt ngưỡng.
 - Không quét image Docker hay quét bí mật.
 - Không kiểm tra tài liệu (link, Mermaid); các script kiểm tra tài liệu chỉ chạy tay ([documentation-guide](../13-contributing/documentation-guide.md)).
-- Không build và đẩy image lên registry, không triển khai.
+- Không triển khai tự động lên VPS (image chỉ được đẩy lên registry bởi `docker-publish.yml`).
 
 ## Git hook cục bộ
 
@@ -37,11 +37,23 @@ Các bước dùng action `checkout`, `setup-node`, `setup-buildx-action`, `buil
 
 [.github/dependabot.yml](../../.github/dependabot.yml): hằng tuần cho `npm` (gộp minor và patch, tối đa 5 PR mở, bỏ qua major của `@nestjs/*` vì đi qua quy trình nâng cấp riêng), `docker` (bỏ qua major của `node`, chọn tay theo LTS), và `github-actions`.
 
+## Đẩy image lên Docker Hub
+
+Nguồn: [.github/workflows/docker-publish.yml](../../.github/workflows/docker-publish.yml). Chạy khi push tag `v*` hoặc bấm chạy tay (`workflow_dispatch`). Cần secret `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`; biến `IMAGE_NAME` là tùy chọn (mặc định `job-portal-be`).
+
+| Tag sinh ra | Khi nào |
+|---|---|
+| `X.Y.Z` | Push tag `vX.Y.Z` |
+| `sha-<short>` | Mọi lần chạy |
+| `latest` | Chỉ khi chạy từ tag |
+
+Chỉ build `linux/amd64`, target `production`. Workflow này **chưa được chạy thật** khi viết tài liệu (cần secrets và một tag).
+
 ## Known Limitation
 
 - Máy tài liệu này chạy Node 22 trong khi CI dùng Node 24 (`.nvmrc`); kết quả test cục bộ vẫn qua nhưng không thay cho CI.
 - `npm audit` mức `critical` bỏ qua các lỗ hổng `high` đã biết trong phụ thuộc production.
-- Không có môi trường staging hay triển khai tự động được mô tả.
+- Không có môi trường staging; triển khai lên VPS là thao tác tay.
 
 ## Future Improvement
 

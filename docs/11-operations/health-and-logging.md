@@ -6,8 +6,8 @@ Mô tả nền tảng nằm ở [observability](../02-architecture/observability
 
 | Cách | Lệnh | Ý nghĩa |
 |---|---|---|
-| Liveness | `curl -s http://127.0.0.1:8081/api/v1/health/live` | Process còn phục vụ HTTP |
-| Readiness | `curl -s http://127.0.0.1:8081/api/v1/health/ready` | MongoDB (`database`) và Redis (`redis`); 503 nếu một trong hai lỗi |
+| Liveness | `curl -s https://<API_DOMAIN>/api/v1/health/live` | Process còn phục vụ HTTP |
+| Readiness | `curl -s https://<API_DOMAIN>/api/v1/health/ready` | MongoDB (`database`) và Redis (`redis`); 503 nếu một trong hai lỗi |
 | Docker | `docker compose -f docker-compose.prod.yml ps` | `healthy` của `backend` dựa trên liveness |
 | Giám sát ngoài | Trỏ uptime monitor tới `https://<domain-api>/api/v1/health/ready` | Báo khi cả VPS chết |
 

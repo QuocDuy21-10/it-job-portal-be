@@ -29,9 +29,10 @@ Cổng chỉ gắn vào loopback nên không truy cập được từ mạng ngo
 
 | Dịch vụ | Image | Cổng | Ghi chú |
 |---|---|---|---|
-| `backend` | build target `production`, gắn tag `job-portal-be:${IMAGE_TAG:-latest}` | `127.0.0.1:${PORT:-8081}` | `env_file: .env.production`; `METRICS_PORT=9464` nội bộ; tự dựng `MONGO_URL` từ biến Mongo; volume `uploads` tại `/app/public/images` và `cv_storage` tại `/app/storage`; chờ Mongo và Redis khỏe |
-| `mongodb` | `mongo:7.0` | Không publish | Biến root bắt buộc (`:?`), volume `mongodb_data`, `mongodb_config` |
-| `redis` | `redis:7-alpine` | Không publish | `--requirepass`, `--appendonly yes`, volume `redis_data` |
+| `caddy` | `caddy:2-alpine` | `80`, `443` (cổng duy nhất publish) | Reverse proxy và TLS tự động cho `API_DOMAIN`, đọc [Caddyfile](../../Caddyfile); `mem_limit: 32m`; chờ backend khỏe |
+| `backend` | `${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG}` (build ở CI, không build trên VPS) | Không publish (`expose` nội bộ) | `init: true`, `mem_limit: 450m`; `env_file: .env.production`; `METRICS_PORT=9464` nội bộ; tự dựng `MONGO_URL` từ biến Mongo; volume `uploads` tại `/app/public/images` và `cv_storage` tại `/app/storage`; chờ Mongo và Redis khỏe |
+| `mongodb` | `mongo:7.0` | Không publish | Biến root bắt buộc (`:?`), volume `mongodb_data`, `mongodb_config`; `mem_limit: 450m`, `--wiredTigerCacheSizeGB 0.25` |
+| `redis` | `redis:7-alpine` | Không publish | `--requirepass`, `--appendonly yes`, `--maxmemory 64mb` với `noeviction` (BullMQ yêu cầu), `mem_limit: 96m`, volume `redis_data` |
 | `prometheus` (profile `monitoring`) | `prom/prometheus:v3.13.5` | `127.0.0.1:9090` | Đọc `monitoring/prometheus.yml`, `alerts.yml`; giữ 15 ngày trong volume `prometheus_data` |
 | `alertmanager` (profile `monitoring`) | `prom/alertmanager:v0.34.2` | không publish | Đọc `monitoring/alertmanager.yml` (không commit); volume `alertmanager_data` |
 
@@ -39,7 +40,8 @@ Tất cả dịch vụ nằm trong mạng `backend` riêng; log dùng driver `js
 
 ## Điểm cần biết
 
-- Compose prod **bắt buộc** `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD`, `REDIS_PASSWORD` (cú pháp `${VAR:?}` làm lệnh lỗi nếu thiếu).
+- Compose prod **bắt buộc** `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD`, `REDIS_PASSWORD`, `DOCKERHUB_USER`, `IMAGE_TAG`, `API_DOMAIN` (cú pháp `${VAR:?}` làm lệnh lỗi nếu thiếu).
+- `docker-compose.yml` (dev) và `docker-compose.prod.yml` cùng tên project mặc định (tên thư mục), nên **dùng chung volume** như `<thư-mục>_mongodb_data`. `MONGO_INITDB_*` chỉ có tác dụng khi volume còn trống: chạy thử bản prod trên máy dev với mật khẩu khác sẽ lỗi `Authentication failed`. Khi thử cục bộ hãy thêm `-p <tên-khác>` và đừng chạy `down -v` ở project mặc định.
 - `MONGO_URL` và `REDIS_HOST` trong `.env.production` bị **ghi đè** bởi compose.
 - Ứng dụng kết nối Mongo bằng tài khoản root ([production-security-checklist](../08-security/production-security-checklist.md)).
 - Chỉ có một container `backend`: không có cấu hình nhân bản, và hệ thống chưa sẵn sàng cho nhiều instance ([scalability](../02-architecture/scalability.md)).

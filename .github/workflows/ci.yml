@@ -83,6 +83,9 @@ jobs:
           MONGO_INITDB_ROOT_USERNAME: ci
           MONGO_INITDB_ROOT_PASSWORD: ci
           REDIS_PASSWORD: ci
+          DOCKERHUB_USER: ci
+          IMAGE_TAG: ci
+          API_DOMAIN: ci.example.com
         run: |
           touch .env.production
           docker compose -f docker-compose.prod.yml --profile monitoring config -q

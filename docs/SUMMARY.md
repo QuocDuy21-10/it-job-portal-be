@@ -88,6 +88,7 @@
 - [Docker và Compose](09-infrastructure/docker.md)
 - [CI/CD](09-infrastructure/ci-cd.md)
 - [Triển khai](09-infrastructure/deployment.md)
+- [Deploy VPS nhỏ và Vercel](09-infrastructure/vps-production-guide.md)
 
 ## 10 · Testing
 

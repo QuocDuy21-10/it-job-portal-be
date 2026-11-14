@@ -2,7 +2,7 @@
 
 The deployment guide now lives with the rest of the documentation:
 
-- **[docs/09-infrastructure/deployment.md](docs/09-infrastructure/deployment.md)**: VPS setup, environment, nginx and TLS, updates, rollback.
+- **[docs/09-infrastructure/deployment.md](docs/09-infrastructure/deployment.md)**: VPS setup, environment, Caddy and TLS, updates, rollback; plus [a step-by-step guide for a small VPS with the frontend on Vercel](docs/09-infrastructure/vps-production-guide.md).
 - [docs/09-infrastructure/docker.md](docs/09-infrastructure/docker.md): Dockerfile stages and both Compose files.
 - [docs/11-operations/backup-and-recovery.md](docs/11-operations/backup-and-recovery.md): backups, restore, rollback.
 - [docs/08-security/production-security-checklist.md](docs/08-security/production-security-checklist.md): read before going live.

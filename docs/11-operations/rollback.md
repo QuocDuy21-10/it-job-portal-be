@@ -1,10 +1,10 @@
 # Deploy và rollback
 
-Quy trình cho một VPS chạy `docker-compose.prod.yml`. Mỗi bản build được gắn tag theo commit (`IMAGE_TAG`), nên rollback chỉ là chạy lại image cũ, không cần build lại.
+Quy trình cho một VPS chạy `docker-compose.prod.yml`. Mỗi bản build do CI gắn tag (`X.Y.Z` và `sha-<short>`) trên Docker Hub ([ci-cd](../09-infrastructure/ci-cd.md)), nên rollback chỉ là kéo và chạy lại image cũ, không cần build lại.
 
 ## Chuẩn bị (một lần)
 
-Thêm dòng `IMAGE_TAG=` vào `.env.production`. Compose đọc biến này cho `image: job-portal-be:${IMAGE_TAG:-latest}`; để trong file (thay vì export trong shell) thì mọi lần `up` hay restart sau đều dùng đúng tag.
+Đặt `DOCKERHUB_USER`, `IMAGE_NAME`, `IMAGE_TAG` trong `.env.production`. Compose đọc chúng cho `image: ${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG}`; để trong file (thay vì export trong shell) thì mọi lần `up` hay restart sau đều dùng đúng tag. Backend không publish cổng ra host, nên kiểm tra readiness qua domain: `https://<API_DOMAIN>/api/v1/health/ready`.
 
 ## Deploy
 
@@ -12,23 +12,23 @@ Thêm dòng `IMAGE_TAG=` vào `.env.production`. Compose đọc biến này cho 
 
    ```bash
    grep '^IMAGE_TAG=' .env.production
-   docker image ls job-portal-be
+   docker image ls
    ```
 
-2. Sao lưu MongoDB theo [backup-and-recovery](backup-and-recovery.md).
-3. Lấy mã mới và đặt tag:
+2. Sao lưu MongoDB: `./scripts/backup-mongo.sh` (chi tiết ở [backup-and-recovery](backup-and-recovery.md)).
+3. Đặt tag mới (tag đã được CI đẩy lên Docker Hub) và triển khai:
 
    ```bash
-   git pull
-   NEW_TAG=$(git rev-parse --short HEAD)
-   sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${NEW_TAG}/" .env.production
-   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build backend
+   sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=<tag-mới>/" .env.production
+   ./scripts/deploy.sh
    ```
 
-4. Chờ readiness:
+   `deploy.sh` kéo image, khởi động lại dịch vụ đổi và chờ healthcheck (tối đa 180 giây).
+
+4. Kiểm tra readiness:
 
    ```bash
-   until curl -fs http://127.0.0.1:8081/api/v1/health/ready > /dev/null; do sleep 5; done; echo ready
+   until curl -fs https://<API_DOMAIN>/api/v1/health/ready > /dev/null; do sleep 5; done; echo ready
    ```
 
 5. Theo dõi 30 phút: không có alert `critical` ([alerts](alerts.md)), log backend không có lỗi mới.
@@ -42,23 +42,24 @@ Thêm dòng `IMAGE_TAG=` vào `.env.production`. Compose đọc biến này cho 
 
 ```bash
 sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=<tag-cũ>/" .env.production
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --no-build backend
-until curl -fs http://127.0.0.1:8081/api/v1/health/ready > /dev/null; do sleep 5; done; echo ready
+./scripts/deploy.sh
+until curl -fs https://<API_DOMAIN>/api/v1/health/ready > /dev/null; do sleep 5; done; echo ready
 ```
 
-Không cần `git checkout`: image cũ vẫn còn trên máy. Sau khi ổn định, `git checkout <commit-cũ>` nếu muốn mã nguồn trên VPS khớp với image đang chạy.
+Không cần `git checkout`: tag cũ vẫn còn trên Docker Hub (và thường còn trên máy). Sau khi ổn định, `git checkout <commit-cũ>` nếu muốn mã nguồn trên VPS khớp với image đang chạy.
 
 ## Dọn image
 
-`docker image prune -f` chỉ xoá image không có tag, nên các bản đã gắn tag vẫn còn. Giữ 3 tag gần nhất, xoá tay tag cũ hơn:
+`deploy.sh` đã chạy `docker image prune -f`, chỉ xoá image không có tag nên các bản đã gắn tag vẫn còn. Giữ 3 tag gần nhất (ổ SSD VPS chỉ 25GB, mỗi image nặng khoảng 900MB), xoá tay tag cũ hơn:
 
 ```bash
-docker image ls job-portal-be
-docker image rm job-portal-be:<tag-cũ-hơn>
+docker image ls
+docker image rm <DOCKERHUB_USER>/<IMAGE_NAME>:<tag-cũ-hơn>
 ```
 
 ## Giới hạn
 
 - Repository không có migration. Field và index do bản mới tạo không tự mất khi quay về; mã cũ thường chịu được field thừa, nhưng index mới vẫn còn.
 - Khôi phục từ bản sao lưu là biện pháp cuối và mất mọi dữ liệu ghi sau thời điểm sao lưu.
-- Image build trên chính VPS; nếu bản cũ đã bị xoá, phải `git checkout` rồi build lại.
+- Rollback cần tag cũ còn trên Docker Hub; đừng xoá tag đang là bản ổn định gần nhất.
+- Mỗi lần deploy có thời gian ngừng ngắn vì chỉ có một container backend.
