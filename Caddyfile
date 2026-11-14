@@ -1,0 +1,11 @@
+{$API_DOMAIN} {
+	encode zstd gzip
+	request_body {
+		max_size 10MB
+	}
+	# flush_interval -1: do not buffer, so chat SSE streams reach the client immediately.
+	# WebSocket upgrades (Socket.IO /notifications) are proxied by default.
+	reverse_proxy backend:{$PORT:8081} {
+		flush_interval -1
+	}
+}
