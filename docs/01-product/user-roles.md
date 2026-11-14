@@ -74,18 +74,9 @@ Rút từ decorator của 116 route. `Có` nghĩa là được phép, `Một ph�
 
 Hạn mức chat lấy từ [chat.constant.ts](../../src/chat/constants/chat.constant.ts) và chính sách ở [chat-quota-policies](../04-database/collections/chat-quota-policies.md).
 
-## Known Limitation: CV của mọi người dùng đọc được bởi bất kỳ ai đã đăng nhập
+## CV trực tuyến của người khác
 
-Hai route dưới đây chỉ yêu cầu đăng nhập, không kiểm tra vai trò hay quyền sở hữu:
-
-| Route | Hành vi |
-|---|---|
-| `GET /api/v1/cv-profiles` | Trả danh sách phân trang **toàn bộ** CV trực tuyến |
-| `GET /api/v1/cv-profiles/:id` | Trả CV của bất kỳ ai khi biết `_id` |
-
-Bằng chứng: [cv-profiles.controller.ts](../../src/cv-profiles/cv-profiles.controller.ts) chỉ có `@UseGuards(JwtAuthGuard)` ở cấp class. Handler không có `@Roles`. `findAll` và `findById` trong [cv-profiles.service.ts](../../src/cv-profiles/cv-profiles.service.ts) không lọc theo người gọi. Chính comment trong controller ghi *"Add @Roles('ADMIN') decorator when implementing RBAC"* và mô tả Swagger ghi *"Implement RBAC guard before production use"*.
-
-CV chứa họ tên, điện thoại, email, ngày sinh và địa chỉ (xem [cv-profiles](../04-database/collections/cv-profiles.md)). Đây là rủi ro lộ dữ liệu cá nhân (kiểu BOLA, Broken Object Level Authorization). Trạng thái: đã xác minh bằng đọc mã; **chưa** thử gọi API thực tế vì chưa chạy được MongoDB. Việc sửa nằm ngoài phạm vi dự án tài liệu và chưa được thực hiện.
+`GET /api/v1/cv-profiles` và `GET /api/v1/cv-profiles/:id` chỉ dành cho `SUPER ADMIN` (`@Roles(ERole.SUPER_ADMIN)` trong [cv-profiles.controller.ts](../../src/cv-profiles/cv-profiles.controller.ts)); vai trò khác nhận `403`. Kiểm thử: `test/tenant-authorization.e2e-spec.ts`. HR chưa có route xem CV trực tuyến của ứng viên theo phạm vi công ty.
 
 ## Ghi chú về xác thực
 

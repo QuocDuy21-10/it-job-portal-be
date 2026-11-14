@@ -47,7 +47,7 @@ Cần người vận hành tự xác nhận các mục `Chưa xác minh` trên h
 | Validate đầu vào, bỏ field lạ | Đã có | `ValidationPipe({ whitelist: true })` |
 | Lọc truy vấn từ query string | Một phần | Có cho `jobs`, `users`, `companies`; không cho `resumes`, `skills`, `notifications` |
 | Rate limit | Một phần | Chỉ `auth`, `chat`, `job-search`, `resumes` (2 route); route khác không giới hạn |
-| Phân quyền theo vai trò | Một phần | Có `@Roles`; lỗ hổng `cv-profiles` ([authorization](authorization.md)) |
+| Phân quyền theo vai trò | Một phần | Có `@Roles`; CASL chưa được thực thi ([authorization](authorization.md)) |
 | Chính sách mật khẩu | Một phần | Không nhất quán, không độ phức tạp |
 | 2FA, khóa tài khoản sau nhiều lần sai | Chưa có | |
 | Chống đoán OTP | Đã có | 5 lần sai, chờ 60 giây |
@@ -82,6 +82,5 @@ Cách giảm thiểu hiện có: đặt `INIT_PASSWORD` mạnh và xóa các tà
 2. Mật khẩu và secret sinh ngẫu nhiên.
 3. Không seed dữ liệu mẫu, hoặc xóa tài khoản `@seed.local`.
 4. Reverse proxy có TLS; `TRUST_PROXY=1`; đóng mọi cổng ngoài SSH và 80/443.
-5. Xử lý rủi ro `cv-profiles` ([authorization](authorization.md)) trước khi có người dùng thật.
-6. Có lịch sao lưu đã thử khôi phục.
-7. Có `SENTRY_DSN` và theo dõi `GET /api/v1/health/ready`.
+5. Có lịch sao lưu đã thử khôi phục.
+6. Có `SENTRY_DSN` và theo dõi `GET /api/v1/health/ready`.

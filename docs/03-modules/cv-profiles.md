@@ -45,7 +45,7 @@ Chín route: `upsert`, `me` (GET, PUT, DELETE), `check`, `me/activate`, `me/deac
 
 ## Known Limitation
 
-**Nghiêm trọng, ảnh hưởng dữ liệu cá nhân:** `GET /cv-profiles` và `GET /cv-profiles/:id` không kiểm tra vai trò hay quyền sở hữu, nên mọi người dùng đăng nhập đọc được CV của người khác. Bằng chứng và phạm vi ở [user-roles](../01-product/user-roles.md#known-limitation-cv-của-mọi-người-dùng-đọc-được-bởi-bất-kỳ-ai-đã-đăng-nhập).
+`GET /cv-profiles` và `GET /cv-profiles/:id` chỉ dành cho `SUPER ADMIN`; chi tiết ở [user-roles](../01-product/user-roles.md#cv-trực-tuyến-của-người-khác).
 
 Các giới hạn khác của schema (ngày dạng chuỗi, index khai báo hai lần) ở tài liệu collection.
 

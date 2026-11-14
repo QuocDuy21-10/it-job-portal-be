@@ -10,7 +10,6 @@ Mô hình và ma trận quyền ở [user-roles](../01-product/user-roles.md); c
 
 | # | Rủi ro | Bằng chứng | Mức | Chi tiết |
 |---|---|---|---|---|
-| 1 | Mọi người dùng đăng nhập đọc được CV của người khác (`GET /cv-profiles`, `GET /cv-profiles/:id`) | Không `@Roles`, không kiểm tra sở hữu trong service; comment trong code tự cảnh báo | **Cao** | [user-roles](../01-product/user-roles.md#known-limitation-cv-của-mọi-người-dùng-đọc-được-bởi-bất-kỳ-ai-đã-đăng-nhập) |
 | 2 | File CV và ảnh tải lên truy cập được không cần đăng nhập nếu biết URL | `useStaticAssets` phục vụ `public/`; tên file là `randomUUID()` nên khó đoán, nhưng URL xuất hiện trong dữ liệu trả về API | Trung bình | [data-protection](data-protection.md#file-tải-lên) |
 | 3 | Seed tạo 96 tài khoản mẫu dùng chung `INIT_PASSWORD` mà `DEPLOYMENT.md` hướng dẫn chạy ở production | Seed không có chặn môi trường | Trung bình đến cao | [production-security-checklist](production-security-checklist.md) |
 | 4 | `GET /resumes` nhận bộ lọc, `populate`, `projection` thô | `sanitizeAqpQuery` bị comment | Trung bình | [api-overview](../05-api/api-overview.md#lọc-và-sắp-xếp-bằng-query-string) |
@@ -21,7 +20,7 @@ Mô hình và ma trận quyền ở [user-roles](../01-product/user-roles.md); c
 
 ## Điều đã kiểm tra là đúng
 
-Các route nhạy cảm sau có kiểm tra sở hữu hoặc vai trò đúng như đọc từ mã: `GET /resumes/:id/analysis` (chủ hồ sơ hoặc `SUPER ADMIN`), nhóm `subscribers` (theo chủ sở hữu), nhóm `notifications` (luôn gắn `userId`), `GET /companies/:id` cho HR (chỉ công ty mình), `PATCH /resumes/:id` cho HR (chỉ hồ sơ công ty mình), nhóm quản trị người dùng và kỹ năng (`SUPER ADMIN`).
+Các route nhạy cảm sau có kiểm tra sở hữu hoặc vai trò đúng như đọc từ mã: `GET /resumes/:id/analysis` (chủ hồ sơ hoặc `SUPER ADMIN`), nhóm `subscribers` (theo chủ sở hữu), nhóm `notifications` (luôn gắn `userId`), `GET /companies/:id` cho HR (chỉ công ty mình), `GET /cv-profiles` và `GET /cv-profiles/:id` (chỉ `SUPER ADMIN`), `PATCH /resumes/:id` cho HR (chỉ hồ sơ công ty mình), nhóm quản trị người dùng và kỹ năng (`SUPER ADMIN`).
 
 ## Chưa xác minh
 
