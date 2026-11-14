@@ -38,20 +38,22 @@ async function flushQueueDb(): Promise<void> {
   await redis.quit();
 }
 
-export async function createTestApp(): Promise<TestApp> {
+export async function createTestApp(options: { throttle?: boolean } = {}): Promise<TestApp> {
   // Before boot, so BullMQ workers never see keys left by a previous run.
   await flushQueueDb();
 
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+  let builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(GeminiService)
     .useValue(inertService())
     .overrideProvider(GroqService)
     .useValue(inertService())
     .overrideProvider(MailerService)
-    .useValue({ sendMail: jest.fn().mockResolvedValue(undefined) })
-    .overrideGuard(ThrottlerGuard)
-    .useValue({ canActivate: () => true })
-    .compile();
+    .useValue({ sendMail: jest.fn().mockResolvedValue(undefined) });
+  if (!options.throttle) {
+    // ThrottlerGuard is a provider behind APP_GUARD (useExisting), so it is replaced as a provider.
+    builder = builder.overrideProvider(ThrottlerGuard).useValue({ canActivate: () => true });
+  }
+  const moduleRef = await builder.compile();
 
   const app = moduleRef.createNestApplication<NestExpressApplication>();
   configureApp(app);

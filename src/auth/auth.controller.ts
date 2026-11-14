@@ -18,7 +18,8 @@ import { LocalAuthGuard } from './guards/local-auth.guard';
 import { Request, Response } from 'express';
 import { IUser } from 'src/users/user.interface';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
+import { STRICT_THROTTLE } from 'src/config/throttle.constants';
 import { AuthRegisterDto } from './dto/auth-register.dto';
 import { AuthEmailLoginDto } from './dto/auth-email-login.dto';
 import { AuthGoogleLoginDto } from './dto/auth-google-login.dto';
@@ -42,7 +43,6 @@ export class AuthController {
 
   @Public()
   @UseGuards(LocalAuthGuard)
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 300000, limit: 10 } })
   @ApiOperation({
     summary: 'Login',
@@ -68,7 +68,6 @@ export class AuthController {
   }
 
   @Public()
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 3600000, limit: 5 } })
   @ApiOperation({
     summary: 'Register a new user',
@@ -82,7 +81,6 @@ export class AuthController {
 
   @Post('verify')
   @Public()
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 300000, limit: 10 } })
   @ApiOperation({
     summary: 'Verify account',
@@ -118,7 +116,6 @@ export class AuthController {
 
   @Post('resend-code')
   @Public()
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 300000, limit: 5 } })
   @ApiOperation({
     summary: 'Resend verification code',
@@ -156,7 +153,6 @@ export class AuthController {
   }
 
   @Public()
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 300000, limit: 10 } })
   @ApiOperation({
     summary: 'Login with Google',
@@ -245,7 +241,6 @@ export class AuthController {
   }
 
   @Post('change-password')
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 300000, limit: 5 } })
   @ApiOperation({ summary: 'Change Password' })
   @ResponseMessage('Change password successfully')
@@ -260,7 +255,6 @@ export class AuthController {
   }
 
   @Post('set-password')
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 300000, limit: 5 } })
   @ApiOperation({ summary: 'Set Password (for OAuth users without a password)' })
   @ResponseMessage('Set password successfully')
@@ -275,7 +269,7 @@ export class AuthController {
   }
 
   @Public()
-  @UseGuards(ThrottlerGuard)
+  @Throttle(STRICT_THROTTLE)
   @Post('forgot-password')
   @ApiOperation({ summary: 'Forgot Password (Request OTP/Link)' })
   @ResponseMessage('Request process successfully')
@@ -284,7 +278,6 @@ export class AuthController {
   }
 
   @Public()
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 300000, limit: 5 } })
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset Password (Confirm)' })
@@ -294,7 +287,6 @@ export class AuthController {
   }
 
   @Delete('account')
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 3600000, limit: 3 } })
   @ApiOperation({
     summary: 'Request Account Deletion',
@@ -329,7 +321,6 @@ export class AuthController {
   }
 
   @Post('account/cancel-deletion')
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 300000, limit: 5 } })
   @ApiOperation({
     summary: 'Cancel Account Deletion',
@@ -350,7 +341,6 @@ export class AuthController {
 
   @Public()
   @Post('account/cancel-deletion-by-token')
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 300000, limit: 5 } })
   @ApiOperation({
     summary: 'Cancel Account Deletion by Token',

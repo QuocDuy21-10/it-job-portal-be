@@ -13,13 +13,12 @@ import {
   Logger,
   HttpCode,
   HttpStatus,
-  UseGuards,
   Res,
   StreamableFile,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { SkipTransform } from 'src/utils/decorators/skip-transform.decorator';
-import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { BulkDeleteDto } from 'src/utils/dto/bulk-delete.dto';
 import { ResumesService } from './resumes.service';
 import { CreateUserCvDto } from './dto/create-resume.dto';
@@ -149,7 +148,6 @@ export class ResumesController {
   // CV Online Submission
 
   @Post('cv-online')
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 300000, limit: 10 } })
   @ApiOperation({
     summary: 'Submit CV Online - Apply using structured CV profile',
@@ -182,7 +180,6 @@ export class ResumesController {
   // CV File Upload
 
   @Post('upload-cv')
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 3600000, limit: 20 } })
   @UseInterceptors(
     FileInterceptor('file', {

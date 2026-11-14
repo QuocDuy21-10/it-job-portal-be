@@ -14,7 +14,7 @@ import { DatabasesModule } from './databases/databases.module';
 import { SubscribersModule } from './subscribers/subscribers.module';
 import { MailModule } from './mail/mail.module';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import Redis from 'ioredis';
 import { HealthModule } from './health/health.module';
@@ -30,8 +30,9 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { CaslModule } from './casl';
 import { SkillsModule } from './skills/skills.module';
 import { validateEnv } from './config/env.validation';
+import { BASELINE_THROTTLERS } from './config/throttle.constants';
 import { LoggerModule } from 'nestjs-pino';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { AppExceptionFilter } from './utils/filters/app-exception.filter';
 import { resolveRequestId } from './utils/helpers/request-id.helper';
@@ -76,11 +77,7 @@ import { resolveRequestId } from './utils/helpers/request-id.helper';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        throttlers: [
-          { name: 'burst', ttl: 1000, limit: 5 },
-          { name: 'sustained', ttl: 10000, limit: 20 },
-          { name: 'default', ttl: 60000, limit: 60 },
-        ],
+        throttlers: BASELINE_THROTTLERS,
         storage: new ThrottlerStorageRedisService(
           new Redis({
             host: configService.get('REDIS_HOST', 'localhost'),
@@ -126,7 +123,12 @@ import { resolveRequestId } from './utils/helpers/request-id.helper';
     StatisticsModule,
     CaslModule,
   ],
-  // Unified HTTP error envelope; unexpected errors are still reported to Sentry.
-  providers: [{ provide: APP_FILTER, useClass: AppExceptionFilter }],
+  providers: [
+    // Unified HTTP error envelope; unexpected errors are still reported to Sentry.
+    { provide: APP_FILTER, useClass: AppExceptionFilter },
+    // useExisting (not useClass) so the e2e harness can replace the guard with overrideProvider.
+    ThrottlerGuard,
+    { provide: APP_GUARD, useExisting: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

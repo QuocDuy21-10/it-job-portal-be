@@ -46,7 +46,7 @@ Cần người vận hành tự xác nhận các mục `Chưa xác minh` trên h
 | Swagger tắt ở production | Đã có | Chỉ bật khi `SWAGGER_ENABLED=true` |
 | Validate đầu vào, bỏ field lạ | Đã có | `ValidationPipe({ whitelist: true })` |
 | Lọc truy vấn từ query string | Một phần | Có cho `jobs`, `users`, `companies`; không cho `resumes`, `skills`, `notifications` |
-| Rate limit | Một phần | Chỉ `auth`, `chat`, `job-search`, `resumes` (2 route); route khác không giới hạn |
+| Rate limit | Đã có | `ThrottlerGuard` toàn cục: nền 20/giây, 100/10 giây, 300/phút theo IP và route; `auth`, `chat`, `job-search` giữ mức chặt ([api-overview](../05-api/api-overview.md#giới-hạn-tốc-độ)) |
 | Phân quyền theo vai trò | Một phần | Có `@Roles`; CASL chưa được thực thi ([authorization](authorization.md)) |
 | Chính sách mật khẩu | Một phần | Không nhất quán, không độ phức tạp |
 | 2FA, khóa tài khoản sau nhiều lần sai | Chưa có | |
