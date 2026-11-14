@@ -32,7 +32,7 @@ Lệnh kiểm tra dùng chung bên dưới:
 
 ```bash
 docker compose -f docker-compose.prod.yml logs --since 30m backend
-curl -s http://127.0.0.1:8081/api/v1/health/ready
+curl -s https://<API_DOMAIN>/api/v1/health/ready
 docker compose -f docker-compose.prod.yml exec backend wget -qO- http://127.0.0.1:9464/metrics | head
 ```
 

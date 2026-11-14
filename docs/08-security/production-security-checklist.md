@@ -32,7 +32,7 @@ Cần người vận hành tự xác nhận các mục `Chưa xác minh` trên h
 | Chỉ backend được publish, chỉ trên `127.0.0.1` | Đã có | [docker-compose.prod.yml](../../docker-compose.prod.yml) |
 | Mongo, Redis không publish ra ngoài | Đã có | như trên; mạng `backend` nội bộ |
 | Redis có mật khẩu, bật AOF | Đã có | `--requirepass`, `--appendonly yes` |
-| TLS | Chưa xác minh | Dựa vào nginx hoặc Caddy ngoài repository ([deployment](../09-infrastructure/deployment.md)) |
+| TLS | Chưa xác minh | Caddy trong compose (`Caddyfile`), chưa kiểm chứng với chứng chỉ thật ([deployment](../09-infrastructure/deployment.md)) |
 | `TRUST_PROXY` đặt đúng | Chưa xác minh | Cấu hình tay; sai thì rate limit theo IP của proxy |
 | Tường lửa chỉ mở SSH, 80, 443 | Chưa xác minh | Khuyến nghị trong `DEPLOYMENT.md`, không thể kiểm tra |
 | Cookie refresh `Secure` + `SameSite=Strict` | Đã có | Ở `NODE_ENV=production`; yêu cầu frontend và API cùng site qua HTTPS |

@@ -11,7 +11,7 @@ Tình trạng hiện có: repository chỉ chứa **lệnh sao lưu mẫu** tron
 | File CV | volume `cv_storage` tại `/app/storage` | CV ứng viên (dữ liệu cá nhân). Chỉ đọc qua `GET /resumes/:id/file`; **bắt buộc** sao lưu và giới hạn quyền đọc bản sao lưu |
 | Redis | volume `redis_data` (AOF) | Hàng đợi chờ xử lý (kể cả lịch xóa tài khoản), quota, cache danh sách. Có thể tái tạo phần lớn, nhưng việc đang chờ sẽ mất |
 | `.env.production` | VPS | Bí mật; lưu riêng và an toàn, **không** để chung với sao lưu dữ liệu |
-| Cấu hình nginx, chứng chỉ | VPS | Ngoài repository |
+| `Caddyfile`, chứng chỉ TLS | Repository và volume `caddy_data` | `Caddyfile` có trong git; chứng chỉ tự cấp lại được nên không cần sao lưu |
 
 Dữ liệu trong `CACHE_MANAGER` (token đặt lại mật khẩu, hủy xóa) nằm trong bộ nhớ nên **không thể sao lưu**.
 

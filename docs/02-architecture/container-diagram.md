@@ -8,7 +8,7 @@ Mức 2 của mô hình C4: những tiến trình và kho dữ liệu chạy đ�
 flowchart TB
     fe["Frontend web"]
     subgraph vps["VPS - docker-compose.prod.yml"]
-        proxy["Reverse proxy<br/>nginx hoặc Caddy<br/>TLS"]
+        proxy["Caddy<br/>TLS tự động"]
         subgraph net["Docker network nội bộ"]
             be["backend<br/>NestJS :8081<br/>API + WebSocket + worker + cron"]
             mongo[("MongoDB 7")]
@@ -32,7 +32,7 @@ flowchart TB
 | `backend` | Node 24, NestJS 10 | REST API, WebSocket, worker BullMQ, cron, tất cả cùng một tiến trình | [Dockerfile](../../Dockerfile), [docker-compose.prod.yml](../../docker-compose.prod.yml) |
 | MongoDB | `mongo:7.0` | Lưu toàn bộ dữ liệu nghiệp vụ | [docker-compose.prod.yml](../../docker-compose.prod.yml) |
 | Redis | `redis:7-alpine` | Hàng đợi BullMQ, rate limit, cache, quota | [docker-compose.prod.yml](../../docker-compose.prod.yml) |
-| Reverse proxy | nginx hoặc Caddy | Kết thúc TLS, chuyển tiếp tới backend | Không nằm trong repository. Xem [DEPLOYMENT.md](../../DEPLOYMENT.md) |
+| Reverse proxy | Caddy (`caddy:2-alpine`) | Kết thúc TLS, chuyển tiếp tới backend | Trong compose production, cấu hình ở [Caddyfile](../../Caddyfile). Xem [deployment](../09-infrastructure/deployment.md) |
 
 ## Giao tiếp giữa các container
 
