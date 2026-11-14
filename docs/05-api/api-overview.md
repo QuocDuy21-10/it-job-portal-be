@@ -125,15 +125,15 @@ Mọi route danh sách dùng aqp đều đi qua `parseListQuery` ([list-query.he
 
 ## Giới hạn tốc độ
 
-`ThrottlerModule` khai báo ba mức dùng chung ([app.module.ts](../../src/app.module.ts)), lưu trong Redis:
+`ThrottlerGuard` đăng ký toàn cục ([app.module.ts](../../src/app.module.ts)) nên mọi route đều bị giới hạn, đếm theo IP và theo từng route, lưu trong Redis. Mức ở [throttle.constants.ts](../../src/config/throttle.constants.ts):
 
-| Tên | Cửa sổ | Giới hạn |
-|---|---|---|
-| `burst` | 1 giây | 5 |
-| `sustained` | 10 giây | 20 |
-| `default` | 60 giây | 60 |
+| Tên | Cửa sổ | Mức nền | Mức chặt |
+|---|---|---|---|
+| `burst` | 1 giây | 20 | 5 |
+| `sustained` | 10 giây | 100 | 20 |
+| `default` | 60 giây | 300 | 60 |
 
-**Chỉ có hiệu lực ở controller hoặc route gắn `ThrottlerGuard`**: `auth`, `chat`, `job-search`, `resumes` (route `cv-online`, `upload-cv`). Các route khác không bị giới hạn tốc độ. `@Throttle` trên route ghi đè mức `default`. Vượt giới hạn trả `429`. IP lấy từ `X-Forwarded-For` khi đặt `TRUST_PROXY`.
+Mức chặt áp cho `job-search`, `chat` và `POST /auth/forgot-password`. Các route `auth` khác và `resumes` (`cv-online`, `upload-cv`) có `@Throttle` ghi đè riêng mức `default`. `health` không bị giới hạn. Vượt giới hạn trả `429`. IP lấy từ `X-Forwarded-For` khi đặt `TRUST_PROXY`.
 
 ## CORS và header
 

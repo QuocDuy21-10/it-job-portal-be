@@ -50,9 +50,7 @@ Tất cả được ghi trong tài liệu liên quan, kèm bằng chứng. Mức
 
 | # | Phát hiện | Mức | Nơi ghi |
 |---|---|---|---|
-| 1 | Mọi người dùng đăng nhập đọc được CV của người khác (`GET /cv-profiles`, `/:id`) | Cao | [user-roles](../01-product/user-roles.md#known-limitation-cv-của-mọi-người-dùng-đọc-được-bởi-bất-kỳ-ai-đã-đăng-nhập) |
 | 2 | Xóa tài khoản không triệt để: `resumes` giữ nội dung CV, file không bị xóa, một số collection không bị xóa | Cao | [account-deletion](../06-workflows/use-cases/account-deletion.md#dữ-liệu-sau-khi-xóa) |
-| 3 | Seed tạo 96 tài khoản chung `INIT_PASSWORD`, và hướng dẫn triển khai bảo chạy ở production | Trung bình đến cao | [production-security-checklist](../08-security/production-security-checklist.md#mục-cần-xử-lý-trước-khi-chạy-production-seed) |
 | 4 | Văn bản CV và email có thể xuất hiện trong log; email người dùng gửi tới nhà cung cấp AI | Trung bình | [data-protection](../08-security/data-protection.md) |
 | 5 | File CV phục vụ tĩnh không cần xác thực (tên UUID) | Trung bình | [data-protection](../08-security/data-protection.md#file-tải-lên) |
 | 6 | Chính sách mật khẩu yếu và không nhất quán; không khóa tài khoản, không 2FA | Trung bình | [authentication](../08-security/authentication.md) |

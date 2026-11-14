@@ -37,4 +37,39 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...base, METRICS_PORT: 'abc' })).toThrow('METRICS_PORT');
     expect(() => validateEnv({ ...base, METRICS_PORT: '70000' })).toThrow('METRICS_PORT');
   });
+
+  describe('secret strength in production', () => {
+    const strong = (char: string) => char.repeat(32);
+    const production = {
+      ...base,
+      NODE_ENV: 'production',
+      FE_URL: 'https://example.com',
+      CORS_ORIGINS: 'https://example.com',
+      JWT_ACCESS_TOKEN_SECRET: strong('a'),
+      JWT_REFRESH_TOKEN_SECRET: strong('b'),
+      OTP_SECRET: strong('c'),
+    };
+
+    it('accepts 32-character secrets', () => {
+      expect(() => validateEnv(production)).not.toThrow();
+    });
+
+    it('rejects secrets shorter than 32 characters and names them without printing values', () => {
+      const weak = 'x'.repeat(31);
+      const run = () =>
+        validateEnv({ ...production, JWT_REFRESH_TOKEN_SECRET: weak, OTP_SECRET: weak });
+      expect(run).toThrow('JWT_REFRESH_TOKEN_SECRET, OTP_SECRET');
+      expect(run).not.toThrow(weak);
+    });
+
+    it('rejects identical access and refresh secrets', () => {
+      expect(() => validateEnv({ ...production, JWT_REFRESH_TOKEN_SECRET: strong('a') })).toThrow(
+        'must differ',
+      );
+    });
+
+    it('does not check secret strength outside production', () => {
+      expect(() => validateEnv(base)).not.toThrow();
+    });
+  });
 });

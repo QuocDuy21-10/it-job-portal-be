@@ -8,10 +8,10 @@ import {
   Param,
   Res,
   HttpException,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody, ApiQuery, ApiResponse } from '@nestjs/swagger';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
+import { STRICT_THROTTLE } from 'src/config/throttle.constants';
 import { Response } from 'express';
 import { ChatService } from './chat.service';
 import { SendMessageDto } from './dto/send-message.dto';
@@ -45,7 +45,7 @@ import { ChatQuotaExceededException } from './exceptions/too-many-requests.excep
 
 @ApiTags('Chat')
 @Controller('chat')
-@UseGuards(ThrottlerGuard)
+@Throttle(STRICT_THROTTLE)
 export class ChatController {
   constructor(
     private readonly chatService: ChatService,

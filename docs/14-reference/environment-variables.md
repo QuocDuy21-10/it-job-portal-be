@@ -53,11 +53,11 @@ Ký hiệu cột "Bắt buộc": `Boot` = thiếu thì ứng dụng không khở
 
 | Biến | Bắt buộc | Mặc định | Dùng cho |
 |---|---|---|---|
-| `JWT_ACCESS_TOKEN_SECRET` | Boot | không | Ký access token; cũng dùng xác minh token của Socket.IO |
+| `JWT_ACCESS_TOKEN_SECRET` | Boot | không | Ký access token; cũng dùng xác minh token của Socket.IO. Production: tối thiểu 32 ký tự |
 | `JWT_ACCESS_EXPIRES_IN` | Boot | không | Thời hạn access token (`.env.example` mẫu `15m`) |
-| `JWT_REFRESH_TOKEN_SECRET` | Boot | không | Ký refresh token và tính HMAC lưu phiên |
+| `JWT_REFRESH_TOKEN_SECRET` | Boot | không | Ký refresh token và tính HMAC lưu phiên. Production: tối thiểu 32 ký tự, phải khác `JWT_ACCESS_TOKEN_SECRET` |
 | `JWT_REFRESH_EXPIRES_IN` | Boot | không | Thời hạn refresh token và cookie (mẫu `7d`) |
-| `OTP_SECRET` | Boot | không | Khóa HMAC cho OTP |
+| `OTP_SECRET` | Boot | không | Khóa HMAC cho OTP. Production: tối thiểu 32 ký tự |
 | `GOOGLE_CLIENT_ID` | Không | không | `audience` khi xác minh Google ID token |
 | `GOOGLE_CLIENT_SECRET` | Không | không | **Không có chỗ nào trong `src/` đọc biến này** |
 
@@ -68,7 +68,7 @@ Tạo secret bằng `openssl rand -hex 32`. Không đưa vào git.
 | Biến | Bắt buộc | Mặc định | Dùng cho |
 |---|---|---|---|
 | `EMAIL_ADMIN` | Seed | không | Email tài khoản quản trị tạo bởi seed |
-| `INIT_PASSWORD` | Seed | không | Mật khẩu của **mọi** tài khoản do seed tạo (admin, 20 HR, 75 ứng viên) |
+| `INIT_PASSWORD` | Seed | không | Mật khẩu của mọi tài khoản do seed tạo. Ngoài `development`/`test` chỉ tạo admin và yêu cầu tối thiểu 12 ký tự |
 
 ## Email
 

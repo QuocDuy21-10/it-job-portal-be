@@ -40,6 +40,10 @@ type SeedJobDocument = {
   };
 };
 
+// Fail closed: sample accounts share INIT_PASSWORD, so they are created only where NODE_ENV says it is safe.
+const SAMPLE_DATA_ENVIRONMENTS = ['development', 'test'];
+const MIN_ADMIN_ONLY_INIT_PASSWORD_LENGTH = 12;
+
 @Injectable()
 export class SeedService {
   private readonly logger = new Logger(SeedService.name);
@@ -64,6 +68,15 @@ export class SeedService {
 
     await this.seedSkills();
     await this.seedJobSources();
+
+    if (!this.seedsSampleData()) {
+      await this.seedUsers(adminEmail, hashedPassword, [], true);
+      this.logger.log(
+        'NODE_ENV is not development or test: seeded skills, job sources and the admin account only; sample data skipped',
+      );
+      return;
+    }
+
     const companies = await this.seedCompanies();
     await this.seedUsers(adminEmail, hashedPassword, companies);
 
@@ -76,6 +89,10 @@ export class SeedService {
     await this.syncCandidateReferences(candidates, companies, jobs);
 
     this.logger.log('Seeding completed successfully');
+  }
+
+  private seedsSampleData(): boolean {
+    return SAMPLE_DATA_ENVIRONMENTS.includes(this.configService.get<string>('NODE_ENV') ?? '');
   }
 
   private async seedSkills(): Promise<void> {
@@ -142,8 +159,10 @@ export class SeedService {
     adminEmail: string,
     hashedPassword: string,
     companies: SeedCompanyDocument[],
+    adminOnly = false,
   ): Promise<void> {
-    const usersData = createUsersSeedData(adminEmail, hashedPassword, companies);
+    const allUsers = createUsersSeedData(adminEmail, hashedPassword, companies);
+    const usersData = adminOnly ? allUsers.filter(user => user.email === adminEmail) : allUsers;
     const emails = usersData.map(user => user.email);
     const existingUsers = await this.userModel.find({ email: { $in: emails } }, 'email').lean();
     const existingEmails = new Set(existingUsers.map(user => user.email));
@@ -317,6 +336,12 @@ export class SeedService {
     if (missing.length > 0) {
       throw new Error(
         `Missing required environment variables for seeding: ${missing.join(', ')}. Check your .env file.`,
+      );
+    }
+    const initPassword = this.configService.get<string>('INIT_PASSWORD')!;
+    if (!this.seedsSampleData() && initPassword.length < MIN_ADMIN_ONLY_INIT_PASSWORD_LENGTH) {
+      throw new Error(
+        `INIT_PASSWORD must be at least ${MIN_ADMIN_ONLY_INIT_PASSWORD_LENGTH} characters unless NODE_ENV is development or test.`,
       );
     }
   }

@@ -6,10 +6,15 @@ import { Notification, NotificationSchema } from './schemas/notification.schema'
 import { NotificationsService } from './notifications.service';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsGateway } from './notifications.gateway';
+import { User, UserSchema } from 'src/users/schemas/user.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Notification.name, schema: NotificationSchema }]),
+    MongooseModule.forFeature([
+      { name: Notification.name, schema: NotificationSchema },
+      // Read-only: the gateway checks account state when a socket connects.
+      { name: User.name, schema: UserSchema },
+    ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

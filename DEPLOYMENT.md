@@ -10,6 +10,6 @@ The deployment guide now lives with the rest of the documentation:
 
 Quick start for local development: `nvm use && npm ci && cp .env.example .env && npm run docker:dev && npm run dev` (see [docs/00-getting-started/quick-start.md](docs/00-getting-started/quick-start.md)).
 
-> Warning: `npm run seed` creates 96 sample accounts (1 admin, 20 HR, 75 candidates) that share `INIT_PASSWORD`. Do not run it unchanged on production.
+> `npm run seed` creates sample companies, jobs and `@seed.local` accounts only when `NODE_ENV` is `development` or `test`. With any other value (or none) it creates skills, job sources and the `EMAIL_ADMIN` account only, and requires `INIT_PASSWORD` of at least 12 characters.
 
 The previous long-form version of this file is in git history (`git log -- DEPLOYMENT.md`).

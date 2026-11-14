@@ -36,6 +36,8 @@ import { JwtAuthGuard } from 'src/auth/guards';
 import { FilesService } from '../files/files.service';
 import { UpsertCvProfileDto } from './dto/upsert-cv-profile.dto';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
+import { Roles } from 'src/casl/decorators/roles.decorator';
+import { ERole } from 'src/casl/enums/role.enum';
 
 @ApiTags('CV Profiles')
 @Controller('cv-profiles')
@@ -427,14 +429,13 @@ export class CvProfilesController {
 
   /**
    * GET /cv-profiles/:id
-   * Get CV Profile by ID
-   * Note: Add role guard for admin/recruiter access
+   * Get any CV Profile by ID (SUPER_ADMIN only)
    */
   @Get(':id')
+  @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'Get CV Profile by ID',
-    description:
-      'Retrieve a specific CV Profile by its ID. Typically used by admins or recruiters.',
+    summary: 'Get CV Profile by ID (Admin)',
+    description: 'Retrieve any CV Profile by its ID. Requires SUPER_ADMIN role.',
   })
   @ApiParam({
     name: 'id',
@@ -466,14 +467,13 @@ export class CvProfilesController {
 
   /**
    * GET /cv-profiles
-   * Get all CV Profiles (Admin only)
-   * Add @Roles('ADMIN') decorator when implementing RBAC
+   * Get all CV Profiles (SUPER_ADMIN only)
    */
   @Get()
+  @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Get All CV Profiles (Admin)',
-    description:
-      'Retrieve all CV Profiles with pagination. This endpoint is intended for administrators only. Implement RBAC guard before production use.',
+    description: 'Retrieve all CV Profiles with pagination. Requires SUPER_ADMIN role.',
   })
   @ApiResponse({
     status: 200,

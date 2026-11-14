@@ -140,7 +140,8 @@ export function createUsersSeedData(
     updatedAt: now,
   }));
 
-  const hrs = Array.from({ length: 20 }, (_, index) => {
+  // Sample HR accounts each need a company; with none (admin-only seed) there are no HR rows.
+  const hrs = Array.from({ length: companies.length === 0 ? 0 : 20 }, (_, index) => {
     const company = companies[index % companies.length];
 
     return {

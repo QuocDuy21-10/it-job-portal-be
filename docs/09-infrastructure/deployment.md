@@ -64,9 +64,9 @@ docker compose -f docker-compose.prod.yml ps          # backend sẽ chuyển "h
 curl -s http://127.0.0.1:8081/api/v1/health/ready
 ```
 
-### 4. Dữ liệu ban đầu (cân nhắc kỹ)
+### 4. Dữ liệu ban đầu
 
-`DEPLOYMENT.md` hướng dẫn chạy `npm run seed` từ image `development` trong cùng mạng Docker để tạo tài khoản quản trị. **Seed không chỉ tạo admin**: nó tạo 95 tài khoản mẫu (20 HR, 75 ứng viên) dùng chung `INIT_PASSWORD`, cùng công ty, tin, CV và hồ sơ mẫu, và không kiểm tra môi trường. Đọc [production-security-checklist](../08-security/production-security-checklist.md#mục-cần-xử-lý-trước-khi-chạy-production-seed) trước khi chạy ở production.
+`npm run seed` tạo kỹ năng, nguồn tin và tài khoản quản trị `EMAIL_ADMIN`. Công ty, tin, CV và các tài khoản mẫu `@seed.local` chỉ được tạo khi `NODE_ENV` là `development` hoặc `test`; mọi giá trị khác, kể cả không đặt, đều chỉ tạo admin ([seed.service.ts](../../src/databases/seeds/seed.service.ts)). Ở chế độ này `INIT_PASSWORD` phải dài ít nhất 12 ký tự. Đổi mật khẩu admin sau lần đăng nhập đầu.
 
 ### 5. Reverse proxy và TLS
 

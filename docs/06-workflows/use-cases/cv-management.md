@@ -35,6 +35,6 @@ Ngày trong CV là chuỗi tự do; `isActive` quyết định có nộp đượ
 
 ## Edge case và cảnh báo
 
-- **Bất kỳ người dùng đăng nhập nào đọc được CV của người khác** qua `GET /cv-profiles` và `GET /cv-profiles/:id` (không kiểm tra quyền): [user-roles](../../01-product/user-roles.md#known-limitation-cv-của-mọi-người-dùng-đọc-được-bởi-bất-kỳ-ai-đã-đăng-nhập).
+- `GET /cv-profiles` và `GET /cv-profiles/:id` chỉ dành cho `SUPER ADMIN`: [user-roles](../../01-product/user-roles.md#cv-trực-tuyến-của-người-khác).
 - Nộp hồ sơ sao chép CV; sửa CV sau không đổi hồ sơ đã nộp.
 - Khi xóa tài khoản CV bị xóa thật, nhưng bản sao trong hồ sơ ứng tuyển thì không ([account-deletion](account-deletion.md)).

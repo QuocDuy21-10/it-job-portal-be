@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import { TransformInterceptor } from './utils/transform.interceptor';
 import { JwtAuthGuard } from './auth/guards';
 import { RolesGuard } from './casl';
+import { parseCorsOrigins } from './config/cors-origins';
 
 /** Global HTTP pipeline, shared by main.ts and the e2e suite so tests run what production runs. */
 export function configureApp(app: NestExpressApplication): void {
@@ -38,12 +39,9 @@ export function configureApp(app: NestExpressApplication): void {
   app.use(cookieParser());
 
   // config cors: only allow known frontends to send credentialed requests
-  const corsOrigins = (
-    configService.get<string>('CORS_ORIGINS') || configService.get<string>('FE_URL')
-  )
-    .split(',')
-    .map(origin => origin.trim())
-    .filter(Boolean);
+  const corsOrigins = parseCorsOrigins(
+    configService.get<string>('CORS_ORIGINS') || configService.get<string>('FE_URL'),
+  );
   app.enableCors({
     origin: corsOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',

@@ -4,8 +4,6 @@ Tiền tố `/api/v1/cv-profiles`. Controller: [cv-profiles.controller.ts](../..
 
 `@UseGuards(JwtAuthGuard)` ở cấp class: mọi route cần đăng nhập. Các route `me` thao tác trên CV của chính người gọi.
 
-> **Cảnh báo bảo mật.** `GET /cv-profiles` và `GET /cv-profiles/:id` không kiểm tra vai trò hay quyền sở hữu: bất kỳ người dùng đã đăng nhập nào cũng đọc được CV (họ tên, điện thoại, email, ngày sinh, địa chỉ) của người khác. Controller tự ghi chú *"Implement RBAC guard before production use"*. Chi tiết: [user-roles](../../01-product/user-roles.md#known-limitation-cv-của-mọi-người-dùng-đọc-được-bởi-bất-kỳ-ai-đã-đăng-nhập). Chưa thử gọi thật vì chưa chạy được MongoDB.
-
 ## Danh sách route
 
 | Route | Auth | Mô tả |
@@ -17,8 +15,8 @@ Tiền tố `/api/v1/cv-profiles`. Controller: [cv-profiles.controller.ts](../..
 | `DELETE /api/v1/cv-profiles/me` | Đăng nhập (mọi vai trò) | Xóa thật CV của mình |
 | `POST /api/v1/cv-profiles/me/deactivate` | Đăng nhập (mọi vai trò) | Tắt CV của mình, không dùng để nộp hồ sơ |
 | `POST /api/v1/cv-profiles/me/activate` | Đăng nhập (mọi vai trò) | Bật lại CV của mình |
-| `GET /api/v1/cv-profiles/:id` | Đăng nhập (mọi vai trò) | Lấy CV bất kỳ theo ID. **Không có kiểm tra quyền** (xem cảnh báo) |
-| `GET /api/v1/cv-profiles` | Đăng nhập (mọi vai trò) | Liệt kê mọi CV có phân trang. **Không có kiểm tra quyền** (xem cảnh báo) |
+| `GET /api/v1/cv-profiles/:id` | Đăng nhập, vai trò: SUPER ADMIN | Lấy CV bất kỳ theo ID |
+| `GET /api/v1/cv-profiles` | Đăng nhập, vai trò: SUPER ADMIN | Liệt kê mọi CV có phân trang |
 
 ## Ghi chú
 

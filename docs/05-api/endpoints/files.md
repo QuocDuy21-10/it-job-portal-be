@@ -7,7 +7,7 @@ Tiền tố `/api/v1/files`. Controller: [files.controller.ts](../../../src/file
 | Route | Auth | Mô tả |
 |---|---|---|
 | `POST /api/v1/files/upload` | Đăng nhập (mọi vai trò), cần header `folder_type` | Tải một file lên thư mục chọn bằng header `folder_type` |
-| `DELETE /api/v1/files/remove` | Đăng nhập, vai trò: SUPER ADMIN, HR | Xóa một file đã tải lên (quản trị viên hoặc HR) |
+| `DELETE /api/v1/files/remove` | Đăng nhập, vai trò: SUPER ADMIN | Xóa một file đã tải lên (quản trị viên) |
 
 ## Upload
 
@@ -37,11 +37,7 @@ Giá trị trong ví dụ là minh họa. Tên file do server đặt, không dù
 
 ## Xóa file
 
-`DELETE /files/remove` chỉ `HR` và `SUPER ADMIN`, nhận `fileName` và `folderType` (khớp mẫu `Matches`, xem DTO) và trả `{ "deleted": true }`.
-
-## Known Limitation
-
-Route xóa không kiểm tra file thuộc về ai: bất kỳ HR nào biết `folderType` và `fileName` đều xóa được file đó. `Chưa xác minh` chi tiết trong `FilesService.deleteFile`.
+`DELETE /files/remove` chỉ `SUPER ADMIN`, nhận `fileName` và `folderType` (khớp mẫu `Matches`, xem DTO) và trả `{ "deleted": true }`.
 
 ## Chi tiết từng route
 
@@ -63,9 +59,9 @@ Tải một file lên thư mục chọn bằng header `folder_type`
 
 ### `DELETE /api/v1/files/remove`
 
-Xóa một file đã tải lên (quản trị viên hoặc HR)
+Xóa một file đã tải lên (quản trị viên)
 
-- **Auth:** Đăng nhập, vai trò: SUPER ADMIN, HR
+- **Auth:** Đăng nhập, vai trò: SUPER ADMIN
 - **Handler:** `deleteFile` trong [files.controller.ts](../../../src/files/files.controller.ts)
 - **Mã thành công:** 200, `message` = "Delete file"
 

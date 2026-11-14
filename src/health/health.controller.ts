@@ -9,12 +9,14 @@ import {
 import { SkipThrottle } from '@nestjs/throttler';
 import Redis from 'ioredis';
 import { REDIS_CLIENT } from 'src/redis/redis.constants';
+import { SKIP_ALL_THROTTLERS } from 'src/config/throttle.constants';
 import { Public } from 'src/utils/decorators/public.decorator';
 
 @ApiTags('Health Check')
 @Controller('health')
 @Public()
-@SkipThrottle()
+// Probes must never be throttled; a bare @SkipThrottle() skips only the `default` throttler.
+@SkipThrottle(SKIP_ALL_THROTTLERS)
 export class HealthController {
   constructor(
     private health: HealthCheckService,
