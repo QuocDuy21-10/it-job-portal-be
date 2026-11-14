@@ -61,8 +61,8 @@ Cần người vận hành tự xác nhận các mục `Chưa xác minh` trên h
 |---|---|---|
 | Che header nhạy cảm trong log | Đã có | Ba header |
 | Không ghi dữ liệu cá nhân vào log | **Chưa có** | `cleanedText`, email lúc xóa tài khoản ([data-protection](data-protection.md#nơi-dữ-liệu-cá-nhân-xuất-hiện-trong-log-known-limitation)) |
-| File tải lên có kiểm soát loại, dung lượng, tên | Đã có | |
-| File CV cần xác thực để tải | Chưa có | Phục vụ tĩnh không xác thực |
+| File tải lên có kiểm soát loại, dung lượng, tên | Đã có | Theo MIME và đuôi do client khai báo; không kiểm tra magic bytes. Rủi ro chấp nhận: file được đổi tên thành UUID với đuôi từ allowlist, không nhận SVG hay HTML, helmet gửi `nosniff` |
+| File CV cần xác thực để tải | Đã có | Lưu ngoài `public/`, trả qua endpoint có kiểm tra quyền (`test/resumes.e2e-spec.ts`) |
 | Xóa tài khoản xóa đủ dữ liệu cá nhân | Chưa có | [account-deletion](../06-workflows/use-cases/account-deletion.md#dữ-liệu-sau-khi-xóa) |
 | Seed không tạo tài khoản mẫu ở production | Đã có | Dữ liệu mẫu chỉ tạo khi `NODE_ENV` là `development` hoặc `test` ([seed.service.ts](../../src/databases/seeds/seed.service.ts)) |
 | Sao lưu có lịch và đã thử khôi phục | Chưa xác minh | Chỉ có lệnh mẫu trong `DEPLOYMENT.md` |

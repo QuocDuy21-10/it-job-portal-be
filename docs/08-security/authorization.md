@@ -10,8 +10,7 @@ Mô hình và ma trận quyền ở [user-roles](../01-product/user-roles.md); c
 
 | # | Rủi ro | Bằng chứng | Mức | Chi tiết |
 |---|---|---|---|---|
-| 2 | File CV và ảnh tải lên truy cập được không cần đăng nhập nếu biết URL | `useStaticAssets` phục vụ `public/`; tên file là `randomUUID()` nên khó đoán, nhưng URL xuất hiện trong dữ liệu trả về API | Trung bình | [data-protection](data-protection.md#file-tải-lên) |
-| 4 | `GET /resumes` nhận bộ lọc, `populate`, `projection` thô | `sanitizeAqpQuery` bị comment | Trung bình | [api-overview](../05-api/api-overview.md#lọc-và-sắp-xếp-bằng-query-string) |
+| 2 | Ảnh tải lên (avatar, logo) truy cập được không cần đăng nhập nếu biết URL. File CV thì không: nằm ngoài `public/` và chỉ trả qua endpoint có kiểm tra quyền | `useStaticAssets` phục vụ `public/`; tên file là `randomUUID()` | Thấp (ảnh công khai theo thiết kế) | [data-protection](data-protection.md#file-tải-lên) |
 | 5 | CASL định nghĩa nhưng không thực thi, dễ gây tin nhầm rằng quyền được bảo đảm | `grep` | Trung bình (hiểu nhầm) | [authorization](../03-modules/authorization.md) |
 | 7 | Mã lỗi quyền không nhất quán (`400` thay vì `403`) | Nhiều nơi | Thấp | [api-overview](../05-api/api-overview.md#định-dạng-lỗi) |
 | 8 | Email gợi ý và email tin mới có thể nhắc tới tin chưa duyệt | Processor không lọc `approvalStatus` | Thấp (nghiệp vụ) | [queues](../03-modules/queues.md#job-recommendation) |
@@ -24,4 +23,4 @@ Các route nhạy cảm sau có kiểm tra sở hữu hoặc vai trò đúng nh�
 
 - Chưa thử khai thác thực tế bất kỳ rủi ro nào ở trên (không chạy được MongoDB). Mọi mục đều từ đọc mã.
 - Chưa rà soát từng handler còn lại ngoài các route đã nêu để tìm lỗi IDOR khác; danh sách route và quyền ở [05-api](../05-api/api-overview.md).
-- Chưa có kiểm thử phân quyền tự động cho route (xem [testing-strategy](../10-testing/testing-strategy.md)).
+- Kiểm thử phân quyền tự động mới phủ một phần route: `test/tenant-authorization.e2e-spec.ts`, `test/resumes.e2e-spec.ts`, `test/auth.e2e-spec.ts`.
