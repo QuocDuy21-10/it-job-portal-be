@@ -10,6 +10,7 @@
 /scripts/*
 !/scripts/deploy.sh
 !/scripts/backup-mongo.sh
+!/scripts/restore-mongo.sh
 /public
 /storage
 

@@ -1,6 +1,6 @@
 # Sao lưu, khôi phục và rollback
 
-Tình trạng hiện có: repository chỉ chứa **lệnh sao lưu mẫu** trong `DEPLOYMENT.md`. Không có kịch bản tự động, lịch sao lưu, quy trình khôi phục đã kiểm chứng hay kiểm tra sao lưu. Mọi lệnh dưới đây `Chưa xác minh` trên hệ thống thật.
+Tình trạng hiện có: [`scripts/backup-mongo.sh`](../../scripts/backup-mongo.sh) sao lưu MongoDB + `uploads` + `cv_storage` hằng đêm (cron 03:00 trên VPS), giữ 7 ngày trên VPS và đẩy bản **mã hóa** lên Google Drive (rclone `crypt`, giữ 30 ngày). [`scripts/restore-mongo.sh`](../../scripts/restore-mongo.sh) khôi phục một lần chạy theo mốc thời gian. Cả hai đã chạy thử trên một compose kiểm tra cục bộ (sao lưu, xóa dữ liệu, tải từ remote mã hóa và khôi phục); trên VPS thật `Chưa xác minh` cho tới khi làm xong phần [Thiết lập một lần](#thiết-lập-một-lần-trên-vps).
 
 ## Cần sao lưu gì
 
@@ -15,36 +15,50 @@ Tình trạng hiện có: repository chỉ chứa **lệnh sao lưu mẫu** tron
 
 Dữ liệu trong `CACHE_MANAGER` (token đặt lại mật khẩu, hủy xóa) nằm trong bộ nhớ nên **không thể sao lưu**.
 
-## Lệnh sao lưu mẫu (từ `DEPLOYMENT.md`)
+## Sao lưu: `scripts/backup-mongo.sh`
 
-```bash
-# MongoDB
-docker compose -f docker-compose.prod.yml --env-file .env.production exec -T mongodb sh -c \
-  'mongodump -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --archive --gzip' \
-  > /var/backups/mongo-$(date +%F).archive.gz
+Mỗi lần chạy dùng một mốc thời gian `TS` (`YYYY-MM-DD-HHMM`) và tạo trong `backups/`:
 
-# File tải lên
-docker run --rm -v my-job-portal-be_uploads:/data -v /var/backups:/backup alpine \
-  tar czf /backup/uploads-$(date +%F).tgz -C /data .
+| File | Nội dung | Cách tạo |
+|---|---|---|
+| `mongo-$TS.archive.gz` | Toàn bộ MongoDB | `mongodump --archive --gzip` trong container `mongodb` |
+| `uploads-$TS.tgz` | `/app/public/images` | `tar czf -` trong container `backend` |
+| `cv-$TS.tgz` | `/app/storage` | `tar czf -` trong container `backend` |
 
-# File CV (private)
-docker run --rm -v my-job-portal-be_cv_storage:/data -v /var/backups:/backup alpine \
-  tar czf /backup/cv-storage-$(date +%F).tgz -C /data .
+- Dump là cách xuất dữ liệu nhất quán khi DB đang chạy; không chép thẳng thư mục `/data/db`.
+- Mỗi lần chạy ghi **một dòng có thời gian** vào `backups/backup.log`, ví dụ `2026-11-15 03:00:12 +0700 OK 2026-11-15-0300 mongo=12M uploads=40M cv=8M`, sau đó `... OK ... offsite gdrive-crypt:job-portal-be`. Lỗi ghi `FAIL <TS> dump` hoặc `FAIL <TS> offsite`.
+- Dump lỗi giữa chừng thì file dở dang bị xóa. Đẩy offsite lỗi thì bản trên VPS vẫn giữ và script thoát mã 1.
+- Có `BACKUP_REMOTE` thì `rclone copy backups/ "$BACKUP_REMOTE"` (bỏ qua `backup.log`) rồi xóa trên remote các bản cũ hơn 30 ngày. Trên VPS giữ 7 ngày.
+
+Kiểm tra nhanh: `tail backups/backup.log` và `rclone ls gdrive-crypt:job-portal-be`.
+
+## Thiết lập một lần trên VPS
+
+1. Cài rclone: `curl https://rclone.org/install.sh | sudo bash`.
+2. VPS không có trình duyệt, nên trên **Mac** chạy `rclone authorize "drive"`, đăng nhập Google rồi chép đoạn token JSON in ra.
+3. Trên VPS chạy `rclone config`:
+   - `n` → tên `gdrive`, loại `drive`, scope `drive.file`, khi hỏi auto config trả lời `n` và dán token ở bước 2.
+   - `n` → tên `gdrive-crypt`, loại `crypt`, remote `gdrive:job-portal-backups`, mã hóa tên file `standard`, đặt mật khẩu (và salt) mạnh.
+4. **Lưu mật khẩu crypt (và salt) vào password manager.** Chúng chỉ nằm trong `~/.config/rclone/rclone.conf` trên VPS; mất VPS mà không có mật khẩu thì bản trên Drive không giải mã được. Nên lưu luôn một bản `rclone.conf`.
+5. Chạy thử: `BACKUP_REMOTE=gdrive-crypt:job-portal-be ./scripts/backup-mongo.sh` rồi `rclone ls gdrive-crypt:job-portal-be`. Trên giao diện Google Drive chỉ thấy tên file đã mã hóa.
+6. Sửa cron (`crontab -e`):
+
+```cron
+0 3 * * * BACKUP_REMOTE=gdrive-crypt:job-portal-be /opt/job-portal-be/scripts/backup-mongo.sh >/dev/null 2>>/opt/job-portal-be/backups/backup.log
 ```
 
-Tên volume phụ thuộc tên thư mục dự án (`<thư-mục>_uploads`); kiểm tra bằng `docker volume ls`. Hướng dẫn gốc nhắc chép bản sao lưu ra khỏi máy chủ; repository không có lịch chạy (cron) cho các lệnh này.
-
-## Khôi phục (suy ra từ công cụ, chưa thử)
-
-`mongodump --archive --gzip` ghép với `mongorestore` cùng tham số `--archive --gzip`:
+## Khôi phục: `scripts/restore-mongo.sh <TS>`
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production exec -T mongodb sh -c \
-  'mongorestore -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --archive --gzip' \
-  < /var/backups/mongo-YYYY-MM-DD.archive.gz
+ls backups/                                   # hoặc: rclone ls gdrive-crypt:job-portal-be
+./scripts/restore-mongo.sh 2026-11-15-0300    # bản có trên VPS
+BACKUP_REMOTE=gdrive-crypt:job-portal-be ./scripts/restore-mongo.sh 2026-11-15-0300   # VPS mới: tải về trước
 ```
 
-Lệnh này không có trong repository; nó là cách dùng chuẩn của công cụ và **cần thử trên môi trường kiểm tra** trước khi tin cậy. Cân nhắc cờ `--drop` tùy mục đích. Sau khi khôi phục file tải lên bằng cách giải nén tarball vào volume `uploads`.
+- Script hỏi và chỉ chạy khi gõ `yes`, vì `mongorestore --drop` xóa từng collection trước khi nạp lại.
+- Chỉ khôi phục database ứng dụng (`--nsInclude="$MONGO_INITDB_DATABASE.*"`), không ghi đè `admin`, nên VPS mới giữ mật khẩu root của chính nó.
+- Sau đó giải nén `uploads` và `cv` vào container `backend`. Bản sao lưu cũ chỉ có Mongo thì bỏ qua phần file.
+- Dựng lại trên VPS mới: clone repo, tạo `.env.production`, `./scripts/deploy.sh`, làm bước 1–3 của phần thiết lập (dùng lại mật khẩu crypt đã lưu), rồi chạy lệnh khôi phục ở trên.
 
 Lưu ý sau khi khôi phục:
 
@@ -54,7 +68,7 @@ Lưu ý sau khi khôi phục:
 
 ## Mục tiêu khôi phục
 
-Repository **không định nghĩa** RPO (lượng dữ liệu chấp nhận mất) hay RTO (thời gian khôi phục). Với lịch sao lưu hằng ngày được gợi ý trong `DEPLOYMENT.md`, dữ liệu tối đa một ngày có thể mất; đây là hệ quả của lịch mẫu, không phải cam kết.
+Repository **không định nghĩa** RPO (lượng dữ liệu chấp nhận mất) hay RTO (thời gian khôi phục). Với cron hằng đêm, dữ liệu tối đa một ngày có thể mất; đây là hệ quả của lịch, không phải cam kết.
 
 ## Sự cố thường gặp
 
@@ -72,4 +86,4 @@ Xem [Deploy và rollback](rollback.md). Luôn sao lưu MongoDB và `uploads` tr�
 
 ## Future Improvement
 
-Đề xuất, chưa có: kịch bản sao lưu có lịch và mã hóa, kiểm tra khôi phục định kỳ, và ghi RPO/RTO.
+Đề xuất, chưa có: cảnh báo khi `backup.log` có `FAIL` hoặc không có dòng mới quá 1 ngày, kiểm tra khôi phục định kỳ, sao lưu `redis_data`, và ghi RPO/RTO.

@@ -92,7 +92,7 @@ Vercel Hobby chỉ dành cho dự án phi thương mại; nếu thu phí hoặc 
 
 - **Cập nhật:** phát hành tag mới, sửa `IMAGE_TAG` trong `.env.production`, chạy `./scripts/deploy.sh`.
 - **Rollback:** đổi `IMAGE_TAG` về tag cũ rồi `./scripts/deploy.sh` ([rollback](../11-operations/rollback.md)).
-- **Backup:** thêm vào crontab `0 3 * * * /opt/job-portal-be/scripts/backup-mongo.sh`. Script giữ 7 ngày trong `backups/`. **Sao chép thư mục này ra nơi khác** (máy cá nhân, bucket): backup chỉ nằm trên VPS thì mất VPS là mất cả hai. Khôi phục: [backup-and-recovery](../11-operations/backup-and-recovery.md).
+- **Backup:** `scripts/backup-mongo.sh` sao lưu MongoDB + `uploads` + `cv_storage` hằng đêm, giữ 7 ngày trong `backups/` và đẩy bản mã hóa lên Google Drive qua rclone (giữ 30 ngày), để mất VPS không mất luôn bản sao lưu. Cài rclone, dòng cron và khôi phục (`scripts/restore-mongo.sh`): [backup-and-recovery](../11-operations/backup-and-recovery.md).
 - **RAM:** dùng `docker stats` và `free -h`. Giới hạn trong compose (backend 450m, mongodb 450m, redis 96m, caddy 32m) là ước tính; khi chạy thử cục bộ không có tải, tổng mức dùng khoảng 330MB. Dùng swap liên tục nghĩa là cần nâng VPS hoặc chuyển MongoDB sang Atlas (chỉ đổi `MONGO_URL`).
 
 ## Known Limitation
