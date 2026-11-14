@@ -9,11 +9,18 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { assertAuthenticatedAccountState } from 'src/auth/utils/assert-authenticated-account-state.util';
+import { parseCorsOrigins } from 'src/config/cors-origins';
+import { User, UserDocument } from 'src/users/schemas/user.schema';
 
 @WebSocketGateway({
   namespace: '/notifications',
   cors: {
-    origin: true,
+    // Evaluated per handshake: process.env is not loaded yet when this decorator runs.
+    origin: (_origin, callback) =>
+      callback(null, parseCorsOrigins(process.env.CORS_ORIGINS || process.env.FE_URL)),
     credentials: true,
   },
 })
@@ -29,6 +36,7 @@ export class NotificationsGateway
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
 
   afterInit() {
@@ -37,6 +45,17 @@ export class NotificationsGateway
 
   async handleConnection(client: Socket) {
     try {
+      // Browsers do not apply CORS to the WebSocket transport, so the allowlist is enforced here too.
+      const origin = client.handshake.headers?.origin;
+      const allowedOrigins = parseCorsOrigins(
+        this.configService.get<string>('CORS_ORIGINS') || this.configService.get<string>('FE_URL'),
+      );
+      if (origin && !allowedOrigins.includes(origin)) {
+        this.logger.warn(`Client ${client.id} disconnected: origin not allowed`);
+        client.disconnect();
+        return;
+      }
+
       const token =
         client.handshake.auth?.token ||
         client.handshake.headers?.authorization?.replace('Bearer ', '');
@@ -51,11 +70,24 @@ export class NotificationsGateway
         secret: this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET'),
       });
 
-      if (!payload?.sub) {
+      if (!payload?.sub || payload.type !== 'access') {
         this.logger.warn(`Client ${client.id} disconnected: invalid token payload`);
         client.disconnect();
         return;
       }
+
+      const user = await this.userModel
+        .findById(payload.sub)
+        .select('isActive isLocked isDeleted scheduledDeletionAt')
+        .lean()
+        .exec();
+      if (!user) {
+        this.logger.warn(`Client ${client.id} disconnected: user not found`);
+        client.disconnect();
+        return;
+      }
+      // Throws for inactive, locked, deleted or pending-deletion accounts; the catch below disconnects.
+      assertAuthenticatedAccountState(user, 'access');
 
       const userId = payload.sub;
 

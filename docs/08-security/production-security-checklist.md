@@ -43,6 +43,7 @@ Cần người vận hành tự xác nhận các mục `Chưa xác minh` trên h
 |---|---|---|
 | Header bảo mật | Đã có | `helmet()` mặc định, [app.setup.ts](../../src/app.setup.ts) |
 | CORS allowlist, có credentials | Đã có | `CORS_ORIGINS` |
+| WebSocket thông báo | Đã có | Allowlist origin từ `CORS_ORIGINS`, chỉ nhận access token, kiểm tra trạng thái tài khoản lúc kết nối ([notifications.gateway.ts](../../src/notifications/notifications.gateway.ts)). Socket đã kết nối không bị ngắt khi tài khoản bị khóa sau đó |
 | Swagger tắt ở production | Đã có | Chỉ bật khi `SWAGGER_ENABLED=true` |
 | Validate đầu vào, bỏ field lạ | Đã có | `ValidationPipe({ whitelist: true })` |
 | Lọc truy vấn từ query string | Một phần | Có cho `jobs`, `users`, `companies`; không cho `resumes`, `skills`, `notifications` |
