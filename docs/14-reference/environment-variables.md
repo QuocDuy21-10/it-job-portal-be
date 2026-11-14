@@ -68,7 +68,7 @@ Tạo secret bằng `openssl rand -hex 32`. Không đưa vào git.
 | Biến | Bắt buộc | Mặc định | Dùng cho |
 |---|---|---|---|
 | `EMAIL_ADMIN` | Seed | không | Email tài khoản quản trị tạo bởi seed |
-| `INIT_PASSWORD` | Seed | không | Mật khẩu của **mọi** tài khoản do seed tạo (admin, 20 HR, 75 ứng viên) |
+| `INIT_PASSWORD` | Seed | không | Mật khẩu của mọi tài khoản do seed tạo. Ngoài `development`/`test` chỉ tạo admin và yêu cầu tối thiểu 12 ký tự |
 
 ## Email
 

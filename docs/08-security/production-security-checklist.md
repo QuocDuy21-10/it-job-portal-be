@@ -63,24 +63,22 @@ Cần người vận hành tự xác nhận các mục `Chưa xác minh` trên h
 | File tải lên có kiểm soát loại, dung lượng, tên | Đã có | |
 | File CV cần xác thực để tải | Chưa có | Phục vụ tĩnh không xác thực |
 | Xóa tài khoản xóa đủ dữ liệu cá nhân | Chưa có | [account-deletion](../06-workflows/use-cases/account-deletion.md#dữ-liệu-sau-khi-xóa) |
-| Seed không tạo tài khoản mẫu ở production | **Chưa có** | Xem bên dưới |
+| Seed không tạo tài khoản mẫu ở production | Đã có | Dữ liệu mẫu chỉ tạo khi `NODE_ENV` là `development` hoặc `test` ([seed.service.ts](../../src/databases/seeds/seed.service.ts)) |
 | Sao lưu có lịch và đã thử khôi phục | Chưa xác minh | Chỉ có lệnh mẫu trong `DEPLOYMENT.md` |
 | Sao lưu được mã hóa, giữ ngoài máy chủ | Chưa xác minh | `DEPLOYMENT.md` chỉ nói "copy off the server" |
 | Giám sát, cảnh báo | Một phần | Health check, Sentry (nếu có DSN), metric Prometheus và alert email qua profile `monitoring` ([alerts](../11-operations/alerts.md)) |
 | Quét phụ thuộc | Một phần | CI `npm audit --omit=dev --audit-level=critical` (chỉ mức critical) và Dependabot hằng tuần |
 | Tuân thủ quy định bảo vệ dữ liệu | Chưa xác minh | Ngoài phạm vi tài liệu |
 
-## Mục cần xử lý trước khi chạy production: seed
+## Seed ở production
 
-`DEPLOYMENT.md` mục 2.4 hướng dẫn chạy `npm run seed` ở lần triển khai đầu để tạo tài khoản quản trị. Seed ([seed.service.ts](../../src/databases/seeds/seed.service.ts), [users.data.ts](../../src/databases/seeds/data/users.data.ts)) tạo **một admin (`EMAIL_ADMIN`), 20 HR (tên `hr` kèm số thứ tự) và 75 ứng viên (tên `candidate` kèm số thứ tự), email đều thuộc tên miền `seed.local`**, cùng dùng một mật khẩu băm từ `INIT_PASSWORD`, kèm công ty, tin, CV và hồ sơ mẫu. Seed không kiểm tra môi trường. Nếu chạy nguyên trạng ở production sẽ có 95 tài khoản mẫu cùng mật khẩu đã biết, trong đó 20 HR có thể đăng tin.
-
-Cách giảm thiểu hiện có: đặt `INIT_PASSWORD` mạnh và xóa các tài khoản `@seed.local` sau khi seed. Seed có idempotent (chạy lại có tạo trùng không): `Chưa xác minh`. Việc tách seed "chỉ admin" cho production là `Future Improvement`.
+Ngoài `development` và `test`, `npm run seed` chỉ tạo kỹ năng, nguồn tin và tài khoản `EMAIL_ADMIN`, và từ chối `INIT_PASSWORD` ngắn hơn 12 ký tự. Nếu trước đây đã chạy seed đầy đủ trên máy chủ thật thì các tài khoản `@seed.local` vẫn còn: xóa chúng thủ công.
 
 ## Kiểm tra nhanh trước khi mở
 
 1. Đặt đủ biến bắt buộc; `NODE_ENV=production`; `SWAGGER_ENABLED` không đặt.
 2. Mật khẩu và secret sinh ngẫu nhiên.
-3. Không seed dữ liệu mẫu, hoặc xóa tài khoản `@seed.local`.
+3. Không còn tài khoản `@seed.local` nào trong database.
 4. Reverse proxy có TLS; `TRUST_PROXY=1`; đóng mọi cổng ngoài SSH và 80/443.
 5. Có lịch sao lưu đã thử khôi phục.
 6. Có `SENTRY_DSN` và theo dõi `GET /api/v1/health/ready`.

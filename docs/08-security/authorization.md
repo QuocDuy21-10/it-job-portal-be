@@ -11,7 +11,6 @@ Mô hình và ma trận quyền ở [user-roles](../01-product/user-roles.md); c
 | # | Rủi ro | Bằng chứng | Mức | Chi tiết |
 |---|---|---|---|---|
 | 2 | File CV và ảnh tải lên truy cập được không cần đăng nhập nếu biết URL | `useStaticAssets` phục vụ `public/`; tên file là `randomUUID()` nên khó đoán, nhưng URL xuất hiện trong dữ liệu trả về API | Trung bình | [data-protection](data-protection.md#file-tải-lên) |
-| 3 | Seed tạo 96 tài khoản mẫu dùng chung `INIT_PASSWORD` mà `DEPLOYMENT.md` hướng dẫn chạy ở production | Seed không có chặn môi trường | Trung bình đến cao | [production-security-checklist](production-security-checklist.md) |
 | 4 | `GET /resumes` nhận bộ lọc, `populate`, `projection` thô | `sanitizeAqpQuery` bị comment | Trung bình | [api-overview](../05-api/api-overview.md#lọc-và-sắp-xếp-bằng-query-string) |
 | 5 | CASL định nghĩa nhưng không thực thi, dễ gây tin nhầm rằng quyền được bảo đảm | `grep` | Trung bình (hiểu nhầm) | [authorization](../03-modules/authorization.md) |
 | 7 | Mã lỗi quyền không nhất quán (`400` thay vì `403`) | Nhiều nơi | Thấp | [api-overview](../05-api/api-overview.md#định-dạng-lỗi) |

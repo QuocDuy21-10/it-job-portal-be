@@ -248,7 +248,7 @@ Bảng tra nhanh các lệnh thường dùng trong workspace:
 | `npm run docker:logs` | Theo dõi log của container Docker |
 | `npm run dev:services` / `npm run dev:stop` | Khởi động / dừng các dịch vụ dev local qua `scripts/` |
 | `npm run migrate:locations` | Migration chạy một lần để chuẩn hóa địa điểm của việc làm/công ty |
-| `npm run seed` | Seed dữ liệu mẫu: kỹ năng, nguồn việc làm, công ty, một tài khoản admin, 20 tài khoản HR và 75 tài khoản ứng viên (cùng dùng `INIT_PASSWORD`), việc làm, CV và hồ sơ ứng tuyển. **Không chạy nguyên trạng trên production** |
+| `npm run seed` | Seed dữ liệu mẫu: kỹ năng, nguồn việc làm, công ty, một tài khoản admin, 20 tài khoản HR và 75 tài khoản ứng viên (cùng dùng `INIT_PASSWORD`), việc làm, CV và hồ sơ ứng tuyển. Dữ liệu mẫu chỉ được tạo khi `NODE_ENV` là `development` hoặc `test`; môi trường khác chỉ tạo kỹ năng, nguồn việc làm và tài khoản `EMAIL_ADMIN` |
 
 ---
 
