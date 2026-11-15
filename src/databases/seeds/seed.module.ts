@@ -11,6 +11,7 @@ import { Resume, ResumeSchema } from 'src/resumes/schemas/resume.schema';
 import { Skill, SkillSchema } from 'src/skills/schemas/skill.schema';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
 
+import { SeedProductionService } from './production/seed-production.service';
 import { SeedService } from './seed.service';
 
 @Module({
@@ -40,7 +41,7 @@ import { SeedService } from './seed.service';
       { name: JobSource.name, schema: JobSourceSchema },
     ]),
   ],
-  providers: [SeedService],
-  exports: [SeedService],
+  providers: [SeedService, SeedProductionService],
+  exports: [SeedService, SeedProductionService],
 })
 export class SeedModule {}

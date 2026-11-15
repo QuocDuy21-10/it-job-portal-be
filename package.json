@@ -30,6 +30,7 @@
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
     "seed": "ts-node -r tsconfig-paths/register src/databases/seeds/run-seed.ts",
+    "seed:production-sample": "ts-node -r tsconfig-paths/register src/databases/seeds/run-seed-production.ts",
     "migrate:locations": "ts-node -r tsconfig-paths/register src/databases/migrations/run-location-standardization.ts",
     "migrate:private-cv": "ts-node -r tsconfig-paths/register src/databases/migrations/move-cv-files-to-private-storage.ts",
     "migrate:application-unique-index": "ts-node -r tsconfig-paths/register src/databases/migrations/application-unique-index.ts",
