@@ -13,7 +13,7 @@ export class AuthEmailLoginDto {
 
   @IsString({ message: 'password must be a string' })
   @IsNotEmpty({ message: 'password is required' })
-  @Transform(({ value }) => value.trim())
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @ApiProperty({
     example: '123456',
     description: 'password',
