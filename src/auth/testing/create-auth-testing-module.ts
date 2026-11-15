@@ -40,6 +40,8 @@ export interface MockCacheManager {
 
 export interface MockRedisPipeline {
   set: SyncMock<[string, string, ...unknown[]], MockRedisPipeline>;
+  incr: SyncMock<[string], MockRedisPipeline>;
+  expire: SyncMock<[string, number, ...unknown[]], MockRedisPipeline>;
   exec: AsyncMock<[], unknown[]>;
 }
 
@@ -80,6 +82,10 @@ export async function createAuthTestingModule(
 ): Promise<AuthTestingModuleContext> {
   const redisPipeline: MockRedisPipeline = {
     set: jest.fn<(...args: [string, string, ...unknown[]]) => MockRedisPipeline>().mockReturnThis(),
+    incr: jest.fn<(key: string) => MockRedisPipeline>().mockReturnThis(),
+    expire: jest
+      .fn<(...args: [string, number, ...unknown[]]) => MockRedisPipeline>()
+      .mockReturnThis(),
     exec: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
   };
 

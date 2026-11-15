@@ -26,6 +26,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
+import { randomUUID } from 'crypto';
+import { MIME_TO_EXT } from '../files/constants/upload-policy';
 import { CvProfilesService } from './cv-profiles.service';
 import { CreateCvProfileDto } from './dto/create-cv-profile.dto';
 import { User } from '../utils/decorators/user.decorator';
@@ -62,10 +64,8 @@ export class CvProfilesController {
           cb(null, uploadPath);
         },
         filename: (req, file, cb) => {
-          const extName = path.extname(file.originalname);
-          const baseName = path.basename(file.originalname, extName);
-          const finalName = `${baseName}-${Date.now()}${extName}`;
-          cb(null, finalName);
+          // Extension comes from the allowlisted MIME type, never the client filename (x.html would be served as HTML).
+          cb(null, `${randomUUID()}${MIME_TO_EXT[file.mimetype]}`);
         },
       }),
       fileFilter: (req, file, cb) => {
@@ -189,6 +189,7 @@ export class CvProfilesController {
 
     // Process avatar upload if provided
     if (avatarFile) {
+      await this.filesService.assertImageContent(avatarFile);
       const avatarUrl = this.filesService.processAvatarUpload(avatarFile);
       cvData.personalInfo = {
         ...cvData.personalInfo,

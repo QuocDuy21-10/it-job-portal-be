@@ -21,6 +21,18 @@ describe('UploadAuthGuard', () => {
   });
 
   describe('folder_type validation', () => {
+    it('reads the folder from the x-folder-type header', () => {
+      const ctx = {
+        switchToHttp: () => ({
+          getRequest: () => ({
+            headers: { 'x-folder-type': UploadFolderType.AVATAR },
+            user: { role: ERole.NORMAL_USER },
+          }),
+        }),
+      } as unknown as ExecutionContext;
+      expect(guard.canActivate(ctx)).toBe(true);
+    });
+
     it('allows a valid user-scoped folder type for any authenticated user', () => {
       const ctx = buildContext(UploadFolderType.AVATAR, ERole.NORMAL_USER);
       expect(guard.canActivate(ctx)).toBe(true);

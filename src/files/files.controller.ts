@@ -23,7 +23,7 @@ import { CreateFileDto } from './dto/create-file.dto';
 import { DeleteFileDto } from './dto/delete-file.dto';
 import { Roles } from 'src/casl/decorators/roles.decorator';
 import { ERole } from 'src/casl/enums/role.enum';
-import { UploadFolderType } from './constants/upload-policy';
+import { UploadFolderType, getUploadFolderType } from './constants/upload-policy';
 import { UploadAuthGuard } from './guards/upload-auth.guard';
 
 @ApiTags('File')
@@ -37,7 +37,7 @@ export class FilesController {
   @ApiOperation({
     summary: 'Upload a single file',
     description:
-      `Specify the upload destination via the 'folder_type' header. ` +
+      `Specify the upload destination via the 'X-Folder-Type' header. ` +
       `Allowed values: ${Object.values(UploadFolderType).join(', ')}. ` +
       `Uploading to 'company' requires HR or SUPER_ADMIN role.`,
   })
@@ -45,17 +45,18 @@ export class FilesController {
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: CreateFileDto })
   @ApiHeader({
-    name: 'folder_type',
+    name: 'X-Folder-Type',
     description: `Upload destination folder. Allowed: ${Object.values(UploadFolderType).join(', ')}`,
     required: true,
     enum: Object.values(UploadFolderType),
   })
   @ApiResponse({ status: 201, description: 'File uploaded successfully.' })
-  uploadFile(
+  async uploadFile(
     @UploadedFile() file: Express.Multer.File,
-    @Headers('folder_type') folderType: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
-    return this.filesService.getFileInfo(file, folderType);
+    await this.filesService.assertImageContent(file);
+    return this.filesService.getFileInfo(file, getUploadFolderType(headers));
   }
 
   @Delete('remove')

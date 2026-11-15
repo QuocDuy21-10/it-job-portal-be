@@ -25,6 +25,8 @@ describe('AuthCredentialsService', () => {
   let sessionsService: AuthTestingModuleContext['sessionsService'];
   let cacheManager: AuthTestingModuleContext['cacheManager'];
   let mailerService: AuthTestingModuleContext['mailerService'];
+  let redisClient: AuthTestingModuleContext['redisClient'];
+  let redisPipeline: AuthTestingModuleContext['redisPipeline'];
 
   beforeEach(async () => {
     authVerificationService = {
@@ -43,6 +45,8 @@ describe('AuthCredentialsService', () => {
     sessionsService = context.sessionsService;
     cacheManager = context.cacheManager;
     mailerService = context.mailerService;
+    redisClient = context.redisClient;
+    redisPipeline = context.redisPipeline;
     mailerService.sendMail.mockResolvedValue(undefined);
   });
 
@@ -126,6 +130,49 @@ describe('AuthCredentialsService', () => {
       await expect(service.validateUser('test@example.com', 'correct-password')).rejects.toThrow(
         ForbiddenException,
       );
+    });
+  });
+
+  describe('validateUser per-email lockout', () => {
+    it('rejects with 429 without checking the password once the email has 10 recent failures', async () => {
+      redisClient.get.mockResolvedValue('10');
+
+      await expect(
+        service.validateUser('Test@Example.com', 'correct-password'),
+      ).rejects.toMatchObject({ status: 429 });
+      expect(redisClient.get).toHaveBeenCalledWith('login:fail:test@example.com');
+      expect(usersService.findOneByUserEmail).not.toHaveBeenCalled();
+    });
+
+    it('counts a wrong password against the email with a 15-minute window', async () => {
+      redisClient.get.mockResolvedValue('3');
+      usersService.findOneByUserEmail.mockResolvedValue(makeUser());
+      usersService.isValidPassword.mockReturnValue(false);
+
+      await expect(service.validateUser('test@example.com', 'wrong')).resolves.toBeNull();
+      expect(redisPipeline.incr).toHaveBeenCalledWith('login:fail:test@example.com');
+      expect(redisPipeline.expire).toHaveBeenCalledWith('login:fail:test@example.com', 900, 'NX');
+      expect(redisPipeline.exec).toHaveBeenCalled();
+    });
+
+    it('counts unknown emails too, so lockout does not reveal which accounts exist', async () => {
+      redisClient.get.mockResolvedValue(null);
+      usersService.findOneByUserEmail.mockResolvedValue(null);
+
+      await expect(service.validateUser('ghost@example.com', 'x')).resolves.toBeNull();
+      expect(redisPipeline.incr).toHaveBeenCalledWith('login:fail:ghost@example.com');
+    });
+
+    it('clears the failure count after a successful login', async () => {
+      redisClient.get.mockResolvedValue('9');
+      usersService.findOneByUserEmail.mockResolvedValue(makeUser());
+      usersService.isValidPassword.mockReturnValue(true);
+
+      await expect(
+        service.validateUser('test@example.com', 'correct-password'),
+      ).resolves.toBeDefined();
+      expect(redisClient.del).toHaveBeenCalledWith('login:fail:test@example.com');
+      expect(redisPipeline.incr).not.toHaveBeenCalled();
     });
   });
 

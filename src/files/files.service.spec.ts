@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as fs from 'fs';
@@ -7,6 +7,7 @@ import { FilesService } from './files.service';
 
 jest.mock('fs', () => ({
   promises: {
+    open: jest.fn(),
     unlink: jest.fn(),
     readdir: jest.fn(),
     stat: jest.fn(),
@@ -47,6 +48,40 @@ describe('FilesService', () => {
 
     it('throws BadRequestException when fileName is empty', () => {
       expect(() => service.buildFileUrl('avatar', '')).toThrow(BadRequestException);
+    });
+  });
+
+  describe('assertImageContent', () => {
+    const mockHeader = (bytes: Buffer) => {
+      (mockFs.promises.open as jest.Mock).mockResolvedValue({
+        read: jest.fn(async (buf: Buffer) => {
+          bytes.copy(buf);
+          return { bytesRead: bytes.length, buffer: buf };
+        }),
+        close: jest.fn(),
+      });
+    };
+    const file = { path: '/tmp/up/x.png', mimetype: 'image/png' } as Express.Multer.File;
+
+    it('accepts a file whose bytes match its declared type', async () => {
+      mockHeader(Buffer.from('89504E470D0A1A0A0000000D', 'hex'));
+      await expect(service.assertImageContent(file)).resolves.toBeUndefined();
+      expect(mockFs.promises.unlink).not.toHaveBeenCalled();
+    });
+
+    it('deletes the stored file and rejects when the bytes do not match', async () => {
+      mockHeader(Buffer.from('<html><script>'));
+      (mockFs.promises.unlink as jest.Mock).mockResolvedValue(undefined);
+      await expect(service.assertImageContent(file)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+      expect(mockFs.promises.unlink).toHaveBeenCalledWith('/tmp/up/x.png');
+    });
+
+    it('rejects a request without a file', async () => {
+      await expect(service.assertImageContent(undefined as any)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
   });
 

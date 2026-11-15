@@ -15,7 +15,7 @@ export class CompanyDto {
   @IsNotEmpty({ message: 'Company name is required' })
   @IsString({ message: 'Company name must be a string' })
   @MaxLength(100, { message: 'Company name is too long (max: 100 chars)' })
-  @Transform(({ value }) => value?.trim())
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @ApiProperty({
     example: 'Tech Corp',
     description: 'Name of the company',

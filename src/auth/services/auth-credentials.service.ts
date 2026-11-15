@@ -1,10 +1,12 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { MailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
+import Redis from 'ioredis';
+import { REDIS_CLIENT } from 'src/redis/redis.module';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthRegisterDto } from '../dto/auth-register.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
@@ -18,6 +20,9 @@ import { AuthVerificationService } from './auth-verification.service';
 import { assertAuthenticatedAccountState } from '../utils/assert-authenticated-account-state.util';
 
 const RESET_PASSWORD_TTL_MS = 10 * 60 * 1000; // 10 minutes
+// Per-email lockout on top of the per-IP throttler, so a proxy pool cannot brute-force one account.
+const LOGIN_FAILURE_LIMIT = 10;
+const LOGIN_FAILURE_WINDOW_SECONDS = 15 * 60;
 
 @Injectable()
 export class AuthCredentialsService {
@@ -29,6 +34,7 @@ export class AuthCredentialsService {
     private readonly mailerService: MailerService,
     private readonly authVerificationService: AuthVerificationService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
   ) {}
 
   hashPassword(password: string): string {
@@ -37,6 +43,15 @@ export class AuthCredentialsService {
   }
 
   async validateUser(email: string, password: string): Promise<any> {
+    const failureKey = `login:fail:${email.toLowerCase()}`;
+    const failures = Number((await this.redisClient.get(failureKey)) ?? 0);
+    if (failures >= LOGIN_FAILURE_LIMIT) {
+      throw new HttpException(
+        'Too many failed login attempts. Please try again in 15 minutes.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     const user = await this.usersService.findOneByUserEmail(email);
     if (user) {
       if (!user.password) {
@@ -48,6 +63,7 @@ export class AuthCredentialsService {
       const isValid = this.usersService.isValidPassword(password, user.password);
       if (isValid) {
         assertAuthenticatedAccountState(user);
+        await this.redisClient.del(failureKey);
 
         return {
           ...user.toObject(),
@@ -55,6 +71,12 @@ export class AuthCredentialsService {
       }
     }
 
+    // Unknown emails count too, so the lockout does not reveal which accounts exist.
+    await this.redisClient
+      .pipeline()
+      .incr(failureKey)
+      .expire(failureKey, LOGIN_FAILURE_WINDOW_SECONDS, 'NX')
+      .exec();
     return null;
   }
 

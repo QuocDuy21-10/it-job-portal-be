@@ -9,6 +9,7 @@ import {
   MIME_TO_EXT,
   UPLOAD_POLICIES,
   UploadFolderType,
+  getUploadFolderType,
 } from './constants/upload-policy';
 
 @Injectable()
@@ -19,14 +20,14 @@ export class MulterConfigService implements MulterOptionsFactory {
     return {
       storage: diskStorage({
         destination: (req, file, cb) => {
-          // folder_type has already been validated by UploadAuthGuard and fileFilter;
+          // The folder has already been validated by UploadAuthGuard and fileFilter;
           // validate here again as defense-in-depth before touching the filesystem.
-          const rawFolder = (req?.headers?.folder_type as string | undefined)?.toLowerCase() ?? '';
+          const rawFolder = getUploadFolderType(req?.headers);
 
           if (!rawFolder || !ALLOWED_FOLDER_TYPES.includes(rawFolder)) {
             return cb(
               new HttpException(
-                `Invalid folder_type. Allowed values: ${ALLOWED_FOLDER_TYPES.join(', ')}`,
+                `Invalid X-Folder-Type. Allowed values: ${ALLOWED_FOLDER_TYPES.join(', ')}`,
                 HttpStatus.BAD_REQUEST,
               ),
               '',
@@ -60,13 +61,13 @@ export class MulterConfigService implements MulterOptionsFactory {
       }),
 
       fileFilter: (req, file, cb) => {
-        const rawFolder = (req?.headers?.folder_type as string | undefined)?.toLowerCase() ?? '';
+        const rawFolder = getUploadFolderType(req?.headers);
         const policy = rawFolder ? UPLOAD_POLICIES[rawFolder as UploadFolderType] : undefined;
 
         if (!policy) {
           return cb(
             new HttpException(
-              `Invalid folder_type. Allowed values: ${ALLOWED_FOLDER_TYPES.join(', ')}`,
+              `Invalid X-Folder-Type. Allowed values: ${ALLOWED_FOLDER_TYPES.join(', ')}`,
               HttpStatus.BAD_REQUEST,
             ),
             false,

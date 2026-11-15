@@ -7,7 +7,7 @@ export class AuthRegisterDto {
   @IsNotEmpty({ message: 'Name is required' })
   @IsString({ message: 'Name must be a string' })
   @MaxLength(100, { message: 'Name is too long (max: 100 chars)' })
-  @Transform(({ value }) => value.trim())
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @ApiProperty({ example: 'Duy', description: 'Name of user' })
   name: string;
 
@@ -18,7 +18,7 @@ export class AuthRegisterDto {
   email: string;
 
   @IsNotEmpty({ message: 'Password is required' })
-  @Transform(({ value }) => value.trim())
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @ApiProperty({ example: '123456', description: 'Password of user' })
   password: string;
 }
