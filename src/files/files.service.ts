@@ -1,7 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  Logger,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { IMAGE_SIGNATURE_BYTES, matchesImageSignature } from './constants/upload-policy';
 
 @Injectable()
 export class FilesService {
@@ -81,6 +87,33 @@ export class FilesService {
         );
       }
       // ENOENT means the file is already gone — treat as success
+    }
+  }
+
+  /**
+   * Rejects an uploaded image whose bytes are not the type the client declared.
+   * multer's fileFilter only sees the client-set MIME type, so this runs after the file is on disk.
+   */
+  async assertImageContent(file: Express.Multer.File): Promise<void> {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    const header = Buffer.alloc(IMAGE_SIGNATURE_BYTES);
+    const handle = await fs.promises.open(file.path, 'r');
+    try {
+      await handle.read(header, 0, IMAGE_SIGNATURE_BYTES, 0);
+    } finally {
+      await handle.close();
+    }
+
+    if (!matchesImageSignature(header, file.mimetype)) {
+      await fs.promises
+        .unlink(file.path)
+        .catch(err =>
+          this.logger.warn(`Could not delete rejected upload ${file.path}: ${err.message}`),
+        );
+      throw new UnprocessableEntityException('File content does not match its declared type');
     }
   }
 

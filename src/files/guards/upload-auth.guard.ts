@@ -9,6 +9,7 @@ import {
   ALLOWED_FOLDER_TYPES,
   UPLOAD_POLICIES,
   UploadFolderType,
+  getUploadFolderType,
 } from '../constants/upload-policy';
 import { ERole } from 'src/casl/enums/role.enum';
 
@@ -20,11 +21,11 @@ export class UploadAuthGuard implements CanActivate {
       user?: { role?: ERole };
     }>();
 
-    const rawFolder = (request.headers?.folder_type ?? '').toLowerCase();
+    const rawFolder = getUploadFolderType(request.headers);
 
     if (!rawFolder || !ALLOWED_FOLDER_TYPES.includes(rawFolder)) {
       throw new BadRequestException(
-        `Invalid folder_type '${rawFolder}'. Allowed values: ${ALLOWED_FOLDER_TYPES.join(', ')}`,
+        `Invalid X-Folder-Type '${rawFolder}'. Allowed values: ${ALLOWED_FOLDER_TYPES.join(', ')}`,
       );
     }
 
