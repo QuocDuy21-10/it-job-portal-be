@@ -390,6 +390,22 @@ const LEVELS: Array<{ level: EJobLevel; prefix: string; factor: number; years: s
 ];
 
 const JOBS_PER_COMPANY = 6;
+// Large employers hire more, so the "Top Companies Hiring Now" ranking is not a flat tie.
+const TOTAL_JOBS: Record<string, number> = {
+  'fpt-software': 16,
+  momo: 14,
+  'vng-corporation': 14,
+  'shopee-vietnam': 13,
+  techcombank: 12,
+  'tiki-corporation': 12,
+  'grab-vietnam': 11,
+  vnpay: 10,
+  vinfast: 10,
+  'lazada-vietnam': 9,
+  'tma-solutions': 9,
+  'nash-tech': 8,
+  rikkeisoft: 8,
+};
 const ROUND_TO_VND = 500_000;
 
 export type JobCompanyRef = {
@@ -435,50 +451,63 @@ export function createProductionJobs(
       company.slug === 'sky-mavis'
         ? ['blockchain', 'backend-node', 'frontend', 'devops', 'security', 'manager']
         : Array.from(
-            { length: JOBS_PER_COMPANY },
+            { length: TOTAL_JOBS[company.slug] ?? JOBS_PER_COMPANY },
             (_, i) =>
               SECTOR_ROLES[company.sector][
                 (companyIndex + i) % SECTOR_ROLES[company.sector].length
               ],
           );
 
-    return roleKeys.map((roleKey, i) => {
+    const usedNames = new Set<string>();
+
+    return roleKeys.flatMap((roleKey, i) => {
       const role = ROLES[roleKey];
       const index = companyIndex * JOBS_PER_COMPANY + i;
-      // Junior / Mid / Senior rotate; managers are always Lead.
-      const lvl = roleKey === 'manager' ? LEVELS[3] : LEVELS[(index + i) % 3];
+      // Junior / Mid / Senior rotate; managers are always Lead. A repeated role takes the next free level.
+      const titleOf = (l: (typeof LEVELS)[number]) =>
+        `${l.prefix ? `${l.prefix} ` : ''}${role.title}`;
+      const lvl = (
+        roleKey === 'manager' ? [LEVELS[3]] : [0, 1, 2].map(k => LEVELS[(index + i + k) % 3])
+      ).find(l => !usedNames.has(titleOf(l)));
+
+      if (!lvl) {
+        return [];
+      }
       const [min, max] = role.salary;
       const base = min + ((max - min) * ((index * 7) % 10)) / 10;
       const salary = Math.round((base * lvl.factor * company.tier) / ROUND_TO_VND) * ROUND_TO_VND;
       const createdAt = addDays(now, -((index * 3) % 40));
-      const pending = index % 17 === 0;
-      const title = `${lvl.prefix ? `${lvl.prefix} ` : ''}${role.title}`.trim();
+      const pending = i < JOBS_PER_COMPANY && index % 17 === 0;
+      const title = titleOf(lvl).trim();
+      usedNames.add(titleOf(lvl));
       const place = company.sector === 'outsourcing' && index % 4 === 0 ? 'Da Nang' : company.city;
 
-      return {
-        name: title,
-        skills: role.skills,
-        company: { _id: company._id, name: company.name, logo: company.logo },
-        ...resolveLocation(place),
-        salary,
-        quantity: 1 + (index % 4),
-        level: lvl.level,
-        formOfWork: index % 3 === 0 ? EJobFormOfWork.HYBRID : EJobFormOfWork.FULL_TIME,
-        description:
-          `<h3>About the role</h3><p>${company.name} is hiring a ${title} to ${role.summary}. ` +
-          `${SECTOR_CONTEXT[company.sector]}</p>` +
-          `<h3>Responsibilities</h3>${list(role.responsibilities)}` +
-          `<h3>Requirements</h3>${list([`${lvl.years} of relevant experience.`, ...role.requirements])}` +
-          `<h3>Benefits</h3>${list(BENEFITS)}`,
-        startDate: createdAt,
-        endDate: addDays(now, 20 + ((index * 5) % 50)),
-        isActive: true,
-        approvalStatus: pending ? EJobApprovalStatus.PENDING : EJobApprovalStatus.APPROVED,
-        ...(pending ? {} : { approvedBy: admin, approvedAt: createdAt }),
-        ...(hr ? { createdBy: hr } : {}),
-        createdAt,
-        updatedAt: createdAt,
-      };
+      return [
+        {
+          name: title,
+          skills: role.skills,
+          company: { _id: company._id, name: company.name, logo: company.logo },
+          ...resolveLocation(place),
+          salary,
+          quantity: 1 + (index % 4),
+          level: lvl.level,
+          formOfWork: index % 3 === 0 ? EJobFormOfWork.HYBRID : EJobFormOfWork.FULL_TIME,
+          description:
+            `<h3>About the role</h3><p>${company.name} is hiring a ${title} to ${role.summary}. ` +
+            `${SECTOR_CONTEXT[company.sector]}</p>` +
+            `<h3>Responsibilities</h3>${list(role.responsibilities)}` +
+            `<h3>Requirements</h3>${list([`${lvl.years} of relevant experience.`, ...role.requirements])}` +
+            `<h3>Benefits</h3>${list(BENEFITS)}`,
+          startDate: createdAt,
+          endDate: addDays(now, 20 + ((index * 5) % 50)),
+          isActive: true,
+          approvalStatus: pending ? EJobApprovalStatus.PENDING : EJobApprovalStatus.APPROVED,
+          ...(pending ? {} : { approvedBy: admin, approvedAt: createdAt }),
+          ...(hr ? { createdBy: hr } : {}),
+          createdAt,
+          updatedAt: createdAt,
+        },
+      ];
     });
   });
 }
