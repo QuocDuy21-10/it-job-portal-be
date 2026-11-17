@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socketdotio&logoColor=white" alt="Socket.IO" />
   <img src="https://img.shields.io/badge/Sentry-362D59?style=for-the-badge&logo=sentry&logoColor=white" alt="Sentry" />
   <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
-  <a href="https://quocduy21-10.github.io/it-job-portal-be/"><img src="https://img.shields.io/badge/Docs-Docusaurus-3ECC5F?style=for-the-badge&logo=docusaurus&logoColor=white" alt="Documentation" /></a>
+  <a href="https://api-docs.devlink.duydq.cloud/"><img src="https://img.shields.io/badge/Docs-Docusaurus-3ECC5F?style=for-the-badge&logo=docusaurus&logoColor=white" alt="Documentation" /></a>
 </div>
 
 <br />
@@ -25,7 +25,7 @@ Backend NestJS duy nhất cho DevLink (cổng việc làm IT tại Việt Nam), 
 
 ## 📚 Tài liệu
 
-👉 **Trang tài liệu chi tiết: [quocduy21-10.github.io/it-job-portal-be](https://quocduy21-10.github.io/it-job-portal-be/)**
+👉 **Trang tài liệu chi tiết: [api-docs.devlink.duydq.cloud](https://api-docs.devlink.duydq.cloud/)**
 
 Trang này mô tả kiến trúc, từ điển dữ liệu của toàn bộ 17 collection MongoDB, 116 route API, các luồng nghiệp vụ, tích hợp, bảo mật và vận hành. Trang được xây dựng bằng Docusaurus (mã nguồn trong [`docs-site/`](docs-site)) và được triển khai lên GitHub Pages bởi `.github/workflows/docs.yml`.
 
@@ -91,7 +91,7 @@ Nguồn Markdown cũng nằm trong [`docs/`](docs/README.md); hãy bắt đầu 
 - **⚙️ Hạ tầng và vận hành:**
   - Cache Redis và hàng đợi tác vụ nền BullMQ.
   - Mẫu email SMTP (dùng Handlebars).
-  - Tài liệu tương tác Swagger/OpenAPI và [trang tài liệu Docusaurus](https://quocduy21-10.github.io/it-job-portal-be/).
+  - Tài liệu tương tác Swagger/OpenAPI và [trang tài liệu Docusaurus](https://api-docs.devlink.duydq.cloud/).
   - Ghi log JSON có cấu trúc (Pino) và theo dõi lỗi (Sentry).
   - Giới hạn tốc độ dựa trên Redis (Throttler), Helmet, CORS, validation pipe và response envelope.
   - Kiểm tra sức khỏe (Terminus) và dashboard thống kê.
