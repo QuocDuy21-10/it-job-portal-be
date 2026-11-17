@@ -3,8 +3,8 @@
 module.exports = {
   title: 'IT Job Portal – Backend',
   tagline: 'Tài liệu kỹ thuật',
-  url: 'https://quocduy21-10.github.io',
-  baseUrl: '/it-job-portal-be/',
+  url: 'https://api-docs.devlink.duydq.cloud',
+  baseUrl: '/',
   onBrokenLinks: 'throw',
   i18n: { defaultLocale: 'vi', locales: ['vi'] },
   // .md = CommonMark (docs có {} và <>), chỉ .mdx mới là MDX.
