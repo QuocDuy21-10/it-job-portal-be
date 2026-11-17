@@ -33,6 +33,13 @@ Nguồn Markdown cũng nằm trong [`docs/`](docs/README.md); hãy bắt đầu 
 
 ---
 
+## 🌐 Bản triển khai (Production)
+
+- **Website:** [devlink.duydq.cloud](https://devlink.duydq.cloud/)
+- **API base URL:** `https://api.duydq.cloud/api/v1`
+
+---
+
 ## 🖥️ Repository Frontend
 
 Ứng dụng frontend đi kèm của **DevLink** nằm trong repository frontend:
