@@ -1,7 +1,7 @@
 #!/bin/sh
 # Forced command for the GitHub Actions deploy key (authorized_keys: restrict,command="<repo>/scripts/deploy-from-ci.sh").
 # The workflow sends only the version to deploy (e.g. 1.2.3); this runs the manual steps from
-# docs/11-operations/rollback.md: update the repo, back up MongoDB, set IMAGE_TAG, deploy.
+# docs/11-operations/rollback.md: update the repo, back up MongoDB, deploy, then record IMAGE_TAG.
 set -eu
 
 VERSION="${SSH_ORIGINAL_COMMAND:-}"
@@ -20,5 +20,7 @@ grep -q '^IMAGE_TAG=' .env.production || { echo "IMAGE_TAG is missing from .env.
 echo "Deploying $VERSION (was $(grep '^IMAGE_TAG=' .env.production | cut -d= -f2))"
 git pull --ff-only --quiet origin main
 ./scripts/backup-mongo.sh
+# The shell value overrides .env.production for this run; the file is only updated once the new
+# version is up, so a failed pull or healthcheck leaves it naming the version still running.
+IMAGE_TAG="$VERSION" ./scripts/deploy.sh
 sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$VERSION/" .env.production
-exec ./scripts/deploy.sh

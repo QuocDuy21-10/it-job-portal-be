@@ -55,7 +55,7 @@ Job `deploy` trong cùng workflow chạy sau `publish`, **chỉ khi chạy từ 
 ```mermaid
 flowchart LR
     T["push tag vX.Y.Z"] --> P["publish: build + push X.Y.Z"] --> D["deploy: ssh VPS 'X.Y.Z'"]
-    D --> S["scripts/deploy-from-ci.sh"] --> S1["git pull --ff-only main"] --> S2["backup-mongo.sh"] --> S3["IMAGE_TAG=X.Y.Z"] --> S4["deploy.sh (chờ healthcheck)"]
+    D --> S["scripts/deploy-from-ci.sh"] --> S1["git pull --ff-only main"] --> S2["backup-mongo.sh"] --> S3["IMAGE_TAG=X.Y.Z deploy.sh (chờ healthcheck)"] --> S4["ghi IMAGE_TAG vào .env.production"]
 ```
 
 | Cần có | Ở đâu |
@@ -64,7 +64,7 @@ flowchart LR
 | Biến `DEPLOY_USER` (tùy chọn, mặc định `root`) | Repository hoặc environment |
 | Khóa công khai trong `authorized_keys` với `restrict,command="<repo>/scripts/deploy-from-ci.sh"` | VPS |
 
-Khóa deploy bị ép chạy đúng [deploy-from-ci.sh](../../scripts/deploy-from-ci.sh): nó không mở được shell, và lệnh workflow gửi (`X.Y.Z`) chỉ đến script qua `$SSH_ORIGINAL_COMMAND`, bị từ chối nếu không đúng dạng semver. Host key được ghim qua `DEPLOY_KNOWN_HOSTS` (`StrictHostKeyChecking=yes`). Cài đặt một lần: [vps-production-guide](vps-production-guide.md#7-một-lần-bật-deploy-tự-động). Job `deploy` fail khi pull, sao lưu hay healthcheck lỗi; nó **không tự rollback** ([rollback](../11-operations/rollback.md)).
+Khóa deploy bị ép chạy đúng [deploy-from-ci.sh](../../scripts/deploy-from-ci.sh): nó không mở được shell, và lệnh workflow gửi (`X.Y.Z`) chỉ đến script qua `$SSH_ORIGINAL_COMMAND`, bị từ chối nếu không đúng dạng semver. Host key được ghim qua `DEPLOY_KNOWN_HOSTS` (`StrictHostKeyChecking=yes`). Cài đặt một lần: [vps-production-guide](vps-production-guide.md#7-một-lần-bật-deploy-tự-động). Job `deploy` fail khi pull, sao lưu hay healthcheck lỗi; `.env.production` chỉ được ghi tag mới sau khi deploy thành công, nên khi lỗi file vẫn ghi đúng bản đang chạy. Job **không tự rollback** ([rollback](../11-operations/rollback.md)).
 
 ## Known Limitation
 
