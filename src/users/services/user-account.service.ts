@@ -43,7 +43,10 @@ export class UserAccountService {
 
   async updatePassword(id: string, newPasswordHash: string) {
     this.userRepository.validateObjectId(id);
-    return this.userRepository.updateOne(id, { password: newPasswordHash });
+    return this.userRepository.updateOne(id, {
+      password: newPasswordHash,
+      passwordChangedAt: new Date(),
+    });
   }
 
   async updateUnverifiedUser(id: string, dto: AuthRegisterDto) {

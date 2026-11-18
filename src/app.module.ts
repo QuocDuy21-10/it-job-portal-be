@@ -30,7 +30,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { CaslModule } from './casl';
 import { SkillsModule } from './skills/skills.module';
 import { validateEnv } from './config/env.validation';
-import { BASELINE_THROTTLERS } from './config/throttle.constants';
+import { BASELINE_THROTTLERS, THROTTLE_ERROR_MESSAGE } from './config/throttle.constants';
 import { LoggerModule } from 'nestjs-pino';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { SentryModule } from '@sentry/nestjs/setup';
@@ -78,6 +78,7 @@ import { resolveRequestId } from './utils/helpers/request-id.helper';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         throttlers: BASELINE_THROTTLERS,
+        errorMessage: THROTTLE_ERROR_MESSAGE,
         storage: new ThrottlerStorageRedisService(
           new Redis({
             host: configService.get('REDIS_HOST', 'localhost'),

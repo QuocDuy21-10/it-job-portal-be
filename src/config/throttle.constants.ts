@@ -1,6 +1,9 @@
 import { ThrottlerOptions } from '@nestjs/throttler';
 
 /** Applied to every route by the global ThrottlerGuard. Counted per IP and per route handler. */
+// Replaces the default 'ThrottlerException: Too Many Requests', which clients showed verbatim.
+export const THROTTLE_ERROR_MESSAGE = 'Too many requests. Please try again later.';
+
 export const BASELINE_THROTTLERS: ThrottlerOptions[] = [
   { name: 'burst', ttl: 1000, limit: 20 },
   { name: 'sustained', ttl: 10000, limit: 100 },

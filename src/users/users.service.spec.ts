@@ -212,6 +212,7 @@ describe('UsersService', () => {
         name: 'Candidate',
         email: 'candidate@example.com',
         password: 'StrongPass1!',
+        acceptTerms: true,
       });
 
       const createPayload = mockUserRepository.create.mock.calls[0][0];
@@ -238,6 +239,7 @@ describe('UsersService', () => {
           name: 'Candidate',
           email: 'candidate@example.com',
           password: 'StrongPass1!',
+          acceptTerms: true,
         }),
       ).rejects.toThrow('Email already exists in the system. Please use another email.');
     });
@@ -250,6 +252,7 @@ describe('UsersService', () => {
         name: 'Updated Candidate',
         email: 'candidate@example.com',
         password: 'StrongPass1!',
+        acceptTerms: true,
       };
       const expected = { _id: id };
       mockUserAccountService.updateUnverifiedUser.mockResolvedValue(expected as any);

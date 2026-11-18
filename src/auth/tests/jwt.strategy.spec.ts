@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -58,5 +58,31 @@ describe('JwtStrategy', () => {
     await expect(strategy.validate({ sub: 'user-id-123', type: 'access' })).rejects.toThrow(
       ForbiddenException,
     );
+  });
+
+  describe('password change revocation', () => {
+    const mockUser = (passwordChangedAt?: Date) => {
+      const exec = jest.fn().mockResolvedValue(makeUser({ passwordChangedAt }));
+      userModel.findById.mockReturnValue({
+        select: () => ({ lean: () => ({ exec }) }),
+      });
+    };
+    const nowSeconds = Math.floor(Date.now() / 1000);
+
+    it('rejects access tokens issued before the last password change', async () => {
+      mockUser(new Date());
+
+      await expect(
+        strategy.validate({ sub: 'user-id-123', type: 'access', iat: nowSeconds - 60 }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('accepts access tokens issued after the last password change', async () => {
+      mockUser(new Date(Date.now() - 60_000));
+
+      await expect(
+        strategy.validate({ sub: 'user-id-123', type: 'access', iat: nowSeconds }),
+      ).resolves.toEqual(expect.objectContaining({ email: expect.any(String) }));
+    });
   });
 });
