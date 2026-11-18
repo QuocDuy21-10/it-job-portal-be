@@ -92,6 +92,17 @@ describe('AuthSessionService', () => {
         expect.objectContaining({ secret: 'refresh-secret' }),
       );
     });
+
+    it('gives every refresh token a unique jti so same-second logins do not collide', () => {
+      const payload = { sub: 'user-id', type: 'refresh' as const };
+
+      service.createRefreshToken(payload);
+      service.createRefreshToken(payload);
+
+      const [first, second] = jwtService.sign.mock.calls.map(call => (call[1] as any).jwtid);
+      expect(first).toEqual(expect.any(String));
+      expect(first).not.toBe(second);
+    });
   });
 
   describe('refreshAccessToken', () => {

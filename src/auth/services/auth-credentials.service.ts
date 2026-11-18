@@ -1,13 +1,11 @@
 import { BadRequestException, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
-import { Cache } from 'cache-manager';
 import { MailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import Redis from 'ioredis';
 import { REDIS_CLIENT } from 'src/redis/redis.module';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { AuthRegisterDto } from '../dto/auth-register.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { ForgotPasswordDto } from '../dto/forgot-password.dto';
@@ -33,7 +31,6 @@ export class AuthCredentialsService {
     private readonly configService: ConfigService,
     private readonly mailerService: MailerService,
     private readonly authVerificationService: AuthVerificationService,
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
   ) {}
 
@@ -165,12 +162,26 @@ export class AuthCredentialsService {
       return { message: 'Nếu email tồn tại, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.' };
     }
 
-    const token = uuidv4();
-    await this.cacheManager.set(`reset_password:${token}`, email, RESET_PASSWORD_TTL_MS);
+    const token = randomUUID();
+    // Only the newest link per email stays valid: swap in the new token and drop the previous one.
+    const previousToken = await this.redisClient.set(
+      `reset_password_latest:${email}`,
+      token,
+      'PX',
+      RESET_PASSWORD_TTL_MS,
+      'GET',
+    );
+    const pipeline = this.redisClient
+      .pipeline()
+      .set(`reset_password:${token}`, email, 'PX', RESET_PASSWORD_TTL_MS);
+    if (previousToken) pipeline.del(`reset_password:${previousToken}`);
+    await pipeline.exec();
 
     const url = `${this.configService.get<string>('FE_URL')}/reset-password?token=${token}&email=${email}`;
 
-    await this.mailerService
+    // Not awaited: waiting on SMTP made known emails answer seconds slower than unknown ones.
+    // shortcut: no retry if the process dies mid-send, move to a BullMQ job if delivery must be guaranteed.
+    void this.mailerService
       .sendMail({
         to: email,
         subject: 'Reset Password Request',
@@ -189,7 +200,8 @@ export class AuthCredentialsService {
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
     const { token, email, newPassword } = resetPasswordDto;
 
-    const emailStored = await this.cacheManager.get<string>(`reset_password:${token}`);
+    // GETDEL consumes the token atomically, so two parallel resets cannot both succeed.
+    const emailStored = await this.redisClient.getdel(`reset_password:${token}`);
     if (!emailStored || emailStored !== email) {
       throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn');
     }
@@ -199,7 +211,7 @@ export class AuthCredentialsService {
 
     const newPasswordHash = this.hashPassword(newPassword);
     await this.usersService.updatePassword(user._id.toString(), newPasswordHash);
-    await this.cacheManager.del(`reset_password:${token}`);
+    await this.sessionsService.deleteAllUserSessions(user._id.toString());
 
     return { message: 'Đặt lại mật khẩu thành công' };
   }

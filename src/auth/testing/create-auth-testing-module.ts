@@ -40,6 +40,7 @@ export interface MockCacheManager {
 
 export interface MockRedisPipeline {
   set: SyncMock<[string, string, ...unknown[]], MockRedisPipeline>;
+  del: SyncMock<string[], MockRedisPipeline>;
   incr: SyncMock<[string], MockRedisPipeline>;
   expire: SyncMock<[string, number, ...unknown[]], MockRedisPipeline>;
   exec: AsyncMock<[], unknown[]>;
@@ -47,7 +48,8 @@ export interface MockRedisPipeline {
 
 export interface MockRedisClient {
   get: AsyncMock<[string], string | null | undefined>;
-  set: AsyncMock<[string, string], void>;
+  set: AsyncMock<[string, string, ...unknown[]], string | null | void>;
+  getdel: AsyncMock<[string], string | null>;
   del: AsyncMock<string[], void>;
   setex: AsyncMock<[string, number, string], void>;
   incr: AsyncMock<[string], number>;
@@ -82,6 +84,7 @@ export async function createAuthTestingModule(
 ): Promise<AuthTestingModuleContext> {
   const redisPipeline: MockRedisPipeline = {
     set: jest.fn<(...args: [string, string, ...unknown[]]) => MockRedisPipeline>().mockReturnThis(),
+    del: jest.fn<(...keys: string[]) => MockRedisPipeline>().mockReturnThis(),
     incr: jest.fn<(key: string) => MockRedisPipeline>().mockReturnThis(),
     expire: jest
       .fn<(...args: [string, number, ...unknown[]]) => MockRedisPipeline>()
@@ -97,7 +100,8 @@ export async function createAuthTestingModule(
 
   const redisClient: MockRedisClient = {
     get: jest.fn<(key: string) => Promise<string | null | undefined>>(),
-    set: jest.fn<(key: string, value: string) => Promise<void>>(),
+    set: jest.fn<(...args: [string, string, ...unknown[]]) => Promise<string | null | void>>(),
+    getdel: jest.fn<(key: string) => Promise<string | null>>(),
     del: jest.fn<(...keys: string[]) => Promise<void>>(),
     setex: jest.fn<(key: string, ttl: number, value: string) => Promise<void>>(),
     incr: jest.fn<(key: string) => Promise<number>>(),

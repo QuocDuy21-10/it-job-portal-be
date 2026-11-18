@@ -77,6 +77,7 @@ export const registerDto = {
   name: 'New User',
   email: 'new@example.com',
   password: 'StrongP@ss1',
+  acceptTerms: true,
   age: 25,
   gender: 'male',
   address: 'Hanoi',

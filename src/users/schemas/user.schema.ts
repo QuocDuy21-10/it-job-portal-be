@@ -20,6 +20,10 @@ export class User {
   @Prop({ required: false })
   password: string;
 
+  // Access tokens issued before this instant are rejected (JwtStrategy).
+  @Prop({ type: Date, required: false })
+  passwordChangedAt?: Date;
+
   @Prop({ type: String, enum: EAuthProvider, default: EAuthProvider.LOCAL })
   authProvider: string;
 

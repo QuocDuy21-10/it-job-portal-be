@@ -102,6 +102,7 @@ describe('UserAccountService', () => {
       expect(mockUserRepository.validateObjectId).toHaveBeenCalledWith(id);
       expect(mockUserRepository.updateOne).toHaveBeenCalledWith(id, {
         password: 'new-password-hash',
+        passwordChangedAt: expect.any(Date),
       });
     });
   });
@@ -117,6 +118,7 @@ describe('UserAccountService', () => {
         name: 'Updated User',
         email: 'updated@example.com',
         password: 'NewPassword123!',
+        acceptTerms: true,
       });
 
       const updatePayload = mockUserRepository.updateOne.mock.calls[0][1];

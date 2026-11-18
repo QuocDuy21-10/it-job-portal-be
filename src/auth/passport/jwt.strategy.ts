@@ -36,6 +36,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     assertAuthenticatedAccountState(user, 'access');
 
+    // Compared in whole seconds (JWT iat precision) so a login right after the change is not rejected.
+    if (
+      user.passwordChangedAt &&
+      payload.iat < Math.floor(new Date(user.passwordChangedAt).getTime() / 1000)
+    ) {
+      throw new UnauthorizedException('Mật khẩu đã thay đổi. Vui lòng đăng nhập lại.');
+    }
+
     if (!this.isSystemRole(user.role)) {
       throw new UnauthorizedException('Role không hợp lệ. Vui lòng liên hệ admin.');
     }

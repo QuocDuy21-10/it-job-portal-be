@@ -23,7 +23,6 @@ describe('AuthCredentialsService', () => {
   };
   let usersService: AuthTestingModuleContext['usersService'];
   let sessionsService: AuthTestingModuleContext['sessionsService'];
-  let cacheManager: AuthTestingModuleContext['cacheManager'];
   let mailerService: AuthTestingModuleContext['mailerService'];
   let redisClient: AuthTestingModuleContext['redisClient'];
   let redisPipeline: AuthTestingModuleContext['redisPipeline'];
@@ -43,7 +42,6 @@ describe('AuthCredentialsService', () => {
     service = context.module.get(AuthCredentialsService);
     usersService = context.usersService;
     sessionsService = context.sessionsService;
-    cacheManager = context.cacheManager;
     mailerService = context.mailerService;
     redisClient = context.redisClient;
     redisPipeline = context.redisPipeline;
@@ -314,17 +312,25 @@ describe('AuthCredentialsService', () => {
       const result = await service.forgotPassword({ email: 'unknown@example.com' });
 
       expect(result).toHaveProperty('message');
-      expect(cacheManager.set).not.toHaveBeenCalled();
+      expect(redisClient.set).not.toHaveBeenCalled();
     });
 
-    it('should store the reset token in cache and send email when the user exists', async () => {
+    it('should store the reset token for 10 minutes and send email when the user exists', async () => {
       usersService.findUserByEmail.mockResolvedValue(makeUser());
 
       const result = await service.forgotPassword(forgotPasswordDto);
 
-      expect(cacheManager.set).toHaveBeenCalledWith(
-        expect.stringContaining('reset_password:'),
+      expect(redisClient.set).toHaveBeenCalledWith(
+        'reset_password_latest:test@example.com',
+        expect.any(String),
+        'PX',
+        600000,
+        'GET',
+      );
+      expect(redisPipeline.set).toHaveBeenCalledWith(
+        expect.stringMatching(/^reset_password:.+/),
         'test@example.com',
+        'PX',
         600000,
       );
       expect(mailerService.sendMail).toHaveBeenCalledWith(
@@ -335,38 +341,56 @@ describe('AuthCredentialsService', () => {
       );
       expect(result).toHaveProperty('message');
     });
+
+    it('invalidates the previous reset token when a new one is issued', async () => {
+      usersService.findUserByEmail.mockResolvedValue(makeUser());
+      redisClient.set.mockResolvedValueOnce('old-token');
+
+      await service.forgotPassword(forgotPasswordDto);
+
+      expect(redisPipeline.del).toHaveBeenCalledWith('reset_password:old-token');
+    });
+
+    it('responds without waiting for the mail server, so timing does not reveal the account', async () => {
+      usersService.findUserByEmail.mockResolvedValue(makeUser());
+      mailerService.sendMail.mockReturnValue(new Promise(() => undefined));
+
+      await expect(service.forgotPassword(forgotPasswordDto)).resolves.toHaveProperty('message');
+    });
   });
 
   describe('resetPassword', () => {
-    it('should reset the password and delete the token from cache', async () => {
+    it('should consume the token, reset the password and revoke all sessions', async () => {
       const user = makeUser();
-      cacheManager.get.mockResolvedValue('test@example.com');
+      redisClient.getdel.mockResolvedValue('test@example.com');
       usersService.findUserByEmail.mockResolvedValue(user);
 
       const result = await service.resetPassword(resetPasswordDto);
 
+      expect(redisClient.getdel).toHaveBeenCalledWith('reset_password:valid-token');
       expect(usersService.updatePassword).toHaveBeenCalledWith(
         user._id.toString(),
         expect.any(String),
       );
-      expect(cacheManager.del).toHaveBeenCalledWith('reset_password:valid-token');
+      expect(sessionsService.deleteAllUserSessions).toHaveBeenCalledWith('user-id-123');
       expect(result).toHaveProperty('message');
     });
 
-    it('should throw BadRequestException when the token is invalid or expired', async () => {
-      cacheManager.get.mockResolvedValue(null);
+    it('should throw BadRequestException when the token is invalid, expired or already used', async () => {
+      redisClient.getdel.mockResolvedValue(null);
 
       await expect(service.resetPassword(resetPasswordDto)).rejects.toThrow(BadRequestException);
+      expect(usersService.updatePassword).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException when the token email does not match', async () => {
-      cacheManager.get.mockResolvedValue('different@example.com');
+      redisClient.getdel.mockResolvedValue('different@example.com');
 
       await expect(service.resetPassword(resetPasswordDto)).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException when user is not found after token validation', async () => {
-      cacheManager.get.mockResolvedValue('test@example.com');
+      redisClient.getdel.mockResolvedValue('test@example.com');
       usersService.findUserByEmail.mockResolvedValue(null);
 
       await expect(service.resetPassword(resetPasswordDto)).rejects.toThrow(BadRequestException);

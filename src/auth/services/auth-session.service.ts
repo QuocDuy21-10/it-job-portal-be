@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 import ms from 'ms';
+import { randomUUID } from 'crypto';
 import { SessionsService } from 'src/sessions/sessions.service';
 import { IUser } from 'src/users/user.interface';
 import { IJwtAccessPayload, IJwtRefreshPayload } from '../interfaces/jwt-payload.interface';
@@ -56,6 +57,8 @@ export class AuthSessionService {
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
       expiresIn: ms(this.configService.get<string>('JWT_REFRESH_EXPIRES_IN')) / 1000,
+      // Unique per token: two logins in the same second would otherwise hit the refreshTokenHash unique index.
+      jwtid: randomUUID(),
     });
   }
 
