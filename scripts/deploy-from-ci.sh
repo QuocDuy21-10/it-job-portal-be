@@ -1,0 +1,24 @@
+#!/bin/sh
+# Forced command for the GitHub Actions deploy key (authorized_keys: restrict,command="<repo>/scripts/deploy-from-ci.sh").
+# The workflow sends only the version to deploy (e.g. 1.2.3); this runs the manual steps from
+# docs/11-operations/rollback.md: update the repo, back up MongoDB, set IMAGE_TAG, deploy.
+set -eu
+
+VERSION="${SSH_ORIGINAL_COMMAND:-}"
+# Untrusted input: allow only a plain semver, no spaces, newlines or shell characters.
+case "$VERSION" in
+  '' | *[!0-9A-Za-z.-]*) VERSION='' ;;
+esac
+if ! printf '%s' "$VERSION" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?'; then
+  echo "refused: expected a version like 1.2.3, got '${SSH_ORIGINAL_COMMAND:-}'" >&2
+  exit 64
+fi
+
+cd "$(dirname "$0")/.."
+grep -q '^IMAGE_TAG=' .env.production || { echo "IMAGE_TAG is missing from .env.production" >&2; exit 1; }
+
+echo "Deploying $VERSION (was $(grep '^IMAGE_TAG=' .env.production | cut -d= -f2))"
+git pull --ff-only --quiet origin main
+./scripts/backup-mongo.sh
+sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$VERSION/" .env.production
+exec ./scripts/deploy.sh

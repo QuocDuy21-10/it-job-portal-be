@@ -1,6 +1,6 @@
 # CI/CD
 
-Quy trình tích hợp liên tục chạy bằng GitHub Actions. Workflow `docker-publish.yml` build và đẩy image lên Docker Hub khi có tag `v*` (mục cuối). **Không có triển khai tự động (CD)** lên VPS: chạy tay `./scripts/deploy.sh` ([deployment](deployment.md)).
+Quy trình tích hợp liên tục chạy bằng GitHub Actions. Workflow `docker-publish.yml` build và đẩy image lên Docker Hub khi có tag `v*`, rồi tự triển khai bản đó lên VPS qua SSH (hai mục cuối).
 
 ## GitHub Actions
 
@@ -27,7 +27,6 @@ Các bước dùng action `checkout`, `setup-node`, `setup-buildx-action`, `buil
 - Không đo độ bao phủ test hay đặt ngưỡng.
 - Không quét image Docker hay quét bí mật.
 - Không kiểm tra tài liệu (link, Mermaid); các script kiểm tra tài liệu chỉ chạy tay ([documentation-guide](../13-contributing/documentation-guide.md)).
-- Không triển khai tự động lên VPS (image chỉ được đẩy lên registry bởi `docker-publish.yml`).
 
 ## Git hook cục bộ
 
@@ -47,13 +46,31 @@ Nguồn: [.github/workflows/docker-publish.yml](../../.github/workflows/docker-p
 | `sha-<short>` | Mọi lần chạy |
 | `latest` | Chỉ khi chạy từ tag |
 
-Chỉ build `linux/amd64`, target `production`. Workflow này **chưa được chạy thật** khi viết tài liệu (cần secrets và một tag).
+Chỉ build `linux/amd64`, target `production`.
+
+## Triển khai tự động (CD)
+
+Job `deploy` trong cùng workflow chạy sau `publish`, **chỉ khi chạy từ tag** (chạy tay từ một nhánh thì chỉ build image). Job dùng GitHub Environment `production` và không chạy song song hai lần deploy (`concurrency: deploy-production`).
+
+```mermaid
+flowchart LR
+    T["push tag vX.Y.Z"] --> P["publish: build + push X.Y.Z"] --> D["deploy: ssh VPS 'X.Y.Z'"]
+    D --> S["scripts/deploy-from-ci.sh"] --> S1["git pull --ff-only main"] --> S2["backup-mongo.sh"] --> S3["IMAGE_TAG=X.Y.Z"] --> S4["deploy.sh (chờ healthcheck)"]
+```
+
+| Cần có | Ở đâu |
+|---|---|
+| Secret `DEPLOY_SSH_KEY` (khóa riêng ed25519), `DEPLOY_HOST`, `DEPLOY_KNOWN_HOSTS` | Environment `production` |
+| Biến `DEPLOY_USER` (tùy chọn, mặc định `root`) | Repository hoặc environment |
+| Khóa công khai trong `authorized_keys` với `restrict,command="<repo>/scripts/deploy-from-ci.sh"` | VPS |
+
+Khóa deploy bị ép chạy đúng [deploy-from-ci.sh](../../scripts/deploy-from-ci.sh): nó không mở được shell, và lệnh workflow gửi (`X.Y.Z`) chỉ đến script qua `$SSH_ORIGINAL_COMMAND`, bị từ chối nếu không đúng dạng semver. Host key được ghim qua `DEPLOY_KNOWN_HOSTS` (`StrictHostKeyChecking=yes`). Cài đặt một lần: [vps-production-guide](vps-production-guide.md#7-một-lần-bật-deploy-tự-động). Job `deploy` fail khi pull, sao lưu hay healthcheck lỗi; nó **không tự rollback** ([rollback](../11-operations/rollback.md)).
 
 ## Known Limitation
 
 - Máy tài liệu này chạy Node 22 trong khi CI dùng Node 24 (`.nvmrc`); kết quả test cục bộ vẫn qua nhưng không thay cho CI.
 - `npm audit` mức `critical` bỏ qua các lỗ hổng `high` đã biết trong phụ thuộc production.
-- Không có môi trường staging; triển khai lên VPS là thao tác tay.
+- Không có môi trường staging; mỗi tag `v*` đi thẳng lên production (bật Required reviewers cho environment `production` nếu muốn duyệt tay trước khi deploy).
 
 ## Future Improvement
 
