@@ -9,6 +9,7 @@
 !/docs/assets/
 /scripts/*
 !/scripts/deploy.sh
+!/scripts/deploy-from-ci.sh
 !/scripts/backup-mongo.sh
 !/scripts/restore-mongo.sh
 /public

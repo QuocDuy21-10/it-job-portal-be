@@ -90,14 +90,45 @@ Vercel Hobby chỉ dành cho dự án phi thương mại; nếu thu phí hoặc 
 
 ## 6. Vận hành
 
-- **Cập nhật:** phát hành tag mới, sửa `IMAGE_TAG` trong `.env.production`, chạy `./scripts/deploy.sh`.
+- **Cập nhật:** phát hành tag mới (`git tag vX.Y.Z && git push origin vX.Y.Z`); GitHub Actions build và deploy tự động sau khi làm mục 7. Chưa bật mục 7 thì sửa `IMAGE_TAG` trong `.env.production` rồi chạy `./scripts/deploy.sh`.
 - **Rollback:** đổi `IMAGE_TAG` về tag cũ rồi `./scripts/deploy.sh` ([rollback](../11-operations/rollback.md)).
 - **Backup:** `scripts/backup-mongo.sh` sao lưu MongoDB + `uploads` + `cv_storage` hằng đêm, giữ 7 ngày trong `backups/` và đẩy bản mã hóa lên Google Drive qua rclone (giữ 30 ngày), để mất VPS không mất luôn bản sao lưu. Cài rclone, dòng cron và khôi phục (`scripts/restore-mongo.sh`): [backup-and-recovery](../11-operations/backup-and-recovery.md).
 - **RAM:** dùng `docker stats` và `free -h`. Giới hạn trong compose (backend 450m, mongodb 450m, redis 96m, caddy 32m) là ước tính; khi chạy thử cục bộ không có tải, tổng mức dùng khoảng 330MB. Dùng swap liên tục nghĩa là cần nâng VPS hoặc chuyển MongoDB sang Atlas (chỉ đổi `MONGO_URL`).
+
+## 7. Một lần: bật deploy tự động
+
+Sau bước này, push tag `vX.Y.Z` là đủ để lên production ([ci-cd](ci-cd.md#triển-khai-tự-động-cd)).
+
+1. Trên máy của bạn, tạo một khóa riêng cho GitHub Actions (không passphrase):
+
+   ```bash
+   ssh-keygen -t ed25519 -N '' -C github-actions-deploy -f ~/.ssh/job-portal-deploy
+   ```
+
+2. Trên VPS, kéo code mới để có `scripts/deploy-from-ci.sh` (`cd /opt/job-portal-be && git pull`), rồi thêm **một dòng** vào `~/.ssh/authorized_keys` của user deploy (thay phần khóa bằng nội dung `~/.ssh/job-portal-deploy.pub`):
+
+   ```text
+   restrict,command="/opt/job-portal-be/scripts/deploy-from-ci.sh" ssh-ed25519 AAAA... github-actions-deploy
+   ```
+
+   `restrict` tắt pty và mọi forwarding; `command=` buộc khóa này chỉ chạy script deploy.
+
+3. Trên GitHub, tạo environment `production` (Settings, Environments; bật Required reviewers nếu muốn duyệt tay mỗi lần deploy) và đặt secret:
+
+   ```bash
+   gh api -X PUT repos/<owner>/<repo>/environments/production
+   gh secret set DEPLOY_SSH_KEY --env production < ~/.ssh/job-portal-deploy
+   gh secret set DEPLOY_HOST --env production --body "<IP hoặc tên máy VPS>"
+   ssh-keygen -F <IP hoặc tên máy VPS> | grep -v '^#' | gh secret set DEPLOY_KNOWN_HOSTS --env production
+   ```
+
+   `DEPLOY_KNOWN_HOSTS` lấy từ `known_hosts` của máy đã SSH vào VPS, nên host key là bản bạn đã tin. Nếu user deploy không phải `root`, đặt biến `DEPLOY_USER`. Đặt xong thì xóa file khóa riêng trên máy (`rm ~/.ssh/job-portal-deploy`); cần đổi khóa thì tạo cặp mới.
+
+4. Kiểm tra: push một tag mới và xem job `deploy` trong tab Actions; trên VPS, `grep '^IMAGE_TAG=' .env.production` phải là tag vừa push.
 
 ## Known Limitation
 
 - Giới hạn RAM chưa đo dưới tải thật trên VPS.
 - Một VPS, một MongoDB, không replica: mất máy là gián đoạn dịch vụ.
-- Không có triển khai tự động qua SSH; mỗi lần cập nhật chạy tay `./scripts/deploy.sh`.
+- Deploy tự động không tự rollback khi bản mới lỗi sau healthcheck; rollback vẫn là thao tác tay.
 - Image production nặng khoảng 919MB (chủ yếu `node_modules` 538MB, gồm các gói như `typescript` và `webpack` kéo vào qua phụ thuộc gián tiếp). Giảm cần đổi phụ thuộc của dự án.

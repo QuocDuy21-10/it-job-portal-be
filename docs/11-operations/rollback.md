@@ -8,6 +8,8 @@ Quy trình cho một VPS chạy `docker-compose.prod.yml`. Mỗi bản build do 
 
 ## Deploy
 
+Mặc định việc deploy là tự động: push tag `vX.Y.Z` thì GitHub Actions build image rồi chạy [deploy-from-ci.sh](../../scripts/deploy-from-ci.sh) trên VPS ([ci-cd](../09-infrastructure/ci-cd.md#triển-khai-tự-động-cd)). Script đó làm đúng các bước 2 và 3 dưới đây (kèm `git pull --ff-only`); các bước còn lại vẫn làm tay. Quy trình tay đầy đủ:
+
 1. Ghi lại tag đang chạy:
 
    ```bash
@@ -39,6 +41,8 @@ Quy trình cho một VPS chạy `docker-compose.prod.yml`. Mỗi bản build do 
 - Lỗi nghiệp vụ đã xác nhận do bản mới, chưa sửa nhanh được.
 
 ## Rollback
+
+Nhanh nhất là chạy tay trên VPS như dưới đây. Cách khác: trên GitHub, mở lần chạy `Docker Publish` của tag cũ và chạy lại job `deploy`.
 
 ```bash
 sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=<tag-cũ>/" .env.production
