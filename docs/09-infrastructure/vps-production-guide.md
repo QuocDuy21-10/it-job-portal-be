@@ -117,10 +117,12 @@ Sau bước này, push tag `vX.Y.Z` là đủ để lên production ([ci-cd](ci-
 
    ```bash
    gh api -X PUT repos/<owner>/<repo>/environments/production
-   gh secret set DEPLOY_SSH_KEY --env production < ~/.ssh/job-portal-deploy
-   gh secret set DEPLOY_HOST --env production --body "<IP hoặc tên máy VPS>"
-   ssh-keygen -F <IP hoặc tên máy VPS> | grep -v '^#' | gh secret set DEPLOY_KNOWN_HOSTS --env production
+   gh secret set DEPLOY_SSH_KEY -R <owner>/<repo> --env production < ~/.ssh/job-portal-deploy
+   gh secret set DEPLOY_HOST -R <owner>/<repo> --env production --body "<IP VPS>"
+   ssh-keygen -F <IP VPS> | grep -v '^#' | gh secret set DEPLOY_KNOWN_HOSTS -R <owner>/<repo> --env production
    ```
+
+   `-R` cho phép chạy từ bất kỳ thư mục nào (không có nó, `gh` phải chạy trong repo và báo `no git remotes found`). Dùng địa chỉ IP thật ở cả `DEPLOY_HOST` lẫn `ssh-keygen -F`: `known_hosts` lưu theo `HostName`, không theo alias trong `~/.ssh/config`.
 
    `DEPLOY_KNOWN_HOSTS` lấy từ `known_hosts` của máy đã SSH vào VPS, nên host key là bản bạn đã tin. Nếu user deploy không phải `root`, đặt biến `DEPLOY_USER`. Đặt xong thì xóa file khóa riêng trên máy (`rm ~/.ssh/job-portal-deploy`); cần đổi khóa thì tạo cặp mới.
 
