@@ -95,6 +95,14 @@ describe('NotificationsService ownership errors', () => {
     );
   });
 
+  it('returns 404 (not a BSONError 500) for a malformed notification ID', async () => {
+    await expect(service.markAsRead('not-an-id', userId)).rejects.toThrow(NotFoundException);
+    await expect(
+      service.remove('not-an-id', { _id: userId, email: 'a@example.com' } as any),
+    ).rejects.toThrow(NotFoundException);
+    expect(model.updateOne).not.toHaveBeenCalled();
+  });
+
   it("returns 404 when deleting someone else's (or a missing) notification", async () => {
     model.updateOne.mockResolvedValue({ matchedCount: 0 });
     model.softDelete.mockResolvedValue({ deleted: 0 });

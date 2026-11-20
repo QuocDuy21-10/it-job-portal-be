@@ -71,6 +71,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         : undefined,
       savedJobs: user.savedJobs?.map((id: any) => id.toString()) || [],
       companyFollowed: user.companyFollowed?.map((id: any) => id.toString()) || [],
+      sessionId: payload.sid,
     };
   }
 

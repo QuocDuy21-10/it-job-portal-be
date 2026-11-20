@@ -132,6 +132,22 @@ describe('Authorization QA regressions 2026-11-20 (e2e)', () => {
     await request(t.server).get('/api/v1/auth/me').set(bearer).expect(401);
   });
 
+  it('logout without the refresh cookie still ends the access token session', async () => {
+    const { accessToken } = await login(t.server, world.users.c1.email);
+    const bearer = { Authorization: `Bearer ${accessToken}` };
+
+    await request(t.server).post('/api/v1/auth/logout').set(bearer).expect(201);
+
+    await request(t.server).get('/api/v1/auth/me').set(bearer).expect(401);
+  });
+
+  it('a malformed notification ID is 404, not 500', async () => {
+    await request(t.server)
+      .patch('/api/v1/notifications/not-an-id/read')
+      .set(auth('admin'))
+      .expect(404);
+  });
+
   it('BUG-07: lock then unlock does not revive an access token issued before the lock', async () => {
     const { accessToken } = await login(t.server, world.users.hrB.email);
     const bearer = { Authorization: `Bearer ${accessToken}` };

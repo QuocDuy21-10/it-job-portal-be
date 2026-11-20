@@ -77,8 +77,8 @@ export class AuthService {
     );
   }
 
-  async logout(response: Response, refreshToken: string) {
-    return this.authSessionService.logout(response, refreshToken);
+  async logout(response: Response, refreshToken: string | undefined, user?: IUser) {
+    return this.authSessionService.logout(response, refreshToken, user);
   }
 
   async logoutAllDevices(response: Response, userId: string) {

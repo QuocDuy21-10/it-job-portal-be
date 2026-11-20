@@ -119,8 +119,14 @@ export class AuthSessionService {
     }
   }
 
-  async logout(response: Response, refreshToken: string) {
-    await this.sessionsService.deleteSession(refreshToken);
+  async logout(response: Response, refreshToken: string | undefined, user?: IUser) {
+    if (refreshToken) {
+      await this.sessionsService.deleteSession(refreshToken);
+    }
+    // The access token's own session ends even when the refresh cookie is missing or stale.
+    if (user?.sessionId) {
+      await this.sessionsService.deleteSessionById(user.sessionId, user._id);
+    }
     this.clearRefreshCookie(response);
 
     return { message: 'Logout successfully' };

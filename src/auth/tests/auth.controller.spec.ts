@@ -162,14 +162,15 @@ describe('AuthController', () => {
   });
 
   describe('handleLogout', () => {
-    it('should call authService.logout with response and refresh token', () => {
+    it('should call authService.logout with response, refresh token and current user', () => {
       const req = makeRequest();
       const res = makeResponse();
+      const user = { _id: 'user-id', sessionId: 'session-1' } as any;
       authService.logout.mockResolvedValue({ message: 'ok' });
 
-      controller.handleLogout(req, res);
+      controller.handleLogout(req, res, user);
 
-      expect(authService.logout).toHaveBeenCalledWith(res, 'mock-refresh-token');
+      expect(authService.logout).toHaveBeenCalledWith(res, 'mock-refresh-token', user);
     });
   });
 
