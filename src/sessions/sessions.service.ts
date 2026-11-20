@@ -109,6 +109,14 @@ export class SessionsService {
     return result.deletedCount > 0;
   }
 
+  async deleteSessionById(sessionId: string, userId: string): Promise<boolean> {
+    if (!mongoose.isValidObjectId(sessionId)) {
+      return false;
+    }
+    const result = await this.sessionModel.deleteOne({ _id: sessionId, userId });
+    return result.deletedCount > 0;
+  }
+
   async deleteAllUserSessions(userId: string): Promise<number> {
     const result = await this.sessionModel.deleteMany({ userId });
     return result.deletedCount;

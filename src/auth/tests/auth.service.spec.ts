@@ -134,7 +134,7 @@ describe('AuthService facade', () => {
     expect(service.createAccessToken({ sub: user._id, type: 'access' })).toBe('access-token');
     expect(service.createRefreshToken({ sub: user._id, type: 'refresh' })).toBe('refresh-token');
     await service.refreshAccessToken('refresh-token', response, user, 'TestAgent', '127.0.0.1');
-    await service.logout(response, 'refresh-token');
+    await service.logout(response, 'refresh-token', user);
     await service.logoutAllDevices(response, user._id);
     await service.getActiveSessions(user._id);
 
@@ -148,7 +148,7 @@ describe('AuthService facade', () => {
       'TestAgent',
       '127.0.0.1',
     );
-    expect(authSessionService.logout).toHaveBeenCalledWith(response, 'refresh-token');
+    expect(authSessionService.logout).toHaveBeenCalledWith(response, 'refresh-token', user);
     expect(authSessionService.logoutAllDevices).toHaveBeenCalledWith(response, user._id);
     expect(authSessionService.getActiveSessions).toHaveBeenCalledWith(user._id);
   });

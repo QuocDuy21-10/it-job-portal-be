@@ -174,6 +174,9 @@ export async function createAuthTestingModule(
           .mockResolvedValue({}),
         revokeSession: jest.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue({}),
         deleteSession: jest.fn<(...args: unknown[]) => Promise<boolean>>().mockResolvedValue(true),
+        deleteSessionById: jest
+          .fn<(...args: unknown[]) => Promise<boolean>>()
+          .mockResolvedValue(true),
         deleteAllUserSessions: jest
           .fn<(...args: unknown[]) => Promise<number>>()
           .mockResolvedValue(3),

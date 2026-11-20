@@ -15,4 +15,6 @@ export interface IUser {
   };
   savedJobs: string[];
   companyFollowed: string[];
+  /** Session behind the current access token (its `sid`); only set on HTTP requests. */
+  sessionId?: string;
 }

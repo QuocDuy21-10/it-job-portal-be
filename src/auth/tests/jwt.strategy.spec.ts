@@ -111,6 +111,15 @@ describe('JwtStrategy', () => {
       expect(userModel.findById).not.toHaveBeenCalled();
     });
 
+    it('exposes the sid as user.sessionId so logout can end this session', async () => {
+      const exec = jest.fn().mockResolvedValue(makeUser());
+      userModel.findById.mockReturnValue({ select: () => ({ lean: () => ({ exec }) }) });
+
+      await expect(
+        strategy.validate({ sub: 'user-id-123', type: 'access', sid: 'session-1' }),
+      ).resolves.toEqual(expect.objectContaining({ sessionId: 'session-1' }));
+    });
+
     it('rejects a token without a sid claim', async () => {
       await expect(strategy.validate({ sub: 'user-id-123', type: 'access' })).rejects.toThrow(
         UnauthorizedException,

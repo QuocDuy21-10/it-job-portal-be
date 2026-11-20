@@ -215,9 +215,13 @@ export class AuthController {
     description: 'Logout from current device. Deletes current session and clears cookie.',
   })
   @ResponseMessage('Logout successfully')
-  handleLogout(@Req() req: Request, @Res({ passthrough: true }) response: Response) {
+  handleLogout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) response: Response,
+    @User() user: IUser,
+  ) {
     const refreshToken = req.cookies['refresh_token'];
-    return this.authService.logout(response, refreshToken);
+    return this.authService.logout(response, refreshToken, user);
   }
 
   @Post('/logout-all')

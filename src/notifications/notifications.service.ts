@@ -94,16 +94,10 @@ export class NotificationsService {
    * Mark a single notification as read
    */
   async markAsRead(id: string, userId: string) {
-    const result = await this.notificationModel.updateOne(
-      {
-        _id: new mongoose.Types.ObjectId(id),
-        userId: new mongoose.Types.ObjectId(userId),
-      },
-      {
-        isRead: true,
-        readAt: new Date(),
-      },
-    );
+    const result = await this.notificationModel.updateOne(this.ownedFilter(id, userId), {
+      isRead: true,
+      readAt: new Date(),
+    });
     // Someone else's notification looks exactly like a missing one.
     if (result.matchedCount === 0) {
       throw new NotFoundException('Notification not found');
@@ -131,20 +125,25 @@ export class NotificationsService {
    * Soft delete a notification
    */
   async remove(id: string, user: IUser) {
-    await this.notificationModel.updateOne(
-      {
-        _id: new mongoose.Types.ObjectId(id),
-        userId: new mongoose.Types.ObjectId(user._id),
-      },
-      { deletedBy: { _id: user._id, email: user.email } },
-    );
-    const result = await this.notificationModel.softDelete({
-      _id: new mongoose.Types.ObjectId(id),
-      userId: new mongoose.Types.ObjectId(user._id),
+    const filter = this.ownedFilter(id, user._id);
+    await this.notificationModel.updateOne(filter, {
+      deletedBy: { _id: user._id, email: user.email },
     });
+    const result = await this.notificationModel.softDelete(filter);
     if (!result.deleted) {
       throw new NotFoundException('Notification not found');
     }
     return result;
+  }
+
+  /** A malformed ID is just another notification the caller does not own: 404, not a BSONError 500. */
+  private ownedFilter(id: string, userId: string) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new NotFoundException('Notification not found');
+    }
+    return {
+      _id: new mongoose.Types.ObjectId(id),
+      userId: new mongoose.Types.ObjectId(userId),
+    };
   }
 }

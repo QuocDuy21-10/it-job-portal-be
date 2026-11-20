@@ -178,6 +178,17 @@ describe('AuthSessionService', () => {
       expect(response.clearCookie).toHaveBeenCalledWith('refresh_token');
       expect(result).toHaveProperty('message');
     });
+
+    it("ends the access token's session even without a refresh cookie", async () => {
+      const response = makeResponse();
+      const user = { ...makeIUser(), sessionId: 'session-1' };
+
+      await service.logout(response, undefined, user);
+
+      expect(sessionsService.deleteSession).not.toHaveBeenCalled();
+      expect(sessionsService.deleteSessionById).toHaveBeenCalledWith('session-1', user._id);
+      expect(response.clearCookie).toHaveBeenCalledWith('refresh_token');
+    });
   });
 
   describe('logoutAllDevices', () => {
