@@ -4,14 +4,9 @@ import { ConfigService } from '@nestjs/config';
 import { Cache } from 'cache-manager';
 import { createHash } from 'crypto';
 import { IUser } from 'src/users/user.interface';
-import { CHAT_CONTEXT_CACHE_TTL_MS, CHAT_FAQ_CACHE_TTL_MS } from './constants/chat.constant';
+import { CHAT_CONTEXT_CACHE_TTL_MS } from './constants/chat.constant';
 import { EChatIntent } from './enums/chat-intent.enum';
 import { IntentAwareChatContext } from './interfaces/chat-context.interface';
-
-export interface CachedFaqResponse {
-  response: string;
-  recommendedJobIds?: string[];
-}
 
 @Injectable()
 export class ChatCacheService {
@@ -19,27 +14,6 @@ export class ChatCacheService {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly configService: ConfigService,
   ) {}
-
-  async getFaqResponse(
-    user: IUser,
-    message: string,
-    topic?: string,
-  ): Promise<CachedFaqResponse | undefined> {
-    return this.cacheManager.get<CachedFaqResponse>(this.buildFaqResponseKey(user, message, topic));
-  }
-
-  async setFaqResponse(
-    user: IUser,
-    message: string,
-    response: CachedFaqResponse,
-    topic?: string,
-  ): Promise<void> {
-    await this.cacheManager.set(
-      this.buildFaqResponseKey(user, message, topic),
-      response,
-      this.readPositiveIntConfig('CHAT_FAQ_CACHE_TTL_MS', CHAT_FAQ_CACHE_TTL_MS),
-    );
-  }
 
   async getContext(
     user: IUser,
@@ -66,16 +40,6 @@ export class ChatCacheService {
     );
   }
 
-  private buildFaqResponseKey(user: IUser, message: string, topic?: string): string {
-    return [
-      'chat_cache',
-      'faq_response',
-      this.normalizeRole(user.role),
-      this.normalizeValue(topic || 'general'),
-      this.hash(this.normalizeValue(message)),
-    ].join(':');
-  }
-
   private buildContextKey(
     user: IUser,
     intent: EChatIntent,
@@ -90,10 +54,6 @@ export class ChatCacheService {
       jobId || 'none',
       this.hash(this.normalizeValue(message)),
     ].join(':');
-  }
-
-  private normalizeRole(roleName?: string): string {
-    return this.normalizeValue(roleName || 'UNKNOWN').replace(/\s+/g, '_');
   }
 
   private normalizeValue(value: string): string {

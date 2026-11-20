@@ -67,8 +67,6 @@ describe('ChatService', () => {
   let mockChatCacheService: {
     getContext: jest.Mock;
     setContext: jest.Mock;
-    getFaqResponse: jest.Mock;
-    setFaqResponse: jest.Mock;
   };
   let mockChatToolActionService: {
     createSaveJobActions: jest.Mock;
@@ -277,8 +275,6 @@ describe('ChatService', () => {
     mockChatCacheService = {
       getContext: jest.fn().mockResolvedValue(undefined),
       setContext: jest.fn().mockResolvedValue(undefined),
-      getFaqResponse: jest.fn().mockResolvedValue(undefined),
-      setFaqResponse: jest.fn().mockResolvedValue(undefined),
     };
 
     mockChatToolActionService = {
@@ -600,7 +596,7 @@ describe('ChatService', () => {
       );
     });
 
-    it('serves cached FAQ responses without consuming quota or calling AI', async () => {
+    it('answers FAQ questions with AI and never reads a shared FAQ cache', async () => {
       const faqContext = {
         ...mockIntentContext,
         intent: EChatIntent.FAQ,
@@ -608,30 +604,28 @@ describe('ChatService', () => {
         contextJobs: [],
         validJobIds: [],
       };
+      const leakedFaqCache = jest.fn().mockResolvedValue({ response: 'Chào QA Tester Một!' });
+      Object.assign(mockChatCacheService, { getFaqResponse: leakedFaqCache });
       mockChatIntentService.detectIntent.mockResolvedValue({
         intent: EChatIntent.FAQ,
         confidence: 0.9,
         source: 'deterministic',
       });
       mockChatContextProviderRegistry.build.mockResolvedValue(faqContext);
-      mockChatCacheService.getFaqResponse.mockResolvedValue({
-        response: 'Apply from the job detail page.',
+      mockAIService.generateChat.mockResolvedValue({
+        text: 'Chào Duy! Bạn ứng tuyển từ trang chi tiết job.',
+        recommendedJobIds: [],
+        provider: 'groq',
+        metadata: { provider: 'groq', model: 'llama' },
       });
 
       const result = await service.sendMessage(user as any, 'How to apply?');
 
-      expect(result.cacheHit).toBe(true);
-      expect(result.cacheCategory).toBe('faq_response');
-      expect(mockChatQuotaService.reserve).not.toHaveBeenCalled();
-      expect(mockChatQuotaService.getStatus).toHaveBeenCalledWith(user);
-      expect(mockAIService.generateChat).not.toHaveBeenCalled();
-      expect(mockAiUsageService.record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          success: true,
-          cacheHit: true,
-          cacheCategory: 'faq_response',
-        }),
-      );
+      expect(leakedFaqCache).not.toHaveBeenCalled();
+      expect(mockAIService.generateChat).toHaveBeenCalledTimes(1);
+      expect(mockChatQuotaService.reserve).toHaveBeenCalledWith(user);
+      expect(result.response).toBe('Chào Duy! Bạn ứng tuyển từ trang chi tiết job.');
+      expect(result.cacheCategory).not.toBe('faq_response');
     });
 
     it('returns pending save-job actions when the assistant suggests saving recommended jobs', async () => {
@@ -732,7 +726,7 @@ describe('ChatService', () => {
       );
     });
 
-    it('serves cached FAQ stream responses with quota metadata without reserving quota', async () => {
+    it('streams FAQ answers from AI and never reads a shared FAQ cache', async () => {
       const faqContext = {
         ...mockIntentContext,
         intent: EChatIntent.FAQ,
@@ -740,6 +734,8 @@ describe('ChatService', () => {
         contextJobs: [],
         validJobIds: [],
       };
+      const leakedFaqCache = jest.fn().mockResolvedValue({ response: 'Chào QA Tester Một!' });
+      Object.assign(mockChatCacheService, { getFaqResponse: leakedFaqCache });
       mockCacheManager.get.mockResolvedValue(undefined);
       setupActiveSession();
       setupPromptHistory();
@@ -750,35 +746,23 @@ describe('ChatService', () => {
       });
       mockChatContextProviderRegistry.build.mockResolvedValue(faqContext);
       mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
-      mockChatMessageModel.countDocuments.mockResolvedValue(0);
       mockChatMessageModel.insertMany.mockResolvedValue([]);
-      mockChatSessionModel.updateOne.mockResolvedValue({ modifiedCount: 1 });
-      mockChatCacheService.getFaqResponse.mockResolvedValue({
-        response: 'Apply from the job detail page.',
-      });
+      mockAIService.streamChat.mockReturnValue(createStream(['Chào Duy!']));
 
       const events = [];
       for await (const event of service.streamMessage(user as any, 'How to apply?')) {
         events.push(event);
       }
 
-      expect(mockChatQuotaService.reserve).not.toHaveBeenCalled();
-      expect(mockChatQuotaService.getStatus).toHaveBeenCalledWith(user);
-      expect(events).toEqual([
-        { type: 'token', data: 'Apply from the job detail page.' },
-        {
+      expect(leakedFaqCache).not.toHaveBeenCalled();
+      expect(mockChatQuotaService.reserve).toHaveBeenCalledWith(user);
+      expect(events[0]).toEqual({ type: 'token', data: 'Chào Duy!' });
+      expect(events[1]).toEqual(
+        expect.objectContaining({
           type: 'done',
-          data: expect.objectContaining({
-            response: 'Apply from the job detail page.',
-            quota: {
-              remainingQuota: 29,
-              nextResetTime: 1733097600,
-            },
-            cacheHit: true,
-            cacheCategory: 'faq_response',
-          }),
-        },
-      ]);
+          data: expect.objectContaining({ response: 'Chào Duy!' }),
+        }),
+      );
     });
 
     it('rejects quota-exceeded streams before calling the AI provider', async () => {

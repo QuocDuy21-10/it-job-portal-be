@@ -159,73 +159,6 @@ export class ChatService {
       intent = turn.intent;
       intentDetectionSource = turn.intentDetectionSource;
 
-      const cachedFaqResponse = await this.getCachedFaqResponse(user, turn);
-      if (cachedFaqResponse) {
-        const quotaStatus = await this.chatQuotaService.getStatus(user);
-        const usageMetadata = this.withEstimatedUsage(
-          undefined,
-          promptEstimateSource,
-          Date.now() - startedAt,
-        );
-        const outputGuardrail = await this.chatResponseFormatterService.formatAssistantOutput(
-          cachedFaqResponse.response,
-        );
-        guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
-
-        await this.persistMessageTurn({
-          session: turn.session,
-          userId: user._id,
-          userMessage: turn.sanitizedMessage,
-          assistantMessage: outputGuardrail.sanitizedOutput,
-          relatedJobIds: cachedFaqResponse.recommendedJobIds ?? [],
-          assistantMetadata: this.buildMessageMetadata(
-            usageMetadata,
-            false,
-            guardrailFlags,
-            undefined,
-            turn.intent,
-            turn.intentDetectionSource,
-          ),
-        });
-
-        await this.recordUsage({
-          userId: user._id,
-          sessionId: turn.sessionId,
-          operationType: 'chat_message',
-          intent: turn.intent,
-          intentDetectionSource: turn.intentDetectionSource,
-          success: true,
-          metadata: usageMetadata,
-          guardrailFlags,
-          cacheHit: true,
-          cacheCategory: 'faq_response',
-          requestStartedAt: new Date(startedAt),
-          requestCompletedAt: new Date(),
-          topicGuardBlocked: outputGuardrail.topicGuardResult?.blocked,
-          topicGuardCategory: outputGuardrail.topicGuardResult?.category,
-          topicGuardLatencyMs: outputGuardrail.topicGuardResult?.latencyMs,
-          ...this.buildQuotaUsageFields(quotaStatus, false, false),
-        });
-
-        const suggestedActions = this.extractSuggestedActions(
-          outputGuardrail.sanitizedOutput,
-          turn.intentContext.user,
-        );
-
-        return {
-          sessionId: turn.sessionId,
-          conversationId: turn.sessionId,
-          response: outputGuardrail.sanitizedOutput,
-          timestamp: new Date(),
-          intent: turn.intent,
-          suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
-          recommendedJobIds: cachedFaqResponse.recommendedJobIds,
-          quota: this.chatQuotaService.serializePublicStatus(quotaStatus),
-          cacheHit: true,
-          cacheCategory: 'faq_response',
-        };
-      }
-
       quotaReservation = await this.chatQuotaService.reserve(user);
       const quotaStatus = quotaReservation.status;
       const parsedResponse = await this.aiService.generateChat(
@@ -279,7 +212,6 @@ export class ChatService {
         turn.intentContext.user,
       );
 
-      await this.cacheFaqResponse(user, turn, outputGuardrail.sanitizedOutput, validatedJobIds);
       await this.recordUsage({
         userId: user._id,
         sessionId: turn.sessionId,
@@ -377,75 +309,6 @@ export class ChatService {
       intent = turn.intent;
       intentDetectionSource = turn.intentDetectionSource;
 
-      const cachedFaqResponse = await this.getCachedFaqResponse(user, turn);
-      if (cachedFaqResponse) {
-        const quotaStatus = await this.chatQuotaService.getStatus(user);
-        const outputGuardrail = await this.chatResponseFormatterService.formatAssistantOutput(
-          cachedFaqResponse.response,
-          { skipTopicGuard: true },
-        );
-        fullText = outputGuardrail.sanitizedOutput;
-        guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
-        const usageMetadata = this.withEstimatedUsage(
-          undefined,
-          promptEstimateSource,
-          Date.now() - startedAt,
-        );
-
-        yield { type: 'token', data: fullText };
-
-        await this.persistMessageTurn({
-          session: turn.session,
-          userId: user._id,
-          userMessage: turn.sanitizedMessage,
-          assistantMessage: fullText,
-          relatedJobIds: cachedFaqResponse.recommendedJobIds ?? [],
-          assistantMetadata: this.buildMessageMetadata(
-            usageMetadata,
-            false,
-            guardrailFlags,
-            undefined,
-            turn.intent,
-            turn.intentDetectionSource,
-          ),
-        });
-
-        await this.recordUsage({
-          userId: user._id,
-          sessionId: turn.sessionId,
-          operationType: 'chat_stream',
-          intent: turn.intent,
-          intentDetectionSource: turn.intentDetectionSource,
-          success: true,
-          metadata: usageMetadata,
-          guardrailFlags,
-          cacheHit: true,
-          cacheCategory: 'faq_response',
-          requestStartedAt: new Date(startedAt),
-          requestCompletedAt: new Date(),
-          ...this.buildQuotaUsageFields(quotaStatus, false, false),
-        });
-
-        const suggestedActions = this.extractSuggestedActions(fullText, turn.intentContext.user);
-
-        yield {
-          type: 'done',
-          data: {
-            sessionId: turn.sessionId,
-            conversationId: turn.sessionId,
-            response: fullText,
-            intent: turn.intent,
-            recommendedJobIds: cachedFaqResponse.recommendedJobIds,
-            suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
-            quota: this.chatQuotaService.serializePublicStatus(quotaStatus),
-            cacheHit: true,
-            cacheCategory: 'faq_response',
-          },
-        };
-
-        return;
-      }
-
       quotaReservation = await this.chatQuotaService.reserve(user);
       const quotaStatus = quotaReservation.status;
       const gen = this.aiService.streamChat(turn.sanitizedMessage, turn.history, turn.systemPrompt);
@@ -521,7 +384,6 @@ export class ChatService {
       });
 
       const suggestedActions = this.extractSuggestedActions(fullText, turn.intentContext.user);
-      await this.cacheFaqResponse(user, turn, fullText, validatedJobIds);
 
       yield {
         type: 'done',
@@ -1018,42 +880,6 @@ export class ChatService {
     } catch (error) {
       this.logger.error('Error archiving chat session:', error);
     }
-  }
-
-  private async getCachedFaqResponse(
-    user: IUser,
-    turn: ChatTurnContext,
-  ): Promise<{ response: string; recommendedJobIds?: string[] } | undefined> {
-    if (turn.intent !== EChatIntent.FAQ) {
-      return undefined;
-    }
-
-    return this.chatCacheService.getFaqResponse(
-      user,
-      turn.sanitizedMessage,
-      turn.intentContext.faq?.topic,
-    );
-  }
-
-  private async cacheFaqResponse(
-    user: IUser,
-    turn: ChatTurnContext,
-    response: string,
-    recommendedJobIds: string[],
-  ): Promise<void> {
-    if (turn.intent !== EChatIntent.FAQ) {
-      return;
-    }
-
-    await this.chatCacheService.setFaqResponse(
-      user,
-      turn.sanitizedMessage,
-      {
-        response,
-        recommendedJobIds: recommendedJobIds.length > 0 ? recommendedJobIds : undefined,
-      },
-      turn.intentContext.faq?.topic,
-    );
   }
 
   private async createPendingToolActions(input: {
