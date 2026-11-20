@@ -134,7 +134,6 @@ Mọi biến tùy chọn; mặc định ở [gemini-quota.constants.ts](../../sr
 | `CHAT_QUOTA_NORMAL_USER_DAILY_LIMIT` | `30` | Lượt mỗi ngày cho `NORMAL USER` khi không có bản ghi chính sách |
 | `CHAT_QUOTA_HR_DAILY_LIMIT` | `100` | Lượt mỗi ngày cho `HR` |
 | `CHAT_CONTEXT_CACHE_TTL_MS` | 10 phút | TTL cache ngữ cảnh chat |
-| `CHAT_FAQ_CACHE_TTL_MS` | 24 giờ | TTL cache FAQ |
 | `CHAT_TOOL_ACTION_EXPIRY_MS` | 15 phút | Thời hạn xác nhận hành động |
 
 ## Bí mật cần bảo vệ

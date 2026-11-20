@@ -84,6 +84,7 @@ export class ChatController {
       sendMessageDto.message,
       undefined,
       sendMessageDto.jobId,
+      sendMessageDto.clientMessageId,
     );
   }
 
@@ -224,6 +225,7 @@ export class ChatController {
       sendMessageDto.message,
       sessionId,
       sendMessageDto.jobId,
+      sendMessageDto.clientMessageId,
     );
   }
 
@@ -354,6 +356,7 @@ export class ChatController {
       response,
       undefined,
       sendMessageDto.jobId,
+      sendMessageDto.clientMessageId,
     );
   }
 
@@ -382,6 +385,7 @@ export class ChatController {
       response,
       sessionId,
       sendMessageDto.jobId,
+      sendMessageDto.clientMessageId,
     );
   }
 
@@ -391,6 +395,7 @@ export class ChatController {
     response: Response,
     sessionId?: string,
     jobId?: string,
+    clientMessageId?: string,
   ): Promise<void> {
     response.status(200);
     response.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -399,7 +404,13 @@ export class ChatController {
     response.flushHeaders?.();
 
     try {
-      for await (const event of this.chatService.streamMessage(user, message, sessionId, jobId)) {
+      for await (const event of this.chatService.streamMessage(
+        user,
+        message,
+        sessionId,
+        jobId,
+        clientMessageId,
+      )) {
         response.write(this.formatSseEvent(event.type, event.data));
       }
     } catch (error) {

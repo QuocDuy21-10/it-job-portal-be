@@ -94,7 +94,7 @@ export class ChatResponseDto {
   @ApiProperty({
     description: 'Cache category used for this response',
     required: false,
-    example: 'faq_response',
+    example: 'retrieval_context',
   })
   cacheCategory?: string;
 }

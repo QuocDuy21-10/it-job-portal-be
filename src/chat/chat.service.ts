@@ -41,6 +41,7 @@ import { ChatContextProviderRegistry } from './chat-context-provider.registry';
 import { ChatQuotaService } from './chat-quota.service';
 import { IChatQuotaReservation, IChatQuotaStatus } from './interfaces/chat-quota-status.interface';
 import { ChatCacheService } from './chat-cache.service';
+import { ChatIdempotencyService } from './chat-idempotency.service';
 import { ChatToolActionService } from './chat-tool-action.service';
 import { PendingChatToolActionDto } from './dto/chat-tool-action.dto';
 import { ChatResponseFormatterService } from './chat-response-formatter.service';
@@ -53,6 +54,8 @@ export interface ChatStreamEvent {
 interface ChatTurnContext {
   session: ChatSessionDocument;
   sessionId: string;
+  userSequence: number;
+  assistantSequence: number;
   sanitizedMessage: string;
   guardrailFlags: string[];
   intent: EChatIntent;
@@ -98,6 +101,7 @@ export class ChatService {
     private readonly chatCacheService: ChatCacheService,
     private readonly chatToolActionService: ChatToolActionService,
     private readonly chatResponseFormatterService: ChatResponseFormatterService,
+    private readonly chatIdempotencyService: ChatIdempotencyService,
   ) {}
 
   async createSession(user: IUser, dto: CreateChatSessionDto): Promise<ChatSessionDto> {
@@ -109,6 +113,7 @@ export class ChatService {
       type: dto.type ?? EChatSessionType.GENERAL,
       title: dto.title?.trim() || undefined,
       isActive: true,
+      messageSeq: 0,
       lastMessageAt: new Date(),
     });
 
@@ -137,6 +142,7 @@ export class ChatService {
     message: string,
     sessionId?: string,
     jobId?: string,
+    clientMessageId?: string,
   ): Promise<ChatResponseDto> {
     const startedAt = Date.now();
     let resolvedSessionId: string | undefined = sessionId;
@@ -146,6 +152,9 @@ export class ChatService {
     let intentDetectionSource: ChatIntentDetectionSource | undefined;
     let quotaReservation: IChatQuotaReservation | undefined;
     let quotaRollback = false;
+
+    // Before prepareChatTurn so a duplicate reserves no sequence slot and no quota.
+    const idempotencyKey = await this.chatIdempotencyService.acquire(user._id, clientMessageId);
 
     try {
       const turn = await this.prepareChatTurn(user, message, {
@@ -158,73 +167,6 @@ export class ChatService {
       promptEstimateSource = turn.promptEstimateSource;
       intent = turn.intent;
       intentDetectionSource = turn.intentDetectionSource;
-
-      const cachedFaqResponse = await this.getCachedFaqResponse(user, turn);
-      if (cachedFaqResponse) {
-        const quotaStatus = await this.chatQuotaService.getStatus(user);
-        const usageMetadata = this.withEstimatedUsage(
-          undefined,
-          promptEstimateSource,
-          Date.now() - startedAt,
-        );
-        const outputGuardrail = await this.chatResponseFormatterService.formatAssistantOutput(
-          cachedFaqResponse.response,
-        );
-        guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
-
-        await this.persistMessageTurn({
-          session: turn.session,
-          userId: user._id,
-          userMessage: turn.sanitizedMessage,
-          assistantMessage: outputGuardrail.sanitizedOutput,
-          relatedJobIds: cachedFaqResponse.recommendedJobIds ?? [],
-          assistantMetadata: this.buildMessageMetadata(
-            usageMetadata,
-            false,
-            guardrailFlags,
-            undefined,
-            turn.intent,
-            turn.intentDetectionSource,
-          ),
-        });
-
-        await this.recordUsage({
-          userId: user._id,
-          sessionId: turn.sessionId,
-          operationType: 'chat_message',
-          intent: turn.intent,
-          intentDetectionSource: turn.intentDetectionSource,
-          success: true,
-          metadata: usageMetadata,
-          guardrailFlags,
-          cacheHit: true,
-          cacheCategory: 'faq_response',
-          requestStartedAt: new Date(startedAt),
-          requestCompletedAt: new Date(),
-          topicGuardBlocked: outputGuardrail.topicGuardResult?.blocked,
-          topicGuardCategory: outputGuardrail.topicGuardResult?.category,
-          topicGuardLatencyMs: outputGuardrail.topicGuardResult?.latencyMs,
-          ...this.buildQuotaUsageFields(quotaStatus, false, false),
-        });
-
-        const suggestedActions = this.extractSuggestedActions(
-          outputGuardrail.sanitizedOutput,
-          turn.intentContext.user,
-        );
-
-        return {
-          sessionId: turn.sessionId,
-          conversationId: turn.sessionId,
-          response: outputGuardrail.sanitizedOutput,
-          timestamp: new Date(),
-          intent: turn.intent,
-          suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
-          recommendedJobIds: cachedFaqResponse.recommendedJobIds,
-          quota: this.chatQuotaService.serializePublicStatus(quotaStatus),
-          cacheHit: true,
-          cacheCategory: 'faq_response',
-        };
-      }
 
       quotaReservation = await this.chatQuotaService.reserve(user);
       const quotaStatus = quotaReservation.status;
@@ -261,6 +203,8 @@ export class ChatService {
       await this.persistMessageTurn({
         session: turn.session,
         userId: user._id,
+        userSequence: turn.userSequence,
+        assistantSequence: turn.assistantSequence,
         userMessage: turn.sanitizedMessage,
         assistantMessage: outputGuardrail.sanitizedOutput,
         relatedJobIds: validatedJobIds,
@@ -279,7 +223,6 @@ export class ChatService {
         turn.intentContext.user,
       );
 
-      await this.cacheFaqResponse(user, turn, outputGuardrail.sanitizedOutput, validatedJobIds);
       await this.recordUsage({
         userId: user._id,
         sessionId: turn.sessionId,
@@ -317,6 +260,7 @@ export class ChatService {
         cacheCategory: turn.contextCacheCategory,
       };
     } catch (error) {
+      await this.chatIdempotencyService.release(idempotencyKey);
       if (quotaReservation?.consumed) {
         await this.chatQuotaService.rollback(quotaReservation);
         quotaRollback = true;
@@ -353,6 +297,7 @@ export class ChatService {
     message: string,
     sessionId?: string,
     jobId?: string,
+    clientMessageId?: string,
   ): AsyncGenerator<ChatStreamEvent> {
     const startedAt = Date.now();
     let resolvedSessionId: string | undefined = sessionId;
@@ -365,6 +310,9 @@ export class ChatService {
     let hasEmittedToken = false;
     let quotaRollback = false;
 
+    // Before prepareChatTurn so a duplicate reserves no sequence slot and no quota.
+    const idempotencyKey = await this.chatIdempotencyService.acquire(user._id, clientMessageId);
+
     try {
       const turn = await this.prepareChatTurn(user, message, {
         sessionId,
@@ -376,75 +324,6 @@ export class ChatService {
       promptEstimateSource = turn.promptEstimateSource;
       intent = turn.intent;
       intentDetectionSource = turn.intentDetectionSource;
-
-      const cachedFaqResponse = await this.getCachedFaqResponse(user, turn);
-      if (cachedFaqResponse) {
-        const quotaStatus = await this.chatQuotaService.getStatus(user);
-        const outputGuardrail = await this.chatResponseFormatterService.formatAssistantOutput(
-          cachedFaqResponse.response,
-          { skipTopicGuard: true },
-        );
-        fullText = outputGuardrail.sanitizedOutput;
-        guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
-        const usageMetadata = this.withEstimatedUsage(
-          undefined,
-          promptEstimateSource,
-          Date.now() - startedAt,
-        );
-
-        yield { type: 'token', data: fullText };
-
-        await this.persistMessageTurn({
-          session: turn.session,
-          userId: user._id,
-          userMessage: turn.sanitizedMessage,
-          assistantMessage: fullText,
-          relatedJobIds: cachedFaqResponse.recommendedJobIds ?? [],
-          assistantMetadata: this.buildMessageMetadata(
-            usageMetadata,
-            false,
-            guardrailFlags,
-            undefined,
-            turn.intent,
-            turn.intentDetectionSource,
-          ),
-        });
-
-        await this.recordUsage({
-          userId: user._id,
-          sessionId: turn.sessionId,
-          operationType: 'chat_stream',
-          intent: turn.intent,
-          intentDetectionSource: turn.intentDetectionSource,
-          success: true,
-          metadata: usageMetadata,
-          guardrailFlags,
-          cacheHit: true,
-          cacheCategory: 'faq_response',
-          requestStartedAt: new Date(startedAt),
-          requestCompletedAt: new Date(),
-          ...this.buildQuotaUsageFields(quotaStatus, false, false),
-        });
-
-        const suggestedActions = this.extractSuggestedActions(fullText, turn.intentContext.user);
-
-        yield {
-          type: 'done',
-          data: {
-            sessionId: turn.sessionId,
-            conversationId: turn.sessionId,
-            response: fullText,
-            intent: turn.intent,
-            recommendedJobIds: cachedFaqResponse.recommendedJobIds,
-            suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
-            quota: this.chatQuotaService.serializePublicStatus(quotaStatus),
-            cacheHit: true,
-            cacheCategory: 'faq_response',
-          },
-        };
-
-        return;
-      }
 
       quotaReservation = await this.chatQuotaService.reserve(user);
       const quotaStatus = quotaReservation.status;
@@ -490,6 +369,8 @@ export class ChatService {
       await this.persistMessageTurn({
         session: turn.session,
         userId: user._id,
+        userSequence: turn.userSequence,
+        assistantSequence: turn.assistantSequence,
         userMessage: turn.sanitizedMessage,
         assistantMessage: fullText,
         relatedJobIds: validatedJobIds,
@@ -521,7 +402,6 @@ export class ChatService {
       });
 
       const suggestedActions = this.extractSuggestedActions(fullText, turn.intentContext.user);
-      await this.cacheFaqResponse(user, turn, fullText, validatedJobIds);
 
       yield {
         type: 'done',
@@ -542,6 +422,7 @@ export class ChatService {
 
       this.logger.log(`Streaming message completed for user ${user._id}`);
     } catch (error) {
+      await this.chatIdempotencyService.release(idempotencyKey);
       if (quotaReservation?.consumed && !hasEmittedToken) {
         await this.chatQuotaService.rollback(quotaReservation);
         quotaRollback = true;
@@ -743,6 +624,7 @@ export class ChatService {
     const session = options.sessionId
       ? await this.getOwnedSession(user._id, options.sessionId, true)
       : await this.getOrCreateActiveSession(user);
+    const { userSequence, assistantSequence } = await this.reserveTurnSequence(session);
 
     const intentResult = await this.chatIntentService.detectIntent({
       user,
@@ -787,6 +669,8 @@ export class ChatService {
     return {
       session,
       sessionId: session._id.toString(),
+      userSequence,
+      assistantSequence,
       sanitizedMessage,
       guardrailFlags: guardrail.flags,
       intent: intentResult.intent,
@@ -800,6 +684,41 @@ export class ChatService {
       contextCacheHit,
       contextCacheCategory: contextCacheHit ? 'retrieval_context' : undefined,
     };
+  }
+
+  private async reserveTurnSequence(
+    session: ChatSessionDocument,
+  ): Promise<{ userSequence: number; assistantSequence: number }> {
+    if (session.messageSeq === undefined) {
+      const lastMessage = await this.chatMessageModel
+        .findOne({ sessionId: session._id })
+        .sort({ sequence: -1 })
+        .select('sequence')
+        .lean()
+        .exec();
+
+      // Concurrent first turns race here; the $exists guard lets only the first seed apply.
+      await this.chatSessionModel.updateOne(
+        { _id: session._id, messageSeq: { $exists: false } },
+        { $set: { messageSeq: lastMessage?.sequence ?? 0 } },
+      );
+    }
+
+    const reserved = await this.chatSessionModel
+      .findOneAndUpdate(
+        { _id: session._id, isActive: true },
+        { $inc: { messageSeq: 2 } },
+        { new: true },
+      )
+      .select('messageSeq')
+      .lean()
+      .exec();
+
+    if (!reserved?.messageSeq) {
+      throw new NotFoundException('Chat session not found');
+    }
+
+    return { userSequence: reserved.messageSeq - 1, assistantSequence: reserved.messageSeq };
   }
 
   private async getOrCreateActiveSession(user: IUser): Promise<ChatSessionDocument> {
@@ -830,6 +749,7 @@ export class ChatService {
         userRole: this.resolveUserRole(user),
         type: EChatSessionType.GENERAL,
         isActive: true,
+        messageSeq: 0,
         lastMessageAt: new Date(),
       });
       this.logger.log(`Created new chat session for user ${user._id}`);
@@ -893,24 +813,41 @@ export class ChatService {
   private async persistMessageTurn(input: {
     session: ChatSessionDocument;
     userId: string;
+    userSequence: number;
+    assistantSequence: number;
     userMessage: string;
     assistantMessage: string;
     relatedJobIds: string[];
     assistantMetadata: IChatMessageMetadata;
   }): Promise<void> {
-    const sessionId = input.session._id.toString();
-    const messageCount = await this.chatMessageModel.countDocuments({
-      sessionId: new Types.ObjectId(sessionId),
-    });
     const now = new Date();
+    const updatePayload: Record<string, any> = { lastMessageAt: now };
 
+    if (!input.session.title) {
+      updatePayload.title = input.userMessage.slice(0, 80);
+    }
+
+    const { matchedCount } = await this.chatSessionModel.updateOne(
+      { _id: input.session._id, isActive: true },
+      { $set: updatePayload },
+    );
+
+    if (matchedCount === 0) {
+      // Cleared or archived while the answer was generating; the user no longer wants this turn.
+      this.logger.warn(
+        `Skipped persisting chat turn: session ${input.session._id} no longer active`,
+      );
+      return;
+    }
+
+    // shortcut: still a ms window between the active check and insertMany; add a per-session lock if clear races show up in logs.
     await this.chatMessageModel.insertMany([
       {
-        sessionId: new Types.ObjectId(sessionId),
+        sessionId: input.session._id,
         userId: new Types.ObjectId(input.userId),
         role: EChatMessageRole.USER,
         content: input.userMessage,
-        sequence: messageCount + 1,
+        sequence: input.userSequence,
         metadata: {
           guardrailFlags: input.assistantMetadata.guardrailFlags ?? [],
         },
@@ -918,11 +855,11 @@ export class ChatService {
         updatedAt: now,
       },
       {
-        sessionId: new Types.ObjectId(sessionId),
+        sessionId: input.session._id,
         userId: new Types.ObjectId(input.userId),
         role: EChatMessageRole.ASSISTANT,
         content: input.assistantMessage,
-        sequence: messageCount + 2,
+        sequence: input.assistantSequence,
         relatedJobIds: input.relatedJobIds.length > 0 ? input.relatedJobIds : undefined,
         metadata: input.assistantMetadata,
         createdAt: now,
@@ -930,17 +867,7 @@ export class ChatService {
       },
     ]);
 
-    const updatePayload: Record<string, any> = {
-      lastMessageAt: now,
-    };
-
-    if (!input.session.title) {
-      updatePayload.title = input.userMessage.slice(0, 80);
-    }
-
-    await this.chatSessionModel.updateOne({ _id: input.session._id }, { $set: updatePayload });
-
-    if (messageCount + 2 > this.MAX_CONVERSATION_LENGTH) {
+    if (input.assistantSequence > this.MAX_CONVERSATION_LENGTH) {
       await this.archiveLongSession(input.session);
     }
   }
@@ -988,6 +915,8 @@ export class ChatService {
         title: session.title,
         summary,
         isActive: true,
+        // shortcut: a turn still in flight on the old session is dropped by persistMessageTurn; route it to the new session if that shows up in logs.
+        messageSeq: carryOverMessages.length,
         lastMessageAt: new Date(),
       });
 
@@ -1018,42 +947,6 @@ export class ChatService {
     } catch (error) {
       this.logger.error('Error archiving chat session:', error);
     }
-  }
-
-  private async getCachedFaqResponse(
-    user: IUser,
-    turn: ChatTurnContext,
-  ): Promise<{ response: string; recommendedJobIds?: string[] } | undefined> {
-    if (turn.intent !== EChatIntent.FAQ) {
-      return undefined;
-    }
-
-    return this.chatCacheService.getFaqResponse(
-      user,
-      turn.sanitizedMessage,
-      turn.intentContext.faq?.topic,
-    );
-  }
-
-  private async cacheFaqResponse(
-    user: IUser,
-    turn: ChatTurnContext,
-    response: string,
-    recommendedJobIds: string[],
-  ): Promise<void> {
-    if (turn.intent !== EChatIntent.FAQ) {
-      return;
-    }
-
-    await this.chatCacheService.setFaqResponse(
-      user,
-      turn.sanitizedMessage,
-      {
-        response,
-        recommendedJobIds: recommendedJobIds.length > 0 ? recommendedJobIds : undefined,
-      },
-      turn.intentContext.faq?.topic,
-    );
   }
 
   private async createPendingToolActions(input: {

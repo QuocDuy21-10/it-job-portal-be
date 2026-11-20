@@ -1,5 +1,5 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
@@ -19,6 +19,7 @@ import {
 } from './exceptions/too-many-requests.exception';
 import { ChatQuotaService } from './chat-quota.service';
 import { ChatCacheService } from './chat-cache.service';
+import { ChatIdempotencyService } from './chat-idempotency.service';
 import { ChatToolActionService } from './chat-tool-action.service';
 import { ChatResponseFormatterService } from './chat-response-formatter.service';
 import { EChatMessageRole } from './enums/chat-message-role.enum';
@@ -37,9 +38,11 @@ describe('ChatService', () => {
     find: jest.Mock;
     create: jest.Mock;
     updateOne: jest.Mock;
+    findOneAndUpdate: jest.Mock;
   };
   let mockChatMessageModel: {
     find: jest.Mock;
+    findOne: jest.Mock;
     countDocuments: jest.Mock;
     insertMany: jest.Mock;
   };
@@ -67,14 +70,13 @@ describe('ChatService', () => {
   let mockChatCacheService: {
     getContext: jest.Mock;
     setContext: jest.Mock;
-    getFaqResponse: jest.Mock;
-    setFaqResponse: jest.Mock;
   };
   let mockChatToolActionService: {
     createSaveJobActions: jest.Mock;
     confirm: jest.Mock;
     cancel: jest.Mock;
   };
+  let mockChatIdempotencyService: { acquire: jest.Mock; release: jest.Mock };
   let mockCacheManager: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
 
   const user = {
@@ -105,6 +107,7 @@ describe('ChatService', () => {
     title: 'Chat title',
     summary: undefined,
     isActive,
+    messageSeq: 0,
     lastMessageAt: new Date('2024-12-01T10:00:00.000Z'),
     createdAt: new Date('2024-12-01T09:00:00.000Z'),
     updatedAt: new Date('2024-12-01T10:00:00.000Z'),
@@ -190,11 +193,13 @@ describe('ChatService', () => {
       findOne: jest.fn(),
       find: jest.fn(),
       create: jest.fn(),
-      updateOne: jest.fn(),
+      updateOne: jest.fn().mockResolvedValue({ matchedCount: 1, modifiedCount: 1 }),
+      findOneAndUpdate: jest.fn().mockReturnValue(createQuery({ messageSeq: 2 })),
     };
 
     mockChatMessageModel = {
       find: jest.fn(),
+      findOne: jest.fn(),
       countDocuments: jest.fn(),
       insertMany: jest.fn(),
     };
@@ -277,14 +282,17 @@ describe('ChatService', () => {
     mockChatCacheService = {
       getContext: jest.fn().mockResolvedValue(undefined),
       setContext: jest.fn().mockResolvedValue(undefined),
-      getFaqResponse: jest.fn().mockResolvedValue(undefined),
-      setFaqResponse: jest.fn().mockResolvedValue(undefined),
     };
 
     mockChatToolActionService = {
       createSaveJobActions: jest.fn().mockResolvedValue([]),
       confirm: jest.fn(),
       cancel: jest.fn(),
+    };
+
+    mockChatIdempotencyService = {
+      acquire: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn().mockResolvedValue(undefined),
     };
 
     mockCacheManager = {
@@ -349,6 +357,10 @@ describe('ChatService', () => {
           useValue: mockChatCacheService,
         },
         {
+          provide: ChatIdempotencyService,
+          useValue: mockChatIdempotencyService,
+        },
+        {
           provide: ChatToolActionService,
           useValue: mockChatToolActionService,
         },
@@ -366,7 +378,7 @@ describe('ChatService', () => {
       mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
       mockChatMessageModel.countDocuments.mockResolvedValue(0);
       mockChatMessageModel.insertMany.mockResolvedValue([]);
-      mockChatSessionModel.updateOne.mockResolvedValue({ modifiedCount: 1 });
+      mockChatSessionModel.updateOne.mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
     });
 
     it('reuses the active session for legacy messages and records session usage', async () => {
@@ -442,6 +454,7 @@ describe('ChatService', () => {
           userRole: 'NORMAL USER',
           type: EChatSessionType.GENERAL,
           isActive: true,
+          messageSeq: 0,
         }),
       );
       expect(mockCacheManager.set).toHaveBeenCalledWith(`chat_session:${userId}`, sessionId, 0);
@@ -600,7 +613,7 @@ describe('ChatService', () => {
       );
     });
 
-    it('serves cached FAQ responses without consuming quota or calling AI', async () => {
+    it('answers FAQ questions with AI and never reads a shared FAQ cache', async () => {
       const faqContext = {
         ...mockIntentContext,
         intent: EChatIntent.FAQ,
@@ -608,30 +621,28 @@ describe('ChatService', () => {
         contextJobs: [],
         validJobIds: [],
       };
+      const leakedFaqCache = jest.fn().mockResolvedValue({ response: 'Chào QA Tester Một!' });
+      Object.assign(mockChatCacheService, { getFaqResponse: leakedFaqCache });
       mockChatIntentService.detectIntent.mockResolvedValue({
         intent: EChatIntent.FAQ,
         confidence: 0.9,
         source: 'deterministic',
       });
       mockChatContextProviderRegistry.build.mockResolvedValue(faqContext);
-      mockChatCacheService.getFaqResponse.mockResolvedValue({
-        response: 'Apply from the job detail page.',
+      mockAIService.generateChat.mockResolvedValue({
+        text: 'Chào Duy! Bạn ứng tuyển từ trang chi tiết job.',
+        recommendedJobIds: [],
+        provider: 'groq',
+        metadata: { provider: 'groq', model: 'llama' },
       });
 
       const result = await service.sendMessage(user as any, 'How to apply?');
 
-      expect(result.cacheHit).toBe(true);
-      expect(result.cacheCategory).toBe('faq_response');
-      expect(mockChatQuotaService.reserve).not.toHaveBeenCalled();
-      expect(mockChatQuotaService.getStatus).toHaveBeenCalledWith(user);
-      expect(mockAIService.generateChat).not.toHaveBeenCalled();
-      expect(mockAiUsageService.record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          success: true,
-          cacheHit: true,
-          cacheCategory: 'faq_response',
-        }),
-      );
+      expect(leakedFaqCache).not.toHaveBeenCalled();
+      expect(mockAIService.generateChat).toHaveBeenCalledTimes(1);
+      expect(mockChatQuotaService.reserve).toHaveBeenCalledWith(user);
+      expect(result.response).toBe('Chào Duy! Bạn ứng tuyển từ trang chi tiết job.');
+      expect(result.cacheCategory).not.toBe('faq_response');
     });
 
     it('returns pending save-job actions when the assistant suggests saving recommended jobs', async () => {
@@ -671,7 +682,7 @@ describe('ChatService', () => {
       mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
       mockChatMessageModel.countDocuments.mockResolvedValue(0);
       mockChatMessageModel.insertMany.mockResolvedValue([]);
-      mockChatSessionModel.updateOne.mockResolvedValue({ modifiedCount: 1 });
+      mockChatSessionModel.updateOne.mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
       mockAIService.streamChat.mockReturnValue(createStream(['Hello ', 'there'], ['job-1']));
       mockChatResponseFormatterService.formatAssistantOutput.mockReturnValue({
         sanitizedOutput: 'Hello\n\nthere',
@@ -732,7 +743,7 @@ describe('ChatService', () => {
       );
     });
 
-    it('serves cached FAQ stream responses with quota metadata without reserving quota', async () => {
+    it('streams FAQ answers from AI and never reads a shared FAQ cache', async () => {
       const faqContext = {
         ...mockIntentContext,
         intent: EChatIntent.FAQ,
@@ -740,6 +751,8 @@ describe('ChatService', () => {
         contextJobs: [],
         validJobIds: [],
       };
+      const leakedFaqCache = jest.fn().mockResolvedValue({ response: 'Chào QA Tester Một!' });
+      Object.assign(mockChatCacheService, { getFaqResponse: leakedFaqCache });
       mockCacheManager.get.mockResolvedValue(undefined);
       setupActiveSession();
       setupPromptHistory();
@@ -750,35 +763,23 @@ describe('ChatService', () => {
       });
       mockChatContextProviderRegistry.build.mockResolvedValue(faqContext);
       mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
-      mockChatMessageModel.countDocuments.mockResolvedValue(0);
       mockChatMessageModel.insertMany.mockResolvedValue([]);
-      mockChatSessionModel.updateOne.mockResolvedValue({ modifiedCount: 1 });
-      mockChatCacheService.getFaqResponse.mockResolvedValue({
-        response: 'Apply from the job detail page.',
-      });
+      mockAIService.streamChat.mockReturnValue(createStream(['Chào Duy!']));
 
       const events = [];
       for await (const event of service.streamMessage(user as any, 'How to apply?')) {
         events.push(event);
       }
 
-      expect(mockChatQuotaService.reserve).not.toHaveBeenCalled();
-      expect(mockChatQuotaService.getStatus).toHaveBeenCalledWith(user);
-      expect(events).toEqual([
-        { type: 'token', data: 'Apply from the job detail page.' },
-        {
+      expect(leakedFaqCache).not.toHaveBeenCalled();
+      expect(mockChatQuotaService.reserve).toHaveBeenCalledWith(user);
+      expect(events[0]).toEqual({ type: 'token', data: 'Chào Duy!' });
+      expect(events[1]).toEqual(
+        expect.objectContaining({
           type: 'done',
-          data: expect.objectContaining({
-            response: 'Apply from the job detail page.',
-            quota: {
-              remainingQuota: 29,
-              nextResetTime: 1733097600,
-            },
-            cacheHit: true,
-            cacheCategory: 'faq_response',
-          }),
-        },
-      ]);
+          data: expect.objectContaining({ response: 'Chào Duy!' }),
+        }),
+      );
     });
 
     it('rejects quota-exceeded streams before calling the AI provider', async () => {
@@ -879,6 +880,171 @@ describe('ChatService', () => {
           quotaRollback: false,
         }),
       );
+    });
+  });
+
+  describe('turn sequence', () => {
+    beforeEach(() => {
+      setupActiveSession();
+      setupPromptHistory();
+      mockChatContextProviderRegistry.build.mockResolvedValue(mockIntentContext);
+      mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
+      mockChatMessageModel.insertMany.mockResolvedValue([]);
+      mockAIService.generateChat.mockResolvedValue({
+        text: 'Hello',
+        recommendedJobIds: [],
+        provider: 'groq',
+        metadata: { provider: 'groq', model: 'llama' },
+      });
+    });
+
+    it('reserves two sequence slots on the active session and persists into them', async () => {
+      mockChatSessionModel.findOneAndUpdate.mockReturnValue(createQuery({ messageSeq: 8 }));
+
+      await service.sendMessage(user as any, 'hello');
+
+      expect(mockChatSessionModel.findOneAndUpdate).toHaveBeenCalledWith(
+        { _id: new Types.ObjectId(sessionId), isActive: true },
+        { $inc: { messageSeq: 2 } },
+        { new: true },
+      );
+      expect(mockChatMessageModel.insertMany).toHaveBeenCalledWith([
+        expect.objectContaining({ role: EChatMessageRole.USER, sequence: 7 }),
+        expect.objectContaining({ role: EChatMessageRole.ASSISTANT, sequence: 8 }),
+      ]);
+      expect(mockChatMessageModel.countDocuments).not.toHaveBeenCalled();
+    });
+
+    it('seeds messageSeq from the highest stored sequence for legacy sessions', async () => {
+      setupActiveSession({ ...createSession(), messageSeq: undefined } as any);
+      mockChatMessageModel.findOne.mockReturnValue(createQuery({ sequence: 14 }));
+      mockChatSessionModel.findOneAndUpdate.mockReturnValue(createQuery({ messageSeq: 16 }));
+
+      await service.sendMessage(user as any, 'hello');
+
+      expect(mockChatSessionModel.updateOne).toHaveBeenCalledWith(
+        { _id: new Types.ObjectId(sessionId), messageSeq: { $exists: false } },
+        { $set: { messageSeq: 14 } },
+      );
+      expect(mockChatMessageModel.insertMany).toHaveBeenCalledWith([
+        expect.objectContaining({ sequence: 15 }),
+        expect.objectContaining({ sequence: 16 }),
+      ]);
+    });
+
+    it('rejects the turn when the session became inactive before reserving', async () => {
+      mockChatSessionModel.findOneAndUpdate.mockReturnValue(createQuery(null));
+
+      await expect(service.sendMessage(user as any, 'hello')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(mockAIService.generateChat).not.toHaveBeenCalled();
+    });
+
+    it('drops the turn when the session was cleared while the answer was generating', async () => {
+      mockChatSessionModel.updateOne.mockResolvedValue({ matchedCount: 0, modifiedCount: 0 });
+
+      const result = await service.sendMessage(user as any, 'hello');
+
+      expect(result.response).toBe('Hello');
+      expect(mockChatSessionModel.updateOne).toHaveBeenCalledWith(
+        { _id: new Types.ObjectId(sessionId), isActive: true },
+        { $set: expect.objectContaining({ lastMessageAt: expect.any(Date) }) },
+      );
+      expect(mockChatMessageModel.insertMany).not.toHaveBeenCalled();
+    });
+
+    it('archives past the length limit and carries messageSeq into the new session', async () => {
+      const carryOver = [
+        { userId: new Types.ObjectId(userId), role: 'assistant', content: 'b' },
+        { userId: new Types.ObjectId(userId), role: 'user', content: 'a' },
+      ];
+      mockChatMessageModel.find.mockReturnValue(createQuery(carryOver));
+      mockChatSessionModel.findOneAndUpdate.mockReturnValue(createQuery({ messageSeq: 102 }));
+      mockAIService.summarizeConversation.mockResolvedValue('summary');
+      mockChatSessionModel.create.mockResolvedValue(createSession(otherSessionId));
+
+      await service.sendMessage(user as any, 'hello');
+
+      expect(mockChatSessionModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({ isActive: true, messageSeq: 2 }),
+      );
+    });
+  });
+
+  describe('idempotency', () => {
+    const clientMessageId = '3f1c2b8e-9a4d-4c1e-8f2a-1b2c3d4e5f60';
+
+    beforeEach(() => {
+      setupActiveSession();
+      setupPromptHistory();
+      mockChatContextProviderRegistry.build.mockResolvedValue(mockIntentContext);
+      mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
+      mockChatMessageModel.insertMany.mockResolvedValue([]);
+    });
+
+    it('rejects a duplicate before reserving sequence or quota', async () => {
+      mockChatIdempotencyService.acquire.mockRejectedValue(
+        new ConflictException('Duplicate message'),
+      );
+
+      await expect(
+        service.sendMessage(user as any, 'hello', undefined, undefined, clientMessageId),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(mockChatIdempotencyService.acquire).toHaveBeenCalledWith(userId, clientMessageId);
+      expect(mockChatSessionModel.findOneAndUpdate).not.toHaveBeenCalled();
+      expect(mockChatQuotaService.reserve).not.toHaveBeenCalled();
+      expect(mockChatIdempotencyService.release).not.toHaveBeenCalled();
+    });
+
+    it('keeps the key after a successful turn', async () => {
+      mockChatIdempotencyService.acquire.mockResolvedValue('chat_idem:key');
+      mockAIService.generateChat.mockResolvedValue({
+        text: 'Hello',
+        recommendedJobIds: [],
+        provider: 'groq',
+        metadata: { provider: 'groq', model: 'llama' },
+      });
+
+      await service.sendMessage(user as any, 'hello', undefined, undefined, clientMessageId);
+
+      expect(mockChatIdempotencyService.release).not.toHaveBeenCalled();
+    });
+
+    it('releases the key when the turn fails so the user can resend', async () => {
+      mockChatIdempotencyService.acquire.mockResolvedValue('chat_idem:key');
+      mockAIService.generateChat.mockRejectedValue(new Error('provider down'));
+
+      await expect(
+        service.sendMessage(user as any, 'hello', undefined, undefined, clientMessageId),
+      ).rejects.toThrow();
+
+      expect(mockChatIdempotencyService.release).toHaveBeenCalledWith('chat_idem:key');
+    });
+
+    it('releases the key when a stream fails', async () => {
+      mockCacheManager.get.mockResolvedValue(undefined);
+      mockChatIdempotencyService.acquire.mockResolvedValue('chat_idem:key');
+      mockAIService.streamChat.mockReturnValue(createFailingStream(new Error('provider down')));
+
+      const consume = async () => {
+        const events = [];
+        for await (const event of service.streamMessage(
+          user as any,
+          'hello',
+          undefined,
+          undefined,
+          clientMessageId,
+        )) {
+          events.push(event);
+        }
+        return events;
+      };
+
+      await expect(consume()).rejects.toThrow();
+      expect(mockChatIdempotencyService.acquire).toHaveBeenCalledWith(userId, clientMessageId);
+      expect(mockChatIdempotencyService.release).toHaveBeenCalledWith('chat_idem:key');
     });
   });
 

@@ -44,4 +44,35 @@ describe('ChatController stream quota errors', () => {
       },
     });
   });
+
+  it('passes clientMessageId through to the stream', async () => {
+    const chatService = {
+      streamMessage: jest.fn().mockImplementation(async function* () {
+        yield { type: 'done', data: {} };
+      }),
+    };
+    const controller = new ChatController(chatService as any, {} as any, {} as any);
+    const response = {
+      status: jest.fn().mockReturnThis(),
+      setHeader: jest.fn(),
+      flushHeaders: jest.fn(),
+      write: jest.fn(),
+      end: jest.fn(),
+    };
+    const user = { _id: '507f1f77bcf86cd799439011' } as any;
+
+    await controller.streamMessage(
+      user,
+      { message: 'hello', clientMessageId: '3f1c2b8e-9a4d-4c1e-8f2a-1b2c3d4e5f60' } as any,
+      response as any,
+    );
+
+    expect(chatService.streamMessage).toHaveBeenCalledWith(
+      user,
+      'hello',
+      undefined,
+      undefined,
+      '3f1c2b8e-9a4d-4c1e-8f2a-1b2c3d4e5f60',
+    );
+  });
 });
