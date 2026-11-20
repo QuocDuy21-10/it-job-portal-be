@@ -1,5 +1,5 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { ServiceUnavailableException } from '@nestjs/common';
+import { NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
@@ -37,9 +37,11 @@ describe('ChatService', () => {
     find: jest.Mock;
     create: jest.Mock;
     updateOne: jest.Mock;
+    findOneAndUpdate: jest.Mock;
   };
   let mockChatMessageModel: {
     find: jest.Mock;
+    findOne: jest.Mock;
     countDocuments: jest.Mock;
     insertMany: jest.Mock;
   };
@@ -103,6 +105,7 @@ describe('ChatService', () => {
     title: 'Chat title',
     summary: undefined,
     isActive,
+    messageSeq: 0,
     lastMessageAt: new Date('2024-12-01T10:00:00.000Z'),
     createdAt: new Date('2024-12-01T09:00:00.000Z'),
     updatedAt: new Date('2024-12-01T10:00:00.000Z'),
@@ -188,11 +191,13 @@ describe('ChatService', () => {
       findOne: jest.fn(),
       find: jest.fn(),
       create: jest.fn(),
-      updateOne: jest.fn(),
+      updateOne: jest.fn().mockResolvedValue({ matchedCount: 1, modifiedCount: 1 }),
+      findOneAndUpdate: jest.fn().mockReturnValue(createQuery({ messageSeq: 2 })),
     };
 
     mockChatMessageModel = {
       find: jest.fn(),
+      findOne: jest.fn(),
       countDocuments: jest.fn(),
       insertMany: jest.fn(),
     };
@@ -362,7 +367,7 @@ describe('ChatService', () => {
       mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
       mockChatMessageModel.countDocuments.mockResolvedValue(0);
       mockChatMessageModel.insertMany.mockResolvedValue([]);
-      mockChatSessionModel.updateOne.mockResolvedValue({ modifiedCount: 1 });
+      mockChatSessionModel.updateOne.mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
     });
 
     it('reuses the active session for legacy messages and records session usage', async () => {
@@ -438,6 +443,7 @@ describe('ChatService', () => {
           userRole: 'NORMAL USER',
           type: EChatSessionType.GENERAL,
           isActive: true,
+          messageSeq: 0,
         }),
       );
       expect(mockCacheManager.set).toHaveBeenCalledWith(`chat_session:${userId}`, sessionId, 0);
@@ -665,7 +671,7 @@ describe('ChatService', () => {
       mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
       mockChatMessageModel.countDocuments.mockResolvedValue(0);
       mockChatMessageModel.insertMany.mockResolvedValue([]);
-      mockChatSessionModel.updateOne.mockResolvedValue({ modifiedCount: 1 });
+      mockChatSessionModel.updateOne.mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
       mockAIService.streamChat.mockReturnValue(createStream(['Hello ', 'there'], ['job-1']));
       mockChatResponseFormatterService.formatAssistantOutput.mockReturnValue({
         sanitizedOutput: 'Hello\n\nthere',
@@ -862,6 +868,95 @@ describe('ChatService', () => {
           quotaConsumed: true,
           quotaRollback: false,
         }),
+      );
+    });
+  });
+
+  describe('turn sequence', () => {
+    beforeEach(() => {
+      setupActiveSession();
+      setupPromptHistory();
+      mockChatContextProviderRegistry.build.mockResolvedValue(mockIntentContext);
+      mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
+      mockChatMessageModel.insertMany.mockResolvedValue([]);
+      mockAIService.generateChat.mockResolvedValue({
+        text: 'Hello',
+        recommendedJobIds: [],
+        provider: 'groq',
+        metadata: { provider: 'groq', model: 'llama' },
+      });
+    });
+
+    it('reserves two sequence slots on the active session and persists into them', async () => {
+      mockChatSessionModel.findOneAndUpdate.mockReturnValue(createQuery({ messageSeq: 8 }));
+
+      await service.sendMessage(user as any, 'hello');
+
+      expect(mockChatSessionModel.findOneAndUpdate).toHaveBeenCalledWith(
+        { _id: new Types.ObjectId(sessionId), isActive: true },
+        { $inc: { messageSeq: 2 } },
+        { new: true },
+      );
+      expect(mockChatMessageModel.insertMany).toHaveBeenCalledWith([
+        expect.objectContaining({ role: EChatMessageRole.USER, sequence: 7 }),
+        expect.objectContaining({ role: EChatMessageRole.ASSISTANT, sequence: 8 }),
+      ]);
+      expect(mockChatMessageModel.countDocuments).not.toHaveBeenCalled();
+    });
+
+    it('seeds messageSeq from the highest stored sequence for legacy sessions', async () => {
+      setupActiveSession({ ...createSession(), messageSeq: undefined } as any);
+      mockChatMessageModel.findOne.mockReturnValue(createQuery({ sequence: 14 }));
+      mockChatSessionModel.findOneAndUpdate.mockReturnValue(createQuery({ messageSeq: 16 }));
+
+      await service.sendMessage(user as any, 'hello');
+
+      expect(mockChatSessionModel.updateOne).toHaveBeenCalledWith(
+        { _id: new Types.ObjectId(sessionId), messageSeq: { $exists: false } },
+        { $set: { messageSeq: 14 } },
+      );
+      expect(mockChatMessageModel.insertMany).toHaveBeenCalledWith([
+        expect.objectContaining({ sequence: 15 }),
+        expect.objectContaining({ sequence: 16 }),
+      ]);
+    });
+
+    it('rejects the turn when the session became inactive before reserving', async () => {
+      mockChatSessionModel.findOneAndUpdate.mockReturnValue(createQuery(null));
+
+      await expect(service.sendMessage(user as any, 'hello')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(mockAIService.generateChat).not.toHaveBeenCalled();
+    });
+
+    it('drops the turn when the session was cleared while the answer was generating', async () => {
+      mockChatSessionModel.updateOne.mockResolvedValue({ matchedCount: 0, modifiedCount: 0 });
+
+      const result = await service.sendMessage(user as any, 'hello');
+
+      expect(result.response).toBe('Hello');
+      expect(mockChatSessionModel.updateOne).toHaveBeenCalledWith(
+        { _id: new Types.ObjectId(sessionId), isActive: true },
+        { $set: expect.objectContaining({ lastMessageAt: expect.any(Date) }) },
+      );
+      expect(mockChatMessageModel.insertMany).not.toHaveBeenCalled();
+    });
+
+    it('archives past the length limit and carries messageSeq into the new session', async () => {
+      const carryOver = [
+        { userId: new Types.ObjectId(userId), role: 'assistant', content: 'b' },
+        { userId: new Types.ObjectId(userId), role: 'user', content: 'a' },
+      ];
+      mockChatMessageModel.find.mockReturnValue(createQuery(carryOver));
+      mockChatSessionModel.findOneAndUpdate.mockReturnValue(createQuery({ messageSeq: 102 }));
+      mockAIService.summarizeConversation.mockResolvedValue('summary');
+      mockChatSessionModel.create.mockResolvedValue(createSession(otherSessionId));
+
+      await service.sendMessage(user as any, 'hello');
+
+      expect(mockChatSessionModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({ isActive: true, messageSeq: 2 }),
       );
     });
   });

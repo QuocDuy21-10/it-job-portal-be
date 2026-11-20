@@ -39,6 +39,10 @@ export class ChatSession {
   @Prop({ type: Date, default: () => new Date(), index: true })
   lastMessageAt: Date;
 
+  // Last reserved chat_messages.sequence; no default so legacy sessions are detectable.
+  @Prop({ type: Number })
+  messageSeq?: number;
+
   @Prop({ type: Types.ObjectId, ref: 'Conversation', index: true })
   legacyConversationId?: Types.ObjectId;
 

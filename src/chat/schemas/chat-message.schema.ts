@@ -52,5 +52,5 @@ export class ChatMessage {
 
 export const ChatMessageSchema = SchemaFactory.createForClass(ChatMessage);
 
-ChatMessageSchema.index({ sessionId: 1, sequence: 1 });
+ChatMessageSchema.index({ sessionId: 1, sequence: 1 }, { unique: true });
 ChatMessageSchema.index({ userId: 1, createdAt: -1 });
