@@ -1,5 +1,5 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
@@ -19,6 +19,7 @@ import {
 } from './exceptions/too-many-requests.exception';
 import { ChatQuotaService } from './chat-quota.service';
 import { ChatCacheService } from './chat-cache.service';
+import { ChatIdempotencyService } from './chat-idempotency.service';
 import { ChatToolActionService } from './chat-tool-action.service';
 import { ChatResponseFormatterService } from './chat-response-formatter.service';
 import { EChatMessageRole } from './enums/chat-message-role.enum';
@@ -75,6 +76,7 @@ describe('ChatService', () => {
     confirm: jest.Mock;
     cancel: jest.Mock;
   };
+  let mockChatIdempotencyService: { acquire: jest.Mock; release: jest.Mock };
   let mockCacheManager: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
 
   const user = {
@@ -288,6 +290,11 @@ describe('ChatService', () => {
       cancel: jest.fn(),
     };
 
+    mockChatIdempotencyService = {
+      acquire: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn().mockResolvedValue(undefined),
+    };
+
     mockCacheManager = {
       get: jest.fn(),
       set: jest.fn(),
@@ -348,6 +355,10 @@ describe('ChatService', () => {
         {
           provide: ChatCacheService,
           useValue: mockChatCacheService,
+        },
+        {
+          provide: ChatIdempotencyService,
+          useValue: mockChatIdempotencyService,
         },
         {
           provide: ChatToolActionService,
@@ -958,6 +969,82 @@ describe('ChatService', () => {
       expect(mockChatSessionModel.create).toHaveBeenCalledWith(
         expect.objectContaining({ isActive: true, messageSeq: 2 }),
       );
+    });
+  });
+
+  describe('idempotency', () => {
+    const clientMessageId = '3f1c2b8e-9a4d-4c1e-8f2a-1b2c3d4e5f60';
+
+    beforeEach(() => {
+      setupActiveSession();
+      setupPromptHistory();
+      mockChatContextProviderRegistry.build.mockResolvedValue(mockIntentContext);
+      mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
+      mockChatMessageModel.insertMany.mockResolvedValue([]);
+    });
+
+    it('rejects a duplicate before reserving sequence or quota', async () => {
+      mockChatIdempotencyService.acquire.mockRejectedValue(
+        new ConflictException('Duplicate message'),
+      );
+
+      await expect(
+        service.sendMessage(user as any, 'hello', undefined, undefined, clientMessageId),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(mockChatIdempotencyService.acquire).toHaveBeenCalledWith(userId, clientMessageId);
+      expect(mockChatSessionModel.findOneAndUpdate).not.toHaveBeenCalled();
+      expect(mockChatQuotaService.reserve).not.toHaveBeenCalled();
+      expect(mockChatIdempotencyService.release).not.toHaveBeenCalled();
+    });
+
+    it('keeps the key after a successful turn', async () => {
+      mockChatIdempotencyService.acquire.mockResolvedValue('chat_idem:key');
+      mockAIService.generateChat.mockResolvedValue({
+        text: 'Hello',
+        recommendedJobIds: [],
+        provider: 'groq',
+        metadata: { provider: 'groq', model: 'llama' },
+      });
+
+      await service.sendMessage(user as any, 'hello', undefined, undefined, clientMessageId);
+
+      expect(mockChatIdempotencyService.release).not.toHaveBeenCalled();
+    });
+
+    it('releases the key when the turn fails so the user can resend', async () => {
+      mockChatIdempotencyService.acquire.mockResolvedValue('chat_idem:key');
+      mockAIService.generateChat.mockRejectedValue(new Error('provider down'));
+
+      await expect(
+        service.sendMessage(user as any, 'hello', undefined, undefined, clientMessageId),
+      ).rejects.toThrow();
+
+      expect(mockChatIdempotencyService.release).toHaveBeenCalledWith('chat_idem:key');
+    });
+
+    it('releases the key when a stream fails', async () => {
+      mockCacheManager.get.mockResolvedValue(undefined);
+      mockChatIdempotencyService.acquire.mockResolvedValue('chat_idem:key');
+      mockAIService.streamChat.mockReturnValue(createFailingStream(new Error('provider down')));
+
+      const consume = async () => {
+        const events = [];
+        for await (const event of service.streamMessage(
+          user as any,
+          'hello',
+          undefined,
+          undefined,
+          clientMessageId,
+        )) {
+          events.push(event);
+        }
+        return events;
+      };
+
+      await expect(consume()).rejects.toThrow();
+      expect(mockChatIdempotencyService.acquire).toHaveBeenCalledWith(userId, clientMessageId);
+      expect(mockChatIdempotencyService.release).toHaveBeenCalledWith('chat_idem:key');
     });
   });
 

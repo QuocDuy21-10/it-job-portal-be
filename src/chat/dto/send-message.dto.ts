@@ -1,5 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsMongoId, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsMongoId,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class SendMessageDto {
   @ApiProperty({
@@ -22,4 +30,14 @@ export class SendMessageDto {
   @IsOptional()
   @IsMongoId({ message: 'jobId must be a valid MongoDB ObjectId' })
   jobId?: string;
+
+  @ApiProperty({
+    description:
+      'Client-generated id of this message; a repeat within 5 minutes is rejected as a duplicate',
+    example: '3f1c2b8e-9a4d-4c1e-8f2a-1b2c3d4e5f60',
+    required: false,
+  })
+  @IsOptional()
+  @IsUUID('all', { message: 'clientMessageId must be a UUID' })
+  clientMessageId?: string;
 }

@@ -41,6 +41,7 @@ import { ChatContextProviderRegistry } from './chat-context-provider.registry';
 import { ChatQuotaService } from './chat-quota.service';
 import { IChatQuotaReservation, IChatQuotaStatus } from './interfaces/chat-quota-status.interface';
 import { ChatCacheService } from './chat-cache.service';
+import { ChatIdempotencyService } from './chat-idempotency.service';
 import { ChatToolActionService } from './chat-tool-action.service';
 import { PendingChatToolActionDto } from './dto/chat-tool-action.dto';
 import { ChatResponseFormatterService } from './chat-response-formatter.service';
@@ -100,6 +101,7 @@ export class ChatService {
     private readonly chatCacheService: ChatCacheService,
     private readonly chatToolActionService: ChatToolActionService,
     private readonly chatResponseFormatterService: ChatResponseFormatterService,
+    private readonly chatIdempotencyService: ChatIdempotencyService,
   ) {}
 
   async createSession(user: IUser, dto: CreateChatSessionDto): Promise<ChatSessionDto> {
@@ -140,6 +142,7 @@ export class ChatService {
     message: string,
     sessionId?: string,
     jobId?: string,
+    clientMessageId?: string,
   ): Promise<ChatResponseDto> {
     const startedAt = Date.now();
     let resolvedSessionId: string | undefined = sessionId;
@@ -149,6 +152,9 @@ export class ChatService {
     let intentDetectionSource: ChatIntentDetectionSource | undefined;
     let quotaReservation: IChatQuotaReservation | undefined;
     let quotaRollback = false;
+
+    // Before prepareChatTurn so a duplicate reserves no sequence slot and no quota.
+    const idempotencyKey = await this.chatIdempotencyService.acquire(user._id, clientMessageId);
 
     try {
       const turn = await this.prepareChatTurn(user, message, {
@@ -254,6 +260,7 @@ export class ChatService {
         cacheCategory: turn.contextCacheCategory,
       };
     } catch (error) {
+      await this.chatIdempotencyService.release(idempotencyKey);
       if (quotaReservation?.consumed) {
         await this.chatQuotaService.rollback(quotaReservation);
         quotaRollback = true;
@@ -290,6 +297,7 @@ export class ChatService {
     message: string,
     sessionId?: string,
     jobId?: string,
+    clientMessageId?: string,
   ): AsyncGenerator<ChatStreamEvent> {
     const startedAt = Date.now();
     let resolvedSessionId: string | undefined = sessionId;
@@ -301,6 +309,9 @@ export class ChatService {
     let quotaReservation: IChatQuotaReservation | undefined;
     let hasEmittedToken = false;
     let quotaRollback = false;
+
+    // Before prepareChatTurn so a duplicate reserves no sequence slot and no quota.
+    const idempotencyKey = await this.chatIdempotencyService.acquire(user._id, clientMessageId);
 
     try {
       const turn = await this.prepareChatTurn(user, message, {
@@ -411,6 +422,7 @@ export class ChatService {
 
       this.logger.log(`Streaming message completed for user ${user._id}`);
     } catch (error) {
+      await this.chatIdempotencyService.release(idempotencyKey);
       if (quotaReservation?.consumed && !hasEmittedToken) {
         await this.chatQuotaService.rollback(quotaReservation);
         quotaRollback = true;
