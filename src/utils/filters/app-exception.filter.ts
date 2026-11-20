@@ -18,6 +18,17 @@ export function toErrorResponse(exception: unknown): ErrorResponse {
     return { status: exception.getStatus(), body, capture: false };
   }
 
+  // Matched by name/code: Nest maps multer errors by message, and multer 2 renamed
+  // LIMIT_UNEXPECTED_FILE's message, so an unknown upload field escaped as a 500.
+  if (exception instanceof Error && exception.name === 'MulterError') {
+    const tooLarge = (exception as Error & { code?: string }).code === 'LIMIT_FILE_SIZE';
+    return {
+      status: tooLarge ? HttpStatus.PAYLOAD_TOO_LARGE : HttpStatus.BAD_REQUEST,
+      body: { message: exception.message, error: tooLarge ? 'Payload Too Large' : 'Bad Request' },
+      capture: false,
+    };
+  }
+
   if ((exception as { code?: unknown } | null)?.code === 11000) {
     return {
       status: HttpStatus.CONFLICT,

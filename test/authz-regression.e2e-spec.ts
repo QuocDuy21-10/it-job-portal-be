@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import request from 'supertest';
 import { Types } from 'mongoose';
 import { ERole } from 'src/casl/enums/role.enum';
@@ -153,5 +155,35 @@ describe('Authorization QA regressions 2026-11-20 (e2e)', () => {
       .set(auth('admin'))
       .send({ name: 'Admin', email: world.users.admin.email, role: ERole.NORMAL_USER })
       .expect(400);
+  });
+
+  describe('BUG-09: image upload', () => {
+    // PNG signature padded past IMAGE_SIGNATURE_BYTES; content checks only read the header.
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(32),
+    ]);
+
+    it('accepts a PNG sent in the `file` field', async () => {
+      const res = await request(t.server)
+        .post('/api/v1/files/upload')
+        .set(auth('c1'))
+        .set('X-Folder-Type', 'avatar')
+        .attach('file', png, { filename: 'avatar.png', contentType: 'image/png' })
+        .expect(201);
+
+      const fileName: string = res.body.data.fileName;
+      expect(fileName).toMatch(/\.png$/);
+      fs.rmSync(path.join(process.cwd(), 'public', 'images', 'avatar', fileName), { force: true });
+    });
+
+    it('rejects an unknown upload field with 400 instead of 500', async () => {
+      await request(t.server)
+        .post('/api/v1/files/upload')
+        .set(auth('c1'))
+        .set('X-Folder-Type', 'avatar')
+        .attach('fileUpload', png, { filename: 'avatar.png', contentType: 'image/png' })
+        .expect(400);
+    });
   });
 });

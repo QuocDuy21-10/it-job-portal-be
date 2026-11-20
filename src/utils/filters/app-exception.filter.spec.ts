@@ -32,6 +32,22 @@ function httpHost(headersSent = false) {
 }
 
 describe('toErrorResponse', () => {
+  const multerError = (code: string, message: string) =>
+    Object.assign(new Error(message), { name: 'MulterError', code });
+
+  it('maps an unexpected upload field (multer 2 message) to 400, not 500', () => {
+    const { status, body, capture } = toErrorResponse(
+      multerError('LIMIT_UNEXPECTED_FILE', 'Unexpected file field'),
+    );
+    expect(status).toBe(400);
+    expect(body).toMatchObject({ message: 'Unexpected file field', error: 'Bad Request' });
+    expect(capture).toBe(false);
+  });
+
+  it('maps an oversized upload to 413', () => {
+    expect(toErrorResponse(multerError('LIMIT_FILE_SIZE', 'File too large')).status).toBe(413);
+  });
+
   it('keeps the HttpException body, including extra fields', () => {
     const { status, body, capture } = toErrorResponse(
       new UnauthorizedException({ message: 'Validation failed', errors: [{ property: 'email' }] }),
