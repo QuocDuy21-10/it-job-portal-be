@@ -30,6 +30,8 @@ import {
 } from 'src/redis/list-cache.constants';
 
 const ORPHANED_LOGO_CLEANUP_CRON = 'cleanup-orphaned-company-logos';
+// Audit fields (admin/HR emails and IDs) are only for SUPER_ADMIN and the company's own HR.
+const PUBLIC_COMPANY_PROJECTION = '-createdBy -updatedBy -deletedBy -isDeleted -deletedAt -__v';
 import { CronLockService } from 'src/redis/cron-lock.service';
 
 @Injectable()
@@ -109,6 +111,7 @@ export class CompaniesService {
           offset,
           safeLimit,
           sort,
+          cacheScope === LIST_CACHE_SCOPES.PUBLIC ? PUBLIC_COMPANY_PROJECTION : undefined,
         );
 
         const companyIds = result.map((company: any) => company._id);
@@ -139,14 +142,23 @@ export class CompaniesService {
   async findOne(id: string, user?: IUser) {
     this.companyRepository.validateObjectId(id);
 
-    // HR can only view their own company
-    if (user && user.role === ERole.HR && user.company?._id) {
-      if (id !== user.company._id.toString()) {
-        throw new BadRequestException('You can only view your own company');
-      }
+    const isHr = user?.role === ERole.HR && !!user.company?._id;
+    const notFound = new NotFoundException(`Company with id = ${id} not found`);
+
+    // HR can only view their own company; same 404 as a missing ID so IDs cannot be probed.
+    if (isHr && id !== user.company._id.toString()) {
+      throw notFound;
     }
 
-    return this.companyRepository.findById(id);
+    const company = await this.companyRepository.findById(
+      id,
+      isHr || user?.role === ERole.SUPER_ADMIN ? undefined : PUBLIC_COMPANY_PROJECTION,
+    );
+    if (!company) {
+      throw notFound;
+    }
+
+    return company;
   }
 
   async update(id: string, updateCompanyDto: UpdateCompanyDto, user: IUser) {
@@ -305,6 +317,10 @@ export class CompaniesService {
   private resolveCompaniesListCacheScope(user?: IUser): string {
     if (user?.role === ERole.HR && user.company?._id) {
       return LIST_CACHE_SCOPES.hr(user.company._id.toString());
+    }
+
+    if (user?.role === ERole.SUPER_ADMIN) {
+      return LIST_CACHE_SCOPES.SUPER_ADMIN;
     }
 
     return LIST_CACHE_SCOPES.PUBLIC;

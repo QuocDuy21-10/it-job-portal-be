@@ -17,20 +17,25 @@ export class AuthSessionService {
   ) {}
 
   async login(user: IUser, response: Response, ipAddress: string, userAgent: string) {
-    const accessPayload: IJwtAccessPayload = {
-      sub: user._id,
-      type: 'access',
-    };
     const refreshPayload: IJwtRefreshPayload = {
       sub: user._id,
       type: 'refresh',
     };
 
-    const access_token = this.createAccessToken(accessPayload);
     const refresh_token = this.createRefreshToken(refreshPayload);
-
-    await this.sessionsService.createSession(user._id, refresh_token, userAgent, ipAddress);
+    const session = await this.sessionsService.createSession(
+      user._id,
+      refresh_token,
+      userAgent,
+      ipAddress,
+    );
     await this.sessionsService.enforceSessionLimit(user._id, 5);
+
+    const access_token = this.createAccessToken({
+      sub: user._id,
+      type: 'access',
+      sid: session._id.toString(),
+    });
 
     this.setRefreshCookie(response, refresh_token);
 
@@ -70,24 +75,27 @@ export class AuthSessionService {
     ipAddress: string,
   ) {
     try {
-      const deleted = await this.sessionsService.deleteSession(oldRefreshToken);
-      if (!deleted) {
-        throw new BadRequestException('Session not found or already used');
-      }
-
-      const accessPayload: IJwtAccessPayload = {
-        sub: user._id,
-        type: 'access',
-      };
       const refreshPayload: IJwtRefreshPayload = {
         sub: user._id,
         type: 'refresh',
       };
-
-      const newAccessToken = this.createAccessToken(accessPayload);
       const newRefreshToken = this.createRefreshToken(refreshPayload);
 
-      await this.sessionsService.createSession(user._id, newRefreshToken, userAgent, ipAddress);
+      const session = await this.sessionsService.rotateSession(
+        oldRefreshToken,
+        newRefreshToken,
+        userAgent,
+        ipAddress,
+      );
+      if (!session) {
+        throw new BadRequestException('Session not found or already used');
+      }
+
+      const newAccessToken = this.createAccessToken({
+        sub: user._id,
+        type: 'access',
+        sid: session._id.toString(),
+      });
 
       this.clearRefreshCookie(response);
       this.setRefreshCookie(response, newRefreshToken);

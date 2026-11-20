@@ -9,7 +9,11 @@ import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { ApproveJobDto } from './dto/approve-job.dto';
 import { EJobApprovalStatus } from './enums/job-approval-status.enum';
-import { buildPublicJobVisibilityFilter } from './job-visibility.util';
+import {
+  buildPublicJobVisibilityFilter,
+  isJobPubliclyVisible,
+  PUBLIC_JOB_PROJECTION,
+} from './job-visibility.util';
 import { IUser } from 'src/users/user.interface';
 import { Job, JobDocument } from './schemas/job.schema';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
@@ -66,6 +70,9 @@ export class JobsService {
     'createdAt',
   ]);
 
+  // Fields HR may change on an approved job without sending it back to review.
+  private readonly SCHEDULING_FIELDS = new Set(['isActive', 'startDate', 'endDate']);
+
   private readonly EXPIRED_JOBS_BATCH_SIZE = 500;
   private readonly ALLOWED_SORT_FIELDS = new Set([
     'name',
@@ -112,22 +119,6 @@ export class JobsService {
       createdBy: { _id: user._id, email: user.email },
     });
 
-    // Add task to queue to notify company followers
-    // This runs asynchronously without blocking the API response
-    try {
-      await this.companyFollowerQueueService.addNewJobNotification({
-        jobId: newJob._id.toString(),
-        companyId: newJob.company._id.toString(),
-        jobName: newJob.name,
-        companyName: newJob.company.name,
-      });
-    } catch (error) {
-      this.logger.error(
-        `Failed to queue new-job notification for job ${newJob._id}: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined,
-      );
-    }
-
     await this.clearJobRelatedCachesForCompanies([newJob.company._id.toString()]);
 
     return { _id: newJob._id, createdAt: newJob.createdAt };
@@ -147,10 +138,12 @@ export class JobsService {
       };
     }
 
+    let projection: string | undefined;
     if (user && user.role === ERole.HR && user.company?._id) {
       Object.assign(filter, buildEmbeddedCompanyIdFilter(user.company._id));
     } else if (!user || user.role !== ERole.SUPER_ADMIN) {
       Object.assign(filter, this.buildActiveJobFilter());
+      projection = PUBLIC_JOB_PROJECTION;
     }
 
     const trimmedKeyword = keyword?.trim();
@@ -188,6 +181,7 @@ export class JobsService {
           safeOffset,
           safeLimit,
           sort,
+          projection,
         );
 
         return { result, meta: buildPaginationMeta(safePage, safeLimit, totalItems) };
@@ -198,26 +192,28 @@ export class JobsService {
   async findOne(id: string, user?: IUser) {
     this.jobRepository.validateObjectId(id);
 
-    const job = await this.jobRepository.findById(id);
+    const isAdmin = user?.role === ERole.SUPER_ADMIN;
+    const hrCompanyId = user?.role === ERole.HR ? user.company?._id?.toString() : undefined;
+    const job = await this.jobRepository.findById(
+      id,
+      isAdmin || hrCompanyId ? undefined : PUBLIC_JOB_PROJECTION,
+    );
+    const notFound = new NotFoundException(`Job with ID ${id} not found`);
 
-    // Nếu user là HR, chỉ cho phép xem job của công ty họ
-    if (user && user.role === ERole.HR && user.company?._id) {
-      if (job && job.company && job.company._id.toString() !== user.company._id.toString()) {
-        throw new BadRequestException('You can only view jobs of your own company');
+    if (!job) {
+      throw notFound;
+    }
+
+    // Same 404 for "missing" and "not yours" so callers cannot probe which IDs exist.
+    if (hrCompanyId) {
+      if (job.company?._id?.toString() !== hrCompanyId) {
+        throw notFound;
       }
       return job;
     }
 
-    // Public users and NORMAL_USER can only view APPROVED, active, non-expired jobs
-    if (!user || user.role !== ERole.SUPER_ADMIN) {
-      if (
-        job &&
-        (job.approvalStatus !== EJobApprovalStatus.APPROVED ||
-          !job.isActive ||
-          (job.endDate && new Date(job.endDate) < new Date()))
-      ) {
-        return null;
-      }
+    if (!isAdmin && !isJobPubliclyVisible(job)) {
+      throw notFound;
     }
 
     return job;
@@ -245,6 +241,19 @@ export class JobsService {
       ...restUpdateJobDto,
       updatedBy: { _id: user._id, email: user.email },
     };
+
+    // An HR edit to an approved job's content must go back through review before it is public again.
+    const touchesContent = Object.keys(updateJobDto).some(key => !this.SCHEDULING_FIELDS.has(key));
+    if (
+      user.role === ERole.HR &&
+      job?.approvalStatus === EJobApprovalStatus.APPROVED &&
+      touchesContent
+    ) {
+      updatePayload.approvalStatus = EJobApprovalStatus.PENDING;
+      updatePayload.approvedBy = null;
+      updatePayload.approvedAt = null;
+      updatePayload.approvalNote = null;
+    }
 
     if (updateJobDto.skills) {
       updatePayload.skills = await this.skillsService.normalizeControlledSkills(
@@ -339,6 +348,14 @@ export class JobsService {
         updatedBy: { _id: user._id, email: user.email },
       },
     );
+
+    // Followers hear about a job only once it is public, never while it is PENDING or REJECTED.
+    if (
+      dto.status === EJobApprovalStatus.APPROVED &&
+      job.approvalStatus !== EJobApprovalStatus.APPROVED
+    ) {
+      await this.queueNewJobNotification(job);
+    }
 
     await this.clearJobRelatedCachesForCompanies([job.company?._id?.toString()].filter(Boolean));
 
@@ -617,6 +634,22 @@ export class JobsService {
 
     filter.locationCode = resolvedLocation.code;
     delete filter.location;
+  }
+
+  private async queueNewJobNotification(job: JobDocument): Promise<void> {
+    try {
+      await this.companyFollowerQueueService.addNewJobNotification({
+        jobId: job._id.toString(),
+        companyId: job.company._id.toString(),
+        jobName: job.name,
+        companyName: job.company.name,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to queue new-job notification for job ${job._id}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
   }
 
   private async assertHrOwnership(

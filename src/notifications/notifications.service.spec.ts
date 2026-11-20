@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import mongoose from 'mongoose';
@@ -59,5 +60,47 @@ describe('NotificationsService.findAllByUser', () => {
     expect(query.sort).toHaveBeenCalledWith({ createdAt: -1 });
     expect(query.limit).toHaveBeenCalledWith(100);
     expect(response.meta.pagination.per_page).toBe(100);
+  });
+});
+
+describe('NotificationsService ownership errors', () => {
+  const userId = new mongoose.Types.ObjectId().toString();
+  const id = new mongoose.Types.ObjectId().toString();
+  let service: NotificationsService;
+  let model: { updateOne: jest.Mock; softDelete: jest.Mock };
+
+  beforeEach(async () => {
+    model = { updateOne: jest.fn(), softDelete: jest.fn() };
+    const module = await Test.createTestingModule({
+      providers: [
+        NotificationsService,
+        { provide: getModelToken(Notification.name), useValue: model },
+        { provide: NotificationsGateway, useValue: {} },
+      ],
+    }).compile();
+    service = module.get(NotificationsService);
+  });
+
+  it("returns 404 when marking someone else's (or a missing) notification as read", async () => {
+    model.updateOne.mockResolvedValue({ matchedCount: 0, modifiedCount: 0 });
+
+    await expect(service.markAsRead(id, userId)).rejects.toThrow(NotFoundException);
+  });
+
+  it("marks the caller's own notification as read", async () => {
+    model.updateOne.mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
+
+    await expect(service.markAsRead(id, userId)).resolves.toEqual(
+      expect.objectContaining({ matchedCount: 1 }),
+    );
+  });
+
+  it("returns 404 when deleting someone else's (or a missing) notification", async () => {
+    model.updateOne.mockResolvedValue({ matchedCount: 0 });
+    model.softDelete.mockResolvedValue({ deleted: 0 });
+
+    await expect(
+      service.remove(id, { _id: userId, email: 'a@example.com' } as any),
+    ).rejects.toThrow(NotFoundException);
   });
 });

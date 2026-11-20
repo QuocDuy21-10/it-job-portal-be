@@ -58,9 +58,14 @@ describe('Auth (e2e)', () => {
       .set('Cookie', refreshCookie)
       .expect(200);
     expect(refreshed.body.data.access_token).toEqual(expect.any(String));
+    // Rotation keeps the session id, so the access token from before the refresh stays valid.
+    await request(t.server)
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
     const rotated =
       ([].concat(refreshed.headers['set-cookie'] ?? []) as string[])
-        .find(c => c.startsWith('refresh_token='))
+        .find(c => /^refresh_token=[^;]+/.test(c)) // skip the empty clearing cookie
         ?.split(';')[0] ?? refreshCookie;
 
     await request(t.server)
@@ -70,6 +75,12 @@ describe('Auth (e2e)', () => {
       .expect(201);
 
     await request(t.server).get('/api/v1/auth/refresh').set('Cookie', rotated).expect(401);
+    for (const token of [accessToken, refreshed.body.data.access_token]) {
+      await request(t.server)
+        .get('/api/v1/auth/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(401);
+    }
   });
 
   it('a candidate cannot create a job (403)', async () => {

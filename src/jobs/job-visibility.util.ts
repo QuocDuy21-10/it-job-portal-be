@@ -8,3 +8,15 @@ export const buildPublicJobVisibilityFilter = (
   approvalStatus: EJobApprovalStatus.APPROVED,
   $or: [{ endDate: { $gte: now } }, { endDate: null }],
 });
+
+export const isJobPubliclyVisible = (
+  job: { approvalStatus?: string; isActive?: boolean; endDate?: Date | string | null },
+  now: Date = new Date(),
+): boolean =>
+  job.approvalStatus === EJobApprovalStatus.APPROVED &&
+  !!job.isActive &&
+  (!job.endDate || new Date(job.endDate) >= now);
+
+// Audit fields (admin/HR emails and IDs) are only for SUPER_ADMIN and the job's own HR.
+export const PUBLIC_JOB_PROJECTION =
+  '-createdBy -updatedBy -deletedBy -approvedBy -approvalNote -isDeleted -deletedAt -__v';

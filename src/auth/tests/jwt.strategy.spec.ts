@@ -5,17 +5,20 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtStrategy } from '../passport/jwt.strategy';
 import { User } from 'src/users/schemas/user.schema';
 import { makeUser } from '../testing/auth-test-data';
+import { SessionsService } from 'src/sessions/sessions.service';
 
 describe('JwtStrategy', () => {
   let strategy: JwtStrategy;
   let userModel: {
     findById: jest.Mock;
   };
+  let sessionsService: { isSessionActive: jest.Mock };
 
   beforeEach(async () => {
     userModel = {
       findById: jest.fn(),
     };
+    sessionsService = { isSessionActive: jest.fn().mockResolvedValue(true) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -32,6 +35,7 @@ describe('JwtStrategy', () => {
             }),
           },
         },
+        { provide: SessionsService, useValue: sessionsService },
         {
           provide: getModelToken(User.name),
           useValue: userModel,
@@ -55,9 +59,9 @@ describe('JwtStrategy', () => {
     const select = jest.fn().mockReturnValue({ lean });
     userModel.findById.mockReturnValue({ select });
 
-    await expect(strategy.validate({ sub: 'user-id-123', type: 'access' })).rejects.toThrow(
-      ForbiddenException,
-    );
+    await expect(
+      strategy.validate({ sub: 'user-id-123', type: 'access', sid: 'session-1' }),
+    ).rejects.toThrow(ForbiddenException);
   });
 
   describe('password change revocation', () => {
@@ -73,7 +77,12 @@ describe('JwtStrategy', () => {
       mockUser(new Date());
 
       await expect(
-        strategy.validate({ sub: 'user-id-123', type: 'access', iat: nowSeconds - 60 }),
+        strategy.validate({
+          sub: 'user-id-123',
+          type: 'access',
+          sid: 'session-1',
+          iat: nowSeconds - 60,
+        }),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -81,8 +90,32 @@ describe('JwtStrategy', () => {
       mockUser(new Date(Date.now() - 60_000));
 
       await expect(
-        strategy.validate({ sub: 'user-id-123', type: 'access', iat: nowSeconds }),
+        strategy.validate({
+          sub: 'user-id-123',
+          type: 'access',
+          sid: 'session-1',
+          iat: nowSeconds,
+        }),
       ).resolves.toEqual(expect.objectContaining({ email: expect.any(String) }));
+    });
+  });
+
+  describe('session binding (logout / lock revocation)', () => {
+    it('rejects a token whose session was deleted or deactivated', async () => {
+      sessionsService.isSessionActive.mockResolvedValue(false);
+
+      await expect(
+        strategy.validate({ sub: 'user-id-123', type: 'access', sid: 'session-1' }),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(sessionsService.isSessionActive).toHaveBeenCalledWith('session-1', 'user-id-123');
+      expect(userModel.findById).not.toHaveBeenCalled();
+    });
+
+    it('rejects a token without a sid claim', async () => {
+      await expect(strategy.validate({ sub: 'user-id-123', type: 'access' })).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(sessionsService.isSessionActive).not.toHaveBeenCalled();
     });
   });
 });

@@ -7,9 +7,11 @@ import { NotificationsService } from './notifications.service';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsGateway } from './notifications.gateway';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
+import { SessionsModule } from 'src/sessions/sessions.module';
 
 @Module({
   imports: [
+    SessionsModule,
     MongooseModule.forFeature([
       { name: Notification.name, schema: NotificationSchema },
       // Read-only: the gateway checks account state when a socket connects.

@@ -1,6 +1,8 @@
 export interface IJwtAccessPayload {
   sub: string;
   type: 'access';
+  /** Session `_id`; the token dies with its session (logout, lock, password change). */
+  sid?: string;
   iss?: string;
   iat?: number;
   exp?: number;

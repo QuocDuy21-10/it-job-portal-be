@@ -163,7 +163,12 @@ export async function createAuthTestingModule(
     {
       provide: SessionsService,
       useValue: {
-        createSession: jest.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue({}),
+        createSession: jest
+          .fn<(...args: unknown[]) => Promise<unknown>>()
+          .mockResolvedValue({ _id: 'session-1' }),
+        rotateSession: jest
+          .fn<(...args: unknown[]) => Promise<unknown>>()
+          .mockResolvedValue({ _id: 'session-1' }),
         enforceSessionLimit: jest
           .fn<(...args: unknown[]) => Promise<unknown>>()
           .mockResolvedValue({}),
