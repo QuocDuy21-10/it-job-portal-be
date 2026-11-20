@@ -122,6 +122,23 @@ Sao lưu MongoDB và hai volume `uploads`, `cv_storage` **trước** (xem [backu
 
 4. Deploy frontend (nút "Xem CV" gọi `GET /resumes/:id/file`).
 
+### Nâng cấp chat QA đợt 1 (chạy một lần)
+
+Sao lưu MongoDB **trước** (xem [backup-and-recovery](../11-operations/backup-and-recovery.md)).
+
+1. Gắn tag release backend; CI tự deploy. Khi khởi động, Mongoose `autoIndex` log lỗi xung đột index `sessionId_1_sequence_1` cho tới khi chạy bước 2. Lỗi này vô hại: code mới cấp `sequence` bằng `$inc messageSeq`, không cần index.
+2. Đánh số lại tin nhắn trùng `sequence` và tạo unique index:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml --env-file .env.production exec backend \
+     node dist/databases/migrations/chat-message-sequence.js
+   ```
+
+   Báo cáo in `sessionsRenumbered`, `messagesRenumbered`, `uniqueIndexCreated`. Chạy lại an toàn. Chạy lúc ít traffic: một lượt chat ghi đúng vào session đang được đánh số lại có thể bị từ chối.
+3. Deploy frontend (gửi `clientMessageId`). Thứ tự FE/BE không bắt buộc.
+
+Rollback: image cũ vẫn chạy với unique index; khi gửi đồng thời, lần ghi trùng bị index từ chối thay vì lưu trùng. Trường `messageSeq` bị code cũ bỏ qua.
+
 ### 7. Sao lưu
 
 Xem [backup-and-recovery](../11-operations/backup-and-recovery.md).
