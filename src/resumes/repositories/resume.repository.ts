@@ -16,8 +16,9 @@ export class ResumeRepository {
     @InjectModel(User.name) private readonly userModel: SoftDeleteModel<UserDocument>,
   ) {}
 
+  // Soft-deleted resumes are invisible to every by-ID read and update.
   async findById(id: string): Promise<ResumeDocument | null> {
-    return this.resumeModel.findById(id).exec();
+    return this.resumeModel.findOne({ _id: id, isDeleted: { $ne: true } }).exec();
   }
 
   async findPaginated(
@@ -77,7 +78,7 @@ export class ResumeRepository {
 
   async findByIdWithPopulate(id: string): Promise<ResumeDocument | null> {
     return this.resumeModel
-      .findById(id)
+      .findOne({ _id: id, isDeleted: { $ne: true } })
       .populate('jobId', 'name')
       .populate('companyId', 'name')
       .lean()
@@ -89,7 +90,7 @@ export class ResumeRepository {
   }
 
   async updateOne(filter: Record<string, any>, update: Record<string, any>) {
-    return this.resumeModel.updateOne(filter, update);
+    return this.resumeModel.updateOne({ ...filter, isDeleted: { $ne: true } }, update);
   }
 
   async softDeleteById(id: string, deletedBy: { _id: string; email: string }) {

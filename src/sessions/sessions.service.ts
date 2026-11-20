@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import { Session, SessionDocument } from './schemas/session.schema';
 import { ConfigService } from '@nestjs/config';
 import ms from 'ms';
@@ -48,6 +48,48 @@ export class SessionsService {
       })
       .populate('userId', 'name email role company')
       .exec();
+  }
+
+  /**
+   * Swap the refresh token on the same session document so its `_id` (the access token `sid`)
+   * survives rotation. Atomic: a token that was already rotated or revoked matches nothing.
+   */
+  async rotateSession(
+    oldRefreshToken: string,
+    newRefreshToken: string,
+    userAgent: string,
+    ipAddress: string,
+  ): Promise<SessionDocument | null> {
+    const refreshTokenTTL = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN');
+    const newHash = this.hashRefreshToken(newRefreshToken);
+
+    return this.sessionModel
+      .findOneAndUpdate(
+        { refreshTokenHash: this.hashRefreshToken(oldRefreshToken), isActive: true },
+        {
+          $set: {
+            refreshToken: newHash,
+            refreshTokenHash: newHash,
+            userAgent,
+            ipAddress,
+            expiresAt: new Date(Date.now() + ms(refreshTokenTTL)),
+            lastUsedAt: new Date(),
+          },
+        },
+        { new: true },
+      )
+      .exec();
+  }
+
+  async isSessionActive(sessionId: string, userId: string): Promise<boolean> {
+    if (!mongoose.isValidObjectId(sessionId)) {
+      return false;
+    }
+
+    const session = await this.sessionModel
+      .exists({ _id: sessionId, userId, isActive: true, expiresAt: { $gt: new Date() } })
+      .exec();
+    return !!session;
   }
 
   async getActiveSessions(userId: string): Promise<SessionDocument[]> {

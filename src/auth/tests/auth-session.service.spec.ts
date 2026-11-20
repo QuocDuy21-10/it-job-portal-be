@@ -53,6 +53,17 @@ describe('AuthSessionService', () => {
       expect(result.user.email).toBe(user.email);
     });
 
+    it('binds the access token to the new session via the sid claim', async () => {
+      const user = makeIUser();
+
+      await service.login(user, makeResponse(), '127.0.0.1', 'TestAgent');
+
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        { sub: user._id, type: 'access', sid: 'session-1' },
+        expect.objectContaining({ secret: 'access-secret' }),
+      );
+    });
+
     it('should set secure=false when NODE_ENV is not production', async () => {
       const response = makeResponse();
 
@@ -106,7 +117,7 @@ describe('AuthSessionService', () => {
   });
 
   describe('refreshAccessToken', () => {
-    it('should rotate tokens, delete the old session, create a new session, and set a new cookie', async () => {
+    it('should rotate the refresh token in place, keep the sid, and set a new cookie', async () => {
       const response = makeResponse();
       const user = makeIUser();
 
@@ -118,8 +129,17 @@ describe('AuthSessionService', () => {
         '127.0.0.1',
       );
 
-      expect(sessionsService.deleteSession).toHaveBeenCalledWith('old-refresh-token');
-      expect(sessionsService.createSession).toHaveBeenCalled();
+      expect(sessionsService.rotateSession).toHaveBeenCalledWith(
+        'old-refresh-token',
+        'mock-jwt-token',
+        'TestAgent',
+        '127.0.0.1',
+      );
+      expect(sessionsService.createSession).not.toHaveBeenCalled();
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        { sub: user._id, type: 'access', sid: 'session-1' },
+        expect.anything(),
+      );
       expect(response.clearCookie).toHaveBeenCalledWith('refresh_token');
       expect(response.cookie).toHaveBeenCalledWith(
         'refresh_token',
@@ -132,7 +152,7 @@ describe('AuthSessionService', () => {
 
     it('should throw BadRequestException when the old session is not found', async () => {
       const response = makeResponse();
-      sessionsService.deleteSession.mockResolvedValue(false as never);
+      sessionsService.rotateSession.mockResolvedValue(null as never);
 
       await expect(
         service.refreshAccessToken(

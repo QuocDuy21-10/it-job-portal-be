@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { JobsService } from './jobs.service';
 import { JobRepository } from './repositories/job.repository';
 import { CompanyFollowerQueueService } from 'src/queues/services/company-follower-queue.service';
 import { JobExpirationQueueService } from 'src/queues/services/job-expiration-queue.service';
 import { EJobApprovalStatus } from './enums/job-approval-status.enum';
+import { PUBLIC_JOB_PROJECTION } from './job-visibility.util';
 import { IUser } from 'src/users/user.interface';
 import { SkillsService } from 'src/skills/skills.service';
 import { ERole } from 'src/casl/enums/role.enum';
@@ -272,35 +273,64 @@ describe('JobsService', () => {
         LIST_CACHE_SCOPES.SUPER_ADMIN,
       ]);
     });
+
+    it('applies the public projection only to the public list scope', async () => {
+      mockJobRepository.findPaginated.mockResolvedValue(paginatedResponse([]));
+
+      await service.findAll(1, 10, '', publicUser());
+      await service.findAll(1, 10, '', hrUser('507f1f77bcf86cd799439041'));
+      await service.findAll(1, 10, '', superAdminUser());
+
+      const projections = mockJobRepository.findPaginated.mock.calls.map(call => call[4]);
+      expect(projections).toEqual([PUBLIC_JOB_PROJECTION, undefined, undefined]);
+    });
   });
 
   describe('findOne', () => {
-    it('returns null for a non-approved job when viewed by a public user', async () => {
+    it('throws NotFoundException for a non-approved job when viewed by a public user', async () => {
       mockJobRepository.findById.mockResolvedValue({
         ...activeApprovedJob(),
         approvalStatus: EJobApprovalStatus.PENDING,
       } as any);
 
-      const result = await service.findOne('job-1', publicUser());
-      expect(result).toBeNull();
+      await expect(service.findOne('job-1', publicUser())).rejects.toThrow(NotFoundException);
     });
 
-    it('returns null for an inactive job when viewed by a public user', async () => {
+    it('throws NotFoundException for an inactive job when viewed by a public user', async () => {
       mockJobRepository.findById.mockResolvedValue({
         ...activeApprovedJob(),
         isActive: false,
       } as any);
 
-      const result = await service.findOne('job-1', publicUser());
-      expect(result).toBeNull();
+      await expect(service.findOne('job-1', publicUser())).rejects.toThrow(NotFoundException);
     });
 
-    it('throws BadRequestException when HR views a job of another company', async () => {
+    it('throws NotFoundException when the job does not exist (or is soft-deleted)', async () => {
+      mockJobRepository.findById.mockResolvedValue(null);
+
+      await expect(service.findOne('job-1', superAdminUser())).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws NotFoundException (not 400) when HR views a job of another company', async () => {
       mockJobRepository.findById.mockResolvedValue(activeApprovedJob('other-company') as any);
 
       await expect(service.findOne('job-1', hrUser('my-company'))).rejects.toThrow(
-        BadRequestException,
+        NotFoundException,
       );
+    });
+
+    it('hides audit fields from public callers but not from SUPER_ADMIN or own HR', async () => {
+      mockJobRepository.findById.mockResolvedValue(activeApprovedJob('my-company') as any);
+
+      await service.findOne('job-1', publicUser());
+      await service.findOne('job-1', superAdminUser());
+      await service.findOne('job-1', hrUser('my-company'));
+
+      expect(mockJobRepository.findById.mock.calls).toEqual([
+        ['job-1', PUBLIC_JOB_PROJECTION],
+        ['job-1', undefined],
+        ['job-1', undefined],
+      ]);
     });
 
     it('SUPER_ADMIN can view any job regardless of status', async () => {
@@ -356,6 +386,41 @@ describe('JobsService', () => {
         expect.objectContaining({ name: 'Updated' }),
       );
       expect(mockStatisticsCacheService.clearTopHiringCompanies).toHaveBeenCalled();
+    });
+
+    it('sends an approved job back to PENDING when HR edits its content', async () => {
+      mockJobRepository.findById.mockResolvedValue(activeApprovedJob('my-company') as any);
+      mockJobRepository.updateOne.mockResolvedValue({ modifiedCount: 1 } as any);
+
+      await service.update('job-1', { description: 'changed' } as any, hrUser('my-company'));
+
+      expect(mockJobRepository.updateOne).toHaveBeenCalledWith(
+        { _id: 'job-1' },
+        expect.objectContaining({
+          approvalStatus: EJobApprovalStatus.PENDING,
+          approvedBy: null,
+          approvedAt: null,
+          approvalNote: null,
+        }),
+      );
+    });
+
+    it('keeps an approved job approved when HR only changes scheduling fields', async () => {
+      mockJobRepository.findById.mockResolvedValue(activeApprovedJob('my-company') as any);
+      mockJobRepository.updateOne.mockResolvedValue({ modifiedCount: 1 } as any);
+
+      await service.update('job-1', { isActive: false } as any, hrUser('my-company'));
+
+      expect(mockJobRepository.updateOne.mock.calls[0][1]).not.toHaveProperty('approvalStatus');
+    });
+
+    it('keeps an approved job approved when SUPER_ADMIN edits its content', async () => {
+      mockJobRepository.findById.mockResolvedValue(activeApprovedJob('my-company') as any);
+      mockJobRepository.updateOne.mockResolvedValue({ modifiedCount: 1 } as any);
+
+      await service.update('job-1', { description: 'changed' } as any, superAdminUser());
+
+      expect(mockJobRepository.updateOne.mock.calls[0][1]).not.toHaveProperty('approvalStatus');
     });
 
     it('allows SUPER_ADMIN to update any job', async () => {
@@ -509,17 +574,17 @@ describe('JobsService', () => {
       ]);
     });
 
-    it('logs an error but does not reject when queue notification fails', async () => {
-      const fakeJob = { _id: 'j1', createdAt: new Date(), company: { _id: 'c1', name: 'X' } };
+    it('does not notify company followers while the job is still PENDING', async () => {
       mockJobRepository.getCompanySnapshot.mockResolvedValue({ _id: 'c1', name: 'X' } as any);
-      mockJobRepository.create.mockResolvedValue(fakeJob as any);
-      mockCompanyFollowerQueueService.addNewJobNotification.mockRejectedValue(
-        new Error('Queue down'),
-      );
+      mockJobRepository.create.mockResolvedValue({
+        _id: 'j1',
+        createdAt: new Date(),
+        company: { _id: 'c1', name: 'X' },
+      } as any);
 
-      await expect(
-        service.create({ company: { _id: 'c1' }, location: 'Ha Noi' } as any, hrUser('c1')),
-      ).resolves.toBeDefined();
+      await service.create({ company: { _id: 'c1' }, locationCode: 'ha-noi' } as any, hrUser('c1'));
+
+      expect(mockCompanyFollowerQueueService.addNewJobNotification).not.toHaveBeenCalled();
     });
 
     it('rejects HR creating a job for another company before touching the DB', async () => {
@@ -550,6 +615,70 @@ describe('JobsService', () => {
       await expect(
         service.create({ company: { _id: 'c9' }, locationCode: 'ha-noi' } as any, superAdminUser()),
       ).resolves.toEqual(expect.objectContaining({ _id: 'j9' }));
+    });
+  });
+
+  describe('approveJob', () => {
+    const pendingJob = () => ({
+      ...activeApprovedJob('c1'),
+      approvalStatus: EJobApprovalStatus.PENDING,
+      company: { _id: 'c1', name: 'Acme' },
+    });
+
+    it('notifies company followers when a PENDING job becomes APPROVED', async () => {
+      mockJobRepository.findById.mockResolvedValue(pendingJob() as any);
+
+      await service.approveJob(
+        'job-1',
+        { status: EJobApprovalStatus.APPROVED } as any,
+        superAdminUser(),
+      );
+
+      expect(mockCompanyFollowerQueueService.addNewJobNotification).toHaveBeenCalledWith({
+        jobId: 'job-1',
+        companyId: 'c1',
+        jobName: 'Backend Dev',
+        companyName: 'Acme',
+      });
+    });
+
+    it('does not notify followers when a job is rejected', async () => {
+      mockJobRepository.findById.mockResolvedValue(pendingJob() as any);
+
+      await service.approveJob(
+        'job-1',
+        { status: EJobApprovalStatus.REJECTED } as any,
+        superAdminUser(),
+      );
+
+      expect(mockCompanyFollowerQueueService.addNewJobNotification).not.toHaveBeenCalled();
+    });
+
+    it('does not notify again when an already approved job is re-approved', async () => {
+      mockJobRepository.findById.mockResolvedValue(activeApprovedJob('c1') as any);
+
+      await service.approveJob(
+        'job-1',
+        { status: EJobApprovalStatus.APPROVED } as any,
+        superAdminUser(),
+      );
+
+      expect(mockCompanyFollowerQueueService.addNewJobNotification).not.toHaveBeenCalled();
+    });
+
+    it('still approves when queueing the notification fails', async () => {
+      mockJobRepository.findById.mockResolvedValue(pendingJob() as any);
+      mockCompanyFollowerQueueService.addNewJobNotification.mockRejectedValue(
+        new Error('Queue down'),
+      );
+
+      await expect(
+        service.approveJob(
+          'job-1',
+          { status: EJobApprovalStatus.APPROVED } as any,
+          superAdminUser(),
+        ),
+      ).resolves.toEqual({ _id: 'job-1', approvalStatus: EJobApprovalStatus.APPROVED });
     });
   });
 

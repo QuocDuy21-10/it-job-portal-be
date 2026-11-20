@@ -26,8 +26,12 @@ export class JobRepository {
     }
   }
 
-  async findById(id: string): Promise<JobDocument | null> {
-    return this.jobModel.findById(id).exec();
+  // Soft-deleted jobs are invisible to every by-ID read and update.
+  async findById(id: string, projection?: string): Promise<JobDocument | null> {
+    return this.jobModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .select(projection ?? '')
+      .exec();
   }
 
   async findPaginated(
@@ -35,6 +39,7 @@ export class JobRepository {
     offset: number,
     limit: number,
     sort: Record<string, any>,
+    projection?: string,
   ): Promise<{ result: Job[]; totalItems: number; totalPages: number }> {
     const totalItems = await this.jobModel.countDocuments(filter);
     const totalPages = Math.ceil(totalItems / limit);
@@ -44,6 +49,7 @@ export class JobRepository {
       .skip(offset)
       .limit(limit)
       .sort(sort as any)
+      .select(projection ?? '')
       .lean()
       .exec();
 
@@ -55,7 +61,7 @@ export class JobRepository {
   }
 
   async updateOne(filter: Record<string, any>, update: Record<string, any>) {
-    return this.jobModel.updateOne(filter, update);
+    return this.jobModel.updateOne({ ...filter, isDeleted: { $ne: true } }, update);
   }
 
   async updateMany(filter: Record<string, any>, update: Record<string, any>) {

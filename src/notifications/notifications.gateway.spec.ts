@@ -3,8 +3,9 @@ import { NotificationsGateway } from './notifications.gateway';
 const ALLOWED_ORIGIN = 'http://localhost:3000';
 const activeUser = { isActive: true, isLocked: false, isDeleted: false };
 
-function setup(options: { payload?: unknown; user?: unknown } = {}) {
-  const payload = 'payload' in options ? options.payload : { sub: 'user-1', type: 'access' };
+function setup(options: { payload?: unknown; user?: unknown; sessionActive?: boolean } = {}) {
+  const payload =
+    'payload' in options ? options.payload : { sub: 'user-1', type: 'access', sid: 'session-1' };
   const user = 'user' in options ? options.user : activeUser;
   const env: Record<string, string> = {
     CORS_ORIGINS: ALLOWED_ORIGIN,
@@ -16,9 +17,13 @@ function setup(options: { payload?: unknown; user?: unknown } = {}) {
   const userModel = {
     findById: jest.fn(() => ({ select: () => ({ lean: () => ({ exec }) }) })),
   };
+  const sessionsService = {
+    isSessionActive: jest.fn().mockResolvedValue(options.sessionActive ?? true),
+  };
   const gateway = new NotificationsGateway(
     jwtService as any,
     configService as any,
+    sessionsService as any,
     userModel as any,
   );
   return { gateway, jwtService, userModel };
@@ -87,6 +92,27 @@ describe('NotificationsGateway.handleConnection', () => {
 
   it('disconnects a locked account', async () => {
     const { gateway } = setup({ user: { ...activeUser, isLocked: true } });
+    const client = createClient(ALLOWED_ORIGIN);
+
+    await gateway.handleConnection(client as any);
+
+    expect(client.disconnect).toHaveBeenCalled();
+    expect(client.join).not.toHaveBeenCalled();
+  });
+
+  it('disconnects a token whose session has ended (logout, lock)', async () => {
+    const { gateway, userModel } = setup({ sessionActive: false });
+    const client = createClient(ALLOWED_ORIGIN);
+
+    await gateway.handleConnection(client as any);
+
+    expect(client.disconnect).toHaveBeenCalled();
+    expect(userModel.findById).not.toHaveBeenCalled();
+    expect(client.join).not.toHaveBeenCalled();
+  });
+
+  it('disconnects a token issued before sessions were bound to tokens (no sid)', async () => {
+    const { gateway } = setup({ payload: { sub: 'user-1', type: 'access' } });
     const client = createClient(ALLOWED_ORIGIN);
 
     await gateway.handleConnection(client as any);

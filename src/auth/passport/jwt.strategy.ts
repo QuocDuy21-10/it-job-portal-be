@@ -9,11 +9,13 @@ import { User, UserDocument } from 'src/users/schemas/user.schema';
 import { IJwtAccessPayload } from '../interfaces/jwt-payload.interface';
 import { assertAuthenticatedAccountState } from '../utils/assert-authenticated-account-state.util';
 import { ERole } from 'src/casl/enums/role.enum';
+import { SessionsService } from 'src/sessions/sessions.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private readonly configService: ConfigService,
+    private readonly sessionsService: SessionsService,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {
     super({
@@ -26,6 +28,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: IJwtAccessPayload): Promise<IUser> {
     if (!payload.sub || payload.type !== 'access') {
       throw new UnauthorizedException('Invalid token payload');
+    }
+
+    // Logout, lock and password change end the session, which must end its access tokens too.
+    if (!payload.sid || !(await this.sessionsService.isSessionActive(payload.sid, payload.sub))) {
+      throw new UnauthorizedException('Session đã kết thúc. Vui lòng đăng nhập lại.');
     }
 
     const user = await this.userModel.findById(payload.sub).select('-password').lean().exec();

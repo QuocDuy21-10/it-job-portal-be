@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import mongoose from 'mongoose';
@@ -94,7 +94,7 @@ export class NotificationsService {
    * Mark a single notification as read
    */
   async markAsRead(id: string, userId: string) {
-    return this.notificationModel.updateOne(
+    const result = await this.notificationModel.updateOne(
       {
         _id: new mongoose.Types.ObjectId(id),
         userId: new mongoose.Types.ObjectId(userId),
@@ -104,6 +104,11 @@ export class NotificationsService {
         readAt: new Date(),
       },
     );
+    // Someone else's notification looks exactly like a missing one.
+    if (result.matchedCount === 0) {
+      throw new NotFoundException('Notification not found');
+    }
+    return result;
   }
 
   /**
@@ -133,9 +138,13 @@ export class NotificationsService {
       },
       { deletedBy: { _id: user._id, email: user.email } },
     );
-    return this.notificationModel.softDelete({
+    const result = await this.notificationModel.softDelete({
       _id: new mongoose.Types.ObjectId(id),
       userId: new mongoose.Types.ObjectId(user._id),
     });
+    if (!result.deleted) {
+      throw new NotFoundException('Notification not found');
+    }
+    return result;
   }
 }

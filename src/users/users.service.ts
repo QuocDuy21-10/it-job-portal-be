@@ -151,6 +151,11 @@ export class UsersService {
 
     this.assertEmailIsUnchanged(updateUserDto.email, existingUser.email);
 
+    // Like self-lock: an admin demoting themselves could leave the system with no admin.
+    if (id === user._id && updateUserDto.role && updateUserDto.role !== existingUser.role) {
+      throw new BadRequestException('You cannot change your own role');
+    }
+
     const roleToCheck = updateUserDto.role || existingUser.role;
     const companyToCheck =
       updateUserDto.company !== undefined

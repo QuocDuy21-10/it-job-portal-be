@@ -14,6 +14,7 @@ import { Model } from 'mongoose';
 import { assertAuthenticatedAccountState } from 'src/auth/utils/assert-authenticated-account-state.util';
 import { parseCorsOrigins } from 'src/config/cors-origins';
 import { User, UserDocument } from 'src/users/schemas/user.schema';
+import { SessionsService } from 'src/sessions/sessions.service';
 
 @WebSocketGateway({
   namespace: '/notifications',
@@ -36,6 +37,7 @@ export class NotificationsGateway
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly sessionsService: SessionsService,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
 
@@ -72,6 +74,12 @@ export class NotificationsGateway
 
       if (!payload?.sub || payload.type !== 'access') {
         this.logger.warn(`Client ${client.id} disconnected: invalid token payload`);
+        client.disconnect();
+        return;
+      }
+
+      if (!payload.sid || !(await this.sessionsService.isSessionActive(payload.sid, payload.sub))) {
+        this.logger.warn(`Client ${client.id} disconnected: session ended`);
         client.disconnect();
         return;
       }

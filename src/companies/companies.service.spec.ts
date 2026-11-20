@@ -274,23 +274,40 @@ describe('CompaniesService', () => {
   describe('findOne', () => {
     const companyId = new mongoose.Types.ObjectId().toString();
 
-    it('should return the company for a non-HR user', async () => {
+    it('should return the company without audit fields for a non-HR user', async () => {
       const company = { _id: companyId, name: 'Test Co' };
       mockCompanyRepository.findById.mockResolvedValue(company as any);
 
       const result = await service.findOne(companyId);
 
-      expect(mockCompanyRepository.findById).toHaveBeenCalledWith(companyId);
+      expect(mockCompanyRepository.findById).toHaveBeenCalledWith(
+        companyId,
+        expect.stringContaining('-createdBy'),
+      );
       expect(result).toEqual(company);
     });
 
-    it('should throw BadRequestException when an HR user accesses another company', async () => {
+    it('should return audit fields to SUPER_ADMIN', async () => {
+      mockCompanyRepository.findById.mockResolvedValue({ _id: companyId } as any);
+
+      await service.findOne(companyId, { role: ERole.SUPER_ADMIN } as any);
+
+      expect(mockCompanyRepository.findById).toHaveBeenCalledWith(companyId, undefined);
+    });
+
+    it('should throw NotFoundException when the company does not exist (or is soft-deleted)', async () => {
+      mockCompanyRepository.findById.mockResolvedValue(null);
+
+      await expect(service.findOne(companyId)).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException (not 400) when an HR user accesses another company', async () => {
       const hrUser = {
         role: ERole.HR,
         company: { _id: new mongoose.Types.ObjectId() }, // different from companyId
       } as any;
 
-      await expect(service.findOne(companyId, hrUser)).rejects.toThrow(BadRequestException);
+      await expect(service.findOne(companyId, hrUser)).rejects.toThrow(NotFoundException);
       expect(mockCompanyRepository.findById).not.toHaveBeenCalled();
     });
 

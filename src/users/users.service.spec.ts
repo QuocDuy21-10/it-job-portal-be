@@ -440,6 +440,19 @@ describe('UsersService', () => {
       expect(mockUserRepository.updateOne).not.toHaveBeenCalled();
     });
 
+    it('should reject an admin changing their own role', async () => {
+      mockUserRepository.findWithSelect.mockResolvedValue({
+        role: ERole.SUPER_ADMIN,
+        email: 'admin@example.com',
+      } as any);
+
+      await expect(
+        service.update(actingUser._id, { role: ERole.NORMAL_USER } as any, actingUser),
+      ).rejects.toThrow('You cannot change your own role');
+
+      expect(mockUserRepository.updateOne).not.toHaveBeenCalled();
+    });
+
     it('should use existing role and company when omitted from dto', async () => {
       const existingCompany = makeCompanySnapshot();
       mockUserRepository.findWithSelect.mockResolvedValue({

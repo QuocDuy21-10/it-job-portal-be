@@ -38,6 +38,7 @@ export class CompanyRepository {
     offset: number,
     limit: number,
     sort: Record<string, any>,
+    projection?: string,
   ): Promise<{ result: Company[]; totalItems: number; totalPages: number }> {
     const totalItems = await this.companyModel.countDocuments(filter);
     const totalPages = Math.ceil(totalItems / limit);
@@ -47,18 +48,23 @@ export class CompanyRepository {
       .skip(offset)
       .limit(limit)
       .sort(sort as any)
+      .select(projection ?? '')
       .lean()
       .exec();
 
     return { result: result as unknown as Company[], totalItems, totalPages };
   }
 
-  async findById(id: string): Promise<CompanyDocument | null> {
-    return this.companyModel.findById(id).exec();
+  // Soft-deleted companies are invisible to every by-ID read and update.
+  async findById(id: string, projection?: string): Promise<CompanyDocument | null> {
+    return this.companyModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .select(projection ?? '')
+      .exec();
   }
 
   async updateOne(filter: Record<string, any>, update: Record<string, any>) {
-    return this.companyModel.updateOne(filter, update);
+    return this.companyModel.updateOne({ ...filter, isDeleted: { $ne: true } }, update);
   }
 
   async softDeleteById(id: string, deletedBy: { _id: any; email: string }) {
