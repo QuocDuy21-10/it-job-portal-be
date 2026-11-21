@@ -22,6 +22,7 @@ describe('ChatController stream quota errors', () => {
       flushHeaders: jest.fn(),
       write: jest.fn((chunk: string) => writes.push(chunk)),
       end: jest.fn(),
+      on: jest.fn(),
     };
 
     await controller.streamMessage(
@@ -58,6 +59,7 @@ describe('ChatController stream quota errors', () => {
       flushHeaders: jest.fn(),
       write: jest.fn(),
       end: jest.fn(),
+      on: jest.fn(),
     };
     const user = { _id: '507f1f77bcf86cd799439011' } as any;
 
@@ -73,6 +75,43 @@ describe('ChatController stream quota errors', () => {
       undefined,
       undefined,
       '3f1c2b8e-9a4d-4c1e-8f2a-1b2c3d4e5f60',
+      expect.any(AbortSignal),
     );
+  });
+
+  it('aborts the stream when the client disconnects and writes no error event', async () => {
+    let onClose: (() => void) | undefined;
+    let seenSignal: AbortSignal | undefined;
+    const chatService = {
+      streamMessage: jest.fn().mockImplementation(async function* (...args: unknown[]) {
+        seenSignal = args[5] as AbortSignal;
+        onClose?.();
+        throw new Error('Request was aborted.');
+      }),
+    };
+    const controller = new ChatController(chatService as any, {} as any, {} as any);
+    const response = {
+      status: jest.fn().mockReturnThis(),
+      setHeader: jest.fn(),
+      flushHeaders: jest.fn(),
+      write: jest.fn(),
+      end: jest.fn(),
+      writableFinished: false,
+      on: jest.fn((event: string, handler: () => void) => {
+        if (event === 'close') {
+          onClose = handler;
+        }
+      }),
+    };
+
+    await controller.streamMessage(
+      { _id: '507f1f77bcf86cd799439011' } as any,
+      { message: 'hello' } as any,
+      response as any,
+    );
+
+    expect(seenSignal?.aborted).toBe(true);
+    expect(response.write).not.toHaveBeenCalled();
+    expect(response.end).toHaveBeenCalled();
   });
 });

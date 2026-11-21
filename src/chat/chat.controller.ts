@@ -403,6 +403,14 @@ export class ChatController {
     response.setHeader('Connection', 'keep-alive');
     response.flushHeaders?.();
 
+    const abortController = new AbortController();
+    // response 'close' fires on disconnect; req 'close' fires once the body is read.
+    response.on('close', () => {
+      if (!response.writableFinished) {
+        abortController.abort();
+      }
+    });
+
     try {
       for await (const event of this.chatService.streamMessage(
         user,
@@ -410,11 +418,14 @@ export class ChatController {
         sessionId,
         jobId,
         clientMessageId,
+        abortController.signal,
       )) {
         response.write(this.formatSseEvent(event.type, event.data));
       }
     } catch (error) {
-      response.write(this.formatSseEvent('error', this.getStreamErrorPayload(error)));
+      if (!abortController.signal.aborted) {
+        response.write(this.formatSseEvent('error', this.getStreamErrorPayload(error)));
+      }
     } finally {
       response.end();
     }
