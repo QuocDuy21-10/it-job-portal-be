@@ -19,4 +19,4 @@ export const isJobPubliclyVisible = (
 
 // Audit fields (admin/HR emails and IDs) are only for SUPER_ADMIN and the job's own HR.
 export const PUBLIC_JOB_PROJECTION =
-  '-createdBy -updatedBy -deletedBy -approvedBy -approvalNote -isDeleted -deletedAt -__v';
+  '-createdBy -updatedBy -deletedBy -approvedBy -approvalNote -followersNotifiedAt -isDeleted -deletedAt -__v';
