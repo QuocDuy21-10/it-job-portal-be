@@ -350,10 +350,12 @@ export class JobsService {
       },
     );
 
-    // Followers hear about a job only once it is public, never while it is PENDING or REJECTED.
+    // Followers hear about a job once it is public, never while it is PENDING or REJECTED, and only
+    // on its first approval: re-approving after an HR edit must not send "new job" again.
     if (
       dto.status === EJobApprovalStatus.APPROVED &&
-      job.approvalStatus !== EJobApprovalStatus.APPROVED
+      job.approvalStatus !== EJobApprovalStatus.APPROVED &&
+      (await this.claimFollowerNotification(id))
     ) {
       await this.queueNewJobNotification(job);
     }
@@ -687,6 +689,15 @@ export class JobsService {
 
     filter.locationCode = resolvedLocation.code;
     delete filter.location;
+  }
+
+  /** Atomically marks the job as announced; true only for the one caller that set the mark. */
+  private async claimFollowerNotification(id: string): Promise<boolean> {
+    const result = await this.jobRepository.updateOne(
+      { _id: id, followersNotifiedAt: null },
+      { $set: { followersNotifiedAt: new Date() } },
+    );
+    return result.modifiedCount === 1;
   }
 
   private async queueNewJobNotification(job: JobDocument): Promise<void> {

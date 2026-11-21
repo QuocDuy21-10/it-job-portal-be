@@ -70,6 +70,10 @@ export class Job {
   @Prop()
   approvedAt?: Date;
 
+  // Set once on the first approval; an HR edit sends the job back to review but never clears it.
+  @Prop({ type: Date, default: null })
+  followersNotifiedAt?: Date | null;
+
   @Prop({ type: Object })
   createdBy?: {
     _id: mongoose.Schema.Types.ObjectId;

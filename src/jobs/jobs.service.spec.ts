@@ -625,6 +625,10 @@ describe('JobsService', () => {
       company: { _id: 'c1', name: 'Acme' },
     });
 
+    beforeEach(() => {
+      mockJobRepository.updateOne.mockResolvedValue({ modifiedCount: 1 } as any);
+    });
+
     it('notifies company followers when a PENDING job becomes APPROVED', async () => {
       mockJobRepository.findById.mockResolvedValue(pendingJob() as any);
 
@@ -656,6 +660,36 @@ describe('JobsService', () => {
 
     it('does not notify again when an already approved job is re-approved', async () => {
       mockJobRepository.findById.mockResolvedValue(activeApprovedJob('c1') as any);
+
+      await service.approveJob(
+        'job-1',
+        { status: EJobApprovalStatus.APPROVED } as any,
+        superAdminUser(),
+      );
+
+      expect(mockCompanyFollowerQueueService.addNewJobNotification).not.toHaveBeenCalled();
+    });
+
+    it('marks the job as announced with a conditional update', async () => {
+      mockJobRepository.findById.mockResolvedValue(pendingJob() as any);
+
+      await service.approveJob(
+        'job-1',
+        { status: EJobApprovalStatus.APPROVED } as any,
+        superAdminUser(),
+      );
+
+      expect(mockJobRepository.updateOne).toHaveBeenCalledWith(
+        { _id: 'job-1', followersNotifiedAt: null },
+        { $set: { followersNotifiedAt: expect.any(Date) } },
+      );
+    });
+
+    it('does not notify again when a job edited back to PENDING is approved again', async () => {
+      mockJobRepository.findById.mockResolvedValue(pendingJob() as any);
+      mockJobRepository.updateOne
+        .mockResolvedValueOnce({ modifiedCount: 1 } as any) // approval fields
+        .mockResolvedValueOnce({ modifiedCount: 0 } as any); // followersNotifiedAt already set
 
       await service.approveJob(
         'job-1',
