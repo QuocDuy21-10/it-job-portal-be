@@ -305,6 +305,7 @@ export class ChatService {
     sessionId?: string,
     jobId?: string,
     clientMessageId?: string,
+    signal?: AbortSignal,
   ): AsyncGenerator<ChatStreamEvent> {
     const startedAt = Date.now();
     let resolvedSessionId: string | undefined = sessionId;
@@ -332,9 +333,16 @@ export class ChatService {
       intent = turn.intent;
       intentDetectionSource = turn.intentDetectionSource;
 
+      signal?.throwIfAborted();
       quotaReservation = await this.chatQuotaService.reserve(user);
       const quotaStatus = quotaReservation.status;
-      const gen = this.aiService.streamChat(turn.sanitizedMessage, turn.history, turn.systemPrompt);
+      signal?.throwIfAborted();
+      const gen = this.aiService.streamChat(
+        turn.sanitizedMessage,
+        turn.history,
+        turn.systemPrompt,
+        signal,
+      );
       let iterResult = await gen.next();
 
       while (!iterResult.done) {
@@ -436,6 +444,7 @@ export class ChatService {
         quotaRollback = true;
       }
 
+      const clientAborted = signal?.aborted === true;
       guardrailFlags = this.resolveGuardrailFlags(error, guardrailFlags);
       await this.recordUsage({
         userId: user._id,
@@ -446,7 +455,7 @@ export class ChatService {
         success: false,
         metadata: this.withEstimatedUsage(undefined, promptEstimateSource, Date.now() - startedAt),
         guardrailFlags,
-        errorCategory: this.categorizeError(error),
+        errorCategory: clientAborted ? 'CLIENT_ABORTED' : this.categorizeError(error),
         requestStartedAt: new Date(startedAt),
         requestCompletedAt: new Date(),
         ...this.buildQuotaUsageFields(
@@ -455,6 +464,11 @@ export class ChatService {
           quotaRollback,
         ),
       });
+
+      if (clientAborted) {
+        this.logger.log(`Streaming message aborted by client for user ${user._id}`);
+        return;
+      }
 
       const errorDetails = error instanceof Error ? (error.stack ?? error.message) : error;
       this.logger.error(`Error streaming message for user ${user._id}:`, errorDetails);

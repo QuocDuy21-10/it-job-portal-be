@@ -917,6 +917,82 @@ describe('ChatService', () => {
         }),
       );
     });
+
+    it('stops quietly when the client aborts before the first token', async () => {
+      mockCacheManager.get.mockResolvedValue(undefined);
+      setupActiveSession();
+      setupPromptHistory();
+      mockChatContextProviderRegistry.build.mockResolvedValue(mockIntentContext);
+      mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
+      mockChatMessageModel.countDocuments.mockResolvedValue(0);
+      const controller = new AbortController();
+      mockAIService.streamChat.mockImplementation(() =>
+        (async function* () {
+          controller.abort();
+          throw new Error('Request was aborted.');
+        })(),
+      );
+
+      const events = [];
+      for await (const event of service.streamMessage(
+        user as any,
+        'show backend jobs',
+        undefined,
+        undefined,
+        undefined,
+        controller.signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([]);
+      expect(mockAIService.streamChat).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        'system prompt',
+        controller.signal,
+      );
+      expect(mockChatMessageModel.insertMany).not.toHaveBeenCalled();
+      expect(mockChatQuotaService.rollback).toHaveBeenCalledWith(
+        expect.objectContaining({ consumed: true }),
+      );
+      expect(mockAiUsageService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operationType: 'chat_stream',
+          success: false,
+          errorCategory: 'CLIENT_ABORTED',
+          quotaRollback: true,
+        }),
+      );
+    });
+
+    it('does not reserve quota or call the AI when the client already left', async () => {
+      mockCacheManager.get.mockResolvedValue(undefined);
+      setupActiveSession();
+      setupPromptHistory();
+      mockChatContextProviderRegistry.build.mockResolvedValue(mockIntentContext);
+      mockPromptBuilder.buildSystemPrompt.mockReturnValue('system prompt');
+      mockChatMessageModel.countDocuments.mockResolvedValue(0);
+      const controller = new AbortController();
+      controller.abort();
+
+      const events = [];
+      for await (const event of service.streamMessage(
+        user as any,
+        'show backend jobs',
+        undefined,
+        undefined,
+        undefined,
+        controller.signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([]);
+      expect(mockChatQuotaService.reserve).not.toHaveBeenCalled();
+      expect(mockAIService.streamChat).not.toHaveBeenCalled();
+      expect(mockChatIdempotencyService.release).toHaveBeenCalled();
+    });
   });
 
   describe('turn sequence', () => {
