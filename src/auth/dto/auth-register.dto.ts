@@ -5,16 +5,16 @@ import { IsAccountPassword } from 'src/utils/decorators/is-account-password.deco
 import { lowerCaseTransformer } from 'src/utils/transformer/lower-case.transformer';
 
 export class AuthRegisterDto {
-  @IsNotEmpty({ message: 'Name is required' })
-  @IsString({ message: 'Name must be a string' })
-  @MaxLength(100, { message: 'Name is too long (max: 100 chars)' })
-  @Matches(/^[a-zA-ZÀ-ỹ\s]+$/, { message: 'Name can only contain letters and spaces' })
+  @IsNotEmpty({ message: 'Tên là bắt buộc' })
+  @IsString({ message: 'Tên phải là chuỗi' })
+  @MaxLength(100, { message: 'Tên quá dài (tối đa 100 ký tự)' })
+  @Matches(/^[a-zA-ZÀ-ỹ\s]+$/, { message: 'Tên chỉ được chứa chữ cái và khoảng trắng' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @ApiProperty({ example: 'Duy', description: 'Name of user' })
   name: string;
 
-  @IsEmail({}, { message: 'Email is invalid' })
-  @IsNotEmpty({ message: 'Email is required' })
+  @IsEmail({}, { message: 'Email không hợp lệ' })
+  @IsNotEmpty({ message: 'Email là bắt buộc' })
   @Transform(lowerCaseTransformer)
   @ApiProperty({ example: 'user@gmail.com', description: 'Email of user' })
   email: string;
@@ -24,7 +24,7 @@ export class AuthRegisterDto {
   @ApiProperty({ example: 'StrongP@ss1', description: 'Password of user' })
   password: string;
 
-  @Equals(true, { message: 'You must accept the terms of service' })
+  @Equals(true, { message: 'Bạn phải đồng ý với điều khoản dịch vụ' })
   @ApiProperty({ example: true, description: 'Must be true: user accepted the terms of service' })
   acceptTerms: boolean;
 }

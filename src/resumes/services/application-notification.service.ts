@@ -40,8 +40,8 @@ export class ApplicationNotificationService {
           .create({
             userId: hr._id.toString(),
             type: ENotificationType.NEW_APPLICATION,
-            title: 'New Application Received',
-            message: `${candidateName} (${candidateEmail}) has applied for "${jobName}".`,
+            title: 'Có hồ sơ ứng tuyển mới',
+            message: `${candidateName} (${candidateEmail}) đã ứng tuyển vào "${jobName}".`,
             data: { resumeId, jobName, companyName, candidateName, candidateEmail },
           })
           .catch(err =>
@@ -81,8 +81,8 @@ export class ApplicationNotificationService {
       {
         userId: resume.userId.toString(),
         type: ENotificationType.APPLICATION_STATUS_CHANGE,
-        title: 'Application Status Updated',
-        message: `Your application for "${jobName}" at ${companyName} has been updated to ${newStatus}.`,
+        title: 'Hồ sơ ứng tuyển được cập nhật trạng thái',
+        message: `Hồ sơ ứng tuyển "${jobName}" tại ${companyName} đã được chuyển sang trạng thái ${newStatus}.`,
         data: {
           resumeId,
           jobId: resume.jobId?.toString(),

@@ -88,7 +88,7 @@ export class AuthSessionService {
         ipAddress,
       );
       if (!session) {
-        throw new BadRequestException('Session not found or already used');
+        throw new BadRequestException('Không tìm thấy phiên đăng nhập hoặc phiên đã được sử dụng');
       }
 
       const newAccessToken = this.createAccessToken({
@@ -129,7 +129,7 @@ export class AuthSessionService {
     }
     this.clearRefreshCookie(response);
 
-    return { message: 'Logout successfully' };
+    return { message: 'Đăng xuất thành công' };
   }
 
   async logoutAllDevices(response: Response, userId: string) {
@@ -137,7 +137,7 @@ export class AuthSessionService {
     this.clearRefreshCookie(response);
 
     return {
-      message: 'Logged out from all devices successfully',
+      message: 'Đã đăng xuất khỏi tất cả thiết bị',
       devicesLoggedOut: deletedCount,
     };
   }

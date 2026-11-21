@@ -56,7 +56,7 @@ export class AuthController {
     type: AuthEmailLoginDto,
   })
   @Post('/login')
-  @ResponseMessage('Login successfully')
+  @ResponseMessage('Đăng nhập thành công')
   handleLogin(
     @Req() req: Request,
     @Res({ passthrough: true }) response: Response,
@@ -73,7 +73,7 @@ export class AuthController {
     summary: 'Register a new user',
     description: 'Register a new user with email and password.',
   })
-  @ResponseMessage('Register a new user successfully')
+  @ResponseMessage('Đăng ký tài khoản thành công')
   @Post('/register')
   handleRegister(@Body() AuthRegisterDto: AuthRegisterDto) {
     return this.authService.register(AuthRegisterDto);
@@ -97,7 +97,7 @@ export class AuthController {
     schema: {
       example: {
         statusCode: 200,
-        message: 'Verify account successfully',
+        message: 'Kích hoạt tài khoản thành công',
         data: {
           user: {
             _id: 'string',
@@ -109,7 +109,7 @@ export class AuthController {
     },
   })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid or expired code.' })
-  @ResponseMessage('Verify account successfully')
+  @ResponseMessage('Kích hoạt tài khoản thành công')
   handleVerify(@Body() verifyAuthDto: VerifyAuthDto) {
     return this.authService.verifyEmail(verifyAuthDto);
   }
@@ -138,7 +138,7 @@ export class AuthController {
     schema: {
       example: {
         statusCode: 200,
-        message: 'Resend code successfully',
+        message: 'Gửi lại mã xác thực thành công',
         data: true,
       },
     },
@@ -147,7 +147,7 @@ export class AuthController {
     status: HttpStatus.BAD_REQUEST,
     description: 'User not found or already verified.',
   })
-  @ResponseMessage('Resend code successfully')
+  @ResponseMessage('Gửi lại mã xác thực thành công')
   handleResendCode(@Body('email') email: string) {
     return this.authService.resendCode(email);
   }
@@ -164,7 +164,7 @@ export class AuthController {
     status: HttpStatus.OK,
     description: 'Google login successful. Returns access token and user information.',
   })
-  @ResponseMessage('Google login successfully')
+  @ResponseMessage('Đăng nhập bằng Google thành công')
   @Post('/google/login')
   handleGoogleLogin(
     @Body() authGoogleLoginDto: AuthGoogleLoginDto,
@@ -183,7 +183,7 @@ export class AuthController {
     status: HttpStatus.OK,
     description: 'User profile retrieved successfully with latest data',
   })
-  @ResponseMessage('Get user information successfully')
+  @ResponseMessage('Lấy thông tin người dùng thành công')
   async handleGetAccount(@User() user: { _id: string }) {
     const userProfile = await this.usersService.findUserProfile(user._id);
     return { user: userProfile };
@@ -196,7 +196,7 @@ export class AuthController {
     description: 'API to refresh access token using refresh token (stored in httpOnly cookie).',
   })
   @Get('/refresh')
-  @ResponseMessage('Get new access token successfully')
+  @ResponseMessage('Cấp access token mới thành công')
   handleRefreshToken(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
@@ -214,7 +214,7 @@ export class AuthController {
     summary: 'Logout (Current Device)',
     description: 'Logout from current device. Deletes current session and clears cookie.',
   })
-  @ResponseMessage('Logout successfully')
+  @ResponseMessage('Đăng xuất thành công')
   handleLogout(
     @Req() req: Request,
     @Res({ passthrough: true }) response: Response,
@@ -229,7 +229,7 @@ export class AuthController {
     summary: 'Logout All Devices',
     description: 'Logout from all devices. Deletes all sessions of the user.',
   })
-  @ResponseMessage('Logged out from all devices successfully')
+  @ResponseMessage('Đã đăng xuất khỏi tất cả thiết bị')
   handleLogoutAll(@User() user: IUser, @Res({ passthrough: true }) response: Response) {
     return this.authService.logoutAllDevices(response, user._id);
   }
@@ -239,7 +239,7 @@ export class AuthController {
     summary: 'Get Active Sessions',
     description: 'Get all active sessions (devices) of the current user.',
   })
-  @ResponseMessage('Get active sessions successfully')
+  @ResponseMessage('Lấy danh sách phiên đăng nhập thành công')
   async getActiveSessions(@User() user: IUser) {
     return this.authService.getActiveSessions(user._id);
   }
@@ -247,7 +247,7 @@ export class AuthController {
   @Post('change-password')
   @Throttle({ default: { ttl: 300000, limit: 5 } })
   @ApiOperation({ summary: 'Change Password' })
-  @ResponseMessage('Change password successfully')
+  @ResponseMessage('Đổi mật khẩu thành công')
   async changePassword(
     @User() user: IUser,
     @Body() changePasswordDto: ChangePasswordDto,
@@ -261,7 +261,7 @@ export class AuthController {
   @Post('set-password')
   @Throttle({ default: { ttl: 300000, limit: 5 } })
   @ApiOperation({ summary: 'Set Password (for OAuth users without a password)' })
-  @ResponseMessage('Set password successfully')
+  @ResponseMessage('Tạo mật khẩu thành công')
   async setPassword(
     @User() user: IUser,
     @Body() setPasswordDto: SetPasswordDto,
@@ -276,7 +276,7 @@ export class AuthController {
   @Throttle(STRICT_THROTTLE)
   @Post('forgot-password')
   @ApiOperation({ summary: 'Forgot Password (Request OTP/Link)' })
-  @ResponseMessage('Request process successfully')
+  @ResponseMessage('Đã tiếp nhận yêu cầu')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto);
   }
@@ -285,7 +285,7 @@ export class AuthController {
   @Throttle({ default: { ttl: 300000, limit: 5 } })
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset Password (Confirm)' })
-  @ResponseMessage('Reset password successfully')
+  @ResponseMessage('Đặt lại mật khẩu thành công')
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
   }
@@ -303,9 +303,9 @@ export class AuthController {
     schema: {
       example: {
         statusCode: 200,
-        message: 'Account deletion scheduled successfully',
+        message: 'Đã lên lịch xoá tài khoản',
         data: {
-          message: 'Your account has been scheduled for deletion on ...',
+          message: 'Tài khoản của bạn sẽ bị xoá vào ngày ...',
           scheduledDeletionAt: '2026-05-19T00:00:00.000Z',
         },
       },
@@ -315,7 +315,7 @@ export class AuthController {
     status: HttpStatus.CONFLICT,
     description: 'A deletion is already pending.',
   })
-  @ResponseMessage('Account deletion scheduled successfully')
+  @ResponseMessage('Đã lên lịch xoá tài khoản')
   async requestAccountDeletion(
     @User() user: IUser,
     @Body() dto: RequestAccountDeletionDto,
@@ -338,7 +338,7 @@ export class AuthController {
     status: HttpStatus.BAD_REQUEST,
     description: 'No pending deletion found, or grace period has expired.',
   })
-  @ResponseMessage('Account deletion cancelled successfully')
+  @ResponseMessage('Huỷ yêu cầu xoá tài khoản thành công')
   async cancelAccountDeletion(@User() user: IUser) {
     return this.authService.cancelAccountDeletion(user._id);
   }
@@ -359,7 +359,7 @@ export class AuthController {
     status: HttpStatus.BAD_REQUEST,
     description: 'Invalid/expired token, no pending deletion, or grace period expired.',
   })
-  @ResponseMessage('Account deletion cancelled successfully')
+  @ResponseMessage('Huỷ yêu cầu xoá tài khoản thành công')
   async cancelAccountDeletionByToken(@Body() dto: CancelDeletionByTokenDto) {
     return this.authService.cancelAccountDeletionByToken(dto.token);
   }

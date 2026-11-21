@@ -17,9 +17,9 @@ export class SendMessageDto {
     maxLength: 1000,
   })
   @IsString()
-  @IsNotEmpty({ message: 'Message cannot be empty' })
-  @MinLength(1, { message: 'Message must be at least 1 character' })
-  @MaxLength(1000, { message: 'Message cannot exceed 1000 characters' })
+  @IsNotEmpty({ message: 'Tin nhắn không được để trống' })
+  @MinLength(1, { message: 'Tin nhắn phải có ít nhất 1 ký tự' })
+  @MaxLength(1000, { message: 'Tin nhắn không được dài quá 1000 ký tự' })
   message: string;
 
   @ApiProperty({
@@ -28,7 +28,7 @@ export class SendMessageDto {
     required: false,
   })
   @IsOptional()
-  @IsMongoId({ message: 'jobId must be a valid MongoDB ObjectId' })
+  @IsMongoId({ message: 'jobId phải là ID hợp lệ' })
   jobId?: string;
 
   @ApiProperty({
@@ -38,6 +38,6 @@ export class SendMessageDto {
     required: false,
   })
   @IsOptional()
-  @IsUUID('all', { message: 'clientMessageId must be a UUID' })
+  @IsUUID('all', { message: 'clientMessageId phải là UUID' })
   clientMessageId?: string;
 }

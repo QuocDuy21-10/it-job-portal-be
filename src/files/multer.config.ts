@@ -27,7 +27,7 @@ export class MulterConfigService implements MulterOptionsFactory {
           if (!rawFolder || !ALLOWED_FOLDER_TYPES.includes(rawFolder)) {
             return cb(
               new HttpException(
-                `Invalid X-Folder-Type. Allowed values: ${ALLOWED_FOLDER_TYPES.join(', ')}`,
+                `X-Folder-Type không hợp lệ. Giá trị cho phép: ${ALLOWED_FOLDER_TYPES.join(', ')}`,
                 HttpStatus.BAD_REQUEST,
               ),
               '',
@@ -43,10 +43,7 @@ export class MulterConfigService implements MulterOptionsFactory {
               `Failed to create upload directory '${uploadPath}': ${(err as Error).message}`,
             );
             return cb(
-              new HttpException(
-                'Upload directory could not be created',
-                HttpStatus.INTERNAL_SERVER_ERROR,
-              ),
+              new HttpException('Không thể tạo thư mục tải lên', HttpStatus.INTERNAL_SERVER_ERROR),
               '',
             );
           }
@@ -67,7 +64,7 @@ export class MulterConfigService implements MulterOptionsFactory {
         if (!policy) {
           return cb(
             new HttpException(
-              `Invalid X-Folder-Type. Allowed values: ${ALLOWED_FOLDER_TYPES.join(', ')}`,
+              `X-Folder-Type không hợp lệ. Giá trị cho phép: ${ALLOWED_FOLDER_TYPES.join(', ')}`,
               HttpStatus.BAD_REQUEST,
             ),
             false,
@@ -81,7 +78,7 @@ export class MulterConfigService implements MulterOptionsFactory {
         if (!isMimeAllowed || !isExtAllowed) {
           return cb(
             new HttpException(
-              `Invalid file type for '${rawFolder}'. Allowed extensions: ${policy.allowedExtensions.join(', ')}`,
+              `Loại tệp không hợp lệ cho '${rawFolder}'. Định dạng cho phép: ${policy.allowedExtensions.join(', ')}`,
               HttpStatus.UNPROCESSABLE_ENTITY,
             ),
             false,

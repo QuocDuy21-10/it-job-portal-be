@@ -37,7 +37,7 @@ describe('ChatController stream quota errors', () => {
 
     const data = JSON.parse(writes[0].match(/^data: (.*)$/m)?.[1] ?? '{}');
     expect(data).toEqual({
-      message: expect.stringContaining('Daily chatbot quota exceeded.'),
+      message: expect.stringContaining('Bạn đã dùng hết lượt chat hôm nay.'),
       quota: {
         remainingQuota: 0,
         nextResetTime: 1733097600,

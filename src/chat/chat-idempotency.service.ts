@@ -29,7 +29,7 @@ export class ChatIdempotencyService {
     }
 
     if (claimed === null) {
-      throw new ConflictException('Duplicate message');
+      throw new ConflictException('Tin nhắn bị gửi trùng');
     }
 
     return key;

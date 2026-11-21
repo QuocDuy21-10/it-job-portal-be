@@ -22,7 +22,7 @@ export class SubscribersService {
     const existingCount = await this.subscribersRepository.countActiveByEmail(email);
     if (existingCount >= 3) {
       throw new BadRequestException(
-        'Subscription limit reached. You already have 3 active subscriptions. Please manage existing subscriptions before adding new ones.',
+        'Bạn đã có 3 đăng ký nhận tin đang hoạt động, đạt mức tối đa. Vui lòng xoá bớt trước khi thêm mới.',
       );
     }
 
@@ -110,7 +110,7 @@ export class SubscribersService {
     this.subscribersRepository.validateObjectId(id);
     const subscriber = await this.subscribersRepository.findOneOwned(id, user._id);
     if (!subscriber) {
-      throw new NotFoundException('Subscriber not found');
+      throw new NotFoundException('Không tìm thấy đăng ký nhận tin việc làm');
     }
     return subscriber;
   }
@@ -120,7 +120,7 @@ export class SubscribersService {
 
     const existing = await this.subscribersRepository.findOneOwned(id, user._id);
     if (!existing) {
-      throw new NotFoundException('Subscriber not found');
+      throw new NotFoundException('Không tìm thấy đăng ký nhận tin việc làm');
     }
 
     const updatePayload: Record<string, any> = {
@@ -160,7 +160,7 @@ export class SubscribersService {
     this.subscribersRepository.validateObjectId(id);
     const existing = await this.subscribersRepository.findOneOwned(id, user._id);
     if (!existing) {
-      throw new NotFoundException('Subscriber not found');
+      throw new NotFoundException('Không tìm thấy đăng ký nhận tin việc làm');
     }
 
     return this.subscribersRepository.softDeleteOwned(id, user._id, {
@@ -194,7 +194,7 @@ export class SubscribersService {
     const resolvedLocation = resolveLocationPayload({ location, locationCode });
 
     if (!resolvedLocation) {
-      throw new BadRequestException('A valid locationCode or location is required');
+      throw new BadRequestException('Cần locationCode hoặc location hợp lệ');
     }
 
     return resolvedLocation;

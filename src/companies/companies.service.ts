@@ -65,7 +65,7 @@ export class CompaniesService {
   async create(createCompanyDto: CreateCompanyDto, user: IUser) {
     const exists = await this.companyRepository.existsByName(createCompanyDto.name);
     if (exists) {
-      throw new BadRequestException(`Company with name = ${createCompanyDto.name} already exists`);
+      throw new BadRequestException(`Công ty có tên ${createCompanyDto.name} đã tồn tại`);
     }
 
     const company = await this.companyRepository.create({
@@ -143,7 +143,7 @@ export class CompaniesService {
     this.companyRepository.validateObjectId(id);
 
     const isHr = user?.role === ERole.HR && !!user.company?._id;
-    const notFound = new NotFoundException(`Company with id = ${id} not found`);
+    const notFound = new NotFoundException(`Không tìm thấy công ty có id = ${id}`);
 
     // HR can only view their own company; same 404 as a missing ID so IDs cannot be probed.
     if (isHr && id !== user.company._id.toString()) {
@@ -197,7 +197,7 @@ export class CompaniesService {
 
     const company = await this.companyRepository.findById(id);
     if (!company) {
-      throw new NotFoundException(`Company with id = ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy công ty có id = ${id}`);
     }
 
     const result = await this.companyRepository.softDeleteById(id, {
@@ -301,15 +301,15 @@ export class CompaniesService {
     user: IUser,
   ): Promise<void> {
     if (!company) {
-      throw new NotFoundException(`Company with id = ${companyId} not found`);
+      throw new NotFoundException(`Không tìm thấy công ty có id = ${companyId}`);
     }
 
     if (user.role === ERole.HR) {
       if (!user.company?._id) {
-        throw new ForbiddenException('HR user must be associated with a company');
+        throw new ForbiddenException('Tài khoản HR phải được gắn với một công ty');
       }
       if (company._id.toString() !== user.company._id.toString()) {
-        throw new ForbiddenException('You can only modify your own company');
+        throw new ForbiddenException('Bạn chỉ có thể sửa công ty của mình');
       }
     }
   }

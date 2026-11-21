@@ -13,12 +13,12 @@ import {
 } from 'class-validator';
 
 export class CreateSubscriberDto {
-  @IsNotEmpty({ message: 'Name is required' })
-  @IsString({ message: 'Name must be a string' })
-  @MinLength(2, { message: 'Name must be at least 2 characters' })
-  @MaxLength(100, { message: 'Name is too long (max: 100 chars)' })
+  @IsNotEmpty({ message: 'Tên là bắt buộc' })
+  @IsString({ message: 'Tên phải là chuỗi' })
+  @MinLength(2, { message: 'Tên phải có ít nhất 2 ký tự' })
+  @MaxLength(100, { message: 'Tên quá dài (tối đa 100 ký tự)' })
   @Matches(/^[a-zA-ZÀ-ỹ\s]+$/, {
-    message: 'Name can only contain letters and spaces',
+    message: 'Tên chỉ được chứa chữ cái và khoảng trắng',
   })
   @Transform(({ value }) => {
     if (typeof value === 'number') {
@@ -32,11 +32,11 @@ export class CreateSubscriberDto {
   })
   name: string;
 
-  @IsNotEmpty({ message: 'Skills is required' })
-  @IsArray({ message: 'Skills must be an array' })
-  @ArrayMinSize(1, { message: 'At least one skill is required' })
-  @ArrayMaxSize(20, { message: 'Maximum 20 skills allowed' })
-  @IsString({ each: true, message: 'Each skill must be a string' })
+  @IsNotEmpty({ message: 'Kỹ năng là bắt buộc' })
+  @IsArray({ message: 'Kỹ năng phải là mảng' })
+  @ArrayMinSize(1, { message: 'Cần ít nhất một kỹ năng' })
+  @ArrayMaxSize(20, { message: 'Tối đa 20 kỹ năng' })
+  @IsString({ each: true, message: 'Mỗi kỹ năng phải là chuỗi' })
   @Transform(({ value }) => {
     if (!Array.isArray(value)) return value;
 
@@ -61,8 +61,8 @@ export class CreateSubscriberDto {
   skills: string[];
 
   @IsOptional()
-  @IsString({ message: 'locationCode must be a string' })
-  @MaxLength(100, { message: 'locationCode is too long (max: 100 chars)' })
+  @IsString({ message: 'locationCode phải là chuỗi' })
+  @MaxLength(100, { message: 'locationCode quá dài (tối đa 100 ký tự)' })
   @Transform(({ value }) => {
     if (typeof value === 'number') {
       value = String(value);
@@ -77,8 +77,8 @@ export class CreateSubscriberDto {
   locationCode?: string;
 
   @IsOptional()
-  @IsString({ message: 'Location must be a string' })
-  @MaxLength(100, { message: 'Location is too long (max: 100 chars)' })
+  @IsString({ message: 'Địa điểm phải là chuỗi' })
+  @MaxLength(100, { message: 'Địa điểm quá dài (tối đa 100 ký tự)' })
   @Transform(({ value }) => {
     if (typeof value === 'number') {
       value = String(value);

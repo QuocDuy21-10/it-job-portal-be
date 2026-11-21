@@ -38,22 +38,22 @@ export class AuthAccountDeletionService {
     const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
 
     const user = await this.usersService.findOneByUserEmail(currentUser.email);
-    if (!user) throw new BadRequestException('User not found');
+    if (!user) throw new BadRequestException('Không tìm thấy người dùng');
 
     if (user.scheduledDeletionAt && user.scheduledDeletionAt > new Date()) {
       throw new ConflictException(
-        'Account deletion is already pending. Check your email for the scheduled date.',
+        'Tài khoản đang chờ xoá. Vui lòng kiểm tra email để biết ngày xoá.',
       );
     }
 
     if (user.authProvider === EAuthProvider.LOCAL) {
       if (!dto.password) {
-        throw new BadRequestException('Password is required to delete a local account.');
+        throw new BadRequestException('Cần nhập mật khẩu để xoá tài khoản.');
       }
 
       const valid = this.usersService.isValidPassword(dto.password, user.password);
       if (!valid) {
-        throw new UnauthorizedException('Incorrect password.');
+        throw new UnauthorizedException('Mật khẩu không chính xác.');
       }
     }
 
@@ -86,56 +86,52 @@ export class AuthAccountDeletionService {
     }
 
     return {
-      message: `Your account has been scheduled for deletion on ${scheduledDeletionAt.toISOString()}. You can cancel within ${GRACE_PERIOD_DAYS} days.`,
+      message: `Tài khoản của bạn sẽ bị xoá vào ${scheduledDeletionAt.toISOString()}. Bạn có thể huỷ trong vòng ${GRACE_PERIOD_DAYS} ngày.`,
       scheduledDeletionAt,
     };
   }
 
   async cancelAccountDeletion(userId: string): Promise<{ message: string }> {
     const userDoc = await this.usersService.findOne(userId);
-    if (!userDoc) throw new BadRequestException('User not found');
+    if (!userDoc) throw new BadRequestException('Không tìm thấy người dùng');
 
     if (!userDoc.scheduledDeletionAt) {
-      throw new BadRequestException('No pending account deletion found.');
+      throw new BadRequestException('Không có yêu cầu xoá tài khoản nào đang chờ.');
     }
     if (userDoc.scheduledDeletionAt < new Date()) {
-      throw new BadRequestException(
-        'The grace period has expired. The account has already been permanently deleted.',
-      );
+      throw new BadRequestException('Đã hết thời hạn huỷ. Tài khoản đã bị xoá vĩnh viễn.');
     }
 
     await this.accountDeletionQueueService.cancelDeletionJob(userId);
     await this.usersService.cancelAccountDeletion(userId);
     await this.clearCancelDeletionToken(userId);
 
-    return { message: 'Account deletion cancelled successfully. Your account is now active.' };
+    return { message: 'Đã huỷ yêu cầu xoá tài khoản. Tài khoản của bạn đã hoạt động trở lại.' };
   }
 
   async cancelAccountDeletionByToken(token: string): Promise<{ message: string }> {
     const userId = await this.cacheManager.get<string>(`cancel_deletion:${token}`);
     if (!userId) {
-      throw new BadRequestException('Invalid or expired cancellation token.');
+      throw new BadRequestException('Liên kết huỷ xoá tài khoản không hợp lệ hoặc đã hết hạn.');
     }
 
     const userDoc = await this.usersService.findOne(userId);
-    if (!userDoc) throw new BadRequestException('User not found.');
+    if (!userDoc) throw new BadRequestException('Không tìm thấy người dùng.');
 
     if (!userDoc.scheduledDeletionAt) {
       await this.clearCancelDeletionToken(userId);
-      throw new BadRequestException('No pending account deletion found.');
+      throw new BadRequestException('Không có yêu cầu xoá tài khoản nào đang chờ.');
     }
     if (userDoc.scheduledDeletionAt < new Date()) {
       await this.clearCancelDeletionToken(userId);
-      throw new BadRequestException(
-        'The grace period has expired. The account has already been permanently deleted.',
-      );
+      throw new BadRequestException('Đã hết thời hạn huỷ. Tài khoản đã bị xoá vĩnh viễn.');
     }
 
     await this.accountDeletionQueueService.cancelDeletionJob(userId);
     await this.usersService.cancelAccountDeletion(userId);
     await this.clearCancelDeletionToken(userId);
 
-    return { message: 'Account deletion cancelled successfully. You can now log in.' };
+    return { message: 'Đã huỷ yêu cầu xoá tài khoản. Bạn có thể đăng nhập ngay bây giờ.' };
   }
 
   private async clearCancelDeletionToken(userId: string): Promise<void> {

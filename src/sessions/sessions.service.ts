@@ -179,7 +179,7 @@ export class SessionsService {
     const refreshTokenSecret = this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET');
 
     if (!refreshTokenSecret) {
-      throw new BadRequestException('JWT refresh token secret is not configured.');
+      throw new BadRequestException('Chưa cấu hình secret cho refresh token.');
     }
 
     return createHmac('sha256', refreshTokenSecret).update(refreshToken).digest('hex');

@@ -62,9 +62,7 @@ export class UsersService {
     const { name, email, password, role, company, avatar } = createUserDto;
 
     if (await this.userRepository.emailExists(email)) {
-      throw new BadRequestException(
-        `Email already exists in the system. Please use another email.`,
-      );
+      throw new BadRequestException(`Email đã tồn tại trong hệ thống. Vui lòng dùng email khác.`);
     }
 
     const normalizedCompany = await this.userRepository.resolveCompanyAssignmentForRole(
@@ -88,9 +86,7 @@ export class UsersService {
     const { name, email, password } = user;
 
     if (await this.userRepository.emailExists(email)) {
-      throw new BadRequestException(
-        `Email already exists in the system. Please use another email.`,
-      );
+      throw new BadRequestException(`Email đã tồn tại trong hệ thống. Vui lòng dùng email khác.`);
     }
 
     const hashedPassword = this.hashPassword(password);
@@ -146,14 +142,14 @@ export class UsersService {
 
     const existingUser = await this.userRepository.findWithSelect(id, 'role company email');
     if (!existingUser) {
-      throw new BadRequestException('User not found');
+      throw new BadRequestException('Không tìm thấy người dùng');
     }
 
     this.assertEmailIsUnchanged(updateUserDto.email, existingUser.email);
 
     // Like self-lock: an admin demoting themselves could leave the system with no admin.
     if (id === user._id && updateUserDto.role && updateUserDto.role !== existingUser.role) {
-      throw new BadRequestException('You cannot change your own role');
+      throw new BadRequestException('Bạn không thể tự đổi vai trò của mình');
     }
 
     const roleToCheck = updateUserDto.role || existingUser.role;
@@ -182,7 +178,7 @@ export class UsersService {
 
     const updateResult = await this.userRepository.updateOne(id, updatePayload);
     if (updateResult.matchedCount === 0) {
-      throw new BadRequestException('User not found');
+      throw new BadRequestException('Không tìm thấy người dùng');
     }
 
     await this.profileIdentitySyncService.syncCvIdentityFromUser(id, {
@@ -199,7 +195,7 @@ export class UsersService {
     const userAdmin = await this.userRepository.findWithSelect(id, 'email');
     const emailAdmin = this.configService.get<string>('EMAIL_ADMIN');
     if (userAdmin && userAdmin.email === emailAdmin) {
-      throw new BadRequestException('Cannot delete admin account');
+      throw new BadRequestException('Không thể xoá tài khoản quản trị viên');
     }
     return this.userRepository.softDeleteById(id, { _id: user._id, email: user.email });
   }
@@ -207,7 +203,7 @@ export class UsersService {
   async bulkRemove(ids: string[], user: IUser): Promise<IBulkDeleteResult> {
     // Prevent self-deletion
     if (ids.includes(user._id.toString())) {
-      throw new BadRequestException('You cannot delete your own account');
+      throw new BadRequestException('Bạn không thể xoá tài khoản của chính mình');
     }
 
     // Prevent deleting the admin account
@@ -218,7 +214,7 @@ export class UsersService {
     );
 
     if (adminUser && ids.includes(adminUser._id.toString())) {
-      throw new BadRequestException('Cannot delete the admin account');
+      throw new BadRequestException('Không thể xoá tài khoản quản trị viên');
     }
 
     return this.userRepository.bulkSoftDelete(ids, user);
@@ -249,16 +245,16 @@ export class UsersService {
     const user = await this.userRepository.findUserProfile(userId);
 
     if (!user) {
-      throw new BadRequestException('User not found');
+      throw new BadRequestException('Không tìm thấy người dùng');
     }
     if (!user.isActive) {
-      throw new BadRequestException('Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ admin.');
+      throw new BadRequestException('Tài khoản đã bị vô hiệu hoá. Vui lòng liên hệ quản trị viên.');
     }
     if (user.isDeleted) {
       throw new BadRequestException('Tài khoản đã bị xóa');
     }
     if (!this.isSystemRole(user.role)) {
-      throw new BadRequestException('Role không hợp lệ. Vui lòng liên hệ admin.');
+      throw new BadRequestException('Vai trò không hợp lệ. Vui lòng liên hệ quản trị viên.');
     }
     const profile: IUser = {
       _id: user._id.toString(),
@@ -349,7 +345,7 @@ export class UsersService {
     }
 
     if (this.normalizeEmail(incomingEmail) !== this.normalizeEmail(currentEmail)) {
-      throw new BadRequestException('Email cannot be updated through this endpoint');
+      throw new BadRequestException('Không thể đổi email qua API này');
     }
   }
 

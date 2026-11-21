@@ -25,9 +25,9 @@ import { EJobLevel } from '../enums/job-level.enum';
 import { EJobFormOfWork } from '../enums/job-form-of-work.enum';
 
 export class CreateJobDto {
-  @IsNotEmpty({ message: 'Name is required' })
-  @IsString({ message: 'Name must be a string' })
-  @MaxLength(100, { message: 'Name is too long (max: 100 chars)' })
+  @IsNotEmpty({ message: 'Tên là bắt buộc' })
+  @IsString({ message: 'Tên phải là chuỗi' })
+  @MaxLength(100, { message: 'Tên quá dài (tối đa 100 ký tự)' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @ApiProperty({
     example: 'Senior Backend Engineer',
@@ -35,11 +35,11 @@ export class CreateJobDto {
   })
   name: string;
 
-  @IsNotEmpty({ message: 'Skills are required' })
-  @IsArray({ message: 'Skills must be an array' })
-  @ArrayMinSize(1, { message: 'At least one skill is required' })
-  @IsString({ each: true, message: 'Each skill must be a string' })
-  @MaxLength(100, { each: true, message: 'Skill name is too long (max: 100 chars)' })
+  @IsNotEmpty({ message: 'Kỹ năng là bắt buộc' })
+  @IsArray({ message: 'Kỹ năng phải là mảng' })
+  @ArrayMinSize(1, { message: 'Cần ít nhất một kỹ năng' })
+  @IsString({ each: true, message: 'Mỗi kỹ năng phải là chuỗi' })
+  @MaxLength(100, { each: true, message: 'Tên kỹ năng quá dài (tối đa 100 ký tự)' })
   @Transform(({ value }) =>
     Array.isArray(value) ? value.map(skill => skill?.trim()).filter(Boolean) : value,
   )
@@ -49,16 +49,16 @@ export class CreateJobDto {
   })
   skills: string[];
 
-  @IsNotEmptyObject({ nullable: true }, { message: 'Company is required' })
-  @IsObject({ message: 'Company must be an object' })
+  @IsNotEmptyObject({ nullable: true }, { message: 'Công ty là bắt buộc' })
+  @IsObject({ message: 'Công ty phải là object' })
   @ValidateNested()
   @Type(() => CompanyDto)
   @ApiProperty({ type: CompanyDto, description: 'Company of job' })
   company: CompanyDto;
 
   @IsOptional()
-  @IsString({ message: 'locationCode must be a string' })
-  @MaxLength(100, { message: 'locationCode is too long (max: 100 chars)' })
+  @IsString({ message: 'locationCode phải là chuỗi' })
+  @MaxLength(100, { message: 'locationCode quá dài (tối đa 100 ký tự)' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
   @ApiPropertyOptional({
     example: 'ha-noi',
@@ -67,8 +67,8 @@ export class CreateJobDto {
   locationCode?: string;
 
   @IsOptional()
-  @IsString({ message: 'Location must be a string' })
-  @MaxLength(200, { message: 'Location is too long (max: 200 chars)' })
+  @IsString({ message: 'Địa điểm phải là chuỗi' })
+  @MaxLength(200, { message: 'Địa điểm quá dài (tối đa 200 ký tự)' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @ApiPropertyOptional({
     example: 'Hà Nội',
@@ -76,23 +76,23 @@ export class CreateJobDto {
   })
   location?: string;
 
-  @IsNotEmpty({ message: 'Salary is required' })
-  @IsNumber({}, { message: 'Salary must be a number' })
-  @IsPositive({ message: 'Salary must be greater than 0' })
+  @IsNotEmpty({ message: 'Mức lương là bắt buộc' })
+  @IsNumber({}, { message: 'Mức lương phải là số' })
+  @IsPositive({ message: 'Mức lương phải lớn hơn 0' })
   @ApiProperty({ example: 25000000, description: 'Monthly salary in VND' })
   salary: number;
 
-  @IsNotEmpty({ message: 'Quantity is required' })
-  @IsInt({ message: 'Quantity must be an integer' })
-  @Min(1, { message: 'Quantity must be at least 1' })
-  @Max(1000, { message: 'Quantity is too large (max: 1000)' })
+  @IsNotEmpty({ message: 'Số lượng là bắt buộc' })
+  @IsInt({ message: 'Số lượng phải là số nguyên' })
+  @Min(1, { message: 'Số lượng phải từ 1 trở lên' })
+  @Max(1000, { message: 'Số lượng quá lớn (tối đa 1000)' })
   @ApiProperty({ example: 5, description: 'Number of positions available' })
   quantity: number;
 
-  @IsNotEmpty({ message: 'Level is required' })
-  @IsEnum(EJobLevel, { message: 'Level must be a valid job level' })
-  @IsString({ message: 'Level must be a string' })
-  @MaxLength(50, { message: 'Level is too long (max: 50 chars)' })
+  @IsNotEmpty({ message: 'Cấp bậc là bắt buộc' })
+  @IsEnum(EJobLevel, { message: 'Cấp bậc không hợp lệ' })
+  @IsString({ message: 'Cấp bậc phải là chuỗi' })
+  @MaxLength(50, { message: 'Cấp bậc quá dài (tối đa 50 ký tự)' })
   @ApiProperty({
     example: EJobLevel.SENIOR,
     description: 'Experience level required for the job',
@@ -101,17 +101,17 @@ export class CreateJobDto {
   })
   level: EJobLevel;
 
-  @IsNotEmpty({ message: 'Form of work is required' })
-  @IsString({ message: 'Form of work must be a string' })
+  @IsNotEmpty({ message: 'Hình thức làm việc là bắt buộc' })
+  @IsString({ message: 'Hình thức làm việc phải là chuỗi' })
   @IsEnum(EJobFormOfWork, {
-    message: `formOfWork must be one of the following values: ${Object.values(EJobFormOfWork).join(', ')}`,
+    message: `formOfWork phải là một trong các giá trị: ${Object.values(EJobFormOfWork).join(', ')}`,
   })
   @ApiProperty({ example: EJobFormOfWork.FULL_TIME, description: 'Job form of work' })
   formOfWork: string;
 
-  @IsNotEmpty({ message: 'Description is required' })
-  @IsString({ message: 'Description must be a string' })
-  @MaxLength(5000, { message: 'Description is too long (max: 5000 chars)' })
+  @IsNotEmpty({ message: 'Mô tả là bắt buộc' })
+  @IsString({ message: 'Mô tả phải là chuỗi' })
+  @MaxLength(5000, { message: 'Mô tả quá dài (tối đa 5000 ký tự)' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @ApiProperty({
     example: 'We are looking for an experienced backend engineer to join our team...',
@@ -119,21 +119,21 @@ export class CreateJobDto {
   })
   description: string;
 
-  @IsNotEmpty({ message: 'Start date is required' })
+  @IsNotEmpty({ message: 'Ngày bắt đầu là bắt buộc' })
   @Transform(({ value }) => (value ? new Date(value) : value))
-  @IsDate({ message: 'startDate must be a valid date' })
+  @IsDate({ message: 'startDate phải là ngày hợp lệ' })
   @ApiProperty({ example: '2025-11-01', description: 'Job posting start date (ISO 8601 format)' })
   startDate: Date;
 
-  @IsNotEmpty({ message: 'End date is required' })
+  @IsNotEmpty({ message: 'Ngày kết thúc là bắt buộc' })
   @Transform(({ value }) => (value ? new Date(value) : value))
-  @IsDate({ message: 'endDate must be a valid date' })
-  @IsAfter('startDate', { message: 'End date must be after start date' })
+  @IsDate({ message: 'endDate phải là ngày hợp lệ' })
+  @IsAfter('startDate', { message: 'Ngày kết thúc phải sau ngày bắt đầu' })
   @ApiProperty({ example: '2025-12-31', description: 'Job posting end date (ISO 8601 format)' })
   endDate: Date;
 
-  @IsNotEmpty({ message: 'isActive is required' })
-  @IsBoolean({ message: 'isActive must be a boolean' })
+  @IsNotEmpty({ message: 'isActive là bắt buộc' })
+  @IsBoolean({ message: 'isActive phải là true hoặc false' })
   @ApiProperty({
     example: true,
     description: 'Whether the job posting is active',

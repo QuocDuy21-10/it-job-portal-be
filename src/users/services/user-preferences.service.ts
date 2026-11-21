@@ -11,12 +11,12 @@ export class UserPreferencesService {
 
     const jobExists = await this.userRepository.jobExists(jobId);
     if (!jobExists) {
-      throw new BadRequestException('Job not found or has been deleted');
+      throw new BadRequestException('Không tìm thấy tin tuyển dụng hoặc tin đã bị xoá');
     }
 
     const result = await this.userRepository.addSavedJob(userId, jobId);
     if (result.matchedCount === 0) {
-      throw new BadRequestException('User not found');
+      throw new BadRequestException('Không tìm thấy người dùng');
     }
   }
 
@@ -26,7 +26,7 @@ export class UserPreferencesService {
 
     const result = await this.userRepository.removeSavedJob(userId, jobId);
     if (result.matchedCount === 0) {
-      throw new BadRequestException('User not found');
+      throw new BadRequestException('Không tìm thấy người dùng');
     }
   }
 
@@ -37,7 +37,7 @@ export class UserPreferencesService {
     const user = await this.userRepository.findUserWithSavedJobs(userId);
 
     if (!user) {
-      throw new BadRequestException('User not found');
+      throw new BadRequestException('Không tìm thấy người dùng');
     }
 
     const savedJobs = user.savedJobs || [];
@@ -62,22 +62,22 @@ export class UserPreferencesService {
 
     const companyExists = await this.userRepository.companyExists(companyId);
     if (!companyExists) {
-      throw new BadRequestException('Company not found or has been deleted');
+      throw new BadRequestException('Không tìm thấy công ty hoặc công ty đã bị xoá');
     }
 
     const user = await this.userRepository.findUserCompanyFollowed(userId);
     if (!user) {
-      throw new BadRequestException('User not found');
+      throw new BadRequestException('Không tìm thấy người dùng');
     }
 
     const isAlreadyFollowing = user.companyFollowed?.some(id => id.toString() === companyId);
     if (isAlreadyFollowing) {
-      throw new BadRequestException('You are already following this company');
+      throw new BadRequestException('Bạn đã theo dõi công ty này');
     }
 
     if (user.companyFollowed && user.companyFollowed.length >= 5) {
       throw new BadRequestException(
-        'You can only follow up to 5 companies. Please unfollow a company first.',
+        'Bạn chỉ có thể theo dõi tối đa 5 công ty. Vui lòng bỏ theo dõi một công ty trước.',
       );
     }
 
@@ -90,7 +90,7 @@ export class UserPreferencesService {
 
     const result = await this.userRepository.removeFollowedCompany(userId, companyId);
     if (result.matchedCount === 0) {
-      throw new BadRequestException('User not found');
+      throw new BadRequestException('Không tìm thấy người dùng');
     }
   }
 
@@ -99,7 +99,7 @@ export class UserPreferencesService {
 
     const user = await this.userRepository.findUserWithFollowedCompanies(userId);
     if (!user) {
-      throw new BadRequestException('User not found');
+      throw new BadRequestException('Không tìm thấy người dùng');
     }
 
     return {

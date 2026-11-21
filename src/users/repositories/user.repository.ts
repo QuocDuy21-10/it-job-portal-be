@@ -25,7 +25,7 @@ export class UserRepository {
 
   validateObjectId(id: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid ID format');
+      throw new BadRequestException('ID không đúng định dạng');
     }
   }
 
@@ -190,7 +190,7 @@ export class UserRepository {
       .findOne({ _id: companyId, isDeleted: false })
       .select('_id name logo');
     if (!company) {
-      throw new BadRequestException('Company not found or has been deleted');
+      throw new BadRequestException('Không tìm thấy công ty hoặc công ty đã bị xoá');
     }
     return buildCanonicalCompanySnapshot(company);
   }
@@ -200,14 +200,14 @@ export class UserRepository {
     company?: CompanyDto | null,
   ): Promise<CompanySnapshotValue | undefined> {
     if (!this.isSystemRole(role)) {
-      throw new BadRequestException('Role is not supported by CASL');
+      throw new BadRequestException('Vai trò không được hỗ trợ');
     }
     if (role !== ERole.HR) {
       return undefined;
     }
     const companyId = company?._id?.toString();
     if (!companyId) {
-      throw new BadRequestException('HR user must be assigned to a company');
+      throw new BadRequestException('Tài khoản HR phải được gắn với một công ty');
     }
     return this.getCompanySnapshot(companyId);
   }

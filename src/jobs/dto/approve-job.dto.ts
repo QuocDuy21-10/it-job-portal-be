@@ -5,9 +5,9 @@ import { EJobApprovalStatus } from '../enums/job-approval-status.enum';
 const ALLOWED_STATUSES = [EJobApprovalStatus.APPROVED, EJobApprovalStatus.REJECTED];
 
 export class ApproveJobDto {
-  @IsNotEmpty({ message: 'Status is required' })
+  @IsNotEmpty({ message: 'Trạng thái là bắt buộc' })
   @IsEnum(ALLOWED_STATUSES, {
-    message: `status must be one of: ${ALLOWED_STATUSES.join(', ')}`,
+    message: `status phải là một trong các giá trị: ${ALLOWED_STATUSES.join(', ')}`,
   })
   @ApiProperty({
     example: EJobApprovalStatus.APPROVED,
@@ -17,8 +17,8 @@ export class ApproveJobDto {
   status: EJobApprovalStatus;
 
   @IsOptional()
-  @IsString({ message: 'approvalNote must be a string' })
-  @MaxLength(500, { message: 'approvalNote is too long (max: 500 chars)' })
+  @IsString({ message: 'approvalNote phải là chuỗi' })
+  @MaxLength(500, { message: 'approvalNote quá dài (tối đa 500 ký tự)' })
   @ApiPropertyOptional({
     example: 'Job description does not meet content guidelines.',
     description: 'Optional note from admin explaining approval or rejection decision',

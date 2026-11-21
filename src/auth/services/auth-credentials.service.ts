@@ -44,7 +44,7 @@ export class AuthCredentialsService {
     const failures = Number((await this.redisClient.get(failureKey)) ?? 0);
     if (failures >= LOGIN_FAILURE_LIMIT) {
       throw new HttpException(
-        'Too many failed login attempts. Please try again in 15 minutes.',
+        'Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.',
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
@@ -115,7 +115,7 @@ export class AuthCredentialsService {
     const { currentPassword, newPassword } = changePasswordDto;
 
     const userInDb = await this.usersService.findOneByUserEmail(user.email);
-    if (!userInDb) throw new BadRequestException('User not found');
+    if (!userInDb) throw new BadRequestException('Không tìm thấy người dùng');
 
     if (!userInDb.password) {
       throw new BadRequestException(
@@ -139,7 +139,7 @@ export class AuthCredentialsService {
     const { newPassword } = setPasswordDto;
 
     const userInDb = await this.usersService.findOneByUserEmail(user.email);
-    if (!userInDb) throw new BadRequestException('User not found');
+    if (!userInDb) throw new BadRequestException('Không tìm thấy người dùng');
 
     if (userInDb.password) {
       throw new BadRequestException(
@@ -207,7 +207,7 @@ export class AuthCredentialsService {
     }
 
     const user = await this.usersService.findUserByEmail(email);
-    if (!user) throw new BadRequestException('User not found');
+    if (!user) throw new BadRequestException('Không tìm thấy người dùng');
 
     const newPasswordHash = this.hashPassword(newPassword);
     await this.usersService.updatePassword(user._id.toString(), newPasswordHash);

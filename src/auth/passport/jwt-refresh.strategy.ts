@@ -25,7 +25,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
         (request: Request) => {
           const token = request?.cookies?.refresh_token;
           if (!token) {
-            throw new UnauthorizedException('Refresh token not found in cookies');
+            throw new UnauthorizedException('Không tìm thấy refresh token trong cookie');
           }
           return token;
         },
@@ -39,12 +39,12 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
 
   async validate(req: Request, payload: IJwtRefreshPayload): Promise<IUser> {
     if (!payload.sub || payload.type !== 'refresh') {
-      throw new UnauthorizedException('Invalid refresh token payload');
+      throw new UnauthorizedException('Refresh token không hợp lệ');
     }
 
     const refreshToken = req.cookies?.refresh_token;
     if (!refreshToken) {
-      throw new UnauthorizedException('Refresh token not found');
+      throw new UnauthorizedException('Không tìm thấy refresh token');
     }
 
     const session = await this.sessionsService.findSessionByToken(refreshToken);
@@ -56,16 +56,16 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
     }
 
     if (!session.isActive) {
-      throw new UnauthorizedException('Session đã bị thu hồi. Vui lòng đăng nhập lại.');
+      throw new UnauthorizedException('Phiên đăng nhập đã bị thu hồi. Vui lòng đăng nhập lại.');
     }
 
     if (session.expiresAt < new Date()) {
-      throw new UnauthorizedException('Session đã hết hạn. Vui lòng đăng nhập lại.');
+      throw new UnauthorizedException('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
     }
 
     const sessionUserId = (session.userId as any)?._id?.toString() || session.userId.toString();
     if (sessionUserId !== payload.sub) {
-      throw new UnauthorizedException('Token không khớp với session. Token đã bị giả mạo.');
+      throw new UnauthorizedException('Token không khớp với phiên đăng nhập.');
     }
 
     // Update lastUsedAt để track hoạt động (background task)
@@ -81,13 +81,13 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
       .exec();
 
     if (!user) {
-      throw new UnauthorizedException('User không tồn tại. Token không hợp lệ.');
+      throw new UnauthorizedException('Người dùng không tồn tại. Token không hợp lệ.');
     }
 
     assertAuthenticatedAccountState(user, 'refresh');
 
     if (!this.isSystemRole(user.role)) {
-      throw new UnauthorizedException('Role không hợp lệ. Vui lòng liên hệ admin.');
+      throw new UnauthorizedException('Vai trò không hợp lệ. Vui lòng liên hệ quản trị viên.');
     }
 
     return {

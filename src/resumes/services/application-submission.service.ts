@@ -36,7 +36,7 @@ export class ApplicationSubmissionService {
     const cvProfile = await this.cvProfilesService.getCurrentUserCv(user._id.toString());
     if (!cvProfile.isActive) {
       throw new BadRequestException(
-        'Your CV profile is inactive. Please activate it before applying.',
+        'Hồ sơ CV của bạn đang tắt. Vui lòng kích hoạt trước khi ứng tuyển.',
       );
     }
 
@@ -89,7 +89,7 @@ export class ApplicationSubmissionService {
       recommendation: matchResult.recommendation,
       summary: matchResult.summary,
       createdAt: newResume.createdAt,
-      message: 'Your CV has been successfully submitted. Match analysis completed.',
+      message: 'Nộp CV thành công. Đã phân tích mức độ phù hợp.',
     };
   }
 
@@ -97,13 +97,13 @@ export class ApplicationSubmissionService {
     const job = await this.jobsService.findOne(jobId);
 
     if (!job) {
-      throw new NotFoundException(`Job with ID ${jobId} not found`);
+      throw new NotFoundException(`Không tìm thấy tin tuyển dụng có ID ${jobId}`);
     }
     if (!job.isActive) {
-      throw new BadRequestException('This job is no longer active');
+      throw new BadRequestException('Tin tuyển dụng này không còn hoạt động');
     }
     if (job.endDate && new Date(job.endDate) < new Date()) {
-      throw new BadRequestException('This job posting has expired');
+      throw new BadRequestException('Tin tuyển dụng này đã hết hạn');
     }
 
     return job;

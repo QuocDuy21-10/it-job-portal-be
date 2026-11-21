@@ -22,11 +22,11 @@ export function assertAuthenticatedAccountState(
       throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa. Không thể refresh token.');
     }
 
-    throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ admin.');
+    throw new UnauthorizedException('Tài khoản đã bị vô hiệu hoá. Vui lòng liên hệ quản trị viên.');
   }
 
   if (user.isLocked) {
-    throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
+    throw new UnauthorizedException('Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.');
   }
 
   if (user.isDeleted) {

@@ -22,7 +22,7 @@ export class JobRepository {
 
   validateObjectId(id: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid ID format');
+      throw new BadRequestException('ID không đúng định dạng');
     }
   }
 
@@ -173,7 +173,7 @@ export class JobRepository {
       .select('_id name logo');
 
     if (!company) {
-      throw new BadRequestException('Company not found or has been deleted');
+      throw new BadRequestException('Không tìm thấy công ty hoặc công ty đã bị xoá');
     }
 
     return buildCanonicalCompanySnapshot(company);

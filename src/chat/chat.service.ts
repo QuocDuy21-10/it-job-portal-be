@@ -488,7 +488,7 @@ export class ChatService {
       }
 
       this.logger.error(`Error fetching conversation history for user ${userId}:`, error);
-      throw new BadRequestException('Failed to fetch conversation history');
+      throw new BadRequestException('Không thể tải lịch sử trò chuyện');
     }
   }
 
@@ -555,7 +555,7 @@ export class ChatService {
       }
 
       this.logger.error(`Error fetching session messages for user ${userId}:`, error);
-      throw new BadRequestException('Failed to fetch conversation history');
+      throw new BadRequestException('Không thể tải lịch sử trò chuyện');
     }
   }
 
@@ -565,7 +565,7 @@ export class ChatService {
 
       const session = await this.findLatestActiveSession(userId);
       if (!session) {
-        return { message: 'Conversation cleared successfully' };
+        return { message: 'Xoá cuộc trò chuyện thành công' };
       }
 
       await this.chatSessionModel.updateOne(
@@ -581,14 +581,14 @@ export class ChatService {
       await this.cacheManager.del(this.getActiveSessionCacheKey(userId));
       this.logger.log(`Conversation cleared for user ${userId}`);
 
-      return { message: 'Conversation cleared successfully' };
+      return { message: 'Xoá cuộc trò chuyện thành công' };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
       }
 
       this.logger.error(`Error clearing conversation for user ${userId}:`, error);
-      throw new BadRequestException('Failed to clear conversation');
+      throw new BadRequestException('Không thể xoá cuộc trò chuyện');
     }
   }
 
@@ -609,14 +609,14 @@ export class ChatService {
       );
 
       await this.cacheManager.del(this.getActiveSessionCacheKey(userId));
-      return { message: 'Session cleared successfully' };
+      return { message: 'Xoá phiên chat thành công' };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
       }
 
       this.logger.error(`Error clearing chat session ${sessionId} for user ${userId}:`, error);
-      throw new BadRequestException('Failed to clear chat session');
+      throw new BadRequestException('Không thể xoá phiên chat');
     }
   }
 
@@ -723,7 +723,7 @@ export class ChatService {
       .exec();
 
     if (!reserved?.messageSeq) {
-      throw new NotFoundException('Chat session not found');
+      throw new NotFoundException('Không tìm thấy phiên chat');
     }
 
     return { userSequence: reserved.messageSeq - 1, assistantSequence: reserved.messageSeq };
@@ -795,7 +795,7 @@ export class ChatService {
 
     const session = await this.chatSessionModel.findOne(filter).exec();
     if (!session) {
-      throw new NotFoundException('Chat session not found');
+      throw new NotFoundException('Không tìm thấy phiên chat');
     }
 
     return session;
@@ -1008,22 +1008,22 @@ export class ChatService {
 
   private validateUserId(userId: string): void {
     if (!Types.ObjectId.isValid(userId)) {
-      throw new BadRequestException('Invalid user ID format');
+      throw new BadRequestException('ID người dùng không đúng định dạng');
     }
   }
 
   private validateSessionId(sessionId: string): void {
     if (!Types.ObjectId.isValid(sessionId)) {
-      throw new BadRequestException('Invalid chat session ID format');
+      throw new BadRequestException('ID phiên chat không đúng định dạng');
     }
   }
 
   private validatePagination(page: number, limit: number): void {
     if (page < 1) {
-      throw new BadRequestException('Page must be greater than 0');
+      throw new BadRequestException('Page phải lớn hơn 0');
     }
     if (limit < 1 || limit > 100) {
-      throw new BadRequestException('Limit must be between 1 and 100');
+      throw new BadRequestException('Limit phải nằm trong khoảng từ 1 đến 100');
     }
   }
 
@@ -1296,20 +1296,16 @@ export class ChatService {
     }
 
     if (this.aiService.isRateLimitError(error)) {
-      return new TooManyRequestsException(
-        'AI service is currently busy. Please try again in a few seconds.',
-      );
+      return new TooManyRequestsException('Dịch vụ AI đang bận. Vui lòng thử lại sau vài giây.');
     }
 
     if (this.aiService.isServiceUnavailableError(error)) {
       return new ServiceUnavailableException(
-        'The chatbot is currently unavailable. Please try again later.',
+        'Chatbot tạm thời không khả dụng. Vui lòng thử lại sau.',
       );
     }
 
-    return new BadRequestException(
-      'Unable to process your message at this time. Please try again later.',
-    );
+    return new BadRequestException('Hiện chưa thể xử lý tin nhắn của bạn. Vui lòng thử lại sau.');
   }
 
   private resolveUserRole(user: IUser): string {

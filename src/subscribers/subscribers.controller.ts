@@ -14,7 +14,7 @@ export class SubscribersController {
   constructor(private readonly subscribersService: SubscribersService) {}
 
   @Post()
-  @ResponseMessage('Create a subscriber')
+  @ResponseMessage('Tạo đăng ký nhận tin việc làm thành công')
   @ApiOperation({
     summary: 'Create a new subscriber',
     description:
@@ -30,7 +30,7 @@ export class SubscribersController {
     description:
       "Retrieves a paginated list of the authenticated user's subscriptions. Supports filtering by location and skill.",
   })
-  @ResponseMessage('Fetch subscribers with paginate')
+  @ResponseMessage('Lấy danh sách đăng ký nhận tin việc làm thành công')
   findAll(@Query() query: GetSubscribersQueryDto, @User() user: IUser) {
     return this.subscribersService.findAll(query.page, query.limit, query, user);
   }
@@ -41,7 +41,7 @@ export class SubscribersController {
     description:
       'Updates a subscription owned by the authenticated user. Only the fields provided will be updated. Email cannot be changed.',
   })
-  @ResponseMessage('Update a subscriber')
+  @ResponseMessage('Cập nhật đăng ký nhận tin việc làm thành công')
   update(
     @Param('id') id: string,
     @Body() updateSubscriberDto: UpdateSubscriberDto,
@@ -56,7 +56,7 @@ export class SubscribersController {
     description:
       'Soft deletes a subscription owned by the authenticated user. The record is marked as deleted but not removed from the database.',
   })
-  @ResponseMessage('Delete a subscriber')
+  @ResponseMessage('Xoá đăng ký nhận tin việc làm thành công')
   remove(@Param('id') id: string, @User() user: IUser) {
     return this.subscribersService.remove(id, user);
   }
@@ -66,7 +66,7 @@ export class SubscribersController {
     summary: 'Get subscriber skills by email',
     description: 'Retrieves the skills associated with the authenticated subscriber.',
   })
-  @ResponseMessage('Get subscriber skills by email')
+  @ResponseMessage('Lấy kỹ năng đăng ký theo email thành công')
   getUserSkills(@User() user: IUser) {
     return this.subscribersService.getUserSkills(user);
   }
@@ -76,7 +76,7 @@ export class SubscribersController {
     summary: 'Get my subscriptions (alias)',
     description: 'Retrieves all active subscriptions of the authenticated user.',
   })
-  @ResponseMessage('Fetch my subscriptions')
+  @ResponseMessage('Lấy danh sách đăng ký nhận tin của bạn thành công')
   getMySubscriptions(@User() user: IUser) {
     return this.subscribersService.getMySubscriptions(user);
   }
@@ -87,7 +87,7 @@ export class SubscribersController {
     description:
       'Retrieves detailed information about a specific subscription owned by the authenticated user.',
   })
-  @ResponseMessage('Fetch subscriber by id')
+  @ResponseMessage('Lấy đăng ký nhận tin việc làm thành công')
   findOne(@Param('id') id: string, @User() user: IUser) {
     return this.subscribersService.findOne(id, user);
   }

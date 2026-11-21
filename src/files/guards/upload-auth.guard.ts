@@ -25,7 +25,7 @@ export class UploadAuthGuard implements CanActivate {
 
     if (!rawFolder || !ALLOWED_FOLDER_TYPES.includes(rawFolder)) {
       throw new BadRequestException(
-        `Invalid X-Folder-Type '${rawFolder}'. Allowed values: ${ALLOWED_FOLDER_TYPES.join(', ')}`,
+        `X-Folder-Type '${rawFolder}' không hợp lệ. Giá trị cho phép: ${ALLOWED_FOLDER_TYPES.join(', ')}`,
       );
     }
 
@@ -35,7 +35,7 @@ export class UploadAuthGuard implements CanActivate {
       const userRole = request.user?.role;
       if (!userRole || !policy.requiredRoles.includes(userRole)) {
         throw new ForbiddenException(
-          `Uploading to '${rawFolder}' requires one of the following roles: ${policy.requiredRoles.join(', ')}`,
+          `Tải lên '${rawFolder}' cần một trong các vai trò: ${policy.requiredRoles.join(', ')}`,
         );
       }
     }

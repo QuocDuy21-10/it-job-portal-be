@@ -6,7 +6,7 @@ export class SaveJobDto {
     description: 'ID of the job to save',
     example: '507f1f77bcf86cd799439011',
   })
-  @IsNotEmpty({ message: 'Job ID is required' })
-  @IsMongoId({ message: 'Invalid job ID format' })
+  @IsNotEmpty({ message: 'ID tin tuyển dụng là bắt buộc' })
+  @IsMongoId({ message: 'ID tin tuyển dụng không đúng định dạng' })
   jobId: string;
 }

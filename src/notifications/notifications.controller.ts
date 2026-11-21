@@ -16,7 +16,7 @@ export class NotificationsController {
     summary: 'Get my notifications',
     description: 'Retrieves paginated notifications for the authenticated user',
   })
-  @ResponseMessage('Notifications retrieved successfully')
+  @ResponseMessage('Lấy danh sách thông báo thành công')
   findAll(@Query() pagination: PaginationQueryDto, @Query() query: string, @User() user: IUser) {
     return this.notificationsService.findAllByUser(
       user._id,
@@ -31,7 +31,7 @@ export class NotificationsController {
     summary: 'Get unread notification count',
     description: 'Returns the number of unread notifications for the authenticated user',
   })
-  @ResponseMessage('Unread count retrieved successfully')
+  @ResponseMessage('Lấy số thông báo chưa đọc thành công')
   getUnreadCount(@User() user: IUser) {
     return this.notificationsService.getUnreadCount(user._id);
   }
@@ -41,7 +41,7 @@ export class NotificationsController {
     summary: 'Mark notification as read',
     description: 'Marks a specific notification as read',
   })
-  @ResponseMessage('Notification marked as read')
+  @ResponseMessage('Đã đánh dấu thông báo là đã đọc')
   markAsRead(@Param('id') id: string, @User() user: IUser) {
     return this.notificationsService.markAsRead(id, user._id);
   }
@@ -51,7 +51,7 @@ export class NotificationsController {
     summary: 'Mark all notifications as read',
     description: 'Marks all unread notifications as read for the authenticated user',
   })
-  @ResponseMessage('All notifications marked as read')
+  @ResponseMessage('Đã đánh dấu tất cả thông báo là đã đọc')
   markAllAsRead(@User() user: IUser) {
     return this.notificationsService.markAllAsRead(user._id);
   }
@@ -61,7 +61,7 @@ export class NotificationsController {
     summary: 'Delete notification',
     description: 'Soft deletes a notification',
   })
-  @ResponseMessage('Notification deleted successfully')
+  @ResponseMessage('Xoá thông báo thành công')
   remove(@Param('id') id: string, @User() user: IUser) {
     return this.notificationsService.remove(id, user);
   }

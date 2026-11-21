@@ -84,7 +84,7 @@ export class AuthGoogleService {
 
       const message = error instanceof Error ? error.message : 'Unknown error';
 
-      throw new BadRequestException(`Google authentication failed: ${message}`);
+      throw new BadRequestException(`Đăng nhập bằng Google thất bại: ${message}`);
     }
   }
 
@@ -102,11 +102,11 @@ export class AuthGoogleService {
       const payload = ticket.getPayload();
 
       if (!payload) {
-        throw new UnauthorizedException('Invalid Google token: No payload');
+        throw new UnauthorizedException('Token Google không hợp lệ');
       }
 
       if (!payload.email_verified) {
-        throw new UnauthorizedException('Google email not verified');
+        throw new UnauthorizedException('Email Google chưa được xác minh');
       }
 
       return {
@@ -116,8 +116,8 @@ export class AuthGoogleService {
         avatar: payload.picture,
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Invalid token';
-      throw new UnauthorizedException(`Google token verification failed: ${message}`);
+      const message = error instanceof Error ? error.message : 'Token không hợp lệ';
+      throw new UnauthorizedException(`Xác minh token Google thất bại: ${message}`);
     }
   }
 }

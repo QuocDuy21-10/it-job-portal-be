@@ -11,18 +11,18 @@ import {
 } from 'class-validator';
 
 export class CreateSkillDto {
-  @IsNotEmpty({ message: 'label is required' })
-  @IsString({ message: 'label must be a string' })
-  @MaxLength(100, { message: 'label is too long (max: 100 chars)' })
+  @IsNotEmpty({ message: 'label là bắt buộc' })
+  @IsString({ message: 'label phải là chuỗi' })
+  @MaxLength(100, { message: 'label quá dài (tối đa 100 ký tự)' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value))
   @ApiProperty({ example: 'Node.js', description: 'Canonical display label for the skill' })
   label: string;
 
   @IsOptional()
-  @IsArray({ message: 'aliases must be an array' })
-  @ArrayMaxSize(30, { message: 'Maximum 30 aliases allowed' })
-  @IsString({ each: true, message: 'Each alias must be a string' })
-  @MaxLength(100, { each: true, message: 'Alias is too long (max: 100 chars)' })
+  @IsArray({ message: 'aliases phải là mảng' })
+  @ArrayMaxSize(30, { message: 'Tối đa 30 tên gọi khác' })
+  @IsString({ each: true, message: 'Mỗi tên gọi khác phải là chuỗi' })
+  @MaxLength(100, { each: true, message: 'Tên gọi khác quá dài (tối đa 100 ký tự)' })
   @Transform(({ value }) => {
     if (!Array.isArray(value)) return value;
 
@@ -38,15 +38,15 @@ export class CreateSkillDto {
   aliases?: string[];
 
   @IsOptional()
-  @IsString({ message: 'category must be a string' })
-  @MaxLength(100, { message: 'category is too long (max: 100 chars)' })
+  @IsString({ message: 'category phải là chuỗi' })
+  @MaxLength(100, { message: 'category quá dài (tối đa 100 ký tự)' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value))
   @ApiPropertyOptional({ example: 'Backend', description: 'Optional skill taxonomy bucket' })
   category?: string;
 
   @IsOptional()
-  @IsString({ message: 'description must be a string' })
-  @MaxLength(500, { message: 'description is too long (max: 500 chars)' })
+  @IsString({ message: 'description phải là chuỗi' })
+  @MaxLength(500, { message: 'description quá dài (tối đa 500 ký tự)' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @ApiPropertyOptional({
     example: 'JavaScript runtime commonly used for backend development',
@@ -54,8 +54,8 @@ export class CreateSkillDto {
   })
   description?: string;
 
-  @IsNotEmpty({ message: 'isActive is required' })
-  @IsBoolean({ message: 'isActive must be a boolean' })
+  @IsNotEmpty({ message: 'isActive là bắt buộc' })
+  @IsBoolean({ message: 'isActive phải là true hoặc false' })
   @ApiProperty({
     example: true,
     default: true,

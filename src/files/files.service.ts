@@ -28,7 +28,7 @@ export class FilesService {
    */
   buildFileUrl(folderType: string, fileName: string): string {
     if (!fileName) {
-      throw new BadRequestException('File name is required');
+      throw new BadRequestException('Tên tệp là bắt buộc');
     }
     return `${this.baseUrl}/images/${folderType}/${fileName}`;
   }
@@ -40,13 +40,13 @@ export class FilesService {
    */
   processAvatarUpload(file: Express.Multer.File): string {
     if (!file) {
-      throw new BadRequestException('Avatar file is required');
+      throw new BadRequestException('Tệp ảnh đại diện là bắt buộc');
     }
 
     const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException(
-        'Only image files (JPEG, JPG, PNG, GIF, WEBP) are allowed for avatar',
+        'Ảnh đại diện chỉ chấp nhận tệp ảnh (JPEG, JPG, PNG, GIF, WEBP)',
       );
     }
 
@@ -65,7 +65,7 @@ export class FilesService {
     const safeFolderPattern = /^[a-zA-Z0-9_-]+$/;
 
     if (!safeNamePattern.test(fileName) || !safeFolderPattern.test(folderType)) {
-      throw new BadRequestException('Invalid file name or folder type');
+      throw new BadRequestException('Tên tệp hoặc loại thư mục không hợp lệ');
     }
 
     const baseDir = path.resolve(process.cwd(), 'public', 'images');
@@ -73,7 +73,7 @@ export class FilesService {
 
     // Defense-in-depth: ensure resolved path stays within baseDir
     if (!filePath.startsWith(baseDir + path.sep)) {
-      throw new BadRequestException('Invalid file path');
+      throw new BadRequestException('Đường dẫn tệp không hợp lệ');
     }
 
     try {
@@ -96,7 +96,7 @@ export class FilesService {
    */
   async assertImageContent(file: Express.Multer.File): Promise<void> {
     if (!file) {
-      throw new BadRequestException('File is required');
+      throw new BadRequestException('Tệp là bắt buộc');
     }
 
     const header = Buffer.alloc(IMAGE_SIGNATURE_BYTES);
@@ -113,7 +113,7 @@ export class FilesService {
         .catch(err =>
           this.logger.warn(`Could not delete rejected upload ${file.path}: ${err.message}`),
         );
-      throw new UnprocessableEntityException('File content does not match its declared type');
+      throw new UnprocessableEntityException('Nội dung tệp không khớp với loại tệp đã khai báo');
     }
   }
 
@@ -136,7 +136,7 @@ export class FilesService {
   ): Promise<Array<{ fileName: string; ageInMs: number }>> {
     const safeFolderPattern = /^[a-zA-Z0-9_-]+$/;
     if (!safeFolderPattern.test(folderType)) {
-      throw new BadRequestException('Invalid folder type');
+      throw new BadRequestException('Loại thư mục không hợp lệ');
     }
 
     const dirPath = path.resolve(process.cwd(), 'public', 'images', folderType);

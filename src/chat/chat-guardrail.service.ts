@@ -20,9 +20,7 @@ export enum ChatGuardrailRiskLevel {
 
 export class ChatGuardrailBlockedException extends BadRequestException {
   constructor(readonly flags: string[]) {
-    super(
-      'Tin nhắn có chứa chỉ thị mà chatbot không thể xử lý. / Your message appears to contain instructions that cannot be processed by the chatbot.',
-    );
+    super('Tin nhắn có chứa chỉ thị mà chatbot không thể xử lý.');
   }
 }
 
@@ -111,13 +109,11 @@ export class ChatGuardrailService {
     const inspection = this.inspectMessage(sanitizedMessage);
 
     if (!sanitizedMessage) {
-      throw new BadRequestException('Tin nhắn không được để trống. / Message cannot be empty');
+      throw new BadRequestException('Tin nhắn không được để trống.');
     }
 
     if (!/[\p{L}\p{N}]/u.test(sanitizedMessage)) {
-      throw new BadRequestException(
-        'Tin nhắn cần có chữ hoặc số. / Message must contain some text',
-      );
+      throw new BadRequestException('Tin nhắn cần có chữ hoặc số.');
     }
 
     if (inspection.riskLevel === ChatGuardrailRiskLevel.HIGH) {

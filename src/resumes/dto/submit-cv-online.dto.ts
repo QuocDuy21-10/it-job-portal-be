@@ -10,7 +10,7 @@ export class SubmitCvOnlineDto {
     description: 'ID of the job to apply for',
     example: '507f1f77bcf86cd799439011',
   })
-  @IsNotEmpty({ message: 'Job ID is required' })
-  @IsMongoId({ message: 'Job ID must be a valid MongoDB ObjectId' })
+  @IsNotEmpty({ message: 'ID tin tuyển dụng là bắt buộc' })
+  @IsMongoId({ message: 'ID tin tuyển dụng không hợp lệ' })
   jobId: string;
 }

@@ -82,7 +82,7 @@ describe('UsersController', () => {
     const result = await controller.saveJob({ jobId }, currentUser);
 
     expect(mockUsersService.saveJob).toHaveBeenCalledWith(currentUser._id, jobId);
-    expect(result).toEqual({ message: 'Job saved successfully' });
+    expect(result).toEqual({ message: 'Lưu tin tuyển dụng thành công' });
   });
 
   it('should unsave a job and return the explicit success body', async () => {
@@ -92,7 +92,7 @@ describe('UsersController', () => {
     const result = await controller.unsaveJob({ jobId }, currentUser);
 
     expect(mockUsersService.unsaveJob).toHaveBeenCalledWith(currentUser._id, jobId);
-    expect(result).toEqual({ message: 'Job unsaved successfully' });
+    expect(result).toEqual({ message: 'Bỏ lưu tin tuyển dụng thành công' });
   });
 
   it('should use default pagination values for saved jobs', async () => {
@@ -112,7 +112,7 @@ describe('UsersController', () => {
     const result = await controller.followCompany({ companyId: followedCompanyId }, currentUser);
 
     expect(mockUsersService.followCompany).toHaveBeenCalledWith(currentUser._id, followedCompanyId);
-    expect(result).toEqual({ message: 'Company followed successfully' });
+    expect(result).toEqual({ message: 'Theo dõi công ty thành công' });
   });
 
   it('should unfollow a company and return the explicit success body', async () => {
@@ -128,7 +128,7 @@ describe('UsersController', () => {
       currentUser._id,
       unfollowedCompanyId,
     );
-    expect(result).toEqual({ message: 'Company unfollowed successfully' });
+    expect(result).toEqual({ message: 'Bỏ theo dõi công ty thành công' });
   });
 
   it('should forward getFollowingCompanies to the service', async () => {

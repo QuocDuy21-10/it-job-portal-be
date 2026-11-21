@@ -6,13 +6,13 @@ import { lowerCaseTransformer } from 'src/utils/transformer/lower-case.transform
 export class AuthEmailLoginDto {
   @ApiProperty({ example: 'admin@gmail.com', description: 'Email' })
   @Transform(lowerCaseTransformer)
-  @IsString({ message: 'Email must be a string' })
-  @IsNotEmpty({ message: 'Email is required' })
-  @IsEmail({}, { message: 'Email must be a valid email' })
+  @IsString({ message: 'Email phải là chuỗi' })
+  @IsNotEmpty({ message: 'Email là bắt buộc' })
+  @IsEmail({}, { message: 'Email không hợp lệ' })
   email: string;
 
-  @IsString({ message: 'password must be a string' })
-  @IsNotEmpty({ message: 'password is required' })
+  @IsString({ message: 'Mật khẩu phải là chuỗi' })
+  @IsNotEmpty({ message: 'Mật khẩu là bắt buộc' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @ApiProperty({
     example: '123456',
