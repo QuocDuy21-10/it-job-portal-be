@@ -661,7 +661,7 @@ describe('ChatService', () => {
         metadata: { provider: 'groq', model: 'llama' },
       });
 
-      const result = await service.sendMessage(user as any, 'show backend jobs');
+      const result = await service.sendMessage(user as any, 'Hãy lưu job này giúp tôi');
 
       expect(mockChatToolActionService.createSaveJobActions).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -670,6 +670,42 @@ describe('ChatService', () => {
         }),
       );
       expect(result.pendingToolActions).toEqual([pendingAction]);
+    });
+
+    it('does not create save-job actions when the user never asked to save', async () => {
+      mockAIService.generateChat.mockResolvedValue({
+        text: 'Một lưu ý nhỏ: hãy cập nhật CV trước khi nộp.',
+        recommendedJobIds: ['job-1'],
+        provider: 'groq',
+        metadata: { provider: 'groq', model: 'llama' },
+      });
+
+      const result = await service.sendMessage(user as any, 'show backend jobs');
+
+      expect(mockChatToolActionService.createSaveJobActions).not.toHaveBeenCalled();
+      expect(result.pendingToolActions).toBeUndefined();
+    });
+
+    it('flags an answer that repeats the previous one for a different question', async () => {
+      // getPromptHistory sorts newest first and reverses, so supply newest first.
+      setupPromptHistory([
+        { role: 'assistant', content: 'Node.js là môi trường chạy JavaScript.' },
+        { role: 'user', content: 'Node.js là gì?' },
+      ]);
+      mockAIService.generateChat.mockResolvedValue({
+        text: 'Node.js là môi trường chạy JavaScript.',
+        recommendedJobIds: [],
+        provider: 'groq',
+        metadata: { provider: 'groq', model: 'llama' },
+      });
+
+      await service.sendMessage(user as any, 'Docker là gì?');
+
+      expect(mockAiUsageService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          guardrailFlags: expect.arrayContaining(['duplicate_of_previous_answer']),
+        }),
+      );
     });
   });
 
