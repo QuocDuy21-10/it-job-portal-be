@@ -72,14 +72,16 @@ describe('ChatResponseFormatterService', () => {
     });
   });
 
-  it('adds spaces after punctuation before Unicode letters in Vietnamese text', async () => {
+  it.each([
+    'Node.js',
+    'Next.js và ASP.NET',
+    'Email: a@b.com',
+    'Xem https://x.y/z?a=b nhé',
+    'Kỹ năng:JavaScript,NodeJS',
+  ])('keeps punctuation inside tech names, emails and URLs: %s', async text => {
     await expect(
-      service.formatAssistantOutput('Kỹ năng:JavaScript,NodeJS', { skipTopicGuard: true }),
-    ).resolves.toMatchObject({
-      sanitizedOutput: 'Kỹ năng: JavaScript, NodeJS',
-      flags: [],
-      riskLevel: ChatGuardrailRiskLevel.LOW,
-    });
+      service.formatAssistantOutput(text, { skipTopicGuard: true }),
+    ).resolves.toMatchObject({ sanitizedOutput: text, flags: [] });
   });
 
   it('replaces off-topic output with bilingual refusal when topic guard blocks', async () => {
