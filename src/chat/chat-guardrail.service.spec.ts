@@ -40,6 +40,18 @@ describe('ChatGuardrailService', () => {
     expect(() => service.validateMessage('\x00\x08')).toThrow(BadRequestException);
   });
 
+  it('rejects messages with no letters or digits', () => {
+    expect(() => service.validateMessage('🚀🔥💼👩‍💻')).toThrow('Message must contain some text');
+    expect(() => service.validateMessage(' ?!... ')).toThrow('Message must contain some text');
+  });
+
+  it('keeps messages that have at least one letter or digit', () => {
+    expect(service.validateMessage('Node.js').sanitizedMessage).toBe('Node.js');
+    expect(service.validateMessage('C#').sanitizedMessage).toBe('C#');
+    expect(service.validateMessage('🚀 React').sanitizedMessage).toBe('🚀 React');
+    expect(service.validateMessage('2024').sanitizedMessage).toBe('2024');
+  });
+
   it('sanitizes unsafe assistant output and reports audit flags', () => {
     expect(
       service.sanitizeAssistantOutput('<script>alert(1)</script>[open](javascript:bad)'),
