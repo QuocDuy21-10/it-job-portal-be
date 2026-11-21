@@ -52,7 +52,7 @@ describe('CvProfilesService', () => {
       getUserIdentity: jest.fn().mockResolvedValue(userIdentity),
       assertCvEmailMatchesUser: jest.fn((incomingEmail?: string, userEmail?: string) => {
         if (incomingEmail && incomingEmail.trim().toLowerCase() !== userEmail) {
-          throw new BadRequestException('CV profile email must match the account email');
+          throw new BadRequestException('Email trong hồ sơ CV phải trùng với email tài khoản');
         }
       }),
       syncUserIdentityFromCv: jest.fn(),

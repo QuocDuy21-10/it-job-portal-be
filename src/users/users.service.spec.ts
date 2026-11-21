@@ -165,7 +165,7 @@ describe('UsersService', () => {
           },
           actingUser,
         ),
-      ).rejects.toThrow('Email already exists in the system. Please use another email.');
+      ).rejects.toThrow('Email đã tồn tại trong hệ thống. Vui lòng dùng email khác.');
 
       expect(mockUserRepository.create).not.toHaveBeenCalled();
     });
@@ -241,7 +241,7 @@ describe('UsersService', () => {
           password: 'StrongPass1!',
           acceptTerms: true,
         }),
-      ).rejects.toThrow('Email already exists in the system. Please use another email.');
+      ).rejects.toThrow('Email đã tồn tại trong hệ thống. Vui lòng dùng email khác.');
     });
   });
 
@@ -434,7 +434,7 @@ describe('UsersService', () => {
       mockUserRepository.findWithSelect.mockResolvedValue(null);
 
       await expect(service.update(id, { name: 'Missing User' } as any, actingUser)).rejects.toThrow(
-        'User not found',
+        'Không tìm thấy người dùng',
       );
 
       expect(mockUserRepository.updateOne).not.toHaveBeenCalled();
@@ -448,7 +448,7 @@ describe('UsersService', () => {
 
       await expect(
         service.update(actingUser._id, { role: ERole.NORMAL_USER } as any, actingUser),
-      ).rejects.toThrow('You cannot change your own role');
+      ).rejects.toThrow('Bạn không thể tự đổi vai trò của mình');
 
       expect(mockUserRepository.updateOne).not.toHaveBeenCalled();
     });
@@ -572,7 +572,7 @@ describe('UsersService', () => {
       mockUserRepository.updateOne.mockResolvedValue({ matchedCount: 0 } as any);
 
       await expect(service.update(id, { name: 'Updated Name' } as any, actingUser)).rejects.toThrow(
-        'User not found',
+        'Không tìm thấy người dùng',
       );
       expect(mockProfileIdentitySyncService.syncCvIdentityFromUser).not.toHaveBeenCalled();
     });
@@ -586,7 +586,7 @@ describe('UsersService', () => {
 
       await expect(
         service.update(id, { email: 'other@example.com' } as any, actingUser),
-      ).rejects.toThrow('Email cannot be updated through this endpoint');
+      ).rejects.toThrow('Không thể đổi email qua API này');
 
       expect(mockUserRepository.updateOne).not.toHaveBeenCalled();
       expect(mockProfileIdentitySyncService.syncCvIdentityFromUser).not.toHaveBeenCalled();
@@ -634,7 +634,9 @@ describe('UsersService', () => {
       mockConfigService.get.mockReturnValue('admin@example.com');
       mockUserRepository.findWithSelect.mockResolvedValue({ email: 'admin@example.com' } as any);
 
-      await expect(service.remove(id, actingUser)).rejects.toThrow('Cannot delete admin account');
+      await expect(service.remove(id, actingUser)).rejects.toThrow(
+        'Không thể xoá tài khoản quản trị viên',
+      );
 
       expect(mockUserRepository.softDeleteById).not.toHaveBeenCalled();
     });
@@ -662,7 +664,7 @@ describe('UsersService', () => {
 
     it('should reject self deletion', async () => {
       await expect(service.bulkRemove([actingUser._id, firstId], actingUser)).rejects.toThrow(
-        'You cannot delete your own account',
+        'Bạn không thể xoá tài khoản của chính mình',
       );
 
       expect(mockUserRepository.bulkSoftDelete).not.toHaveBeenCalled();
@@ -673,7 +675,7 @@ describe('UsersService', () => {
       mockUserRepository.findOneWithSelect.mockResolvedValue({ _id: secondId } as any);
 
       await expect(service.bulkRemove([firstId, secondId], actingUser)).rejects.toThrow(
-        'Cannot delete the admin account',
+        'Không thể xoá tài khoản quản trị viên',
       );
 
       expect(mockUserRepository.bulkSoftDelete).not.toHaveBeenCalled();
@@ -766,7 +768,7 @@ describe('UsersService', () => {
     it('should reject when user is not found', async () => {
       mockUserRepository.findUserProfile.mockResolvedValue(null);
 
-      await expect(service.findUserProfile(userId)).rejects.toThrow('User not found');
+      await expect(service.findUserProfile(userId)).rejects.toThrow('Không tìm thấy người dùng');
     });
 
     it('should reject inactive users', async () => {
@@ -775,7 +777,7 @@ describe('UsersService', () => {
       );
 
       await expect(service.findUserProfile(userId)).rejects.toThrow(
-        'Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ admin.',
+        'Tài khoản đã bị vô hiệu hoá. Vui lòng liên hệ quản trị viên.',
       );
     });
 
@@ -791,7 +793,7 @@ describe('UsersService', () => {
       mockUserRepository.findUserProfile.mockResolvedValue(makeProfileDoc({ role: null }) as any);
 
       await expect(service.findUserProfile(userId)).rejects.toThrow(
-        'Role không hợp lệ. Vui lòng liên hệ admin.',
+        'Vai trò không hợp lệ. Vui lòng liên hệ quản trị viên.',
       );
     });
 

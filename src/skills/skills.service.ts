@@ -84,7 +84,7 @@ export class SkillsService {
       .lean()
       .exec();
     if (!skill) {
-      throw new NotFoundException(`Skill with id ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy kỹ năng có id ${id}`);
     }
 
     return skill;
@@ -97,7 +97,7 @@ export class SkillsService {
       .findOne({ _id: id, isDeleted: { $ne: true } })
       .exec();
     if (!existingSkill) {
-      throw new NotFoundException(`Skill with id ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy kỹ năng có id ${id}`);
     }
 
     const payload = this.buildSkillPayload({
@@ -129,7 +129,7 @@ export class SkillsService {
       .findOne({ _id: id, isDeleted: { $ne: true } })
       .lean();
     if (!existingSkill) {
-      throw new NotFoundException(`Skill with id ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy kỹ năng có id ${id}`);
     }
 
     await this.skillModel.updateOne(
@@ -271,7 +271,7 @@ export class SkillsService {
 
     if (unknownSkills.length > 0) {
       throw new BadRequestException(
-        `Unknown skills: ${unknownSkills.join(', ')}. Please use active skills from the catalog.`,
+        `Kỹ năng không có trong danh mục: ${unknownSkills.join(', ')}. Vui lòng chọn kỹ năng trong danh mục.`,
       );
     }
 
@@ -324,7 +324,7 @@ export class SkillsService {
 
     if (duplicate) {
       throw new BadRequestException(
-        `Skill '${label}' conflicts with existing catalog entry '${duplicate.label}'.`,
+        `Kỹ năng '${label}' trùng với kỹ năng đã có '${duplicate.label}'.`,
       );
     }
   }
@@ -375,7 +375,7 @@ export class SkillsService {
 
   private validateObjectId(id: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestException(`Not found Skill with id = ${id}`);
+      throw new BadRequestException(`Không tìm thấy kỹ năng có id = ${id}`);
     }
   }
 

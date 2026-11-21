@@ -78,9 +78,7 @@ export class CvProfilesController {
         ];
         if (!allowedMimeTypes.includes(file.mimetype)) {
           cb(
-            new BadRequestException(
-              'Only image files (JPEG, PNG, GIF, WEBP) are allowed for avatar',
-            ),
+            new BadRequestException('Ảnh đại diện chỉ chấp nhận tệp ảnh (JPEG, PNG, GIF, WEBP)'),
             false,
           );
         } else {
@@ -147,7 +145,7 @@ export class CvProfilesController {
     schema: {
       example: {
         statusCode: 200,
-        message: 'CV Profile saved successfully',
+        message: 'Lưu hồ sơ CV thành công',
         data: {
           _id: '507f1f77bcf86cd799439011',
           userId: '507f1f77bcf86cd799439012',
@@ -173,7 +171,7 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
-  @ResponseMessage('CV Profile saved successfully')
+  @ResponseMessage('Lưu hồ sơ CV thành công')
   async upsertCvProfile(
     @User() user: IUser,
     @Body('cvData') cvDataString: string,
@@ -184,7 +182,7 @@ export class CvProfilesController {
     try {
       cvData = JSON.parse(cvDataString);
     } catch {
-      throw new BadRequestException('Invalid JSON format for cvData field');
+      throw new BadRequestException('Trường cvData không đúng định dạng JSON');
     }
 
     // Process avatar upload if provided
@@ -219,7 +217,7 @@ export class CvProfilesController {
     schema: {
       example: {
         statusCode: 200,
-        message: 'CV Profile retrieved successfully',
+        message: 'Lấy hồ sơ CV thành công',
         data: {
           _id: '507f1f77bcf86cd799439011',
           userId: '507f1f77bcf86cd799439012',
@@ -240,7 +238,7 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
-  @ResponseMessage('CV Profile retrieved successfully')
+  @ResponseMessage('Lấy hồ sơ CV thành công')
   async getCurrentUserCv(@User() user: IUser) {
     const cvProfile = await this.cvProfilesService.getCurrentUserCv(user._id, {
       includeDraft: true,
@@ -264,7 +262,7 @@ export class CvProfilesController {
     schema: {
       example: {
         statusCode: 200,
-        message: 'CV Profile check completed',
+        message: 'Đã kiểm tra hồ sơ CV',
         data: {
           exists: true,
         },
@@ -275,7 +273,7 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
-  @ResponseMessage('CV Profile check completed')
+  @ResponseMessage('Đã kiểm tra hồ sơ CV')
   async checkCvProfileExists(@User() user: IUser) {
     const exists = await this.cvProfilesService.hasCvProfile(user._id);
 
@@ -309,7 +307,7 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
-  @ResponseMessage('CV Profile updated successfully')
+  @ResponseMessage('Cập nhật hồ sơ CV thành công')
   async updateCurrentUserCv(@User() user: IUser, @Body() updateCvProfileDto: CreateCvProfileDto) {
     const cvProfile = await this.cvProfilesService.upsertCvProfile(user._id, updateCvProfileDto);
 
@@ -344,7 +342,7 @@ export class CvProfilesController {
 
     return {
       statusCode: HttpStatus.NO_CONTENT,
-      message: 'CV Profile deleted successfully',
+      message: 'Xoá hồ sơ CV thành công',
     };
   }
 
@@ -364,7 +362,7 @@ export class CvProfilesController {
     schema: {
       example: {
         statusCode: 200,
-        message: 'CV Profile deactivated successfully',
+        message: 'Tắt hồ sơ CV thành công',
         data: {
           _id: '507f1f77bcf86cd799439011',
           isActive: false,
@@ -381,7 +379,7 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
-  @ResponseMessage('CV Profile deactivated successfully')
+  @ResponseMessage('Tắt hồ sơ CV thành công')
   async deactivateCvProfile(@User() user: IUser) {
     const cvProfile = await this.cvProfilesService.deactivateCvProfile(user._id);
 
@@ -404,7 +402,7 @@ export class CvProfilesController {
     schema: {
       example: {
         statusCode: 200,
-        message: 'CV Profile activated successfully',
+        message: 'Kích hoạt hồ sơ CV thành công',
         data: {
           _id: '507f1f77bcf86cd799439011',
           isActive: true,
@@ -421,7 +419,7 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
-  @ResponseMessage('CV Profile activated successfully')
+  @ResponseMessage('Kích hoạt hồ sơ CV thành công')
   async activateCvProfile(@User() user: IUser) {
     const cvProfile = await this.cvProfilesService.activateCvProfile(user._id);
 
@@ -459,7 +457,7 @@ export class CvProfilesController {
     status: 401,
     description: 'Unauthorized - Invalid or missing JWT token',
   })
-  @ResponseMessage('CV Profile retrieved successfully')
+  @ResponseMessage('Lấy hồ sơ CV thành công')
   async getCvProfileById(@Param('id') id: string) {
     const cvProfile = await this.cvProfilesService.findById(id);
 
@@ -482,7 +480,7 @@ export class CvProfilesController {
     schema: {
       example: {
         statusCode: 200,
-        message: 'CV Profiles retrieved successfully',
+        message: 'Lấy danh sách hồ sơ CV thành công',
         data: [
           {
             _id: '507f1f77bcf86cd799439011',
@@ -520,7 +518,7 @@ export class CvProfilesController {
     status: 403,
     description: 'Forbidden - Admin access required',
   })
-  @ResponseMessage('CV Profiles retrieved successfully')
+  @ResponseMessage('Lấy danh sách hồ sơ CV thành công')
   async getAllCvProfiles(@Query() pagination: PaginationQueryDto) {
     const { page: pageNum, limit: limitNum } = resolvePagination(pagination.page, pagination.limit);
 

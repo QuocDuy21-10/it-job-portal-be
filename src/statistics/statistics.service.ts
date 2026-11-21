@@ -101,7 +101,7 @@ export class StatisticsService {
 
   async getHrDashboardStats(companyId?: string): Promise<HrDashboardStatsDto> {
     if (!companyId) {
-      throw new ForbiddenException('HR user must be associated with a company');
+      throw new ForbiddenException('Tài khoản HR phải được gắn với một công ty');
     }
 
     const startTime = Date.now();

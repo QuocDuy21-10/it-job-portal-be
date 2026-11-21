@@ -41,7 +41,7 @@ export class FilesController {
       `Allowed values: ${Object.values(UploadFolderType).join(', ')}. ` +
       `Uploading to 'company' requires HR or SUPER_ADMIN role.`,
   })
-  @ResponseMessage('Upload single file')
+  @ResponseMessage('Tải tệp lên thành công')
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: CreateFileDto })
   @ApiHeader({
@@ -67,7 +67,7 @@ export class FilesController {
     summary: 'Delete a previously uploaded file',
     description: 'Requires SUPER_ADMIN role.',
   })
-  @ResponseMessage('Delete file')
+  @ResponseMessage('Xoá tệp thành công')
   @ApiResponse({ status: 200, description: 'File deleted successfully.' })
   async deleteFile(@Body() deleteFileDto: DeleteFileDto) {
     await this.filesService.deleteFile(deleteFileDto.folderType, deleteFileDto.fileName);

@@ -28,7 +28,7 @@ export class StatisticsController {
     status: 401,
     description: 'Unauthorized - Invalid or missing token',
   })
-  @ResponseMessage('Get admin dashboard statistics')
+  @ResponseMessage('Lấy thống kê dashboard quản trị thành công')
   async getAdminDashboardStats(): Promise<AdminDashboardStatsDto> {
     return this.statisticsService.getAdminDashboardStats();
   }
@@ -49,7 +49,7 @@ export class StatisticsController {
     status: 403,
     description: 'Forbidden - HR account is not associated with a company',
   })
-  @ResponseMessage('Get HR dashboard statistics')
+  @ResponseMessage('Lấy thống kê dashboard HR thành công')
   async getHrDashboardStats(@User() user: IUser): Promise<HrDashboardStatsDto> {
     return this.statisticsService.getHrDashboardStats(user.company?._id);
   }

@@ -23,7 +23,7 @@ export class CompaniesController {
     description:
       'API to create a new company with information including: name, address, description and logo. Requires admin or HR privileges.',
   })
-  @ResponseMessage('Create a new company')
+  @ResponseMessage('Tạo công ty thành công')
   create(@Body() createCompanyDto: CreateCompanyDto, @User() user: IUser) {
     return this.companiesService.create(createCompanyDto, user);
   }
@@ -35,7 +35,7 @@ export class CompaniesController {
     description:
       'Manually trigger cleanup of orphaned company logo files from disk. Deletes files older than 24h that are not referenced by any company. Requires admin privileges.',
   })
-  @ResponseMessage('Orphaned logo cleanup completed')
+  @ResponseMessage('Đã dọn các logo không còn sử dụng')
   cleanupOrphanedLogos() {
     return this.companiesService.cleanupOrphanedLogos();
   }
@@ -47,7 +47,7 @@ export class CompaniesController {
     description:
       'Public API to get a list of all companies with pagination and search. Does not require authentication.',
   })
-  @ResponseMessage('Get list companies')
+  @ResponseMessage('Lấy danh sách công ty thành công')
   findAll(@Query() pagination: PaginationQueryDto, @Query() query: string, @User() user: IUser) {
     return this.companiesService.findAll(pagination.page, pagination.limit, query, user);
   }
@@ -66,7 +66,7 @@ export class CompaniesController {
     description: 'Maximum number of companies to return (default: 8, max: 12)',
     example: 8,
   })
-  @ResponseMessage('Get top hiring companies')
+  @ResponseMessage('Lấy danh sách công ty tuyển dụng nhiều nhất thành công')
   findTopHiringCompanies(
     @Query() query: TopHiringCompaniesQueryDto,
   ): Promise<TopHiringCompanyDto[]> {
@@ -80,7 +80,7 @@ export class CompaniesController {
     description:
       'Public API to get detailed information of a company based on ID. Does not require authentication.',
   })
-  @ResponseMessage('Get company by id')
+  @ResponseMessage('Lấy thông tin công ty thành công')
   findOne(@Param('id') id: string, @User() user: IUser) {
     return this.companiesService.findOne(id, user);
   }
@@ -93,7 +93,7 @@ export class CompaniesController {
       'API to update information of a company based on ID. Can update one or more fields. Requires admin or HR privileges.',
   })
   @ApiBody({ type: UpdateCompanyDto })
-  @ResponseMessage('Update company by id')
+  @ResponseMessage('Cập nhật công ty thành công')
   update(@Param('id') id: string, @Body() updateCompanyDto: UpdateCompanyDto, @User() user: IUser) {
     return this.companiesService.update(id, updateCompanyDto, user);
   }
@@ -105,7 +105,7 @@ export class CompaniesController {
     description:
       'Soft deletes multiple companies by IDs (max 100). Also deactivates all active jobs associated with the deleted companies.',
   })
-  @ResponseMessage('Bulk delete companies')
+  @ResponseMessage('Xoá nhiều công ty thành công')
   bulkRemove(@Body() bulkDeleteDto: BulkDeleteDto, @User() user: IUser) {
     return this.companiesService.bulkRemove(bulkDeleteDto.ids, user);
   }
@@ -117,7 +117,7 @@ export class CompaniesController {
     description:
       'API to delete a company based on ID. Performs soft delete (sets isDeleted = true). Requires admin privileges.',
   })
-  @ResponseMessage('Delete company by id')
+  @ResponseMessage('Xoá công ty thành công')
   remove(@Param('id') id: string, @User() user: IUser) {
     return this.companiesService.remove(id, user);
   }

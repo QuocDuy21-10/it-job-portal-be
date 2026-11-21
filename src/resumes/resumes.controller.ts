@@ -58,7 +58,7 @@ export class ResumesController {
   @ApiOperation({
     description: 'Creates a new resume with the provided information. Requires authentication.',
   })
-  @ResponseMessage('Resume created successfully')
+  @ResponseMessage('Tạo hồ sơ ứng tuyển thành công')
   create(@Body() createUserCvDto: CreateUserCvDto, @User() user: IUser) {
     return this.resumesService.create(createUserCvDto, user);
   }
@@ -69,7 +69,7 @@ export class ResumesController {
     summary: 'Get all resumes',
     description: 'Retrieves a paginated list of all resumes. Supports filtering and sorting.',
   })
-  @ResponseMessage('Resumes have been retrieved successfully')
+  @ResponseMessage('Lấy danh sách hồ sơ ứng tuyển thành công')
   findAll(@Query() pagination: PaginationQueryDto, @Query() query: string, @User() user: IUser) {
     return this.resumesService.findAll(pagination.page, pagination.limit, query, user);
   }
@@ -80,7 +80,7 @@ export class ResumesController {
     summary: 'Get resume by ID',
     description: 'Retrieves detailed information about a specific resume by its ID',
   })
-  @ResponseMessage('Resume has been retrieved successfully')
+  @ResponseMessage('Lấy hồ sơ ứng tuyển thành công')
   findOne(@Param('id') id: string, @User() user: IUser) {
     return this.resumesService.findOne(id, user);
   }
@@ -92,7 +92,7 @@ export class ResumesController {
     description:
       'Updates an existing resume. Only the fields provided will be updated. Requires authentication.',
   })
-  @ResponseMessage('Resume updated status successfully')
+  @ResponseMessage('Cập nhật trạng thái hồ sơ ứng tuyển thành công')
   update(@Param('id') id: string, @Body() updateResumeDto: UpdateResumeDto, @User() user: IUser) {
     return this.resumesService.update(id, updateResumeDto, user);
   }
@@ -104,7 +104,7 @@ export class ResumesController {
     description:
       'Soft deletes multiple resumes by IDs (max 100). HR can only delete resumes belonging to their own company.',
   })
-  @ResponseMessage('Bulk delete resumes')
+  @ResponseMessage('Xoá nhiều hồ sơ ứng tuyển thành công')
   bulkRemove(@Body() bulkDeleteDto: BulkDeleteDto, @User() user: IUser) {
     return this.resumesService.bulkRemove(bulkDeleteDto.ids, user);
   }
@@ -116,7 +116,7 @@ export class ResumesController {
     description:
       'Soft deletes a resume. The resume will be marked as deleted but not removed from database. Requires authentication.',
   })
-  @ResponseMessage('Resume deleted successfully')
+  @ResponseMessage('Xoá hồ sơ ứng tuyển thành công')
   remove(@Param('id') id: string, @User() user: IUser) {
     return this.resumesService.remove(id, user);
   }
@@ -128,7 +128,7 @@ export class ResumesController {
     summary: 'Get resume by user',
     description: 'Retrieves resume associated with the authenticated user.',
   })
-  @ResponseMessage('Resume has been retrieved successfully')
+  @ResponseMessage('Lấy hồ sơ ứng tuyển thành công')
   getResumeByUser(@User() user: IUser) {
     return this.resumesService.getResumeByUser(user);
   }
@@ -140,7 +140,7 @@ export class ResumesController {
     summary: 'Get resume of user',
     description: 'Gets the resume associated with the authenticated user.',
   })
-  @ResponseMessage('Resume has been retrieved successfully')
+  @ResponseMessage('Lấy hồ sơ ứng tuyển thành công')
   getResumeOfMe(@User() user: IUser) {
     return this.resumesService.getResumeOfMe(user);
   }
@@ -154,7 +154,7 @@ export class ResumesController {
     description:
       'Apply for a job using your pre-created structured CV profile. The system will automatically calculate match score and create application.',
   })
-  @ResponseMessage('CV submitted successfully')
+  @ResponseMessage('Nộp CV thành công')
   async submitCvOnline(@Body() submitCvOnlineDto: SubmitCvOnlineDto, @User() user: IUser) {
     const result = await this.applicationSubmissionService.submitCvOnline(submitCvOnlineDto, user);
 
@@ -199,7 +199,7 @@ export class ResumesController {
         if (!allowedFileTypes.includes(fileExtension)) {
           cb(
             new BadRequestException(
-              `Invalid file type: ${fileExtension}. Only PDF, DOC, DOCX, and TXT are allowed.`,
+              `Loại tệp không hợp lệ: ${fileExtension}. Chỉ chấp nhận PDF, DOC, DOCX và TXT.`,
             ),
             false,
           );
@@ -229,7 +229,7 @@ export class ResumesController {
       required: ['file', 'jobId'],
     },
   })
-  @ResponseMessage('CV uploaded and queued for processing')
+  @ResponseMessage('Đã tải CV lên và đưa vào hàng đợi xử lý')
   async uploadCV(
     @UploadedFile() file: Express.Multer.File,
     @Body() uploadCvDto: UploadCvDto,
@@ -290,7 +290,7 @@ export class ResumesController {
     summary: 'Get CV analysis results',
     description: 'Retrieve parsed data and AI matching analysis for a resume',
   })
-  @ResponseMessage('Analysis results retrieved successfully')
+  @ResponseMessage('Lấy kết quả phân tích thành công')
   async getAnalysis(@Param('id') id: string, @User() user: IUser) {
     const resume = await this.resumesService.findOneForRead(id, user);
     const canSeeNotes = user.role === ERole.SUPER_ADMIN || user.role === ERole.HR;
@@ -323,7 +323,7 @@ export class ResumesController {
     summary: 'Get queue processing statistics',
     description: 'View current status of CV processing queue (Admin only)',
   })
-  @ResponseMessage('Queue statistics retrieved')
+  @ResponseMessage('Lấy thống kê hàng đợi thành công')
   async getQueueStats() {
     return await this.resumeQueueService.getQueueStats();
   }
@@ -334,12 +334,12 @@ export class ResumesController {
     summary: 'Re-parse a CV',
     description: 'Trigger re-parsing of an already uploaded CV',
   })
-  @ResponseMessage('Re-parsing queued successfully')
+  @ResponseMessage('Đã đưa yêu cầu đọc lại vào hàng đợi')
   async reparseCV(@Param('id') id: string, @User() user: IUser) {
     const resume = await this.resumesService.findOne(id, user);
 
     if (!resume.url) {
-      throw new BadRequestException('No CV file found for this resume');
+      throw new BadRequestException('Hồ sơ ứng tuyển này không có tệp CV');
     }
 
     const job = await this.resumeQueueService.addParseResumeJob({
@@ -347,7 +347,7 @@ export class ResumesController {
       jobId: resume.jobId.toString(),
     });
 
-    return { resumeId: id, jobId: job.id, message: 'CV re-parsing has been queued' };
+    return { resumeId: id, jobId: job.id, message: 'Đã đưa yêu cầu đọc lại CV vào hàng đợi' };
   }
 
   @Post(':id/reanalyze')
@@ -358,14 +358,14 @@ export class ResumesController {
     summary: 'Re-analyze a CV',
     description: 'Trigger re-analysis of a parsed CV against the job',
   })
-  @ResponseMessage('Re-analysis queued successfully')
+  @ResponseMessage('Đã đưa yêu cầu phân tích lại vào hàng đợi')
   async reanalyzeCV(@Param('id') id: string, @User() user: IUser) {
     // Company scope check first; validateResumeForAnalysis has no notion of the caller.
     await this.resumesService.findOne(id, user);
     const resume = await this.resumeProcessingService.validateResumeForAnalysis(id);
 
     if (!resume.jobId) {
-      throw new BadRequestException('No job associated with this resume');
+      throw new BadRequestException('Hồ sơ ứng tuyển này không gắn với tin tuyển dụng nào');
     }
 
     const job = await this.resumeQueueService.addAnalyzeResumeJob({
@@ -373,6 +373,6 @@ export class ResumesController {
       jobId: resume.jobId.toString(),
     });
 
-    return { resumeId: id, jobId: job.id, message: 'CV re-analysis has been queued' };
+    return { resumeId: id, jobId: job.id, message: 'Đã đưa yêu cầu phân tích lại CV vào hàng đợi' };
   }
 }

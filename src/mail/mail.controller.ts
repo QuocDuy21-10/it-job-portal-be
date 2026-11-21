@@ -31,12 +31,12 @@ export class MailController {
     summary: 'Trigger job recommendations manually',
     description: 'Manually trigger job recommendation emails for all subscribers. Use for testing.',
   })
-  @ResponseMessage('Job recommendation task queued successfully')
+  @ResponseMessage('Đã đưa tác vụ gợi ý việc làm vào hàng đợi')
   async triggerJobRecommendations() {
     await this.queueJobRecommendations();
     const metrics = await this.jobRecommendationQueueService.getQueueMetrics();
     return {
-      message: 'Job recommendation tasks queued successfully',
+      message: 'Đã đưa các tác vụ gợi ý việc làm vào hàng đợi',
       metrics,
     };
   }

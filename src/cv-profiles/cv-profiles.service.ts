@@ -93,7 +93,7 @@ export class CvProfilesService {
     existingCv: CvProfile | null,
   ): CreateCvProfileDto {
     if (!createCvProfileDto.personalInfo) {
-      throw new BadRequestException('Personal information is required');
+      throw new BadRequestException('Thông tin cá nhân là bắt buộc');
     }
 
     this.profileIdentitySyncService.assertCvEmailMatchesUser(
@@ -133,7 +133,7 @@ export class CvProfilesService {
       return await cvProfile.save();
     } catch (error) {
       if (error.code === 11000) {
-        throw new ConflictException('CV Profile already exists for this user');
+        throw new ConflictException('Người dùng này đã có hồ sơ CV');
       }
       throw error;
     }
@@ -159,7 +159,7 @@ export class CvProfilesService {
       .exec();
 
     if (!updatedCv) {
-      throw new NotFoundException('CV Profile not found');
+      throw new NotFoundException('Không tìm thấy hồ sơ CV');
     }
 
     return updatedCv;
@@ -260,7 +260,7 @@ export class CvProfilesService {
       .exec();
 
     if (result.deletedCount === 0) {
-      throw new NotFoundException('CV Profile not found');
+      throw new NotFoundException('Không tìm thấy hồ sơ CV');
     }
   }
 
@@ -277,7 +277,7 @@ export class CvProfilesService {
       .exec();
 
     if (!updatedCv) {
-      throw new NotFoundException('CV Profile not found');
+      throw new NotFoundException('Không tìm thấy hồ sơ CV');
     }
 
     return updatedCv;
@@ -296,7 +296,7 @@ export class CvProfilesService {
       .exec();
 
     if (!updatedCv) {
-      throw new NotFoundException('CV Profile not found');
+      throw new NotFoundException('Không tìm thấy hồ sơ CV');
     }
 
     return updatedCv;
@@ -324,7 +324,7 @@ export class CvProfilesService {
     const cvProfile = await this.cvProfileModel.findById(cvProfileId).exec();
 
     if (!cvProfile) {
-      throw new NotFoundException('CV Profile not found');
+      throw new NotFoundException('Không tìm thấy hồ sơ CV');
     }
 
     return cvProfile;
@@ -335,7 +335,7 @@ export class CvProfilesService {
    */
   private validateUserId(userId: string): void {
     if (!Types.ObjectId.isValid(userId)) {
-      throw new BadRequestException('Invalid user ID format');
+      throw new BadRequestException('ID người dùng không đúng định dạng');
     }
   }
 

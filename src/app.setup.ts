@@ -1,7 +1,7 @@
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { VersioningType } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { join } from 'path';
 import helmet from 'helmet';
@@ -9,6 +9,7 @@ import { TransformInterceptor } from './utils/transform.interceptor';
 import { JwtAuthGuard } from './auth/guards';
 import { RolesGuard } from './casl';
 import { parseCorsOrigins } from './config/cors-origins';
+import { ViValidationPipe } from './utils/validation/vi-validation.pipe';
 
 /** Global HTTP pipeline, shared by main.ts and the e2e suite so tests run what production runs. */
 export function configureApp(app: NestExpressApplication): void {
@@ -33,7 +34,7 @@ export function configureApp(app: NestExpressApplication): void {
   // config static
   app.useStaticAssets(join(__dirname, '..', 'public'));
 
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+  app.useGlobalPipes(new ViValidationPipe({ whitelist: true }));
 
   // config cookie parser
   app.use(cookieParser());

@@ -15,7 +15,7 @@ export const RESUME_FILE_CONTENT_TYPES: Readonly<Record<string, string>> = {
 export function resolveResumeFilePath(url: string): string {
   const fileName = path.basename(url ?? '');
   if (!fileName || fileName === '.' || fileName === '..') {
-    throw new BadRequestException('Invalid file path');
+    throw new BadRequestException('Đường dẫn tệp không hợp lệ');
   }
   return path.join(RESUME_STORAGE_DIR, fileName);
 }

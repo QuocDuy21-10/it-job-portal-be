@@ -41,8 +41,8 @@ describe('ChatGuardrailService', () => {
   });
 
   it('rejects messages with no letters or digits', () => {
-    expect(() => service.validateMessage('🚀🔥💼👩‍💻')).toThrow('Message must contain some text');
-    expect(() => service.validateMessage(' ?!... ')).toThrow('Message must contain some text');
+    expect(() => service.validateMessage('🚀🔥💼👩‍💻')).toThrow('Tin nhắn cần có chữ hoặc số');
+    expect(() => service.validateMessage(' ?!... ')).toThrow('Tin nhắn cần có chữ hoặc số');
   });
 
   it('keeps messages that have at least one letter or digit', () => {

@@ -14,13 +14,13 @@ import { ParsedDataDto } from './parsed-data.dto';
 import { AIAnalysisDto } from './ai-analysis.dto';
 
 export class UpdateResumeDto {
-  @IsNotEmpty({ message: 'Status should not be empty' })
+  @IsNotEmpty({ message: 'Trạng thái không được để trống' })
   @Type(() => String)
   @IsEnum(EResumeStatus, {
-    message: `Status must be one of the following values: ${Object.values(EResumeStatus).join(', ')}`,
+    message: `Trạng thái phải là một trong các giá trị: ${Object.values(EResumeStatus).join(', ')}`,
   })
   @ApiProperty({ example: EResumeStatus.PENDING, description: 'Status of resume' })
-  @IsString({ message: 'Status must be a string' })
+  @IsString({ message: 'Trạng thái phải là chuỗi' })
   @IsOptional()
   status?: string;
 

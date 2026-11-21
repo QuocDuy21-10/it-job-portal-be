@@ -15,24 +15,24 @@ import { ERole } from 'src/casl/enums/role.enum';
 import { CompanyDto } from 'src/companies/dto/company.dto';
 
 export class CreateUserDto {
-  @IsNotEmpty({ message: 'Name is required' })
-  @IsString({ message: 'Name must be a string' })
-  @MaxLength(100, { message: 'Name is too long (max: 100 chars)' })
+  @IsNotEmpty({ message: 'Tên là bắt buộc' })
+  @IsString({ message: 'Tên phải là chuỗi' })
+  @MaxLength(100, { message: 'Tên quá dài (tối đa 100 ký tự)' })
   @ApiProperty({ example: 'Test', description: 'Name of user' })
   name: string;
 
-  @IsEmail({}, { message: 'Email is invalid' })
-  @IsNotEmpty({ message: 'Email is required' })
+  @IsEmail({}, { message: 'Email không hợp lệ' })
+  @IsNotEmpty({ message: 'Email là bắt buộc' })
   @ApiProperty({ example: 'test@gmail.com', description: 'Email of user' })
   email: string;
 
-  @IsNotEmpty({ message: 'Password is required' })
+  @IsNotEmpty({ message: 'Mật khẩu là bắt buộc' })
   @ApiProperty({ example: '123456', description: 'Password of user' })
   password: string;
 
   @IsOptional()
-  @IsString({ message: 'Avatar must be a string' })
-  @MaxLength(500, { message: 'Avatar URL is too long (max: 500 chars)' })
+  @IsString({ message: 'Ảnh đại diện phải là chuỗi' })
+  @MaxLength(500, { message: 'URL ảnh đại diện quá dài (tối đa 500 ký tự)' })
   @ApiPropertyOptional({
     example: 'https://example.com/avatar.jpg',
     description: 'Avatar URL of user',
@@ -40,15 +40,15 @@ export class CreateUserDto {
   avatar?: string;
 
   @IsOptional()
-  @IsNotEmptyObject({ nullable: true }, { message: 'Company is required' })
-  @IsObject({ message: 'Company must be an object' })
+  @IsNotEmptyObject({ nullable: true }, { message: 'Công ty là bắt buộc' })
+  @IsObject({ message: 'Công ty phải là object' })
   @ValidateNested()
   @Type(() => CompanyDto)
   @ApiProperty({ type: CompanyDto, description: 'Company of user' })
   company?: CompanyDto;
 
-  @IsNotEmpty({ message: 'Role is required' })
-  @IsEnum(ERole, { message: 'Role must be one of: SUPER ADMIN, HR, NORMAL USER' })
+  @IsNotEmpty({ message: 'Vai trò là bắt buộc' })
+  @IsEnum(ERole, { message: 'Vai trò phải là một trong các giá trị: SUPER ADMIN, HR, NORMAL USER' })
   @ApiProperty({ enum: ERole, example: ERole.HR, description: 'Role of user' })
   role: ERole;
 }

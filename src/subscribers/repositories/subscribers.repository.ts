@@ -18,7 +18,7 @@ export class SubscribersRepository {
 
   validateObjectId(id: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid subscriber ID format');
+      throw new BadRequestException('ID đăng ký nhận tin không đúng định dạng');
     }
   }
 

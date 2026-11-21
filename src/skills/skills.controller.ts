@@ -35,7 +35,7 @@ export class SkillsController {
   })
   @ApiQuery({ name: 'search', required: false, type: String, example: 'node' })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 100 })
-  @ResponseMessage('Get active skills catalog')
+  @ResponseMessage('Lấy danh mục kỹ năng thành công')
   getCatalog(@Query('search') search: string, @Query('limit') limit: string) {
     return this.skillsService.getCatalog(search, +limit);
   }
@@ -47,7 +47,7 @@ export class SkillsController {
     description: 'Returns top N skills ranked by frequency across approved active job postings.',
   })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
-  @ResponseMessage('Get popular skills')
+  @ResponseMessage('Lấy danh sách kỹ năng phổ biến thành công')
   getPopular(@Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number) {
     const clampedLimit = Math.min(Math.max(limit, 1), 50);
     return this.skillsService.getPopularSkills(clampedLimit);
@@ -59,7 +59,7 @@ export class SkillsController {
     summary: 'Create a new catalog skill',
     description: 'Creates a canonical skill in the master catalog. Requires SUPER ADMIN.',
   })
-  @ResponseMessage('Skill created successfully')
+  @ResponseMessage('Tạo kỹ năng thành công')
   create(@Body() createSkillDto: CreateSkillDto, @User() user: IUser) {
     return this.skillsService.create(createSkillDto, user);
   }
@@ -70,7 +70,7 @@ export class SkillsController {
     summary: 'Get skills catalog entries',
     description: 'Retrieves a paginated list of skill catalog entries for admin management.',
   })
-  @ResponseMessage('Skills have been retrieved successfully')
+  @ResponseMessage('Lấy danh sách kỹ năng thành công')
   findAll(@Query() pagination: PaginationQueryDto, @Query() query: string) {
     return this.skillsService.findAll(pagination.page, pagination.limit, query);
   }
@@ -81,7 +81,7 @@ export class SkillsController {
     summary: 'Get skill by ID',
     description: 'Retrieves a single skill catalog entry by ID. Requires SUPER ADMIN.',
   })
-  @ResponseMessage('Skill has been retrieved successfully')
+  @ResponseMessage('Lấy kỹ năng thành công')
   findOne(@Param('id') id: string) {
     return this.skillsService.findOne(id);
   }
@@ -92,7 +92,7 @@ export class SkillsController {
     summary: 'Update skill by ID',
     description: 'Updates a skill catalog entry. Requires SUPER ADMIN.',
   })
-  @ResponseMessage('Skill updated successfully')
+  @ResponseMessage('Cập nhật kỹ năng thành công')
   update(@Param('id') id: string, @Body() updateSkillDto: UpdateSkillDto, @User() user: IUser) {
     return this.skillsService.update(id, updateSkillDto, user);
   }
@@ -103,7 +103,7 @@ export class SkillsController {
     summary: 'Bulk delete skills',
     description: 'Soft deletes multiple skill catalog entries by IDs. Requires SUPER ADMIN.',
   })
-  @ResponseMessage('Bulk delete skills')
+  @ResponseMessage('Xoá nhiều kỹ năng thành công')
   bulkRemove(@Body() bulkDeleteDto: BulkDeleteDto, @User() user: IUser) {
     return this.skillsService.bulkRemove(bulkDeleteDto.ids, user);
   }
@@ -114,7 +114,7 @@ export class SkillsController {
     summary: 'Delete skill by ID',
     description: 'Soft deletes a skill catalog entry. Requires SUPER ADMIN.',
   })
-  @ResponseMessage('Skill deleted successfully')
+  @ResponseMessage('Xoá kỹ năng thành công')
   remove(@Param('id') id: string, @User() user: IUser) {
     return this.skillsService.remove(id, user);
   }

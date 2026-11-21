@@ -49,7 +49,7 @@ export class JobIngestionService {
     const exists = await this.jobSourceModel.exists({ key });
 
     if (!exists) {
-      throw new NotFoundException(`Job source '${key}' not found`);
+      throw new NotFoundException(`Không tìm thấy nguồn tin tuyển dụng '${key}'`);
     }
 
     await this.jobIngestionQueueService.enqueueSync(key);
@@ -66,7 +66,7 @@ export class JobIngestionService {
       .lean<JobSource>();
 
     if (!previous) {
-      throw new NotFoundException(`Job source '${key}' not found`);
+      throw new NotFoundException(`Không tìm thấy nguồn tin tuyển dụng '${key}'`);
     }
 
     const { displayPolicy } = dto;
@@ -86,7 +86,7 @@ export class JobIngestionService {
     const exists = await this.jobSourceModel.exists({ key });
 
     if (!exists) {
-      throw new NotFoundException(`Job source '${key}' not found`);
+      throw new NotFoundException(`Không tìm thấy nguồn tin tuyển dụng '${key}'`);
     }
 
     // ValidationPipe does not transform, so limit may still be a string here.

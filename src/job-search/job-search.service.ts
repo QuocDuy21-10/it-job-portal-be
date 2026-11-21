@@ -77,13 +77,13 @@ export class JobSearchService {
 
   async findExternalJob(id: string): Promise<IExternalJobDetail> {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid ID format');
+      throw new BadRequestException('ID không đúng định dạng');
     }
 
     const job = await this.externalJobModel.findById(id).select(EXTERNAL_DETAIL_FIELDS).lean();
 
     if (!job) {
-      throw new NotFoundException(`External job with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy tin tuyển dụng bên ngoài có ID ${id}`);
     }
 
     const source = await this.jobSourceModel
@@ -93,7 +93,7 @@ export class JobSearchService {
     const displayPolicy = source?.displayPolicy ?? DEFAULT_DISPLAY_POLICY;
 
     if (displayPolicy === EJobSourceDisplayPolicy.HIDDEN) {
-      throw new NotFoundException(`External job with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy tin tuyển dụng bên ngoài có ID ${id}`);
     }
 
     // STALE is internal; an expired job is closed for the public even before the next sync.
@@ -128,7 +128,7 @@ export class JobSearchService {
     const salaryMax = toOptionalNumber(query.salaryMax);
 
     if (salaryMin !== undefined && salaryMax !== undefined && salaryMin > salaryMax) {
-      throw new BadRequestException('salaryMin must not be greater than salaryMax');
+      throw new BadRequestException('salaryMin không được lớn hơn salaryMax');
     }
 
     return {

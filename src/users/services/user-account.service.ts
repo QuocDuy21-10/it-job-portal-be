@@ -65,16 +65,16 @@ export class UserAccountService {
     this.userRepository.validateObjectId(id);
 
     if (id === adminUser._id.toString()) {
-      throw new BadRequestException('You cannot lock your own account');
+      throw new BadRequestException('Bạn không thể khoá tài khoản của chính mình');
     }
 
     const user = await this.userRepository.findActiveUser(id);
     if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy người dùng có ID ${id}`);
     }
 
     if (user.isLocked) {
-      throw new BadRequestException('User account is already locked');
+      throw new BadRequestException('Tài khoản đã bị khoá trước đó');
     }
 
     await this.userRepository.updateOne(id, {
@@ -95,11 +95,11 @@ export class UserAccountService {
 
     const user = await this.userRepository.findActiveUser(id);
     if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy người dùng có ID ${id}`);
     }
 
     if (!user.isLocked) {
-      throw new BadRequestException('User account is not locked');
+      throw new BadRequestException('Tài khoản đang không bị khoá');
     }
 
     await this.userRepository.updateOne(id, {

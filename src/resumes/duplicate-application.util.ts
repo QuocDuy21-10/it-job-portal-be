@@ -1,7 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 
 export const DUPLICATE_APPLICATION_MESSAGE =
-  'You have already applied to this job. Duplicate applications are not allowed.';
+  'Bạn đã ứng tuyển vào tin tuyển dụng này. Không thể ứng tuyển lại.';
 
 /** The unique (userId, jobId) index is the real guard; pre-checks only give a nicer fast path. */
 export function rethrowDuplicateApplication(error: unknown): never {

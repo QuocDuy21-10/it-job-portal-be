@@ -140,7 +140,7 @@ describe('UserAccountService', () => {
 
     it('should reject when the admin tries to lock their own account', async () => {
       await expect(service.lockUser(adminUser._id, {}, adminUser)).rejects.toThrow(
-        new BadRequestException('You cannot lock your own account'),
+        new BadRequestException('Bạn không thể khoá tài khoản của chính mình'),
       );
     });
 
@@ -148,7 +148,7 @@ describe('UserAccountService', () => {
       mockUserRepository.findActiveUser.mockResolvedValue(null);
 
       await expect(service.lockUser(id, {}, adminUser)).rejects.toThrow(
-        new NotFoundException(`User with ID ${id} not found`),
+        new NotFoundException(`Không tìm thấy người dùng có ID ${id}`),
       );
     });
 
@@ -160,7 +160,7 @@ describe('UserAccountService', () => {
       } as any);
 
       await expect(service.lockUser(id, {}, adminUser)).rejects.toThrow(
-        new BadRequestException('User account is already locked'),
+        new BadRequestException('Tài khoản đã bị khoá trước đó'),
       );
     });
 
@@ -203,7 +203,7 @@ describe('UserAccountService', () => {
       mockUserRepository.findActiveUser.mockResolvedValue(null);
 
       await expect(service.unlockUser(id, adminUser)).rejects.toThrow(
-        new NotFoundException(`User with ID ${id} not found`),
+        new NotFoundException(`Không tìm thấy người dùng có ID ${id}`),
       );
     });
 
@@ -215,7 +215,7 @@ describe('UserAccountService', () => {
       } as any);
 
       await expect(service.unlockUser(id, adminUser)).rejects.toThrow(
-        new BadRequestException('User account is not locked'),
+        new BadRequestException('Tài khoản đang không bị khoá'),
       );
     });
 

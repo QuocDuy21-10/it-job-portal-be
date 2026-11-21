@@ -119,12 +119,16 @@ export class ResumesService {
     const resume = await this.resumeRepository.findById(id);
 
     if (!resume) {
-      throw new NotFoundException(`Resume with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy hồ sơ ứng tuyển có ID ${id}`);
     }
 
     // HR users may only view resumes belonging to their company
     if (user?.role === ERole.HR) {
-      assertCompanyAccess(user, resume.companyId, 'You can only view resumes of your own company');
+      assertCompanyAccess(
+        user,
+        resume.companyId,
+        'Bạn chỉ có thể xem hồ sơ ứng tuyển của công ty mình',
+      );
     }
 
     return resume;
@@ -136,7 +140,7 @@ export class ResumesService {
     const isOwner = resume.userId?.toString() === user._id.toString();
 
     if (!isOwner) {
-      assertCompanyAccess(user, resume.companyId, 'You do not have permission to view this resume');
+      assertCompanyAccess(user, resume.companyId, 'Bạn không có quyền xem hồ sơ ứng tuyển này');
     }
 
     return resume;
@@ -145,12 +149,12 @@ export class ResumesService {
   async getFileForRead(id: string, user: IUser) {
     const resume = await this.findOneForRead(id, user);
     if (!resume.url) {
-      throw new NotFoundException('No CV file found for this resume');
+      throw new NotFoundException('Hồ sơ ứng tuyển này không có tệp CV');
     }
 
     const filePath = resolveResumeFilePath(resume.url);
     if (!fs.existsSync(filePath)) {
-      throw new NotFoundException('CV file not found');
+      throw new NotFoundException('Không tìm thấy tệp CV');
     }
 
     const fileName = path.basename(filePath);
@@ -169,7 +173,7 @@ export class ResumesService {
     // Verify the resume exists and that the HR user owns it before mutating
     const existing = await this.resumeRepository.findById(id);
     if (!existing) {
-      throw new NotFoundException(`Resume with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy hồ sơ ứng tuyển có ID ${id}`);
     }
 
     if (user?.role === ERole.HR) {
@@ -219,7 +223,7 @@ export class ResumesService {
 
     const existing = await this.resumeRepository.findById(id);
     if (!existing) {
-      throw new NotFoundException(`Resume with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy hồ sơ ứng tuyển có ID ${id}`);
     }
 
     if (user?.role === ERole.HR) {
@@ -247,7 +251,7 @@ export class ResumesService {
 
     if (user.role === ERole.HR) {
       if (!user.company?._id) {
-        throw new ForbiddenException('HR user must be associated with a company');
+        throw new ForbiddenException('Tài khoản HR phải được gắn với một công ty');
       }
 
       const ownedCount = await this.resumeRepository.countOwnedByCompany(
@@ -255,7 +259,7 @@ export class ResumesService {
         user.company._id.toString(),
       );
       if (ownedCount !== ids.length) {
-        throw new ForbiddenException('You can only delete resumes that belong to your company');
+        throw new ForbiddenException('Bạn chỉ có thể xoá hồ sơ ứng tuyển của công ty mình');
       }
     }
 
@@ -296,7 +300,7 @@ export class ResumesService {
 
   private validateObjectId(id: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestException(`Not found Resume with id = ${id}`);
+      throw new BadRequestException(`Không tìm thấy hồ sơ ứng tuyển có id = ${id}`);
     }
   }
 

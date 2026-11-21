@@ -4,14 +4,14 @@ import { IsNotEmpty, IsString, IsStrongPassword, MaxLength } from 'class-validat
 // Single password policy for every DTO that sets a password; mirrors the frontend register schema.
 export const IsAccountPassword = () =>
   applyDecorators(
-    IsNotEmpty({ message: 'Password is required' }),
-    IsString({ message: 'Password must be a string' }),
-    MaxLength(128, { message: 'Password must be at most 128 characters' }),
+    IsNotEmpty({ message: 'Mật khẩu là bắt buộc' }),
+    IsString({ message: 'Mật khẩu phải là chuỗi' }),
+    MaxLength(128, { message: 'Mật khẩu không được dài quá 128 ký tự' }),
     IsStrongPassword(
       { minLength: 8, minLowercase: 1, minUppercase: 1, minNumbers: 1, minSymbols: 1 },
       {
         message:
-          'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number and a special character',
+          'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt',
       },
     ),
   );

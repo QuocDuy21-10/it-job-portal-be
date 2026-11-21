@@ -74,7 +74,7 @@ export class ChatController {
     status: 429,
     description: 'Too many requests - rate limit exceeded',
   })
-  @ResponseMessage('Message sent successfully')
+  @ResponseMessage('Gửi tin nhắn thành công')
   async sendMessage(
     @User() user: IUser,
     @Body() sendMessageDto: SendMessageDto,
@@ -110,7 +110,7 @@ export class ChatController {
     description: 'History retrieved successfully',
     type: ConversationHistoryResponseDto,
   })
-  @ResponseMessage('History retrieved successfully')
+  @ResponseMessage('Lấy lịch sử trò chuyện thành công')
   async getHistory(
     @User() user: IUser,
     @Query() query: ConversationHistoryQueryDto,
@@ -127,7 +127,7 @@ export class ChatController {
     status: 200,
     description: 'Conversation cleared successfully',
   })
-  @ResponseMessage('Conversation cleared successfully')
+  @ResponseMessage('Xoá cuộc trò chuyện thành công')
   async clearConversation(@User() user: IUser): Promise<{ message: string }> {
     return this.chatService.clearConversation(user._id);
   }
@@ -143,7 +143,7 @@ export class ChatController {
     description: 'Chat session created successfully',
     type: ChatSessionDto,
   })
-  @ResponseMessage('Chat session created successfully')
+  @ResponseMessage('Tạo phiên chat thành công')
   async createSession(
     @User() user: IUser,
     @Body() dto: CreateChatSessionDto,
@@ -161,7 +161,7 @@ export class ChatController {
     description: 'Chat sessions retrieved successfully',
     type: ChatSessionListResponseDto,
   })
-  @ResponseMessage('Chat sessions retrieved successfully')
+  @ResponseMessage('Lấy danh sách phiên chat thành công')
   async listSessions(@User() user: IUser): Promise<ChatSessionListResponseDto> {
     return this.chatService.listSessions(user._id);
   }
@@ -188,7 +188,7 @@ export class ChatController {
     description: 'Session messages retrieved successfully',
     type: ConversationHistoryResponseDto,
   })
-  @ResponseMessage('Session messages retrieved successfully')
+  @ResponseMessage('Lấy tin nhắn của phiên chat thành công')
   async getSessionMessages(
     @User() user: IUser,
     @Param('sessionId') sessionId: string,
@@ -214,7 +214,7 @@ export class ChatController {
     description: 'Message sent successfully',
     type: ChatResponseDto,
   })
-  @ResponseMessage('Message sent successfully')
+  @ResponseMessage('Gửi tin nhắn thành công')
   async sendSessionMessage(
     @User() user: IUser,
     @Param('sessionId') sessionId: string,
@@ -238,7 +238,7 @@ export class ChatController {
     status: 200,
     description: 'Chat session cleared successfully',
   })
-  @ResponseMessage('Chat session cleared successfully')
+  @ResponseMessage('Xoá phiên chat thành công')
   async clearSession(
     @User() user: IUser,
     @Param('sessionId') sessionId: string,
@@ -257,7 +257,7 @@ export class ChatController {
     description: 'AI usage summary retrieved successfully',
     type: AiUsageSummaryDto,
   })
-  @ResponseMessage('AI usage summary retrieved successfully')
+  @ResponseMessage('Lấy tổng hợp mức sử dụng AI thành công')
   async getUsageSummary(@Query() query: AiUsageQueryDto): Promise<AiUsageSummaryDto> {
     return this.aiUsageService.getUsageSummary(query);
   }
@@ -273,7 +273,7 @@ export class ChatController {
     description: 'AI usage timeseries retrieved successfully',
     type: AiUsageTimeseriesDto,
   })
-  @ResponseMessage('AI usage timeseries retrieved successfully')
+  @ResponseMessage('Lấy thống kê sử dụng AI theo thời gian thành công')
   async getUsageTimeseries(
     @Query() query: AiUsageTimeseriesQueryDto,
   ): Promise<AiUsageTimeseriesDto> {
@@ -291,7 +291,7 @@ export class ChatController {
     description: 'Top AI users retrieved successfully',
     type: AiUsageTopUsersDto,
   })
-  @ResponseMessage('Top AI users retrieved successfully')
+  @ResponseMessage('Lấy danh sách người dùng AI nhiều nhất thành công')
   async getTopUsers(@Query() query: AiUsageTopUsersQueryDto): Promise<AiUsageTopUsersDto> {
     return this.aiUsageService.getTopUsers(query);
   }
@@ -306,7 +306,7 @@ export class ChatController {
     description: 'Chat tool action confirmed successfully',
     type: ChatToolActionResultDto,
   })
-  @ResponseMessage('Chat tool action confirmed successfully')
+  @ResponseMessage('Xác nhận thao tác thành công')
   async confirmToolAction(
     @User() user: IUser,
     @Param('actionId') actionId: string,
@@ -324,7 +324,7 @@ export class ChatController {
     description: 'Chat tool action canceled successfully',
     type: ChatToolActionResultDto,
   })
-  @ResponseMessage('Chat tool action canceled successfully')
+  @ResponseMessage('Huỷ thao tác thành công')
   async cancelToolAction(
     @User() user: IUser,
     @Param('actionId') actionId: string,
@@ -443,7 +443,7 @@ export class ChatController {
 
   private getStreamErrorMessage(error: unknown): string {
     if (!(error instanceof HttpException)) {
-      return 'Unable to process your message at this time. Please try again later.';
+      return 'Hiện chưa thể xử lý tin nhắn của bạn. Vui lòng thử lại sau.';
     }
 
     const response = error.getResponse();

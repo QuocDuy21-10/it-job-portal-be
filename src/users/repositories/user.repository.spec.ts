@@ -29,12 +29,12 @@ describe('UserRepository', () => {
     it('should reject roles that are not backed by CASL', async () => {
       await expect(
         repository.resolveCompanyAssignmentForRole('CUSTOM ROLE' as ERole),
-      ).rejects.toThrow('Role is not supported by CASL');
+      ).rejects.toThrow('Vai trò không được hỗ trợ');
     });
 
     it('should reject HR users without a company', async () => {
       await expect(repository.resolveCompanyAssignmentForRole(ERole.HR)).rejects.toThrow(
-        'HR user must be assigned to a company',
+        'Tài khoản HR phải được gắn với một công ty',
       );
     });
 

@@ -17,14 +17,14 @@ export class JobSearchController {
 
   @Get()
   @ApiOperation({ summary: 'Search internal and external jobs in one paginated list' })
-  @ResponseMessage('Search jobs')
+  @ResponseMessage('Tìm kiếm tin tuyển dụng thành công')
   search(@Query() query: SearchJobsQueryDto) {
     return this.jobSearchService.search(query);
   }
 
   @Get('external/:id')
   @ApiOperation({ summary: 'Get an external job by ID' })
-  @ResponseMessage('Get external job by id')
+  @ResponseMessage('Lấy tin tuyển dụng bên ngoài thành công')
   findExternalJob(@Param('id') id: string) {
     return this.jobSearchService.findExternalJob(id);
   }

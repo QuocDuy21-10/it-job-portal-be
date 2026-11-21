@@ -2,7 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { ERole } from 'src/casl/enums/role.enum';
 import { IUser } from 'src/users/user.interface';
 
-const DEFAULT_MESSAGE = 'You can only access resources of your own company';
+const DEFAULT_MESSAGE = 'Bạn chỉ có thể truy cập dữ liệu của công ty mình';
 
 /** SUPER_ADMIN may act on any company, HR only on its own; everyone else is rejected (fail closed). */
 export function assertCompanyAccess(
@@ -13,7 +13,7 @@ export function assertCompanyAccess(
   if (user?.role === ERole.SUPER_ADMIN) return;
   if (user?.role !== ERole.HR) throw new ForbiddenException(message);
   if (!user.company?._id) {
-    throw new ForbiddenException('HR user must be associated with a company');
+    throw new ForbiddenException('Tài khoản HR phải được gắn với một công ty');
   }
   if (companyId == null || String(companyId) !== String(user.company._id)) {
     throw new ForbiddenException(message);

@@ -64,7 +64,7 @@ describe('ApplicationNotificationService', () => {
         expect.objectContaining({
           userId: hrUsers[0]._id.toString(),
           type: ENotificationType.NEW_APPLICATION,
-          title: 'New Application Received',
+          title: 'Có hồ sơ ứng tuyển mới',
         }),
       );
       expect(mockNotificationsService.create).toHaveBeenCalledWith(

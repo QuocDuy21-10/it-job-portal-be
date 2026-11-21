@@ -38,7 +38,7 @@ describe('assertCompanyAccess', () => {
 
   it('rejects HR without a company (fail closed)', () => {
     expect(() => assertCompanyAccess(hr(), 'c1')).toThrow(
-      new ForbiddenException('HR user must be associated with a company'),
+      new ForbiddenException('Tài khoản HR phải được gắn với một công ty'),
     );
   });
 

@@ -100,7 +100,7 @@ export class NotificationsService {
     });
     // Someone else's notification looks exactly like a missing one.
     if (result.matchedCount === 0) {
-      throw new NotFoundException('Notification not found');
+      throw new NotFoundException('Không tìm thấy thông báo');
     }
     return result;
   }
@@ -131,7 +131,7 @@ export class NotificationsService {
     });
     const result = await this.notificationModel.softDelete(filter);
     if (!result.deleted) {
-      throw new NotFoundException('Notification not found');
+      throw new NotFoundException('Không tìm thấy thông báo');
     }
     return result;
   }
@@ -139,7 +139,7 @@ export class NotificationsService {
   /** A malformed ID is just another notification the caller does not own: 404, not a BSONError 500. */
   private ownedFilter(id: string, userId: string) {
     if (!mongoose.isValidObjectId(id)) {
-      throw new NotFoundException('Notification not found');
+      throw new NotFoundException('Không tìm thấy thông báo');
     }
     return {
       _id: new mongoose.Types.ObjectId(id),

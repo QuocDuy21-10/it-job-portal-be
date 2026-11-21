@@ -52,7 +52,7 @@ describe('UserPreferencesService', () => {
       mockUserRepository.jobExists.mockResolvedValue(false);
 
       await expect(service.saveJob(userId, jobId)).rejects.toThrow(
-        new BadRequestException('Job not found or has been deleted'),
+        new BadRequestException('Không tìm thấy tin tuyển dụng hoặc tin đã bị xoá'),
       );
     });
 
@@ -61,7 +61,7 @@ describe('UserPreferencesService', () => {
       mockUserRepository.addSavedJob.mockResolvedValue({ matchedCount: 0 } as any);
 
       await expect(service.saveJob(userId, jobId)).rejects.toThrow(
-        new BadRequestException('User not found'),
+        new BadRequestException('Không tìm thấy người dùng'),
       );
     });
   });
@@ -81,7 +81,7 @@ describe('UserPreferencesService', () => {
       mockUserRepository.removeSavedJob.mockResolvedValue({ matchedCount: 0 } as any);
 
       await expect(service.unsaveJob(userId, jobId)).rejects.toThrow(
-        new BadRequestException('User not found'),
+        new BadRequestException('Không tìm thấy người dùng'),
       );
     });
   });
@@ -113,7 +113,7 @@ describe('UserPreferencesService', () => {
       mockUserRepository.findUserWithSavedJobs.mockResolvedValue(null);
 
       await expect(service.getSavedJobs(userId)).rejects.toThrow(
-        new BadRequestException('User not found'),
+        new BadRequestException('Không tìm thấy người dùng'),
       );
     });
   });
@@ -137,7 +137,7 @@ describe('UserPreferencesService', () => {
       mockUserRepository.companyExists.mockResolvedValue(false);
 
       await expect(service.followCompany(userId, companyId)).rejects.toThrow(
-        new BadRequestException('Company not found or has been deleted'),
+        new BadRequestException('Không tìm thấy công ty hoặc công ty đã bị xoá'),
       );
     });
 
@@ -146,7 +146,7 @@ describe('UserPreferencesService', () => {
       mockUserRepository.findUserCompanyFollowed.mockResolvedValue(null);
 
       await expect(service.followCompany(userId, companyId)).rejects.toThrow(
-        new BadRequestException('User not found'),
+        new BadRequestException('Không tìm thấy người dùng'),
       );
     });
 
@@ -157,7 +157,7 @@ describe('UserPreferencesService', () => {
       } as any);
 
       await expect(service.followCompany(userId, companyId)).rejects.toThrow(
-        new BadRequestException('You are already following this company'),
+        new BadRequestException('Bạn đã theo dõi công ty này'),
       );
     });
 
@@ -169,7 +169,7 @@ describe('UserPreferencesService', () => {
 
       await expect(service.followCompany(userId, companyId)).rejects.toThrow(
         new BadRequestException(
-          'You can only follow up to 5 companies. Please unfollow a company first.',
+          'Bạn chỉ có thể theo dõi tối đa 5 công ty. Vui lòng bỏ theo dõi một công ty trước.',
         ),
       );
     });
@@ -190,7 +190,7 @@ describe('UserPreferencesService', () => {
       mockUserRepository.removeFollowedCompany.mockResolvedValue({ matchedCount: 0 } as any);
 
       await expect(service.unfollowCompany(userId, companyId)).rejects.toThrow(
-        new BadRequestException('User not found'),
+        new BadRequestException('Không tìm thấy người dùng'),
       );
     });
   });
@@ -218,7 +218,7 @@ describe('UserPreferencesService', () => {
       mockUserRepository.findUserWithFollowedCompanies.mockResolvedValue(null);
 
       await expect(service.getFollowingCompanies(userId)).rejects.toThrow(
-        new BadRequestException('User not found'),
+        new BadRequestException('Không tìm thấy người dùng'),
       );
     });
   });

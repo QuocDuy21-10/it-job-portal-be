@@ -24,7 +24,7 @@ export class JobsController {
     description:
       'Creates a new job posting with the provided information. Requires authentication.',
   })
-  @ResponseMessage('Create a new job')
+  @ResponseMessage('Tạo tin tuyển dụng thành công')
   create(@Body() createJobDto: CreateJobDto, @User() user: IUser) {
     return this.jobsService.create(createJobDto, user);
   }
@@ -43,7 +43,7 @@ export class JobsController {
     description: 'Search keyword — matches job title, skills, and company name',
     example: 'React',
   })
-  @ResponseMessage('Get list jobs')
+  @ResponseMessage('Lấy danh sách tin tuyển dụng thành công')
   findAll(
     @Query() pagination: PaginationQueryDto,
     @Query('keyword') keyword: string,
@@ -59,7 +59,7 @@ export class JobsController {
     summary: 'Get job by ID (Public API)',
     description: 'Retrieves detailed information about a specific job posting by its ID',
   })
-  @ResponseMessage('Get job by id')
+  @ResponseMessage('Lấy tin tuyển dụng thành công')
   findOne(@Param('id') id: string, @User() user: IUser) {
     return this.jobsService.findOne(id, user);
   }
@@ -71,7 +71,7 @@ export class JobsController {
     description:
       'Updates an existing job posting. Only the fields provided will be updated. Requires authentication.',
   })
-  @ResponseMessage('Update job by id')
+  @ResponseMessage('Cập nhật tin tuyển dụng thành công')
   update(@Param('id') id: string, @Body() updateJobDto: UpdateJobDto, @User() user: IUser) {
     return this.jobsService.update(id, updateJobDto, user);
   }
@@ -83,7 +83,7 @@ export class JobsController {
     description:
       'Soft deletes multiple job postings by IDs (max 100). HR can only delete jobs belonging to their own company.',
   })
-  @ResponseMessage('Bulk delete jobs')
+  @ResponseMessage('Xoá nhiều tin tuyển dụng thành công')
   bulkRemove(@Body() bulkDeleteDto: BulkDeleteDto, @User() user: IUser) {
     return this.jobsService.bulkRemove(bulkDeleteDto.ids, user);
   }
@@ -95,7 +95,7 @@ export class JobsController {
     description:
       'Soft deletes a job posting. The job will be marked as deleted but not removed from database. Requires authentication.',
   })
-  @ResponseMessage('Delete job by id')
+  @ResponseMessage('Xoá tin tuyển dụng thành công')
   remove(@Param('id') id: string, @User() user: IUser) {
     return this.jobsService.remove(id, user);
   }
@@ -107,7 +107,7 @@ export class JobsController {
     description:
       'Allows SUPER ADMIN to approve or reject a job posting. Approved jobs become visible to the public.',
   })
-  @ResponseMessage('Job approval status updated')
+  @ResponseMessage('Cập nhật trạng thái duyệt tin tuyển dụng thành công')
   approveJob(@Param('id') id: string, @Body() approveJobDto: ApproveJobDto, @User() user: IUser) {
     return this.jobsService.approveJob(id, approveJobDto, user);
   }

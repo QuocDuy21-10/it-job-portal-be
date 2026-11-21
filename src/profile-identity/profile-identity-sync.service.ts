@@ -34,7 +34,7 @@ export class ProfileIdentitySyncService {
       .exec();
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Không tìm thấy người dùng');
     }
 
     return {
@@ -51,7 +51,7 @@ export class ProfileIdentitySyncService {
     }
 
     if (this.normalizeEmail(incomingEmail) !== this.normalizeEmail(userEmail)) {
-      throw new BadRequestException('CV profile email must match the account email');
+      throw new BadRequestException('Email trong hồ sơ CV phải trùng với email tài khoản');
     }
   }
 
@@ -110,7 +110,7 @@ export class ProfileIdentitySyncService {
 
   private validateObjectId(id: string): void {
     if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid user ID format');
+      throw new BadRequestException('ID người dùng không đúng định dạng');
     }
   }
 }

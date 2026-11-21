@@ -56,7 +56,7 @@ export class ResumeProcessingService {
 
     const fullFilePath = resolveResumeFilePath(resume.url);
     if (!fs.existsSync(fullFilePath)) {
-      throw new BadRequestException('File not found after upload. Please try again.');
+      throw new BadRequestException('Không tìm thấy tệp sau khi tải lên. Vui lòng thử lại.');
     }
 
     const parseJob = await resumeQueueService.addParseResumeJob({
@@ -78,7 +78,7 @@ export class ResumeProcessingService {
         jobs: { parseJobId: parseJob.id },
         file: this.getFileMetadata(file),
         message:
-          'Your CV has been uploaded and is being processed. You will be notified when analysis is complete.',
+          'CV của bạn đã được tải lên và đang được xử lý. Bạn sẽ nhận được thông báo khi phân tích xong.',
         estimatedTime: '30-60 seconds',
       },
     };
@@ -87,10 +87,10 @@ export class ResumeProcessingService {
   // File validation helper method to keep the main flow clean
   validateFile(file: Express.Multer.File): void {
     if (!file) {
-      throw new BadRequestException('No file uploaded');
+      throw new BadRequestException('Chưa có tệp nào được tải lên');
     }
     if (!file.path || !file.filename) {
-      throw new BadRequestException('Invalid file upload');
+      throw new BadRequestException('Tệp tải lên không hợp lệ');
     }
 
     const allowedMimeTypes = [
@@ -101,14 +101,14 @@ export class ResumeProcessingService {
     ];
     if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException(
-        `Invalid file type: ${file.mimetype}. Only PDF, DOC, DOCX, and TXT are allowed.`,
+        `Loại tệp không hợp lệ: ${file.mimetype}. Chỉ chấp nhận PDF, DOC, DOCX và TXT.`,
       );
     }
 
     const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
       throw new BadRequestException(
-        `File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Maximum size is 5MB.`,
+        `Tệp quá lớn: ${(file.size / 1024 / 1024).toFixed(2)}MB. Dung lượng tối đa là 5MB.`,
       );
     }
 
@@ -121,13 +121,13 @@ export class ResumeProcessingService {
     const job = await this.jobsService.findOne(jobId);
 
     if (!job) {
-      throw new NotFoundException(`Job not found with id: ${jobId}`);
+      throw new NotFoundException(`Không tìm thấy tin tuyển dụng có id: ${jobId}`);
     }
     if (!job.isActive) {
-      throw new BadRequestException('This job is no longer active');
+      throw new BadRequestException('Tin tuyển dụng này không còn hoạt động');
     }
     if (job.endDate && new Date(job.endDate) < new Date()) {
-      throw new BadRequestException('This job posting has expired');
+      throw new BadRequestException('Tin tuyển dụng này đã hết hạn');
     }
 
     this.logger.log(`Job validated: ${job.name} (${jobId})`);
@@ -192,15 +192,15 @@ export class ResumeProcessingService {
     const resume = await this.resumeModel.findById(resumeId);
 
     if (!resume) {
-      throw new NotFoundException(`Resume not found with id: ${resumeId}`);
+      throw new NotFoundException(`Không tìm thấy hồ sơ ứng tuyển có id: ${resumeId}`);
     }
     if (!resume.isParsed) {
       throw new BadRequestException(
-        'Resume must be parsed before analysis. Please wait for parsing to complete.',
+        'CV cần được đọc xong trước khi phân tích. Vui lòng chờ trong giây lát.',
       );
     }
     if (!resume.parsedData) {
-      throw new BadRequestException('No parsed data available. Please re-upload the CV.');
+      throw new BadRequestException('Chưa có dữ liệu phân tích CV. Vui lòng tải CV lên lại.');
     }
 
     return resume;

@@ -20,7 +20,7 @@ export class CompanyRepository {
 
   validateObjectId(id: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestException(`Not found Company with id = ${id}`);
+      throw new BadRequestException(`Không tìm thấy công ty có id = ${id}`);
     }
   }
 

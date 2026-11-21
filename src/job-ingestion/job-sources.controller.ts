@@ -24,21 +24,21 @@ export class JobSourcesController {
 
   @Get()
   @ApiOperation({ summary: 'List external job sources with their last sync status' })
-  @ResponseMessage('Get list job sources')
+  @ResponseMessage('Lấy danh sách nguồn tin tuyển dụng thành công')
   findAll() {
     return this.jobIngestionService.findAllSources();
   }
 
   @Patch(':key')
   @ApiOperation({ summary: 'Enable/disable crawling or change the public display policy' })
-  @ResponseMessage('Job source updated')
+  @ResponseMessage('Cập nhật nguồn tin tuyển dụng thành công')
   update(@Param('key') key: string, @Body() dto: UpdateJobSourceDto) {
     return this.jobIngestionService.updateSource(key, dto);
   }
 
   @Get(':key/runs')
   @ApiOperation({ summary: 'List recent sync runs of one source, newest first' })
-  @ResponseMessage('Get job source sync runs')
+  @ResponseMessage('Lấy lịch sử đồng bộ nguồn tin tuyển dụng thành công')
   findRuns(@Param('key') key: string, @Query() query: ListCrawlRunsQueryDto) {
     return this.jobIngestionService.findRuns(key, query);
   }
@@ -46,7 +46,7 @@ export class JobSourcesController {
   @Post(':key/sync')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Queue a sync for one external job source' })
-  @ResponseMessage('Job source sync queued')
+  @ResponseMessage('Đã đưa đồng bộ nguồn tin tuyển dụng vào hàng đợi')
   sync(@Param('key') key: string) {
     return this.jobIngestionService.requestSync(key);
   }

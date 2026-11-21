@@ -27,18 +27,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: IJwtAccessPayload): Promise<IUser> {
     if (!payload.sub || payload.type !== 'access') {
-      throw new UnauthorizedException('Invalid token payload');
+      throw new UnauthorizedException('Token không hợp lệ');
     }
 
     // Logout, lock and password change end the session, which must end its access tokens too.
     if (!payload.sid || !(await this.sessionsService.isSessionActive(payload.sid, payload.sub))) {
-      throw new UnauthorizedException('Session đã kết thúc. Vui lòng đăng nhập lại.');
+      throw new UnauthorizedException('Phiên đăng nhập đã kết thúc. Vui lòng đăng nhập lại.');
     }
 
     const user = await this.userModel.findById(payload.sub).select('-password').lean().exec();
 
     if (!user) {
-      throw new UnauthorizedException('User not found. Token không hợp lệ.');
+      throw new UnauthorizedException('Không tìm thấy người dùng. Token không hợp lệ.');
     }
 
     assertAuthenticatedAccountState(user, 'access');
@@ -52,7 +52,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     if (!this.isSystemRole(user.role)) {
-      throw new UnauthorizedException('Role không hợp lệ. Vui lòng liên hệ admin.');
+      throw new UnauthorizedException('Vai trò không hợp lệ. Vui lòng liên hệ quản trị viên.');
     }
 
     return {

@@ -66,16 +66,16 @@ export class ChatToolActionService {
         { _id: action._id },
         { $set: { status: EChatToolActionStatus.EXPIRED } },
       );
-      throw new BadRequestException('Chat tool action has expired');
+      throw new BadRequestException('Thao tác của chatbot đã hết hạn');
     }
 
     if (action.type !== EChatToolActionType.SAVE_JOB) {
-      throw new BadRequestException('Unsupported chat tool action');
+      throw new BadRequestException('Thao tác của chatbot không được hỗ trợ');
     }
 
     const jobId = action.payload?.jobId;
     if (typeof jobId !== 'string' || !Types.ObjectId.isValid(jobId)) {
-      throw new BadRequestException('Invalid chat tool action payload');
+      throw new BadRequestException('Dữ liệu thao tác của chatbot không hợp lệ');
     }
 
     await this.usersService.saveJob(user._id, jobId);
@@ -93,7 +93,7 @@ export class ChatToolActionService {
       actionId: action._id.toString(),
       type: action.type,
       status: EChatToolActionStatus.CONFIRMED,
-      message: 'Job saved successfully',
+      message: 'Lưu tin tuyển dụng thành công',
     };
   }
 
@@ -114,7 +114,7 @@ export class ChatToolActionService {
       actionId: action._id.toString(),
       type: action.type,
       status: EChatToolActionStatus.CANCELED,
-      message: 'Chat tool action canceled',
+      message: 'Đã huỷ thao tác',
     };
   }
 
@@ -123,7 +123,7 @@ export class ChatToolActionService {
     actionId: string,
   ): Promise<ChatToolActionDocument> {
     if (!Types.ObjectId.isValid(actionId)) {
-      throw new BadRequestException('Invalid chat tool action ID format');
+      throw new BadRequestException('ID thao tác của chatbot không đúng định dạng');
     }
 
     const action = await this.chatToolActionModel
@@ -134,11 +134,11 @@ export class ChatToolActionService {
       .exec();
 
     if (!action) {
-      throw new NotFoundException('Chat tool action not found');
+      throw new NotFoundException('Không tìm thấy thao tác của chatbot');
     }
 
     if (action.userId.toString() !== user._id) {
-      throw new ForbiddenException('You cannot access this chat tool action');
+      throw new ForbiddenException('Bạn không có quyền truy cập thao tác này');
     }
 
     return action;

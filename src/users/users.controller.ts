@@ -38,7 +38,7 @@ export class UsersController {
       'API to create a new user with full information including: name, email, password, age, gender, address, company (optional) and role.',
   })
   @ApiBody({ type: CreateUserDto })
-  @ResponseMessage('Create a new user')
+  @ResponseMessage('Tạo người dùng thành công')
   create(@Body() CreateUserDto: CreateUserDto, @User() user: IUser) {
     return this.usersService.create(CreateUserDto, user);
   }
@@ -50,7 +50,7 @@ export class UsersController {
     description:
       'API to get a list of all users with pagination and search. Supports filtering by fields.',
   })
-  @ResponseMessage('Get list users')
+  @ResponseMessage('Lấy danh sách người dùng thành công')
   findAll(@Query() pagination: PaginationQueryDto, @Query() query: string) {
     return this.usersService.findAll(pagination.page, pagination.limit, query);
   }
@@ -62,7 +62,7 @@ export class UsersController {
     description: 'API to update information of a user by ID.',
   })
   @ApiBody({ type: UpdateUserDto })
-  @ResponseMessage('Update user by id')
+  @ResponseMessage('Cập nhật người dùng thành công')
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @User() user: IUser) {
     return this.usersService.update(id, updateUserDto, user);
   }
@@ -74,10 +74,10 @@ export class UsersController {
     description: "Add a job to the user's saved jobs list. Duplicates are automatically prevented.",
   })
   @ApiBody({ type: SaveJobDto })
-  @ResponseMessage('Job saved successfully')
+  @ResponseMessage('Lưu tin tuyển dụng thành công')
   async saveJob(@Body() saveJobDto: SaveJobDto, @User() user: IUser) {
     await this.usersService.saveJob(user._id, saveJobDto.jobId);
-    return { message: 'Job saved successfully' };
+    return { message: 'Lưu tin tuyển dụng thành công' };
   }
 
   @Delete('save-job')
@@ -87,10 +87,10 @@ export class UsersController {
     description: "Remove a job from the user's saved jobs list.",
   })
   @ApiBody({ type: SaveJobDto })
-  @ResponseMessage('Job unsaved successfully')
+  @ResponseMessage('Bỏ lưu tin tuyển dụng thành công')
   async unsaveJob(@Body() saveJobDto: SaveJobDto, @User() user: IUser) {
     await this.usersService.unsaveJob(user._id, saveJobDto.jobId);
-    return { message: 'Job unsaved successfully' };
+    return { message: 'Bỏ lưu tin tuyển dụng thành công' };
   }
 
   @Get('saved-jobs')
@@ -98,7 +98,7 @@ export class UsersController {
     summary: "Get user's saved jobs",
     description: 'Retrieve all jobs that the user has saved with pagination support.',
   })
-  @ResponseMessage('Get saved jobs successfully')
+  @ResponseMessage('Lấy danh sách tin tuyển dụng đã lưu thành công')
   async getSavedJobs(@User() user: IUser, @Query() pagination: PaginationQueryDto) {
     const { page, limit } = resolvePagination(pagination.page, pagination.limit);
     return this.usersService.getSavedJobs(user._id, page, limit);
@@ -111,10 +111,10 @@ export class UsersController {
     description: "Add a company to the user's following list. Maximum 5 companies allowed.",
   })
   @ApiBody({ type: FollowCompanyDto })
-  @ResponseMessage('Company followed successfully')
+  @ResponseMessage('Theo dõi công ty thành công')
   async followCompany(@Body() followCompanyDto: FollowCompanyDto, @User() user: IUser) {
     await this.usersService.followCompany(user._id, followCompanyDto.companyId);
-    return { message: 'Company followed successfully' };
+    return { message: 'Theo dõi công ty thành công' };
   }
 
   @Delete('follow-company')
@@ -124,10 +124,10 @@ export class UsersController {
     description: "Remove a company from the user's following list.",
   })
   @ApiBody({ type: FollowCompanyDto })
-  @ResponseMessage('Company unfollowed successfully')
+  @ResponseMessage('Bỏ theo dõi công ty thành công')
   async unfollowCompany(@Body() followCompanyDto: FollowCompanyDto, @User() user: IUser) {
     await this.usersService.unfollowCompany(user._id, followCompanyDto.companyId);
-    return { message: 'Company unfollowed successfully' };
+    return { message: 'Bỏ theo dõi công ty thành công' };
   }
 
   @Get('following-companies')
@@ -135,7 +135,7 @@ export class UsersController {
     summary: "Get user's following companies",
     description: 'Retrieve all companies that the user is following.',
   })
-  @ResponseMessage('Get following companies successfully')
+  @ResponseMessage('Lấy danh sách công ty đang theo dõi thành công')
   async getFollowingCompanies(@User() user: IUser) {
     return this.usersService.getFollowingCompanies(user._id);
   }
@@ -146,7 +146,7 @@ export class UsersController {
     summary: 'Get information of a user by ID',
     description: 'API to get information of a user by ID.',
   })
-  @ResponseMessage('Get user by id')
+  @ResponseMessage('Lấy thông tin người dùng thành công')
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }
@@ -159,7 +159,7 @@ export class UsersController {
       'Lock a user account that violates rules. All active sessions will be revoked immediately.',
   })
   @ApiBody({ type: LockUserDto })
-  @ResponseMessage('User account locked successfully')
+  @ResponseMessage('Khoá tài khoản thành công')
   lockUser(@Param('id') id: string, @Body() lockUserDto: LockUserDto, @User() user: IUser) {
     return this.usersService.lockUser(id, lockUserDto, user);
   }
@@ -170,7 +170,7 @@ export class UsersController {
     summary: 'Unlock a user account',
     description: 'Restore access to a previously locked user account.',
   })
-  @ResponseMessage('User account unlocked successfully')
+  @ResponseMessage('Mở khoá tài khoản thành công')
   unlockUser(@Param('id') id: string, @User() user: IUser) {
     return this.usersService.unlockUser(id, user);
   }
@@ -182,7 +182,7 @@ export class UsersController {
     description:
       'Soft deletes multiple users by IDs (max 100). The admin account and the requesting user cannot be deleted.',
   })
-  @ResponseMessage('Bulk delete users')
+  @ResponseMessage('Xoá nhiều người dùng thành công')
   bulkRemove(@Body() bulkDeleteDto: BulkDeleteDto, @User() user: IUser) {
     return this.usersService.bulkRemove(bulkDeleteDto.ids, user);
   }
@@ -193,7 +193,7 @@ export class UsersController {
     summary: 'Delete a user by ID',
     description: 'API to delete a user by ID.',
   })
-  @ResponseMessage('Delete user by id')
+  @ResponseMessage('Xoá người dùng thành công')
   remove(@Param('id') id: string, @User() user: IUser) {
     return this.usersService.remove(id, user);
   }

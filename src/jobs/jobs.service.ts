@@ -199,7 +199,7 @@ export class JobsService {
       id,
       isAdmin || hrCompanyId ? undefined : PUBLIC_JOB_PROJECTION,
     );
-    const notFound = new NotFoundException(`Job with ID ${id} not found`);
+    const notFound = new NotFoundException(`Không tìm thấy tin tuyển dụng có ID ${id}`);
 
     if (!job) {
       throw notFound;
@@ -336,7 +336,7 @@ export class JobsService {
 
     const job = await this.jobRepository.findById(id);
     if (!job) {
-      throw new NotFoundException(`Job with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy tin tuyển dụng có ID ${id}`);
     }
 
     await this.jobRepository.updateOne(
@@ -388,13 +388,13 @@ export class JobsService {
     // HR can only delete jobs belonging to their own company
     if (user.role === ERole.HR) {
       if (!user.company?._id) {
-        throw new ForbiddenException('HR user must be associated with a company');
+        throw new ForbiddenException('Tài khoản HR phải được gắn với một công ty');
       }
 
       const ownedCount = await this.jobRepository.countJobsOwnedByCompany(ids, user.company._id);
 
       if (ownedCount !== ids.length) {
-        throw new ForbiddenException('You can only delete jobs that belong to your company');
+        throw new ForbiddenException('Bạn chỉ có thể xoá tin tuyển dụng của công ty mình');
       }
     }
 
@@ -662,7 +662,7 @@ export class JobsService {
       return;
     }
 
-    throw new BadRequestException('Invalid skills filter format');
+    throw new BadRequestException('Bộ lọc kỹ năng không đúng định dạng');
   }
 
   private normalizeLocationFilter(filter: Record<string, any>): void {
@@ -711,7 +711,7 @@ export class JobsService {
     user: IUser,
   ): Promise<void> {
     if (!job) {
-      throw new NotFoundException(`Job with ID ${jobId} not found`);
+      throw new NotFoundException(`Không tìm thấy tin tuyển dụng có ID ${jobId}`);
     }
 
     if (user.role === ERole.HR) {
@@ -736,7 +736,7 @@ export class JobsService {
     const resolvedLocation = resolveLocationPayload({ location, locationCode });
 
     if (!resolvedLocation) {
-      throw new BadRequestException('A valid locationCode or location is required');
+      throw new BadRequestException('Cần locationCode hoặc location hợp lệ');
     }
 
     return resolvedLocation;

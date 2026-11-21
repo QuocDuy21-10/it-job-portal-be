@@ -8,7 +8,11 @@ import {
 import * as Sentry from '@sentry/nestjs';
 import { SentryGlobalFilter } from '@sentry/nestjs/setup';
 import mongoose from 'mongoose';
-import { AppExceptionFilter, toErrorResponse } from './app-exception.filter';
+import {
+  AppExceptionFilter,
+  toErrorResponse,
+  translateFrameworkMessage,
+} from './app-exception.filter';
 
 // Keep the real module so '@sentry/nestjs/setup' still loads; only stub captureException.
 jest.mock('@sentry/nestjs', () => ({
@@ -31,6 +35,29 @@ function httpHost(headersSent = false) {
   return { host, res };
 }
 
+describe('translateFrameworkMessage', () => {
+  it.each([
+    ['Forbidden resource', 'Bạn không có quyền thực hiện thao tác này'],
+    ['Forbidden', 'Bạn không có quyền thực hiện thao tác này'],
+    ['Unauthorized', 'Bạn cần đăng nhập để tiếp tục'],
+    ['Cannot GET /api/v1/nope', 'Không tìm thấy đường dẫn GET /api/v1/nope'],
+    ['Not Found', 'Không tìm thấy tài nguyên'],
+    ['ThrottlerException: Too Many Requests', 'Bạn gửi quá nhiều yêu cầu. Vui lòng thử lại sau.'],
+    ['Validation failed (numeric string is expected)', 'Giá trị phải là số nguyên'],
+  ])('%s', (input, expected) => {
+    expect(translateFrameworkMessage(input)).toBe(expected);
+  });
+
+  it('leaves other messages and message arrays alone', () => {
+    expect(translateFrameworkMessage('Không tìm thấy công ty')).toBe('Không tìm thấy công ty');
+    expect(translateFrameworkMessage(['a', 'b'])).toEqual(['a', 'b']);
+  });
+
+  it('is applied to Nest exceptions thrown without a message', () => {
+    expect(toErrorResponse(new NotFoundException()).body.message).toBe('Không tìm thấy tài nguyên');
+  });
+});
+
 describe('toErrorResponse', () => {
   const multerError = (code: string, message: string) =>
     Object.assign(new Error(message), { name: 'MulterError', code });
@@ -40,7 +67,7 @@ describe('toErrorResponse', () => {
       multerError('LIMIT_UNEXPECTED_FILE', 'Unexpected file field'),
     );
     expect(status).toBe(400);
-    expect(body).toMatchObject({ message: 'Unexpected file field', error: 'Bad Request' });
+    expect(body).toMatchObject({ message: 'Trường tệp không hợp lệ', error: 'Bad Request' });
     expect(capture).toBe(false);
   });
 
@@ -87,7 +114,7 @@ describe('toErrorResponse', () => {
     });
     const { status, body, capture } = toErrorResponse(error);
     expect(status).toBe(409);
-    expect(body).toEqual({ message: 'Resource already exists', error: 'Conflict' });
+    expect(body).toEqual({ message: 'Dữ liệu đã tồn tại', error: 'Conflict' });
     expect(JSON.stringify(body)).not.toContain('a@b.c');
     expect(capture).toBe(false);
   });
@@ -96,7 +123,7 @@ describe('toErrorResponse', () => {
     const error = new mongoose.Error.CastError('ObjectId', 'abc', '_id');
     expect(toErrorResponse(error)).toEqual({
       status: 400,
-      body: { message: 'Invalid value for _id', error: 'Bad Request' },
+      body: { message: 'Giá trị của _id không hợp lệ', error: 'Bad Request' },
       capture: false,
     });
   });
@@ -105,17 +132,24 @@ describe('toErrorResponse', () => {
     const error = new mongoose.Error.ValidationError();
     error.addError(
       'name',
-      new mongoose.Error.ValidatorError({ message: 'name is required', path: 'name' }),
+      new mongoose.Error.ValidatorError({
+        message: 'name is required',
+        path: 'name',
+        type: 'required',
+      }),
     );
     const { status, body } = toErrorResponse(error);
     expect(status).toBe(400);
-    expect(body).toEqual({ message: ['name is required'], error: 'Bad Request' });
+    expect(body).toEqual({ message: ['name là bắt buộc'], error: 'Bad Request' });
   });
 
   it('hides unknown errors behind a generic 500 and asks for capture', () => {
     const { status, body, capture } = toErrorResponse(new Error('db password is hunter2'));
     expect(status).toBe(500);
-    expect(body).toEqual({ message: 'Internal server error', error: 'Internal Server Error' });
+    expect(body).toEqual({
+      message: 'Lỗi máy chủ. Vui lòng thử lại sau.',
+      error: 'Internal Server Error',
+    });
     expect(capture).toBe(true);
   });
 });
