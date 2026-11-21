@@ -20,7 +20,9 @@ export enum ChatGuardrailRiskLevel {
 
 export class ChatGuardrailBlockedException extends BadRequestException {
   constructor(readonly flags: string[]) {
-    super('Your message appears to contain instructions that cannot be processed by the chatbot.');
+    super(
+      'Tin nhắn có chứa chỉ thị mà chatbot không thể xử lý. / Your message appears to contain instructions that cannot be processed by the chatbot.',
+    );
   }
 }
 
@@ -70,7 +72,8 @@ export class ChatGuardrailService {
       flag: 'code_generation_request',
       pattern:
         /(write|generate|create)\s+(me\s+|the\s+)?(an?\s+|some\s+)?(html|css|javascript|python|sql|code|program|script)\b/i,
-      riskLevel: ChatGuardrailRiskLevel.HIGH,
+      // Flag only: blocking hit technical interview questions; prompt rule 8 and the topic guard stop code output.
+      riskLevel: ChatGuardrailRiskLevel.MEDIUM,
     },
     {
       flag: 'vi_injection',
@@ -108,11 +111,13 @@ export class ChatGuardrailService {
     const inspection = this.inspectMessage(sanitizedMessage);
 
     if (!sanitizedMessage) {
-      throw new BadRequestException('Message cannot be empty');
+      throw new BadRequestException('Tin nhắn không được để trống. / Message cannot be empty');
     }
 
     if (!/[\p{L}\p{N}]/u.test(sanitizedMessage)) {
-      throw new BadRequestException('Message must contain some text');
+      throw new BadRequestException(
+        'Tin nhắn cần có chữ hoặc số. / Message must contain some text',
+      );
     }
 
     if (inspection.riskLevel === ChatGuardrailRiskLevel.HIGH) {
@@ -135,7 +140,8 @@ export class ChatGuardrailService {
 
   sanitizeAssistantOutput(output: string): ChatOutputGuardrailResult {
     const flags = new Set<string>();
-    let sanitizedOutput = this.sanitizeMessage(output);
+    // No trim: output is sanitized per stream chunk, and trimming chunks glued words together.
+    let sanitizedOutput = this.stripControlCharacters(output);
 
     if (/<script[\s>]/i.test(sanitizedOutput) || /<\/script>/i.test(sanitizedOutput)) {
       flags.add('output_script_removed');
@@ -144,7 +150,7 @@ export class ChatGuardrailService {
 
     if (/\son[a-z]+\s*=/i.test(sanitizedOutput)) {
       flags.add('output_event_handler_removed');
-      sanitizedOutput = sanitizedOutput.replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, '');
+      sanitizedOutput = sanitizedOutput.replace(/\son[a-z]+\s*=\s*(?:(['"]).*?\1|[^\s>]+)/gi, '');
     }
 
     if (/javascript:/i.test(sanitizedOutput)) {
@@ -160,7 +166,11 @@ export class ChatGuardrailService {
   }
 
   private sanitizeMessage(message: string): string {
-    return message.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim();
+    return this.stripControlCharacters(message).trim();
+  }
+
+  private stripControlCharacters(text: string): string {
+    return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
   }
 
   private detectInputPatterns(

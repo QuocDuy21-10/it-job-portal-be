@@ -9,6 +9,8 @@ export class TooManyRequestsException extends HttpException {
 
 export class ChatQuotaExceededException extends TooManyRequestsException {
   constructor(readonly quota: IChatQuotaStatus) {
-    super('Daily chatbot quota exceeded. Please try again after the quota resets.');
+    super(
+      'Bạn đã dùng hết lượt chat hôm nay. Vui lòng thử lại sau khi hạn mức được làm mới. / Daily chatbot quota exceeded. Please try again after the quota resets.',
+    );
   }
 }

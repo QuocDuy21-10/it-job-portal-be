@@ -62,17 +62,30 @@ describe('ChatGuardrailService', () => {
     });
   });
 
+  it('removes unquoted event handlers from assistant output', () => {
+    expect(service.sanitizeAssistantOutput('<img src=x onerror=alert(1)>')).toMatchObject({
+      sanitizedOutput: '<img src=x>',
+      flags: ['output_event_handler_removed'],
+    });
+  });
+
+  it('keeps leading and trailing spaces of streamed output chunks', () => {
+    expect(service.sanitizeAssistantOutput(' đã tham').sanitizedOutput).toBe(' đã tham');
+    expect(service.sanitizeAssistantOutput('Tôi ').sanitizedOutput).toBe('Tôi ');
+  });
+
   describe('new injection patterns', () => {
-    it('blocks direct code generation requests', () => {
-      expect(() => service.validateMessage('Write me an HTML page')).toThrow(
-        ChatGuardrailBlockedException,
-      );
-      expect(() => service.validateMessage('Generate a Python script for me')).toThrow(
-        ChatGuardrailBlockedException,
-      );
-      expect(() => service.validateMessage('Create some CSS code')).toThrow(
-        ChatGuardrailBlockedException,
-      );
+    it('flags code generation requests without blocking them', () => {
+      for (const message of [
+        'Write me an HTML page',
+        'Generate a Python script for me',
+        'Câu phỏng vấn: write a SQL query to find duplicate emails?',
+      ]) {
+        expect(service.validateMessage(message)).toMatchObject({
+          flags: ['code_generation_request'],
+          riskLevel: ChatGuardrailRiskLevel.MEDIUM,
+        });
+      }
     });
 
     it('allows legitimate career questions that mention technologies', () => {
