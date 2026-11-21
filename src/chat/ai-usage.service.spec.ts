@@ -47,6 +47,19 @@ describe('AiUsageService', () => {
     );
   });
 
+  it('stores time to first token from the provider metadata', async () => {
+    await service.record({
+      userId: '507f1f77bcf86cd799439011',
+      operationType: 'chat_stream',
+      success: true,
+      metadata: { provider: 'groq', latencyMs: 2400, timeToFirstTokenMs: 380 },
+    });
+
+    expect(model.create).toHaveBeenCalledWith(
+      expect.objectContaining({ latencyMs: 2400, timeToFirstTokenMs: 380 }),
+    );
+  });
+
   it('returns summarized usage metrics', async () => {
     model.aggregate
       .mockResolvedValueOnce([

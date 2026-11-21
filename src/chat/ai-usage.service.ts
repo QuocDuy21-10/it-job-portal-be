@@ -72,6 +72,7 @@ export class AiUsageService {
         totalTokens: input.metadata?.totalTokens,
         estimatedPromptTokens: input.metadata?.estimatedPromptTokens,
         latencyMs: input.metadata?.latencyMs ?? input.latencyMs,
+        timeToFirstTokenMs: input.metadata?.timeToFirstTokenMs,
         estimatedCostUsd: cost.estimatedCostUsd,
         costEstimated: cost.costEstimated,
         cacheHit: input.cacheHit ?? false,
