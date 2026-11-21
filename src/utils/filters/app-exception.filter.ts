@@ -29,6 +29,16 @@ export function toErrorResponse(exception: unknown): ErrorResponse {
     };
   }
 
+  // body-parser throws a plain error with type 'entity.too.large' and status 413.
+  const bodyParserError = exception as { type?: unknown; status?: unknown } | null;
+  if (bodyParserError?.type === 'entity.too.large' || bodyParserError?.status === 413) {
+    return {
+      status: HttpStatus.PAYLOAD_TOO_LARGE,
+      body: { message: 'Request body is too large', error: 'Payload Too Large' },
+      capture: false,
+    };
+  }
+
   if ((exception as { code?: unknown } | null)?.code === 11000) {
     return {
       status: HttpStatus.CONFLICT,
