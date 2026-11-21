@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -129,16 +124,14 @@ export class ChatToolActionService {
     const action = await this.chatToolActionModel
       .findOne({
         _id: new Types.ObjectId(actionId),
+        // Scoped to the owner so another user's action is a 404, not a 403 that confirms it exists.
+        userId: new Types.ObjectId(user._id),
         status: EChatToolActionStatus.PENDING,
       })
       .exec();
 
     if (!action) {
       throw new NotFoundException('Không tìm thấy thao tác của chatbot');
-    }
-
-    if (action.userId.toString() !== user._id) {
-      throw new ForbiddenException('Bạn không có quyền truy cập thao tác này');
     }
 
     return action;

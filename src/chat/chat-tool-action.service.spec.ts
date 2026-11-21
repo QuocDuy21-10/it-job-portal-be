@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { ChatToolActionService } from './chat-tool-action.service';
 import { EChatToolActionStatus, EChatToolActionType } from './enums/chat-tool-action.enum';
@@ -91,16 +91,18 @@ describe('ChatToolActionService', () => {
     expect(result.status).toBe(EChatToolActionStatus.CONFIRMED);
   });
 
-  it('rejects actions owned by another user', async () => {
-    model.findOne.mockReturnValue({
-      exec: jest
-        .fn()
-        .mockResolvedValue(
-          createAction({ userId: new Types.ObjectId('507f1f77bcf86cd799439099') }),
-        ),
-    });
+  it('answers 404 for an action owned by another user, same as a missing one', async () => {
+    model.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
 
-    await expect(service.confirm(user, actionId)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.confirm(user, actionId)).rejects.toThrow(
+      new NotFoundException('Không tìm thấy thao tác của chatbot'),
+    );
+    expect(model.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _id: new Types.ObjectId(actionId),
+        userId: new Types.ObjectId(userId),
+      }),
+    );
   });
 
   it('rejects expired actions and marks them expired', async () => {
