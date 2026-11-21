@@ -21,6 +21,8 @@ export class ChatContextService {
   private readonly CACHE_TTL_PLATFORM_CONTEXT = 1800000; // 30 minutes
   private readonly CACHE_PREFIX_CTX = 'chat_ctx:';
   private readonly CACHE_KEY_PLATFORM = 'chat_platform_ctx';
+  private readonly CACHE_KEY_HIRING_COMPANIES = 'chat_hiring_companies';
+  private readonly RANKING_KEYWORDS = ['cao nhat', 'highest', 'luong cao'];
 
   // Stats keywords for Vietnamese + English
   private readonly STATS_KEYWORDS = [
@@ -156,17 +158,32 @@ export class ChatContextService {
     const detectedSkills = this.detectSkillsInMessage(lowerMessage, platform, aliasMap);
 
     // 3. Detect company names from message
-    const detectedCompanyNames = this.detectCompaniesInMessage(lowerMessage, platform);
+    const detectedCompanyNames = await this.detectCompaniesInMessage(lowerMessage);
 
     // Fetch data in parallel
     const promises: Promise<void>[] = [];
 
     if (detectedSkills.length > 0) {
+      const sortBy = this.isRankingQuery(lowerMessage) ? 'salary' : 'newest';
+
       promises.push(
-        this.jobsService
-          .searchJobs(detectedSkills, undefined, undefined, 10)
-          .then(jobs => {
+        Promise.all([
+          this.jobsService.searchJobs(detectedSkills, undefined, undefined, 10, sortBy),
+          this.jobsService.getJobSearchStats(detectedSkills).catch(err => {
+            this.logger.warn('Error fetching job stats for detected skills:', err);
+            return null;
+          }),
+        ])
+          .then(([jobs, stats]) => {
             result.detectedJobs = jobs;
+            if (stats) {
+              result.jobStats = {
+                skills: detectedSkills,
+                total: stats.total,
+                shown: jobs.length,
+                highestSalary: stats.highestSalary,
+              };
+            }
           })
           .catch(err => {
             this.logger.warn('Error fetching jobs for detected skills:', err);
@@ -238,15 +255,50 @@ export class ChatContextService {
       .trim();
   }
 
-  private detectCompaniesInMessage(lowerMessage: string, platform: PlatformContext): string[] {
-    const detected: string[] = [];
+  private async detectCompaniesInMessage(lowerMessage: string): Promise<string[]> {
+    const names = await this.getHiringCompanyNames();
+    const paddedMessage = ` ${this.normalizeForMatch(lowerMessage)} `;
 
-    for (const company of platform.topCompanies) {
-      if (company.name && lowerMessage.includes(company.name.toLowerCase())) {
-        detected.push(company.name);
-      }
+    return names
+      .map(name => ({ name, normalized: this.normalizeForMatch(name) }))
+      .filter(
+        ({ normalized }) => normalized.length >= 3 && paddedMessage.includes(` ${normalized} `),
+      )
+      .sort((a, b) => b.normalized.length - a.normalized.length)
+      .map(({ name }) => name);
+  }
+
+  private async getHiringCompanyNames(): Promise<string[]> {
+    const cached = await this.cacheManager.get<string[]>(this.CACHE_KEY_HIRING_COMPANIES);
+    if (cached) return cached;
+
+    try {
+      const names = await this.jobsService.getHiringCompanyNames();
+      await this.cacheManager.set(
+        this.CACHE_KEY_HIRING_COMPANIES,
+        names,
+        this.CACHE_TTL_PLATFORM_CONTEXT,
+      );
+      return names;
+    } catch (error) {
+      this.logger.warn('Error loading hiring company names for chat context:', error);
+      return [];
     }
+  }
 
-    return detected;
+  private isRankingQuery(lowerMessage: string): boolean {
+    const normalized = this.normalizeForMatch(lowerMessage);
+    return this.RANKING_KEYWORDS.some(keyword => normalized.includes(keyword));
+  }
+
+  // "đ" has no Unicode decomposition, so it needs its own replacement.
+  private normalizeForMatch(value: string): string {
+    return value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
   }
 }

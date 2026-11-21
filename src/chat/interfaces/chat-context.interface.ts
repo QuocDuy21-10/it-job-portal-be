@@ -1,3 +1,4 @@
+import { JobSalarySummary } from 'src/jobs/job-search-stats.interface';
 import { MatchResultDto } from 'src/matching/dto/match-result.dto';
 import { EChatIntent } from '../enums/chat-intent.enum';
 
@@ -32,6 +33,13 @@ export interface QueryAwareContext {
     jobCount: number;
   }>;
   includeStats: boolean;
+  // Real DB numbers; detectedJobs is only a sample of at most 10 jobs.
+  jobStats?: {
+    skills: string[];
+    total: number;
+    shown: number;
+    highestSalary: JobSalarySummary | null;
+  };
 }
 
 export interface FullChatContext {
