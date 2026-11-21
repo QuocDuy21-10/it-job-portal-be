@@ -82,4 +82,50 @@ describe('ChatPromptBuilder', () => {
     expect(prompt).toContain('Vietnamese');
     expect(prompt).toContain('diacritical marks');
   });
+
+  describe('job statistics and accuracy rules', () => {
+    const jobContext: IntentAwareChatContext = {
+      ...baseContext,
+      intent: EChatIntent.JOB_ADVISOR,
+      queryAware: {
+        ...baseContext.queryAware,
+        detectedJobs: [{ _id: 'job-2', name: 'Node Developer', salary: 1 }],
+        jobStats: {
+          skills: ['Node.js'],
+          total: 38,
+          shown: 1,
+          highestSalary: { id: 'job-top', name: 'Lead', company: 'VNG', salary: 173500000 },
+        },
+      },
+    };
+
+    it('prints SEARCH STATS before SEARCH RESULTS', () => {
+      const prompt = builder.buildSystemPrompt(jobContext);
+
+      expect(prompt).toContain('SEARCH STATS: {"skills":["Node.js"],"total":38');
+      expect(prompt.indexOf('SEARCH STATS')).toBeLessThan(prompt.indexOf('SEARCH RESULTS'));
+    });
+
+    it('omits SEARCH STATS when there are none', () => {
+      const prompt = builder.buildSystemPrompt({
+        ...jobContext,
+        queryAware: { ...jobContext.queryAware, jobStats: undefined },
+      });
+
+      expect(prompt).not.toContain('SEARCH STATS: ');
+    });
+
+    it('tells the model not to count list items and not to invent user facts', () => {
+      const prompt = builder.buildSystemPrompt(jobContext);
+
+      expect(prompt).toContain('State a total only when SEARCH STATS provides `total`');
+      expect(prompt).toContain('Never infer or fill in missing personal facts');
+    });
+
+    it('teaches the model to propose saving a listed job instead of refusing', () => {
+      const prompt = builder.buildSystemPrompt(jobContext);
+
+      expect(prompt).toContain('never say you cannot save jobs');
+    });
+  });
 });

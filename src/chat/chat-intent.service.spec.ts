@@ -107,4 +107,24 @@ describe('ChatIntentService', () => {
       }),
     );
   });
+
+  it('routes questions about open positions to job advisor, not general', async () => {
+    await expect(
+      service.detectIntent({
+        message: 'FPT Software hiện có bao nhiêu vị trí đang tuyển trên DevLink?',
+        allowAiFallback: false,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({ intent: EChatIntent.JOB_ADVISOR, source: 'deterministic' }),
+    );
+  });
+
+  it('matches Vietnamese keywords that contain đ', async () => {
+    await expect(
+      service.detectIntent({
+        message: 'Làm sao để đăng ký tài khoản?',
+        allowAiFallback: false,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ intent: EChatIntent.FAQ }));
+  });
 });

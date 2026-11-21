@@ -101,6 +101,10 @@ export class ChatIntentService {
       'ky nang',
       'interview',
       'phong van',
+      'vi tri',
+      'tuyen dung',
+      'dang tuyen',
+      'hiring',
     ]);
 
     const hasMessageSignal = scores.size > 0;
@@ -229,6 +233,7 @@ export class ChatIntentService {
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
       .replace(/[^\w\s]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
