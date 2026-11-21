@@ -93,6 +93,7 @@ Thiếu cấu hình SMTP không làm ứng dụng từ chối khởi động nh�
 | `GROQ_MAX_RETRIES` | Không | `2` | Số lần SDK thử lại |
 | `AI_CHAT_PRIMARY_PROVIDER` | Không | `groq` | Nhà cung cấp chính cho chat (`gemini` hoặc `groq`) |
 | `AI_CHAT_GEMINI_FALLBACK_ENABLED` | Không | bật | Cho phép dự phòng Gemini khi chat |
+| `AI_CHAT_FIRST_TOKEN_TIMEOUT_MS` | Không | `20000` | Thời gian chờ token đầu tiên khi stream chat; quá hạn thì hủy nhà cung cấp chính và dự phòng Gemini |
 | `AI_SUMMARY_PRIMARY_PROVIDER` | Không | `groq` | Nhà cung cấp chính cho tóm tắt |
 | `AI_SUMMARY_GEMINI_FALLBACK_ENABLED` | Không | bật | Cho phép dự phòng Gemini khi tóm tắt |
 | `AI_COST_GROQ_PROMPT_USD_PER_1K` | Không | `0` | Đơn giá token đầu vào để ước tính chi phí (mẫu khác: `AI_COST_PROMPT_USD_PER_1K`) |
