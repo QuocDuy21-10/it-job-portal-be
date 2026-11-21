@@ -268,6 +268,11 @@ export class GroqService {
     }
 
     if (error instanceof APIError) {
+      // Groq answers 400 json_validate_failed when the model breaks the response schema; Gemini can still answer.
+      if (error.status === 400 && error.message.includes('json_validate_failed')) {
+        return true;
+      }
+
       return typeof error.status === 'number' && error.status >= 500;
     }
 

@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { APIError } from 'groq-sdk';
 import { GroqService } from './groq.service';
 
 describe('GroqService', () => {
@@ -186,6 +187,26 @@ describe('GroqService', () => {
     expect(
       service.isFallbackEligibleError(new Error('Groq returned invalid structured chat response')),
     ).toBe(true);
+  });
+
+  it('treats Groq json_validate_failed as fallback-eligible but not other 400s', () => {
+    const { service } = createService({ GROQ_API_KEY: 'test-key' });
+    const headers = new Headers();
+    const jsonFailed = APIError.generate(
+      400,
+      { error: { message: 'Failed to generate JSON', code: 'json_validate_failed' } },
+      undefined,
+      headers,
+    );
+    const badRequest = APIError.generate(
+      400,
+      { error: { message: 'Invalid model', code: 'model_not_found' } },
+      undefined,
+      headers,
+    );
+
+    expect(service.isFallbackEligibleError(jsonFailed)).toBe(true);
+    expect(service.isFallbackEligibleError(badRequest)).toBe(false);
   });
 
   it('throws a Groq fallback-eligible error when structured JSON has invalid types', async () => {

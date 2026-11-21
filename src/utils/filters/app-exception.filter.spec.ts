@@ -48,6 +48,18 @@ describe('toErrorResponse', () => {
     expect(toErrorResponse(multerError('LIMIT_FILE_SIZE', 'File too large')).status).toBe(413);
   });
 
+  it('maps an oversized JSON body (body-parser) to 413 without capture', () => {
+    const error = Object.assign(new Error('request entity too large'), {
+      type: 'entity.too.large',
+      status: 413,
+    });
+    expect(toErrorResponse(error)).toMatchObject({
+      status: 413,
+      body: { error: 'Payload Too Large' },
+      capture: false,
+    });
+  });
+
   it('keeps the HttpException body, including extra fields', () => {
     const { status, body, capture } = toErrorResponse(
       new UnauthorizedException({ message: 'Validation failed', errors: [{ property: 'email' }] }),
