@@ -8,6 +8,7 @@ import {
   AI_PROVIDER_GEMINI,
   AI_PROVIDER_GROQ,
   DEFAULT_AI_CHAT_FALLBACK_ENABLED,
+  DEFAULT_AI_CHAT_FIRST_TOKEN_TIMEOUT_MS,
   DEFAULT_AI_CHAT_PRIMARY_PROVIDER,
   DEFAULT_AI_GROQ_HISTORY_LIMIT,
   DEFAULT_AI_GROQ_MAX_COMPANY_ITEMS,
@@ -25,6 +26,12 @@ import { IAIChatResponse } from './interfaces/ai-chat-response.interface';
 import { IAIChatStreamResult } from './interfaces/ai-chat-stream-result.interface';
 import { TopicGuardClassification } from './interfaces/topic-guard-classification.interface';
 
+class ChatFirstTokenTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Chat provider first token timeout after ${timeoutMs}ms`);
+  }
+}
+
 @Injectable()
 export class AIService {
   private readonly logger = new Logger(AIService.name);
@@ -32,6 +39,7 @@ export class AIService {
   private readonly summaryPrimaryProvider: AIProvider;
   private readonly isChatFallbackEnabled: boolean;
   private readonly isSummaryFallbackEnabled: boolean;
+  private readonly chatFirstTokenTimeoutMs: number;
   private readonly groqHistoryLimit: number;
   private readonly groqMaxInputTokens: number;
   private readonly groqMaxMatchingJobs: number;
@@ -61,6 +69,10 @@ export class AIService {
     this.isSummaryFallbackEnabled = this.readBooleanConfig(
       'AI_SUMMARY_GEMINI_FALLBACK_ENABLED',
       DEFAULT_AI_SUMMARY_FALLBACK_ENABLED,
+    );
+    this.chatFirstTokenTimeoutMs = this.readOptionalPositiveIntConfig(
+      'AI_CHAT_FIRST_TOKEN_TIMEOUT_MS',
+      DEFAULT_AI_CHAT_FIRST_TOKEN_TIMEOUT_MS,
     );
     this.groqHistoryLimit = this.readRequiredPositiveIntConfig(
       'AI_GROQ_HISTORY_LIMIT',
@@ -148,7 +160,9 @@ export class AIService {
     message: string,
     conversationHistory: IAIChatMessage[],
     systemPrompt: string,
+    signal?: AbortSignal,
   ): AsyncGenerator<string, IAIChatStreamResult, unknown> {
+    const startedAt = Date.now();
     const primaryProvider = this.chatPrimaryProvider;
     const preparedRequest = this.prepareChatRequest(
       primaryProvider,
@@ -156,36 +170,29 @@ export class AIService {
       conversationHistory,
       systemPrompt,
     );
+    const primaryController = new AbortController();
+    const primarySignal = signal
+      ? AbortSignal.any([signal, primaryController.signal])
+      : primaryController.signal;
+    const primaryGenerator = this.streamChatWithProvider(
+      primaryProvider,
+      message,
+      preparedRequest.conversationHistory,
+      preparedRequest.systemPrompt,
+      primarySignal,
+    );
 
-    let emittedChunk = false;
-
+    let firstResult: IteratorResult<string, IAIChatStreamResult>;
     try {
-      const primaryGenerator = this.streamChatWithProvider(
-        primaryProvider,
-        message,
-        preparedRequest.conversationHistory,
-        preparedRequest.systemPrompt,
-      );
-
-      let nextResult = await primaryGenerator.next();
-      while (!nextResult.done) {
-        emittedChunk = true;
-        yield nextResult.value as string;
-        nextResult = await primaryGenerator.next();
-      }
-
-      return nextResult.value;
+      firstResult = await this.awaitFirstChunk(primaryGenerator, primaryController);
     } catch (error) {
-      if (
-        emittedChunk ||
-        !this.shouldFallbackToGemini(primaryProvider, error, this.isChatFallbackEnabled)
-      ) {
+      if (signal?.aborted || !this.canFallbackStream(primaryProvider, error)) {
         throw error;
       }
 
       this.logger.warn(
         `Primary streaming provider ${primaryProvider} failed before the first token. Falling back to Gemini.`,
-        error instanceof Error ? error.stack : undefined,
+        error instanceof Error ? error.message : undefined,
       );
 
       const fallbackGenerator = this.streamChatWithProvider(
@@ -193,19 +200,12 @@ export class AIService {
         message,
         conversationHistory,
         systemPrompt,
+        signal,
       );
-
-      let nextResult = await fallbackGenerator.next();
-      while (!nextResult.done) {
-        yield nextResult.value as string;
-        nextResult = await fallbackGenerator.next();
-      }
-
-      return {
-        ...(nextResult.value as IAIChatStreamResult),
-        fallbackUsed: true,
-      };
+      return yield* this.streamWithTiming(fallbackGenerator, startedAt, true);
     }
+
+    return yield* this.streamWithTiming(primaryGenerator, startedAt, false, firstResult);
   }
 
   async summarizeConversation(messages: IAIChatMessage[]): Promise<string> {
@@ -326,12 +326,14 @@ export class AIService {
     message: string,
     conversationHistory: IAIChatMessage[],
     systemPrompt: string,
+    signal?: AbortSignal,
   ): AsyncGenerator<string, IAIChatStreamResult, unknown> {
     if (provider === AI_PROVIDER_GROQ) {
       return this.groqService.chatWithContextStreamAndTools(
         message,
         conversationHistory,
         systemPrompt,
+        signal,
       );
     }
 
@@ -339,7 +341,61 @@ export class AIService {
       message,
       conversationHistory,
       systemPrompt,
+      signal,
     );
+  }
+
+  private async awaitFirstChunk(
+    generator: AsyncGenerator<string, IAIChatStreamResult, unknown>,
+    controller: AbortController,
+  ): Promise<IteratorResult<string, IAIChatStreamResult>> {
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new ChatFirstTokenTimeoutError(this.chatFirstTokenTimeoutMs));
+      }, this.chatFirstTokenTimeoutMs);
+    });
+
+    try {
+      return await Promise.race([generator.next(), timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private async *streamWithTiming(
+    generator: AsyncGenerator<string, IAIChatStreamResult, unknown>,
+    startedAt: number,
+    fallbackUsed: boolean,
+    firstResult?: IteratorResult<string, IAIChatStreamResult>,
+  ): AsyncGenerator<string, IAIChatStreamResult, unknown> {
+    let result = firstResult ?? (await generator.next());
+    let timeToFirstTokenMs: number | undefined;
+
+    while (!result.done) {
+      timeToFirstTokenMs ??= Date.now() - startedAt;
+      yield result.value as string;
+      result = await generator.next();
+    }
+
+    const streamResult = result.value;
+    return {
+      ...streamResult,
+      ...(fallbackUsed ? { fallbackUsed: true } : {}),
+      metadata: {
+        ...(streamResult.metadata ?? { provider: streamResult.provider }),
+        timeToFirstTokenMs,
+      },
+    };
+  }
+
+  private canFallbackStream(primaryProvider: AIProvider, error: unknown): boolean {
+    if (error instanceof ChatFirstTokenTimeoutError) {
+      return this.isChatFallbackEnabled && primaryProvider === AI_PROVIDER_GROQ;
+    }
+
+    return this.shouldFallbackToGemini(primaryProvider, error, this.isChatFallbackEnabled);
   }
 
   private summarizeConversationWithProvider(
@@ -565,6 +621,20 @@ export class AIService {
     }
 
     return ['1', 'true', 'yes', 'on'].includes(value);
+  }
+
+  private readOptionalPositiveIntConfig(key: string, fallback: number): number {
+    const rawValue = this.configService.get<string>(key)?.trim();
+    if (!rawValue) {
+      return fallback;
+    }
+
+    const parsedValue = Number.parseInt(rawValue, 10);
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+      throw new Error(`${key} must be a positive integer. Default: ${fallback}.`);
+    }
+
+    return parsedValue;
   }
 
   private readRequiredPositiveIntConfig(key: string, recommendedValue: number): number {

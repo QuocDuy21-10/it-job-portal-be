@@ -27,6 +27,7 @@ Nguồn: [ai.constants.ts](../../src/ai/ai.constants.ts) (`DEFAULT_AI_CHAT_PRIMA
 | `GEMINI_DAILY_BUDGET` và các biến dự trữ | Ngân sách quota | 450 mỗi ngày, 15 mỗi phút |
 | `AI_CHAT_PRIMARY_PROVIDER`, `AI_SUMMARY_PRIMARY_PROVIDER` | Đổi nhà cung cấp chính | `groq` |
 | `AI_CHAT_GEMINI_FALLBACK_ENABLED`, `AI_SUMMARY_GEMINI_FALLBACK_ENABLED` | Bật tắt dự phòng | bật |
+| `AI_CHAT_FIRST_TOKEN_TIMEOUT_MS` | Thời gian chờ token đầu tiên khi stream chat | 20000 |
 | `AI_GROQ_*` (lịch sử, token đầu vào, số tin, ...) | Ngân sách ngữ cảnh gửi cho Groq | `.env.example` ghi là bắt buộc, `AIService` kiểm tra |
 | `AI_COST_[<PROVIDER>_][<MODEL>_]<PROMPT\|COMPLETION>_USD_PER_1K` | Đơn giá để ước tính chi phí; không đặt thì chi phí ghi 0 | 0 |
 
@@ -34,7 +35,9 @@ Danh sách đầy đủ: `.env.example` và `14-reference` (Phase 4).
 
 ## Chuyển dự phòng
 
-Lỗi Groq được coi là đủ điều kiện chuyển sang Gemini: giới hạn tốc độ, lỗi kết nối, hết thời gian, lỗi máy chủ 5xx ([groq.service.ts](../../src/groq/groq.service.ts)). Chuyển sang Gemini còn phải được bộ giữ quota cho phép (loại `chat-fallback`, chừa 2 mỗi phút và 25 mỗi ngày). Mỗi lần chuyển được ghi bằng `fallbackUsed`.
+Lỗi Groq được coi là đủ điều kiện chuyển sang Gemini: giới hạn tốc độ, lỗi kết nối, hết thời gian, lỗi máy chủ 5xx, `400 json_validate_failed`, phản hồi rỗng, tham số tool hỏng ([groq.service.ts](../../src/groq/groq.service.ts)). Khi stream, nếu chưa có token nào sau `AI_CHAT_FIRST_TOKEN_TIMEOUT_MS` thì lời gọi Groq bị hủy và chuyển sang Gemini ([ai.service.ts](../../src/ai/ai.service.ts)). Chỉ chuyển trước token đầu tiên; client ngắt kết nối thì không chuyển. Chuyển sang Gemini còn phải được bộ giữ quota cho phép (loại `chat-fallback`, chừa 2 mỗi phút và 25 mỗi ngày). Mỗi lần chuyển được ghi bằng `fallbackUsed`.
+
+Groq stream lượt 1 kèm tool `recommend_jobs`; chỉ khi model gọi tool mới stream thêm lượt 2. Thời gian tới token đầu được ghi vào `ai_usage_logs.timeToFirstTokenMs`.
 
 ## Quota Gemini
 

@@ -18,9 +18,16 @@ const DEFAULT_GROQ_SUMMARY_MODEL = DEFAULT_GROQ_CHAT_MODEL;
 const DEFAULT_GROQ_TIMEOUT_MS = 30000;
 const DEFAULT_GROQ_MAX_RETRIES = 2;
 
-interface IGroqStructuredChatResponse {
-  text: string;
-  recommendedJobIds: string[];
+interface IGroqToolCall {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+}
+
+interface IGroqUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
 }
 
 @Injectable()
@@ -34,37 +41,6 @@ export class GroqService {
   // private readonly temperature = 0.4;
   private readonly temperature = 0.7;
   private readonly summaryTemperature = 0.3;
-  private readonly structuredResponseInstruction =
-    'Return the final assistant answer using the required JSON schema. ' +
-    '`text` must contain the conversational Markdown response for the user. ' +
-    '`recommendedJobIds` must contain only exact job IDs accepted through the recommend_jobs tool. ' +
-    'If no recommend_jobs tool response was provided, use an empty array.';
-
-  private readonly chatResponseFormat = {
-    type: 'json_schema' as const,
-    json_schema: {
-      name: 'chat_response',
-      description: 'Structured AI career advisor chat response for frontend rendering.',
-      strict: true,
-      schema: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          text: {
-            type: 'string',
-            description: 'Conversational response with Markdown formatting.',
-          },
-          recommendedJobIds: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'Array of job IDs from provided context to recommend.',
-          },
-        },
-        required: ['text', 'recommendedJobIds'],
-      },
-    },
-  };
-
   private readonly recommendJobsTool = {
     type: 'function' as const,
     function: {
@@ -119,36 +95,20 @@ export class GroqService {
     conversationHistory: IAIChatMessage[],
     systemPrompt: string,
   ): Promise<IAIChatResponse> {
-    const client = this.getClient();
-    const messages = this.buildChatMessages(systemPrompt, conversationHistory, message);
-    const startedAt = Date.now();
+    const stream = this.chatWithContextStreamAndTools(message, conversationHistory, systemPrompt);
+    let text = '';
+    let next = await stream.next();
 
-    const firstTurn = await client.chat.completions.create({
-      model: this.chatModelName,
-      messages,
-      temperature: this.temperature,
-      max_completion_tokens: this.maxCompletionTokens,
-      tools: [this.recommendJobsTool],
-      tool_choice: 'auto',
-      parallel_tool_calls: false,
-    });
-
-    const assistantMessage = firstTurn.choices[0]?.message;
-    if (!assistantMessage) {
-      throw new Error('Groq returned an empty chat response');
+    while (!next.done) {
+      text += next.value;
+      next = await stream.next();
     }
 
-    const toolCalls = assistantMessage.tool_calls ?? [];
-    const toolRecommendedJobIds = this.extractRecommendedJobIds(toolCalls);
-    const finalMessages = this.buildStructuredFinalMessages(messages, assistantMessage, toolCalls);
-    const secondTurn = await this.createStructuredChatCompletion(client, finalMessages);
-    const structuredResponse = this.parseStructuredChatResponse(secondTurn);
-
     return {
-      text: structuredResponse.text,
-      recommendedJobIds: toolRecommendedJobIds,
+      text,
+      recommendedJobIds: next.value.recommendedJobIds,
       provider: AI_PROVIDER_GROQ,
-      metadata: this.buildUsageMetadata([firstTurn, secondTurn], Date.now() - startedAt),
+      metadata: next.value.metadata,
     };
   }
 
@@ -156,42 +116,96 @@ export class GroqService {
     message: string,
     conversationHistory: IAIChatMessage[],
     systemPrompt: string,
+    signal?: AbortSignal,
   ): AsyncGenerator<string, IAIChatStreamResult, unknown> {
     const client = this.getClient();
     const messages = this.buildChatMessages(systemPrompt, conversationHistory, message);
     const startedAt = Date.now();
+    const usages: IGroqUsage[] = [];
 
-    const firstTurn = await client.chat.completions.create({
-      model: this.chatModelName,
-      messages,
-      temperature: this.temperature,
-      max_completion_tokens: this.maxCompletionTokens,
-      tools: [this.recommendJobsTool],
-      tool_choice: 'auto',
-      parallel_tool_calls: false,
-    });
+    const firstTurn = await client.chat.completions.create(
+      {
+        model: this.chatModelName,
+        messages,
+        temperature: this.temperature,
+        max_completion_tokens: this.maxCompletionTokens,
+        tools: [this.recommendJobsTool],
+        tool_choice: 'auto',
+        parallel_tool_calls: false,
+        stream: true,
+      },
+      { signal },
+    );
 
-    const assistantMessage = firstTurn.choices[0]?.message;
-    if (!assistantMessage) {
-      throw new Error('Groq returned an empty streaming preflight response');
+    let prefaceText = '';
+    const toolCallParts: IGroqToolCall[] = [];
+
+    for await (const chunk of firstTurn) {
+      const delta = chunk.choices[0]?.delta;
+      if (delta?.content) {
+        prefaceText += delta.content;
+        yield delta.content;
+      }
+
+      for (const part of delta?.tool_calls ?? []) {
+        const toolCall = (toolCallParts[part.index] ??= {
+          id: '',
+          type: 'function',
+          function: { name: '', arguments: '' },
+        });
+        toolCall.id += part.id ?? '';
+        toolCall.function.name += part.function?.name ?? '';
+        toolCall.function.arguments += part.function?.arguments ?? '';
+      }
+
+      if (chunk.x_groq?.usage) {
+        usages.push(chunk.x_groq.usage);
+      }
     }
 
-    const toolCalls = assistantMessage.tool_calls ?? [];
-    const toolRecommendedJobIds = this.extractRecommendedJobIds(toolCalls);
-    const finalMessages = this.buildStructuredFinalMessages(messages, assistantMessage, toolCalls);
-    const secondTurn = await this.createStructuredChatCompletion(client, finalMessages);
-    const structuredResponse = this.parseStructuredChatResponse(secondTurn);
+    const toolCalls = toolCallParts.filter(Boolean);
+    if (toolCalls.length === 0) {
+      if (!prefaceText) {
+        throw new Error('Groq returned an empty chat response');
+      }
 
-    if (structuredResponse.text) {
-      yield structuredResponse.text;
+      return this.buildStreamResult([], usages, startedAt);
     }
 
-    return {
-      recommendedJobIds: toolRecommendedJobIds,
-      provider: AI_PROVIDER_GROQ,
-      model: this.chatModelName,
-      metadata: this.buildUsageMetadata([firstTurn, secondTurn], Date.now() - startedAt),
-    };
+    const recommendedJobIds = this.extractRecommendedJobIds(toolCalls);
+    const secondTurn = await client.chat.completions.create(
+      {
+        model: this.chatModelName,
+        messages: [
+          ...messages,
+          { role: 'assistant', content: prefaceText || null, tool_calls: toolCalls },
+          ...this.buildToolResponseMessages(toolCalls),
+        ],
+        temperature: this.temperature,
+        max_completion_tokens: this.maxCompletionTokens,
+        stream: true,
+      },
+      { signal },
+    );
+
+    let answerText = prefaceText;
+    for await (const chunk of secondTurn) {
+      const content = chunk.choices[0]?.delta?.content;
+      if (content) {
+        answerText += content;
+        yield content;
+      }
+
+      if (chunk.x_groq?.usage) {
+        usages.push(chunk.x_groq.usage);
+      }
+    }
+
+    if (!answerText) {
+      throw new Error('Groq returned an empty chat response');
+    }
+
+    return this.buildStreamResult(recommendedJobIds, usages, startedAt);
   }
 
   async summarizeConversation(messages: IAIChatMessage[]): Promise<string> {
@@ -318,44 +332,6 @@ export class GroqService {
     });
   }
 
-  private buildStructuredFinalMessages(
-    messages: any[],
-    assistantMessage: {
-      content?: string | null;
-      tool_calls?: Array<{ id: string; function: { arguments: string; name: string } }>;
-    },
-    toolCalls: Array<{ id: string; function: { arguments: string; name: string } }>,
-  ): any[] {
-    const assistantTurn: any = {
-      role: 'assistant' as const,
-      content: assistantMessage.content ?? '',
-    };
-
-    if (toolCalls.length > 0) {
-      assistantTurn.tool_calls = toolCalls;
-    }
-
-    return [
-      ...messages,
-      assistantTurn,
-      ...this.buildToolResponseMessages(toolCalls),
-      {
-        role: 'user' as const,
-        content: this.structuredResponseInstruction,
-      },
-    ];
-  }
-
-  private async createStructuredChatCompletion(client: Groq, messages: any[]) {
-    return client.chat.completions.create({
-      model: this.chatModelName,
-      messages,
-      temperature: this.temperature,
-      max_completion_tokens: this.maxCompletionTokens,
-      response_format: this.chatResponseFormat,
-    });
-  }
-
   private extractRecommendedJobIds(
     toolCalls: Array<{ function: { arguments: string; name: string } }>,
   ): string[] {
@@ -380,53 +356,26 @@ export class GroqService {
     }
   }
 
-  private parseStructuredChatResponse(response: unknown): IGroqStructuredChatResponse {
-    const content = (response as any)?.choices?.[0]?.message?.content;
-    if (typeof content !== 'string' || content.trim().length === 0) {
-      throw new Error('Groq returned invalid structured chat response');
-    }
-
-    try {
-      const parsed = JSON.parse(content) as unknown;
-      if (!this.isStructuredChatResponse(parsed)) {
-        throw new Error('Invalid structured chat response shape');
-      }
-
-      return parsed;
-    } catch (error) {
-      this.logger.warn('Groq returned malformed structured chat response', error);
-      throw new Error('Groq returned invalid structured chat response');
-    }
+  private buildStreamResult(
+    recommendedJobIds: string[],
+    usages: IGroqUsage[],
+    startedAt: number,
+  ): IAIChatStreamResult {
+    return {
+      recommendedJobIds,
+      provider: AI_PROVIDER_GROQ,
+      model: this.chatModelName,
+      metadata: this.buildUsageMetadata(usages, Date.now() - startedAt),
+    };
   }
 
-  private isStructuredChatResponse(value: unknown): value is IGroqStructuredChatResponse {
-    if (!value || typeof value !== 'object') {
-      return false;
-    }
-
-    const response = value as Record<string, unknown>;
-    return (
-      typeof response.text === 'string' &&
-      Array.isArray(response.recommendedJobIds) &&
-      response.recommendedJobIds.every(jobId => typeof jobId === 'string')
-    );
-  }
-
-  private buildUsageMetadata(responses: unknown[], latencyMs: number): IAIChatUsageMetadata {
-    const usage = responses.reduce<{
-      promptTokens: number;
-      completionTokens: number;
-      totalTokens: number;
-    }>(
-      (total, response) => {
-        const responseUsage = (response as any)?.usage;
-
-        return {
-          promptTokens: total.promptTokens + (responseUsage?.prompt_tokens ?? 0),
-          completionTokens: total.completionTokens + (responseUsage?.completion_tokens ?? 0),
-          totalTokens: total.totalTokens + (responseUsage?.total_tokens ?? 0),
-        };
-      },
+  private buildUsageMetadata(usages: IGroqUsage[], latencyMs: number): IAIChatUsageMetadata {
+    const usage = usages.reduce(
+      (total, item) => ({
+        promptTokens: total.promptTokens + (item.prompt_tokens ?? 0),
+        completionTokens: total.completionTokens + (item.completion_tokens ?? 0),
+        totalTokens: total.totalTokens + (item.total_tokens ?? 0),
+      }),
       { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
     );
 

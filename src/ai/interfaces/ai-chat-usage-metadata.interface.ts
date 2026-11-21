@@ -8,4 +8,5 @@ export interface IAIChatUsageMetadata {
   totalTokens?: number;
   estimatedPromptTokens?: number;
   latencyMs?: number;
+  timeToFirstTokenMs?: number;
 }

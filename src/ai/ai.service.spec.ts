@@ -109,6 +109,20 @@ describe('AIService', () => {
     };
   };
 
+  afterEach(() => jest.useRealTimers());
+
+  const createHangingStream = (onSignal?: (signal: AbortSignal) => void) =>
+    jest.fn((_message: string, _history: unknown, _prompt: string, signal: AbortSignal) => {
+      onSignal?.(signal);
+      return (async function* (): AsyncGenerator<string, IAIChatStreamResult, unknown> {
+        await new Promise<never>((_, reject) =>
+          signal.addEventListener('abort', () => reject(new Error('Request was aborted.'))),
+        );
+        yield 'never';
+        return { recommendedJobIds: [], provider: 'groq' };
+      })();
+    });
+
   it('delegates CV parsing to Gemini', async () => {
     const { service, geminiServiceMock } = await createTestingModule();
     const parsedData = { skills: ['NODEJS'] };
@@ -212,6 +226,7 @@ describe('AIService', () => {
         provider: 'gemini',
         model: 'gemini-model',
         fallbackUsed: true,
+        metadata: { provider: 'gemini', timeToFirstTokenMs: expect.any(Number) },
       },
     });
   });
@@ -231,6 +246,82 @@ describe('AIService', () => {
     });
     await expect(generator.next()).rejects.toThrow('Groq stream failed mid-response');
     expect(geminiServiceMock.chatWithContextStreamAndTools).not.toHaveBeenCalled();
+  });
+
+  it('passes an abort signal to the provider and reports time to first token', async () => {
+    const { service, groqServiceMock } = await createTestingModule();
+    groqServiceMock.chatWithContextStreamAndTools.mockReturnValue(createStream(['Hi']));
+
+    const { streamResult } = await collectStream(service.streamChat('hello', [], 'prompt'));
+
+    expect(groqServiceMock.chatWithContextStreamAndTools).toHaveBeenCalledWith(
+      'hello',
+      [],
+      'prompt',
+      expect.any(AbortSignal),
+    );
+    expect(streamResult.metadata).toEqual({
+      provider: 'groq',
+      timeToFirstTokenMs: expect.any(Number),
+    });
+  });
+
+  it('aborts Groq and falls back to Gemini when no token arrives in time', async () => {
+    const { service, groqServiceMock, geminiServiceMock } = await createTestingModule({
+      AI_CHAT_FIRST_TOKEN_TIMEOUT_MS: '1000',
+    });
+    let groqSignal: AbortSignal | undefined;
+    groqServiceMock.chatWithContextStreamAndTools = createHangingStream(signal => {
+      groqSignal = signal;
+    });
+    geminiServiceMock.chatWithContextStreamAndTools.mockReturnValue(
+      createStream(['Gemini'], [], 'gemini'),
+    );
+    jest.useFakeTimers();
+
+    const resultPromise = collectStream(service.streamChat('hello', [], 'prompt'));
+    await jest.advanceTimersByTimeAsync(1000);
+
+    await expect(resultPromise).resolves.toMatchObject({
+      text: 'Gemini',
+      streamResult: { provider: 'gemini', fallbackUsed: true },
+    });
+    expect(groqSignal?.aborted).toBe(true);
+  });
+
+  it('fails with a timeout when no token arrives and fallback is disabled', async () => {
+    const { service, groqServiceMock, geminiServiceMock } = await createTestingModule({
+      AI_CHAT_FIRST_TOKEN_TIMEOUT_MS: '1000',
+      AI_CHAT_GEMINI_FALLBACK_ENABLED: 'false',
+    });
+    groqServiceMock.chatWithContextStreamAndTools = createHangingStream();
+    jest.useFakeTimers();
+
+    const resultPromise = collectStream(service.streamChat('hello', [], 'prompt'));
+    const assertion = expect(resultPromise).rejects.toThrow('first token timeout');
+    await jest.advanceTimersByTimeAsync(1000);
+
+    await assertion;
+    expect(geminiServiceMock.chatWithContextStreamAndTools).not.toHaveBeenCalled();
+  });
+
+  it('does not fall back when the client aborts before the first token', async () => {
+    const { service, groqServiceMock, geminiServiceMock } = await createTestingModule();
+    groqServiceMock.chatWithContextStreamAndTools = createHangingStream();
+    groqServiceMock.isFallbackEligibleError.mockReturnValue(true);
+    const client = new AbortController();
+
+    const resultPromise = collectStream(service.streamChat('hello', [], 'prompt', client.signal));
+    client.abort();
+
+    await expect(resultPromise).rejects.toThrow('Request was aborted.');
+    expect(geminiServiceMock.chatWithContextStreamAndTools).not.toHaveBeenCalled();
+  });
+
+  it('fails fast when the first token timeout is invalid', async () => {
+    await expect(createTestingModule({ AI_CHAT_FIRST_TOKEN_TIMEOUT_MS: '0' })).rejects.toThrow(
+      'AI_CHAT_FIRST_TOKEN_TIMEOUT_MS must be a positive integer',
+    );
   });
 
   it('trims Groq history before sending chat requests when configured', async () => {

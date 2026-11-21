@@ -59,6 +59,9 @@ export class AiUsageLog {
   latencyMs?: number;
 
   @Prop({ type: Number })
+  timeToFirstTokenMs?: number;
+
+  @Prop({ type: Number })
   estimatedCostUsd?: number;
 
   @Prop({ type: Boolean, default: false })
