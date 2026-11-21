@@ -7,6 +7,7 @@ describe('userWantsToSaveJob', () => {
     'Save the Backend job please',
     'bookmark this position',
     'lưu vị trí đó lại',
+    'Lưu lại job này giúp mình',
   ])('is true for %s', message => {
     expect(userWantsToSaveJob(message)).toBe(true);
   });
@@ -16,6 +17,10 @@ describe('userWantsToSaveJob', () => {
     'save time',
     'Tôi muốn tìm job React ở Hà Nội',
     'Việc làm Node.js nào lương cao nhất?',
+    'How can I save time finding a job?',
+    'save time on job search',
+    'How do I save money while looking for a job?',
+    'Tôi tìm job nào để lưu kinh nghiệm?',
   ])('is false for %s', message => {
     expect(userWantsToSaveJob(message)).toBe(false);
   });
