@@ -1,3 +1,4 @@
+import { JobSearchStats } from './job-search-stats.interface';
 import {
   BadRequestException,
   ForbiddenException,
@@ -541,7 +542,64 @@ export class JobsService {
     level?: string,
     location?: string,
     limit: number = 10,
+    sortBy: 'newest' | 'salary' = 'newest',
   ): Promise<Job[]> {
+    const filter = await this.buildJobSearchFilter(skills, level, location);
+
+    return this.jobRepository.findLean(
+      filter,
+      'name company location locationCode skills level salary',
+      sortBy === 'salary' ? { salary: -1, createdAt: -1 } : { createdAt: -1 },
+      limit,
+    );
+  }
+
+  async getJobSearchStats(
+    skills?: string[],
+    level?: string,
+    location?: string,
+  ): Promise<JobSearchStats> {
+    const filter = await this.buildJobSearchFilter(skills, level, location);
+    const [total, [topPaid]] = await Promise.all([
+      this.jobRepository.countDocuments(filter),
+      this.jobRepository.findLean(
+        { ...filter, salary: { $gt: 0 } },
+        'name company salary',
+        { salary: -1 },
+        1,
+      ),
+    ]);
+
+    return {
+      total,
+      highestSalary: topPaid
+        ? {
+            id: String((topPaid as any)._id),
+            name: topPaid.name,
+            company: topPaid.company?.name ?? 'N/A',
+            salary: topPaid.salary,
+          }
+        : null,
+    };
+  }
+
+  async getHiringCompanyNames(limit: number = 500): Promise<string[]> {
+    const rows = await this.jobRepository.aggregate([
+      { $match: { ...this.buildActiveJobFilter(), isDeleted: false } },
+      { $group: { _id: '$company.name' } },
+      { $limit: limit },
+    ]);
+
+    return rows
+      .map((row: { _id?: unknown }) => row._id)
+      .filter((name): name is string => typeof name === 'string' && name.length > 0);
+  }
+
+  private async buildJobSearchFilter(
+    skills?: string[],
+    level?: string,
+    location?: string,
+  ): Promise<Record<string, any>> {
     const filter: Record<string, any> = {
       ...this.buildActiveJobFilter(),
       isDeleted: false,
@@ -573,12 +631,7 @@ export class JobsService {
       }
     }
 
-    return this.jobRepository.findLean(
-      filter,
-      'name company location locationCode skills level salary',
-      { createdAt: -1 },
-      limit,
-    );
+    return filter;
   }
 
   // Private helpers

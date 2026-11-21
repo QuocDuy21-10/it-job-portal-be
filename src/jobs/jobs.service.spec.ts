@@ -697,6 +697,85 @@ describe('JobsService', () => {
         10,
       );
     });
+
+    it('sorts by salary when asked to rank', async () => {
+      mockJobRepository.findLean.mockResolvedValue([]);
+
+      await service.searchJobs(undefined, undefined, undefined, 10, 'salary');
+
+      expect(mockJobRepository.findLean).toHaveBeenCalledWith(
+        expect.any(Object),
+        'name company location locationCode skills level salary',
+        { salary: -1, createdAt: -1 },
+        10,
+      );
+    });
+  });
+
+  describe('getJobSearchStats', () => {
+    it('returns the total and the highest-paid job for the same filter as searchJobs', async () => {
+      (mockSkillsService as any).normalizeExtractedSkills = jest
+        .fn()
+        .mockResolvedValue({ normalizedSkills: ['Node.js'], unmappedSkills: [] });
+      mockJobRepository.countDocuments.mockResolvedValue(38);
+      mockJobRepository.findLean.mockResolvedValue([
+        {
+          _id: { toString: () => 'job-vng' },
+          name: 'Lead Engineering Manager',
+          company: { name: 'VNG' },
+          salary: 173500000,
+        },
+      ] as any);
+
+      const stats = await service.getJobSearchStats(['Node.js']);
+
+      expect(stats).toEqual({
+        total: 38,
+        highestSalary: {
+          id: 'job-vng',
+          name: 'Lead Engineering Manager',
+          company: 'VNG',
+          salary: 173500000,
+        },
+      });
+      const countFilter = mockJobRepository.countDocuments.mock.calls[0][0];
+      expect(countFilter).toEqual(expect.objectContaining({ isDeleted: false }));
+      expect(countFilter.skills).toEqual({ $in: [expect.any(RegExp)] });
+      expect(mockJobRepository.findLean).toHaveBeenCalledWith(
+        expect.objectContaining({ skills: countFilter.skills, salary: { $gt: 0 } }),
+        'name company salary',
+        { salary: -1 },
+        1,
+      );
+    });
+
+    it('returns null highestSalary when no job has a salary', async () => {
+      mockJobRepository.countDocuments.mockResolvedValue(0);
+      mockJobRepository.findLean.mockResolvedValue([]);
+
+      await expect(service.getJobSearchStats()).resolves.toEqual({
+        total: 0,
+        highestSalary: null,
+      });
+    });
+  });
+
+  describe('getHiringCompanyNames', () => {
+    it('lists distinct company names of active jobs and drops empty values', async () => {
+      mockJobRepository.aggregate.mockResolvedValue([
+        { _id: 'FPT Software' },
+        { _id: 'VNG' },
+        { _id: null },
+        { _id: '' },
+      ] as any);
+
+      await expect(service.getHiringCompanyNames()).resolves.toEqual(['FPT Software', 'VNG']);
+
+      const pipeline = mockJobRepository.aggregate.mock.calls[0][0] as any[];
+      expect(pipeline[0].$match).toEqual(expect.objectContaining({ isDeleted: false }));
+      expect(pipeline[1]).toEqual({ $group: { _id: '$company.name' } });
+      expect(pipeline[2]).toEqual({ $limit: 500 });
+    });
   });
 
   describe('runExpiredJobsCron', () => {

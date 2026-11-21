@@ -42,6 +42,8 @@ import { ChatQuotaService } from './chat-quota.service';
 import { IChatQuotaReservation, IChatQuotaStatus } from './interfaces/chat-quota-status.interface';
 import { ChatCacheService } from './chat-cache.service';
 import { ChatIdempotencyService } from './chat-idempotency.service';
+import { userWantsToSaveJob } from './chat-save-intent.util';
+import { DUPLICATE_ANSWER_FLAG, isDuplicateOfPreviousAnswer } from './chat-duplicate-answer.util';
 import { ChatToolActionService } from './chat-tool-action.service';
 import { PendingChatToolActionDto } from './dto/chat-tool-action.dto';
 import { ChatResponseFormatterService } from './chat-response-formatter.service';
@@ -179,6 +181,11 @@ export class ChatService {
         parsedResponse.text,
       );
       guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
+      guardrailFlags = this.flagDuplicateAnswer(
+        turn,
+        outputGuardrail.sanitizedOutput,
+        guardrailFlags,
+      );
 
       const validatedJobIds = this.validateRecommendedJobIds(
         parsedResponse.recommendedJobIds ?? [],
@@ -196,7 +203,7 @@ export class ChatService {
       const pendingToolActions = await this.createPendingToolActions({
         user,
         sessionId: turn.sessionId,
-        responseText: outputGuardrail.sanitizedOutput,
+        userMessage: turn.sanitizedMessage,
         recommendedJobs,
       });
 
@@ -346,6 +353,7 @@ export class ChatService {
       );
       fullText = outputGuardrail.sanitizedOutput;
       guardrailFlags = [...new Set([...guardrailFlags, ...outputGuardrail.flags])];
+      guardrailFlags = this.flagDuplicateAnswer(turn, fullText, guardrailFlags);
       const validatedJobIds = this.validateRecommendedJobIds(
         streamResult?.recommendedJobIds ?? [],
         turn.validJobIds,
@@ -362,7 +370,7 @@ export class ChatService {
       const pendingToolActions = await this.createPendingToolActions({
         user,
         sessionId: turn.sessionId,
-        responseText: fullText,
+        userMessage: turn.sanitizedMessage,
         recommendedJobs,
       });
 
@@ -952,13 +960,10 @@ export class ChatService {
   private async createPendingToolActions(input: {
     user: IUser;
     sessionId: string;
-    responseText: string;
+    userMessage: string;
     recommendedJobs: ChatRecommendedJobDto[];
   }): Promise<PendingChatToolActionDto[]> {
-    if (
-      input.recommendedJobs.length === 0 ||
-      !this.shouldProposeSaveJobActions(input.responseText)
-    ) {
+    if (input.recommendedJobs.length === 0 || !userWantsToSaveJob(input.userMessage)) {
       return [];
     }
 
@@ -969,14 +974,13 @@ export class ChatService {
     });
   }
 
-  private shouldProposeSaveJobActions(responseText: string): boolean {
-    const normalizedResponse = responseText.toLowerCase();
-    return (
-      normalizedResponse.includes('save') ||
-      normalizedResponse.includes('bookmark') ||
-      normalizedResponse.includes('lưu') ||
-      normalizedResponse.includes('luu')
-    );
+  private flagDuplicateAnswer(turn: ChatTurnContext, answer: string, flags: string[]): string[] {
+    if (!isDuplicateOfPreviousAnswer(turn.history, turn.sanitizedMessage, answer)) {
+      return flags;
+    }
+
+    this.logger.warn(`Model repeated its previous answer in session ${turn.sessionId}`);
+    return [...new Set([...flags, DUPLICATE_ANSWER_FLAG])];
   }
 
   private extractSuggestedActions(aiResponse: string, userContext: UserContext): string[] {

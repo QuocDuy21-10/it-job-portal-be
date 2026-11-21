@@ -111,6 +111,10 @@ export class ChatGuardrailService {
       throw new BadRequestException('Message cannot be empty');
     }
 
+    if (!/[\p{L}\p{N}]/u.test(sanitizedMessage)) {
+      throw new BadRequestException('Message must contain some text');
+    }
+
     if (inspection.riskLevel === ChatGuardrailRiskLevel.HIGH) {
       throw new ChatGuardrailBlockedException(inspection.flags);
     }
