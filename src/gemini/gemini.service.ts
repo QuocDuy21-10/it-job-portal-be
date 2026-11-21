@@ -356,6 +356,7 @@ ${cvText}`;
     message: string,
     conversationHistory: Array<{ role: string; content: string }>,
     systemPrompt: string,
+    signal?: AbortSignal,
   ): AsyncGenerator<string, IAIChatStreamResult, unknown> {
     const startedAt = Date.now();
     const contents = this.buildChatContents(systemPrompt, conversationHistory, message);
@@ -368,6 +369,7 @@ ${cvText}`;
         config: {
           temperature: this.CHAT_TEMPERATURE,
           maxOutputTokens: 2000,
+          abortSignal: signal,
           tools: [{ functionDeclarations: [this.RECOMMEND_JOBS_TOOL] }],
           toolConfig: {
             functionCallingConfig: { mode: FunctionCallingConfigMode.AUTO },
@@ -412,6 +414,7 @@ ${cvText}`;
           config: {
             temperature: this.CHAT_TEMPERATURE,
             maxOutputTokens: 2000,
+            abortSignal: signal,
           },
         });
       });
