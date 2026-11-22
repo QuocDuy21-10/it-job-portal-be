@@ -14,7 +14,7 @@ Ký hiệu cột "Bắt buộc": `Boot` = thiếu thì ứng dụng không khở
 | `NODE_ENV` | Không | `development` | `production` bật cookie `Secure`, tắt Swagger, log JSON, yêu cầu thêm biến |
 | `FE_URL` | Prod | `http://localhost:3000` | Liên kết trong email; danh sách CORS khi không có `CORS_ORIGINS` |
 | `CORS_ORIGINS` | Prod | rơi về `FE_URL` | Danh sách origin cho phép, cách nhau bằng dấu phẩy |
-| `TRUST_PROXY` | Không | không đặt | Số bước proxy tin cậy (số nguyên) hoặc giá trị Express; cần khi chạy sau nginx |
+| `TRUST_PROXY` | Production | không đặt | Số bước proxy tin cậy (số nguyên) hoặc giá trị Express; cần khi chạy sau nginx |
 | `SWAGGER_ENABLED` | Không | tắt ở production | `true` để mở Swagger ở production |
 | `IMAGE_TAG` | Không | `latest` | Chỉ dùng bởi `docker-compose.prod.yml` (tag image backend); đặt trong `.env.production`, xem [rollback](../11-operations/rollback.md) |
 
@@ -33,6 +33,7 @@ Ký hiệu cột "Bắt buộc": `Boot` = thiếu thì ứng dụng không khở
 |---|---|---|---|
 | `MONGO_URL` | Boot | không | Chuỗi kết nối. Compose prod ghi đè bằng URL dựng từ các biến `MONGO_INITDB_*` |
 | `MONGO_INITDB_ROOT_USERNAME` | Compose | `root` (compose dev) | Khởi tạo tài khoản root của container |
+| `MONGO_APP_USERNAME`, `MONGO_APP_PASSWORD` | Không | trống: dùng root | User mà backend dùng để kết nối ở production (`readWrite` + `dbAdmin` trên database của app), xem [production-security-checklist](../08-security/production-security-checklist.md) |
 | `MONGO_INITDB_ROOT_PASSWORD` | Compose | `123456` (compose dev) | Mật khẩu root; production phải đặt mạnh, dạng hex để không phá URI |
 | `MONGO_INITDB_DATABASE` | Không | `my-job-portal` | Tên database |
 
@@ -44,7 +45,7 @@ Ký hiệu cột "Bắt buộc": `Boot` = thiếu thì ứng dụng không khở
 |---|---|---|---|
 | `REDIS_HOST` | Không | `localhost` | Máy chủ Redis (compose prod ghi đè `redis`) |
 | `REDIS_PORT` | Không | `6379` | Cổng |
-| `REDIS_PASSWORD` | Compose | không | Mật khẩu; compose prod bắt buộc |
+| `REDIS_PASSWORD` | Production, compose | không | Mật khẩu; compose prod bắt buộc |
 | `REDIS_QUEUE_DB` | Không | `0` | DB cho hàng đợi BullMQ |
 | `REDIS_CACHE_DB` | Không | `1` | DB cho cache danh sách, OTP, quota, rate limit |
 | `REDIS_TTL` | Không | `3600000` | TTL mặc định (mili giây) của `CACHE_MANAGER`, lưu trong Redis DB `REDIS_CACHE_DB` qua `@keyv/redis` |
@@ -58,7 +59,7 @@ Ký hiệu cột "Bắt buộc": `Boot` = thiếu thì ứng dụng không khở
 | `JWT_REFRESH_TOKEN_SECRET` | Boot | không | Ký refresh token và tính HMAC lưu phiên. Production: tối thiểu 32 ký tự, phải khác `JWT_ACCESS_TOKEN_SECRET` |
 | `JWT_REFRESH_EXPIRES_IN` | Boot | không | Thời hạn refresh token và cookie (mẫu `7d`) |
 | `OTP_SECRET` | Boot | không | Khóa HMAC cho OTP. Production: tối thiểu 32 ký tự |
-| `GOOGLE_CLIENT_ID` | Không | không | `audience` khi xác minh Google ID token |
+| `GOOGLE_CLIENT_ID` | Production | không | `audience` khi xác minh Google ID token |
 | `GOOGLE_CLIENT_SECRET` | Không | không | **Không có chỗ nào trong `src/` đọc biến này** |
 
 Tạo secret bằng `openssl rand -hex 32`. Không đưa vào git.
@@ -74,9 +75,9 @@ Tạo secret bằng `openssl rand -hex 32`. Không đưa vào git.
 
 | Biến | Bắt buộc | Mặc định | Dùng cho |
 |---|---|---|---|
-| `SMTP_HOST` | Không | không | Máy chủ SMTP |
-| `SMTP_EMAIL` | Không | không | Tên đăng nhập SMTP |
-| `SMTP_PASSWORD` | Không | không | Mật khẩu SMTP |
+| `SMTP_HOST` | Production | không | Máy chủ SMTP |
+| `SMTP_EMAIL` | Production | không | Tên đăng nhập SMTP |
+| `SMTP_PASSWORD` | Production | không | Mật khẩu SMTP |
 
 Thiếu cấu hình SMTP không làm ứng dụng từ chối khởi động nhưng gửi email sẽ lỗi.
 
@@ -84,7 +85,7 @@ Thiếu cấu hình SMTP không làm ứng dụng từ chối khởi động nh�
 
 | Biến | Bắt buộc | Mặc định | Dùng cho |
 |---|---|---|---|
-| `GEMINI_API_KEY` | Không (thực tế có) | không | Khóa Gemini; `GeminiService` không khởi động nếu thiếu theo `.env.example` |
+| `GEMINI_API_KEY` | Có | không | Khóa Gemini; `validateEnv` dừng boot nếu thiếu |
 | `GEMINI_MODEL` | Không | `gemini-3.1-flash-lite` | Mô hình Gemini |
 | `GROQ_API_KEY` | Không | không | Khóa Groq; thiếu thì Groq không khả dụng |
 | `GROQ_CHAT_MODEL` | Không | `openai/gpt-oss-20b` | Mô hình chat |
@@ -101,7 +102,7 @@ Thiếu cấu hình SMTP không làm ứng dụng từ chối khởi động nh�
 
 ## Ngân sách ngữ cảnh gửi Groq
 
-`.env.example` ghi nhóm này là bắt buộc và `AIService` kiểm tra; trong code có giá trị mặc định ([ai.constants.ts](../../src/ai/ai.constants.ts)).
+Bắt buộc ở mọi môi trường: `validateEnv` ([env.validation.ts](../../src/config/env.validation.ts)) dừng boot nếu thiếu hoặc không phải số nguyên dương. Giá trị khuyến nghị nằm trong [ai.constants.ts](../../src/ai/ai.constants.ts).
 
 | Biến | Mặc định | Ý nghĩa |
 |---|---|---|

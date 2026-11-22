@@ -38,7 +38,7 @@ Các bước dùng action `checkout`, `setup-node`, `setup-buildx-action`, `buil
 
 ## Đẩy image lên Docker Hub
 
-Nguồn: [.github/workflows/docker-publish.yml](../../.github/workflows/docker-publish.yml). Chạy khi push tag `v*` hoặc bấm chạy tay (`workflow_dispatch`). Cần secret `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`; biến `IMAGE_NAME` là tùy chọn (mặc định `job-portal-be`).
+Nguồn: [.github/workflows/docker-publish.yml](../../.github/workflows/docker-publish.yml). Chạy khi push tag `v*` hoặc bấm chạy tay (`workflow_dispatch`). Job đầu tiên `ci` gọi lại toàn bộ [ci.yml](../../.github/workflows/ci.yml) (`workflow_call`) trên đúng commit được tag; `publish` có `needs: ci`, nên tag gắn lên commit chưa qua test không được build hay deploy. Cần secret `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`; biến `IMAGE_NAME` là tùy chọn (mặc định `job-portal-be`).
 
 | Tag sinh ra | Khi nào |
 |---|---|
@@ -54,7 +54,7 @@ Job `deploy` trong cùng workflow chạy sau `publish`, **chỉ khi chạy từ 
 
 ```mermaid
 flowchart LR
-    T["push tag vX.Y.Z"] --> P["publish: build + push X.Y.Z"] --> D["deploy: ssh VPS 'X.Y.Z'"]
+    T["push tag vX.Y.Z"] --> CI["ci: lint, test, e2e, build"] --> P["publish: build + push X.Y.Z"] --> D["deploy: ssh VPS 'X.Y.Z'"]
     D --> S["scripts/deploy-from-ci.sh"] --> S1["git pull --ff-only main"] --> S2["backup-mongo.sh"] --> S3["IMAGE_TAG=X.Y.Z deploy.sh (chờ healthcheck)"] --> S4["ghi IMAGE_TAG vào .env.production"]
 ```
 
