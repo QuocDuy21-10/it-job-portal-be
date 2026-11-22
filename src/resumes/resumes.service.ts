@@ -5,7 +5,6 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateUserCvDto } from './dto/create-resume.dto';
 import { UpdateResumeDto } from './dto/update-resume.dto';
 import { IUser } from 'src/users/user.interface';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
@@ -18,12 +17,10 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import mongoose from 'mongoose';
-import { EResumeStatus } from './enums/resume-status.enum';
 import { ResumeRepository } from './repositories/resume.repository';
 import { ApplicationNotificationService } from './services/application-notification.service';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
 import { assertCompanyAccess } from 'src/companies/company-access.util';
-import { rethrowDuplicateApplication } from './duplicate-application.util';
 import { RESUME_FILE_CONTENT_TYPES, resolveResumeFilePath } from './resume-storage.util';
 
 // Fixed server-side population: the list UI only needs these names, and client-controlled
@@ -64,29 +61,6 @@ export class ResumesService {
     private readonly applicationNotificationService: ApplicationNotificationService,
     private readonly statisticsCacheService: StatisticsCacheService,
   ) {}
-
-  async create(createUserCvDto: CreateUserCvDto, user: IUser) {
-    const newResume = await this.resumeRepository
-      .create({
-        email: user.email,
-        userId: user._id,
-        status: EResumeStatus.PENDING,
-        histories: [
-          {
-            status: EResumeStatus.PENDING,
-            updatedAt: new Date(),
-            updatedBy: { _id: user._id, email: user.email },
-          },
-        ],
-        ...createUserCvDto,
-        createdBy: { _id: user._id, email: user.email },
-      })
-      .catch(rethrowDuplicateApplication);
-
-    await this.clearDashboardCachesForCompany(newResume.companyId?.toString());
-
-    return { _id: newResume?._id, createdAt: newResume?.createdAt };
-  }
 
   async findAll(page?: unknown, limit?: unknown, query?: string, user?: IUser) {
     const { filter, sort } = parseListQuery(query, {

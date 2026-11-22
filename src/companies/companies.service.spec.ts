@@ -21,6 +21,7 @@ describe('CompaniesService', () => {
     mockCompanyRepository = {
       validateObjectId: jest.fn(),
       existsByName: jest.fn(),
+      isLogoUsedByAnotherCompany: jest.fn().mockResolvedValue(false),
       create: jest.fn(),
       findPaginated: jest.fn(),
       findById: jest.fn(),

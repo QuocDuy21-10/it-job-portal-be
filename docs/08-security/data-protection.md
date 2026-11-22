@@ -52,7 +52,7 @@ Họ tên, email, điện thoại, địa chỉ, nội dung CV, nội dung chat,
 | Dữ liệu | Thời hạn giữ |
 |---|---|
 | Tài khoản chưa xác thực | 15 phút (TTL) |
-| Phiên | Đến `expiresAt` (TTL có thể không tồn tại, xem [sessions](../04-database/collections/sessions.md#known-limitation-index-trùng-key-pattern)) |
+| Phiên | Đến `expiresAt` (TTL; database cũ cần migration `session-indexes`, xem [sessions](../04-database/collections/sessions.md#known-limitation-index-trùng-key-pattern)) |
 | `crawl_runs` | 90 ngày (TTL) |
 | `chat_*`, `ai_usage_logs`, `notifications`, `resumes` | Vô thời hạn (không TTL) |
 | Sau yêu cầu xóa tài khoản | Xóa 30 ngày sau; xóa không triệt để |

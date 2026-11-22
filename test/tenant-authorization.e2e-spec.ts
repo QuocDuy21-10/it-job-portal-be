@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { EResumeStatus } from 'src/resumes/enums/resume-status.enum';
 import { Resume } from 'src/resumes/schemas/resume.schema';
 import { CvProfile } from 'src/cv-profiles/schemas/cv-profile.schema';
+import { Company } from 'src/companies/schemas/company.schema';
 import { createTestApp, TestApp } from './utils/test-app';
 import { resetState } from './utils/reset';
 import { createJobBody, login, seedWorld, World } from './utils/fixtures';
@@ -24,6 +25,64 @@ describe('Tenant authorization (e2e)', () => {
 
   afterAll(async () => {
     await t?.close();
+  });
+
+  it('the manual POST /resumes route is gone (it let HR plant applications in any company)', async () => {
+    await request(t.server)
+      .post('/api/v1/resumes')
+      .set(auth('hrA'))
+      .send({ url: 'any.pdf', companyId: world.companyB, jobId: world.jobB })
+      .expect(404);
+  });
+
+  it('a candidate listing its applications sees no HR notes, HR emails or deleted applications', async () => {
+    const owner = { userId: new Types.ObjectId(world.users.c1._id), email: world.users.c1.email };
+    await t.model(Resume.name).create([
+      {
+        ...owner,
+        url: 'c1-with-notes.pdf',
+        status: EResumeStatus.REVIEWING,
+        hrNotes: 'internal-hr-note',
+        adminNotes: 'internal-admin-note',
+        histories: [
+          {
+            status: EResumeStatus.REVIEWING,
+            updatedAt: new Date(),
+            updatedBy: { _id: world.users.hrA._id, email: world.users.hrA.email },
+          },
+        ],
+      },
+      {
+        ...owner,
+        url: 'c1-deleted-application.pdf',
+        status: EResumeStatus.PENDING,
+        isDeleted: true,
+      },
+    ]);
+
+    const res = await request(t.server).post('/api/v1/resumes/by-user').set(auth('c1')).expect(200);
+    const body = JSON.stringify(res.body.data);
+
+    expect(body).toContain('c1-with-notes.pdf');
+    for (const leaked of [
+      'internal-hr-note',
+      'internal-admin-note',
+      world.users.hrA.email,
+      'c1-deleted-application.pdf',
+    ]) {
+      expect(body).not.toContain(leaked);
+    }
+  });
+
+  it("HR cannot point its company logo at another company's logo file", async () => {
+    // Taking the file name, then changing the logo again, used to delete the other company's file.
+    await t.model(Company.name).updateOne({ _id: world.companyB }, { logo: 'company-b-logo.png' });
+
+    await request(t.server)
+      .patch(`/api/v1/companies/${world.companyA}`)
+      .set(auth('hrA'))
+      .send({ logo: 'company-b-logo.png' })
+      .expect(409);
   });
 
   it('HR cannot create a job for another company', async () => {

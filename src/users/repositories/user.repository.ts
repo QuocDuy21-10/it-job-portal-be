@@ -14,6 +14,7 @@ import { CompanyDto } from 'src/companies/dto/company.dto';
 import { ERole } from 'src/casl/enums/role.enum';
 import { bulkSoftDelete } from 'src/utils/helpers/bulk-soft-delete.helper';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
+import { buildPublicJobVisibilityFilter } from 'src/jobs/job-visibility.util';
 
 @Injectable()
 export class UserRepository {
@@ -134,7 +135,7 @@ export class UserRepository {
       .select('savedJobs')
       .populate({
         path: 'savedJobs',
-        match: { isDeleted: false },
+        match: { isDeleted: false, ...buildPublicJobVisibilityFilter() },
         select: 'name skills company location salary level formOfWork startDate endDate',
       });
   }

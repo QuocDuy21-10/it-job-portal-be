@@ -36,7 +36,8 @@
     "migrate:application-unique-index": "ts-node -r tsconfig-paths/register src/databases/migrations/application-unique-index.ts",
     "migrate:index-audit": "ts-node -r tsconfig-paths/register src/databases/migrations/index-audit.ts",
     "migrate:chat-message-sequence": "ts-node -r tsconfig-paths/register src/databases/migrations/chat-message-sequence.ts",
-    "migrate:job-followers-notified": "ts-node -r tsconfig-paths/register src/databases/migrations/job-followers-notified.ts"
+    "migrate:job-followers-notified": "ts-node -r tsconfig-paths/register src/databases/migrations/job-followers-notified.ts",
+    "migrate:session-indexes": "ts-node -r tsconfig-paths/register src/databases/migrations/session-indexes.ts"
   },
   "dependencies": {
     "@casl/ability": "^6.8.0",

@@ -94,7 +94,7 @@ Ba collection khai báo cùng một key pattern hai lần với option khác nha
 
 | Collection | Key | Chi tiết |
 |---|---|---|
-| `sessions` | `expiresAt`, `refreshTokenHash` | Xem [sessions](collections/sessions.md#known-limitation-index-trùng-key-pattern) |
+| `sessions` | `expiresAt`, `refreshTokenHash` (đã sửa, cần migration `session-indexes` cho database cũ) | Xem [sessions](collections/sessions.md#known-limitation-index-trùng-key-pattern) |
 | `cvprofiles` | `userId` | Xem [cv-profiles](collections/cv-profiles.md#known-limitation-index-userid-bị-khai-báo-hai-lần) |
 | `chat_sessions` | `legacyConversationId` | Xem [chat-sessions](collections/chat-sessions.md) |
 

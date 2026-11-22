@@ -13,7 +13,6 @@ Mô hình và ma trận quyền ở [user-roles](../01-product/user-roles.md); c
 | 2 | Ảnh tải lên (avatar, logo) truy cập được không cần đăng nhập nếu biết URL. File CV thì không: nằm ngoài `public/` và chỉ trả qua endpoint có kiểm tra quyền | `useStaticAssets` phục vụ `public/`; tên file là `randomUUID()` | Thấp (ảnh công khai theo thiết kế) | [data-protection](data-protection.md#file-tải-lên) |
 | 5 | CASL định nghĩa nhưng không thực thi, dễ gây tin nhầm rằng quyền được bảo đảm | `grep` | Trung bình (hiểu nhầm) | [authorization](../03-modules/authorization.md) |
 | 7 | Mã lỗi quyền không nhất quán (`400` thay vì `403`) | Nhiều nơi | Thấp | [api-overview](../05-api/api-overview.md#định-dạng-lỗi) |
-| 8 | Email gợi ý và email tin mới có thể nhắc tới tin chưa duyệt | Processor không lọc `approvalStatus` | Thấp (nghiệp vụ) | [queues](../03-modules/queues.md#job-recommendation) |
 
 ## Điều đã kiểm tra là đúng
 

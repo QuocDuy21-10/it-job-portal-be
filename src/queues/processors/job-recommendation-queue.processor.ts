@@ -10,6 +10,7 @@ import { Job as JobEntity, JobDocument } from 'src/jobs/schemas/job.schema';
 import { JOB_RECOMMENDATION_QUEUE } from '../queues.constants';
 import { JobRecommendationPayload } from '../services/job-recommendation-queue.service';
 import { resolveLocationPayload } from 'src/utils/location-catalog';
+import { buildPublicJobVisibilityFilter } from 'src/jobs/job-visibility.util';
 
 interface JobRecommendationData {
   name: string;
@@ -60,11 +61,10 @@ export class JobRecommendationQueueProcessor extends WorkerHost {
       }
 
       // 2. Build matching query
-      const now = new Date();
+      // Same visibility rule as the public job pages: an email must never link to a pending job.
       const matchQuery: any = {
-        isActive: true,
+        ...buildPublicJobVisibilityFilter(),
         isDeleted: false,
-        endDate: { $gte: now }, // Job still valid
         skills: { $in: subscriber.skills || [] }, // Skills intersection
       };
 

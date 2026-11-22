@@ -111,6 +111,7 @@ Cập nhật công ty (quản trị viên, hoặc HR của công ty đó)
 - **Auth:** Đăng nhập, vai trò: SUPER ADMIN, HR
 - **Handler:** `update` trong [companies.controller.ts](../../../src/companies/companies.controller.ts)
 - **Mã thành công:** 200, `message` = "Update company by id"
+- **409:** `logo` là tên file đang thuộc công ty khác (đổi logo sẽ xóa file cũ, nên mỗi file chỉ thuộc một công ty). Tạo công ty cũng kiểm tra như vậy.
 
 **Path params**
 
@@ -145,6 +146,7 @@ Xóa mềm một công ty (quản trị viên)
 - **Auth:** Đăng nhập, vai trò: SUPER ADMIN
 - **Handler:** `remove` trong [companies.controller.ts](../../../src/companies/companies.controller.ts)
 - **Mã thành công:** 200, `message` = "Delete company by id"
+- **Tác động:** tắt (`isActive = false`) mọi tin của công ty, như xóa hàng loạt, nên tin không còn hiển thị công khai.
 
 **Path params**
 
