@@ -37,6 +37,17 @@ describe('Rate limit (e2e)', () => {
     expect(statuses).toContain(429);
   });
 
+  // Every accepted upload is up to 5 MB kept on the VPS disk; the baseline 300/minute let one IP fill it.
+  it('caps image uploads at 10 per minute per IP', async () => {
+    const statuses = (
+      await Promise.all(
+        Array.from({ length: 15 }, () => request(t.server).post('/api/v1/files/upload')),
+      )
+    ).map(res => res.status);
+    expect(statuses).toContain(429);
+    expect(statuses.filter(s => s !== 429).length).toBeLessThanOrEqual(10);
+  });
+
   it('never throttles health probes', async () => {
     const statuses = await statusesOf('/api/v1/health', 30);
     expect(statuses).not.toContain(429);

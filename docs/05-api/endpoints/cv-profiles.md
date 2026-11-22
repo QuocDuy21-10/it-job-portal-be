@@ -35,6 +35,7 @@ Tạo hoặc cập nhật CV của mình, kèm ảnh đại diện
 - **Auth:** Đăng nhập (mọi vai trò)
 - **Handler:** `upsertCvProfile` trong [cv-profiles.controller.ts](../../../src/cv-profiles/cv-profiles.controller.ts)
 - **Mã thành công:** HttpStatus.OK, `message` = "CV Profile saved successfully"
+- **Giới hạn tốc độ:** 10 lần mỗi phút mỗi IP (`UPLOAD_THROTTLE`, vì request có thể kèm file avatar)
 
 **Body:** field `cvData` kiểu `string`
 

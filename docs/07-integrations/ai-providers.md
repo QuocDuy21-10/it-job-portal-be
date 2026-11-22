@@ -39,6 +39,10 @@ Lỗi Groq được coi là đủ điều kiện chuyển sang Gemini: giới h�
 
 Groq stream lượt 1 kèm tool `recommend_jobs`; chỉ khi model gọi tool mới stream thêm lượt 2. Thời gian tới token đầu được ghi vào `ai_usage_logs.timeToFirstTokenMs`.
 
+## Thời gian chờ và thử lại của Gemini
+
+Client Gemini có timeout 45 giây cho mỗi lời gọi ([gemini.service.ts](../../src/gemini/gemini.service.ts)). Khi bị giới hạn tốc độ, chỉ việc đọc CV (`parse`, chạy trong hàng đợi) mới chờ rồi thử lại, tối đa 3 lần; chat dự phòng và tóm tắt hội thoại có người dùng đang chờ nên báo lỗi ngay, không ngủ chờ trong request.
+
 ## Quota Gemini
 
 Đặt chỗ nguyên tử bằng Lua trong Redis; đọc CV có ưu tiên cao nhất. Chi tiết: [cv-parsing-and-matching](../03-modules/cv-parsing-and-matching.md#giữ-quota-gemini). Ngưỡng cảnh báo ngày 70%, 85%, 95%; cách phát cảnh báo (log hay kênh khác): `Chưa xác minh`.

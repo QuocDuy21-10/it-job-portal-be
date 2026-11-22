@@ -17,7 +17,9 @@ export class FilesService {
 
   constructor(private readonly configService: ConfigService) {
     this.port = this.configService.get<string>('PORT', '8000');
-    this.baseUrl = `http://localhost:${this.port}`;
+    // API_DOMAIN is the public host Caddy serves (set in .env.production); local dev has none.
+    const apiDomain = this.configService.get<string>('API_DOMAIN');
+    this.baseUrl = apiDomain ? `https://${apiDomain}` : `http://localhost:${this.port}`;
   }
 
   /**

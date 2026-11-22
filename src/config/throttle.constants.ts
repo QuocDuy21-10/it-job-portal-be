@@ -17,6 +17,11 @@ export const STRICT_THROTTLE: Record<string, { ttl: number; limit: number }> = {
   default: { ttl: 60000, limit: 60 },
 };
 
+/** Image uploads: each accepted file (up to 5 MB) stays on the VPS disk until it is cleaned up. */
+export const UPLOAD_THROTTLE: Record<string, { ttl: number; limit: number }> = {
+  default: { ttl: 60000, limit: 10 },
+};
+
 /** `@SkipThrottle()` alone skips only the throttler named `default`. */
 export const SKIP_ALL_THROTTLERS: Record<string, boolean> = {
   burst: true,

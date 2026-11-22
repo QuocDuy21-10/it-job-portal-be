@@ -25,6 +25,8 @@ import { Roles } from 'src/casl/decorators/roles.decorator';
 import { ERole } from 'src/casl/enums/role.enum';
 import { UploadFolderType, getUploadFolderType } from './constants/upload-policy';
 import { UploadAuthGuard } from './guards/upload-auth.guard';
+import { Throttle } from '@nestjs/throttler';
+import { UPLOAD_THROTTLE } from 'src/config/throttle.constants';
 
 @ApiTags('File')
 @Controller('files')
@@ -32,6 +34,7 @@ export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
   @Post('upload')
+  @Throttle(UPLOAD_THROTTLE)
   @UseGuards(UploadAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({

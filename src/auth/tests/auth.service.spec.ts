@@ -31,7 +31,7 @@ describe('AuthService facade', () => {
         {
           provide: AuthCredentialsService,
           useValue: {
-            hashPassword: jest.fn().mockReturnValue('hashed-password'),
+            hashPassword: jest.fn().mockResolvedValue('hashed-password'),
             validateUser: jest.fn().mockResolvedValue({ email: 'test@example.com' }),
             register: jest.fn().mockResolvedValue({ message: 'registered' }),
             changePassword: jest.fn().mockResolvedValue({ message: 'changed' }),
@@ -94,7 +94,7 @@ describe('AuthService facade', () => {
   it('should delegate credential methods to AuthCredentialsService', async () => {
     const user = makeIUser();
 
-    expect(service.hashPassword('plain')).toBe('hashed-password');
+    await expect(service.hashPassword('plain')).resolves.toBe('hashed-password');
     await service.validateUser('test@example.com', 'password');
     await service.register(registerDto);
     await service.changePassword(user, changePasswordDto);

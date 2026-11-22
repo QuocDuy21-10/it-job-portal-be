@@ -99,6 +99,8 @@ export class GeminiService {
   private readonly MAX_RETRIES = 3;
   private readonly INITIAL_RETRY_DELAY = 5000; // 5 seconds
   private readonly MAX_RETRY_DELAY = 60000; // 60 seconds
+  // Without it a stalled Gemini call held the request (and its socket) open indefinitely.
+  private readonly REQUEST_TIMEOUT_MS = 45000;
 
   constructor(
     private configService: ConfigService,
@@ -114,7 +116,7 @@ export class GeminiService {
 
     this.modelName = configuredModel || DEFAULT_GEMINI_MODEL;
 
-    this.ai = new GoogleGenAI({ apiKey });
+    this.ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: this.REQUEST_TIMEOUT_MS } });
     this.logger.log(`Gemini AI Service initialized with model: ${this.modelName}`);
   }
 
@@ -178,7 +180,9 @@ ${cvText}`;
       }
 
       const isRateLimitError = this.isRateLimitError(error);
-      const shouldRetry = retryCount < this.MAX_RETRIES && isRateLimitError;
+      // Only CV parsing runs in a queue worker; chat and summary calls have a user waiting on them,
+      // so they fail fast instead of sleeping (up to a minute per attempt) inside the request.
+      const shouldRetry = workload === 'parse' && retryCount < this.MAX_RETRIES && isRateLimitError;
 
       if (shouldRetry) {
         const retryDelay = this.calculateRetryDelay(error, retryCount);
