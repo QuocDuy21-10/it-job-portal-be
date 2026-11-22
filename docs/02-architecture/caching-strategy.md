@@ -7,11 +7,11 @@ DevLink dùng **bốn lớp lưu trữ tạm khác nhau**, với độ bền và
 | Lớp | Công nghệ | Nằm ở đâu thật sự | Chia sẻ giữa instance | Mất khi khởi động lại |
 |---|---|---|---|---|
 | 1. Cache danh sách | `ListCacheService` qua `REDIS_CLIENT` | **Redis** | Có | Không |
-| 2. `CACHE_MANAGER` | `@nestjs/cache-manager` | **Bộ nhớ tiến trình** (đã kiểm chứng) | Không | Có |
+| 2. `CACHE_MANAGER` | `@nestjs/cache-manager` + `@keyv/redis` | **Redis** (`REDIS_CACHE_DB`) | Có | Không |
 | 3. Redis trực tiếp | `REDIS_CLIENT` (ioredis) | **Redis** | Có | Không |
 | 4. Bộ nhớ trong service | `Map` hoặc biến trong class | Bộ nhớ tiến trình | Không | Có |
 
-Về lớp 2: cấu hình `store: redisStore` không có tác dụng với `@nestjs/cache-manager` 3.0.1 (chỉ đọc `stores`). Đã dựng đúng cấu hình khi không có Redis và `set`/`get` vẫn chạy ngay với store `Keyv` trong bộ nhớ. Chi tiết và tác động: [data-flow](data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis).
+Về lớp 2: trước 2026-11-22 cấu hình `store: redisStore` không có tác dụng với `@nestjs/cache-manager` 3.0.1 (chỉ đọc `stores`), nên lớp này chạy trong bộ nhớ tiến trình. Nay `stores` dùng `@keyv/redis`. Chi tiết: [data-flow](data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis).
 
 ## Lớp 1: cache danh sách tin và công ty (Redis, có tag)
 
@@ -32,7 +32,7 @@ Nguồn: [list-cache.service.ts](../../src/redis/list-cache.service.ts), hằng 
 
 TTL ngắn giới hạn độ lệch tối đa (60 giây với tin) khi có thay đổi mà đường vô hiệu hóa bỏ sót, ví dụ `jobs` hết hạn bởi cron thì cron chủ động xóa cache liên quan nhưng sửa trực tiếp trong database thì không. Vô hiệu hóa theo thẻ làm thay đổi hiển thị gần như tức thì với thao tác đi qua API.
 
-## Lớp 2: `CACHE_MANAGER` (bộ nhớ tiến trình)
+## Lớp 2: `CACHE_MANAGER` (Redis qua Keyv)
 
 Đơn vị TTL là **mili giây** (đã kiểm chứng: giá trị `3600` hết hạn sau 3,6 giây; `0` nghĩa là không hết hạn).
 
@@ -63,11 +63,11 @@ Hai giá trị `CHAT_CONTEXT_CACHE_TTL_MS` (10 phút, trong `chat.constant.ts`) 
 | Xóa tài khoản | Xóa token hủy xóa, `chat_session:`, `chat_conv:` | [account-deletion-queue.processor.ts](../../src/queues/processors/account-deletion-queue.processor.ts) |
 | Dùng token đặt lại mật khẩu | Xóa `reset_password:<token>` | auth-credentials |
 
-### Hệ quả của việc nằm trong bộ nhớ
+### Lưu ý khi dùng lớp 2
 
-- Mất khi khởi động lại: token đặt lại mật khẩu và hủy xóa tài khoản không còn dùng được ([auth-and-sessions](../03-modules/auth-and-sessions.md#known-limitation)).
-- Không dùng chung: nhiều instance có thể trả số liệu dashboard và danh mục kỹ năng khác nhau tối đa vài phút.
-- Không có giới hạn kích thước: tùy chọn `max: 100` trong cấu hình không có tác dụng với store `Keyv`. Với các khóa `ttl = 0` (như `chat_session:<userId>`) dữ liệu chỉ rời bộ nhớ khi khởi động lại hoặc bị xóa tường minh.
+- Khóa dùng chung bộ nhớ Redis (`maxmemory 96mb`, `noeviction`) với BullMQ và throttler. Khi đầy, mọi lệnh ghi lỗi, nên cần theo dõi `used_memory`.
+- Khóa `ttl = 0` (như `chat_session:<userId>`) nằm trong Redis tới khi bị xóa tường minh.
+- Giá trị đi qua JSON của Keyv, nên `Date` hay `ObjectId` đọc ra là chuỗi.
 - Cache kết quả đọc CV gần như vô dụng vì TTL 3,6 giây.
 
 ## Lớp 3: Redis trực tiếp (không dùng `CACHE_MANAGER`)

@@ -51,7 +51,7 @@ Tài liệu này chọn các bài toán khó nhất của DevLink Backend, nêu 
 
 **Cách giải.** `ListCacheService` đưa phạm vi vai trò vào khóa, gắn thẻ cho mỗi mục và vô hiệu hóa theo thẻ khi ghi; Redis lỗi thì vẫn phục vụ từ database. Chi tiết: [caching-strategy](../02-architecture/caching-strategy.md), [ADR-0008](../12-decisions/0008-redis-tagged-list-cache.md).
 
-**Điểm cần cẩn trọng.** Lớp `CACHE_MANAGER` trông giống cache Redis nhưng chạy trong bộ nhớ; các thực nghiệm kiểm chứng điều này là một phần giá trị của tài liệu.
+**Điểm cần cẩn trọng.** Lớp `CACHE_MANAGER` từng trông giống cache Redis nhưng chạy trong bộ nhớ (thực nghiệm phát hiện, sửa ngày 2026-11-22); việc kiểm chứng bằng thực nghiệm thay vì đọc cấu hình là một phần giá trị của tài liệu.
 
 ## 6. Phiên nhiều thiết bị với refresh token xoay vòng
 

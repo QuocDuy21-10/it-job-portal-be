@@ -33,6 +33,21 @@ describe('Auth (e2e)', () => {
       .expect(401);
   });
 
+  it('resend-code rejects a Mongo operator as email instead of querying with it', async () => {
+    // Before the fix `{ $regex }` reached findOne and the two business messages leaked whether a match existed.
+    const res = await request(t.server)
+      .post('/api/v1/auth/resend-code')
+      .send({ email: { $regex: '^' } })
+      .expect(400);
+    expect(JSON.stringify(res.body.message)).not.toMatch(/kích hoạt|không tồn tại/);
+
+    const unknown = await request(t.server)
+      .post('/api/v1/auth/resend-code')
+      .send({ email: 'nobody-e2e@example.com' })
+      .expect(400);
+    expect(unknown.body.message).toBe('Người dùng không tồn tại');
+  });
+
   it('GET /auth/me needs a valid access token', async () => {
     await request(t.server).get('/api/v1/auth/me').expect(401);
     await request(t.server)

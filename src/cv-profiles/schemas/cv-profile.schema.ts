@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export type CvProfileDocument = HydratedDocument<CvProfile>;
 
@@ -192,7 +192,7 @@ export class Award {
  */
 @Schema({ timestamps: true })
 export class CvProfile {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, unique: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'User', required: true, unique: true })
   userId: Types.ObjectId;
 
   @Prop({ type: PersonalInfo, required: true })

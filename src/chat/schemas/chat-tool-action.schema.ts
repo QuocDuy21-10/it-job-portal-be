@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, SchemaTypes, Types } from 'mongoose';
 import { EChatToolActionStatus, EChatToolActionType } from '../enums/chat-tool-action.enum';
 
 export type ChatToolActionDocument = ChatToolAction & Document;
@@ -10,14 +10,14 @@ export type ChatToolActionDocument = ChatToolAction & Document;
 })
 export class ChatToolAction {
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'User',
     required: true,
   })
   userId: Types.ObjectId;
 
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'ChatSession',
     required: true,
   })

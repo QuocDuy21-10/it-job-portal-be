@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, SchemaTypes, Types } from 'mongoose';
 
 export type AiUsageLogDocument = AiUsageLog & Document;
 
@@ -9,21 +9,21 @@ export type AiUsageLogDocument = AiUsageLog & Document;
 })
 export class AiUsageLog {
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'User',
     required: true,
   })
   userId: Types.ObjectId;
 
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'Conversation',
     index: true,
   })
   conversationId?: Types.ObjectId;
 
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'ChatSession',
   })
   sessionId?: Types.ObjectId;

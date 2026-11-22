@@ -26,6 +26,7 @@ import { AuthGoogleLoginDto } from './dto/auth-google-login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { SetPasswordDto } from './dto/set-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResendCodeDto } from './dto/resend-code.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyAuthDto } from './dto/verify-auth.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -122,16 +123,7 @@ export class AuthController {
     description:
       "Resend a new verification code to the user's email. Used if the previous code expired or was not received.",
   })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        email: { type: 'string', description: 'Email address to resend code for.' },
-      },
-      required: ['email'],
-      example: { email: 'user@example.com' },
-    },
-  })
+  @ApiBody({ type: ResendCodeDto })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Verification code resent successfully.',
@@ -148,8 +140,8 @@ export class AuthController {
     description: 'User not found or already verified.',
   })
   @ResponseMessage('Gửi lại mã xác thực thành công')
-  handleResendCode(@Body('email') email: string) {
-    return this.authService.resendCode(email);
+  handleResendCode(@Body() dto: ResendCodeDto) {
+    return this.authService.resendCode(dto.email);
   }
 
   @Public()

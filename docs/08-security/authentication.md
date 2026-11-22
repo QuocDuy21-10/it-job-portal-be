@@ -34,7 +34,6 @@ Tổng hợp cơ chế xác thực hiện có và giới hạn, kèm bằng ch�
 | Không có khóa tài khoản sau nhiều lần đăng nhập sai | Chỉ có giới hạn tốc độ theo IP (10 lần mỗi 5 phút ở đăng nhập). Thử từ nhiều IP không bị chặn theo tài khoản | Trung bình |
 | Không có xác thực hai yếu tố | Không thấy trong source | Trung bình |
 | Access token không thu hồi riêng | Chỉ chết khi hết hạn hoặc khi trạng thái tài khoản đổi | Thấp |
-| Token đặt lại mật khẩu, hủy xóa tài khoản trong bộ nhớ | Mất khi khởi động lại ([data-flow](../02-architecture/data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis)) | Trung bình (chức năng) |
 | Hủy xóa tài khoản bằng đăng nhập không dùng được | [auth-and-sessions](../03-modules/auth-and-sessions.md#known-limitation) | Trung bình (chức năng) |
 | Làm mới token không có giao dịch, không phát hiện tái sử dụng | [refresh-token](../06-workflows/sequences/refresh-token.md#known-limitation) | Thấp |
 | Phiên Google ghi `userAgent`, `ipAddress` cứng | Mất dấu vết thiết bị cho phiên Google ([google-oauth](../07-integrations/google-oauth.md)) | Thấp |

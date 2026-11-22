@@ -32,7 +32,7 @@ Cổng chỉ gắn vào loopback nên không truy cập được từ mạng ngo
 | `caddy` | `caddy:2-alpine` | `80`, `443` (cổng duy nhất publish) | Reverse proxy và TLS tự động cho `API_DOMAIN`, đọc [Caddyfile](../../Caddyfile); `mem_limit: 32m`; chờ backend khỏe |
 | `backend` | `${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG}` (build ở CI, không build trên VPS) | Không publish (`expose` nội bộ) | `init: true`, `mem_limit: 450m`; `env_file: .env.production`; `METRICS_PORT=9464` nội bộ; tự dựng `MONGO_URL` từ biến Mongo; volume `uploads` tại `/app/public/images` và `cv_storage` tại `/app/storage`; chờ Mongo và Redis khỏe |
 | `mongodb` | `mongo:7.0` | Không publish | Biến root bắt buộc (`:?`), volume `mongodb_data`, `mongodb_config`; `mem_limit: 450m`, `--wiredTigerCacheSizeGB 0.25` |
-| `redis` | `redis:7-alpine` | Không publish | `--requirepass`, `--appendonly yes`, `--maxmemory 64mb` với `noeviction` (BullMQ yêu cầu), `mem_limit: 96m`, volume `redis_data` |
+| `redis` | `redis:7-alpine` | Không publish | `--requirepass`, `--appendonly yes`, `--maxmemory 96mb` với `noeviction` (BullMQ yêu cầu), `mem_limit: 128m`, volume `redis_data` |
 | `prometheus` (profile `monitoring`) | `prom/prometheus:v3.13.5` | `127.0.0.1:9090` | Đọc `monitoring/prometheus.yml`, `alerts.yml`; giữ 15 ngày trong volume `prometheus_data` |
 | `alertmanager` (profile `monitoring`) | `prom/alertmanager:v0.34.2` | không publish | Đọc `monitoring/alertmanager.yml` (không commit); volume `alertmanager_data` |
 

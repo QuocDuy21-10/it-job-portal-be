@@ -2,8 +2,7 @@ import { Module, Global } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { CacheModule } from '@nestjs/cache-manager';
-import { redisStore } from 'cache-manager-redis-store';
-import type { RedisClientOptions } from 'redis';
+import { createKeyv } from '@keyv/redis';
 import Redis from 'ioredis';
 import { ListCacheService } from './list-cache.service';
 import { CronLockService } from './cron-lock.service';
@@ -44,16 +43,22 @@ export { REDIS_CLIENT } from './redis.constants';
     }),
 
     // Cache Configuration
-    CacheModule.registerAsync<RedisClientOptions>({
+    // cache-manager v7 only takes Keyv stores: the old `store: redisStore` option was ignored, which left an
+    // unbounded in-memory Map that lost every entry (account-deletion cancel tokens included) on restart.
+    CacheModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        store: redisStore as any,
-        host: configService.get('REDIS_HOST', 'localhost'),
-        port: configService.get('REDIS_PORT', 6379),
-        password: configService.get('REDIS_PASSWORD'),
-        db: configService.get('REDIS_CACHE_DB', 1),
-        ttl: configService.get('REDIS_TTL', 3600000), // 1 hour default
-        max: 100, // maximum number of items in cache
+      useFactory: (configService: ConfigService) => ({
+        stores: [
+          createKeyv({
+            socket: {
+              host: configService.get('REDIS_HOST', 'localhost'),
+              port: Number(configService.get('REDIS_PORT', 6379)),
+            },
+            password: configService.get('REDIS_PASSWORD') || undefined,
+            database: Number(configService.get('REDIS_CACHE_DB', 1)),
+          }),
+        ],
+        ttl: Number(configService.get('REDIS_TTL', 3600000)), // milliseconds, 1 hour default
       }),
       inject: [ConfigService],
       isGlobal: true,

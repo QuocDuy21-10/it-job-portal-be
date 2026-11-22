@@ -38,6 +38,7 @@ import { JwtAuthGuard } from 'src/auth/guards';
 import { FilesService } from '../files/files.service';
 import { UpsertCvProfileDto } from './dto/upsert-cv-profile.dto';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
+import { ViValidationPipe } from 'src/utils/validation/vi-validation.pipe';
 import { Roles } from 'src/casl/decorators/roles.decorator';
 import { ERole } from 'src/casl/enums/role.enum';
 
@@ -178,12 +179,17 @@ export class CvProfilesController {
     @UploadedFile() avatarFile?: Express.Multer.File,
   ) {
     // Parse CV data from JSON string
-    let cvData: UpsertCvProfileDto;
+    let parsed: unknown;
     try {
-      cvData = JSON.parse(cvDataString);
+      parsed = JSON.parse(cvDataString);
     } catch {
       throw new BadRequestException('Trường cvData không đúng định dạng JSON');
     }
+    // A JSON string inside multipart skips the global pipe, so run the same pipe as PUT /cv-profiles/me.
+    const cvData: UpsertCvProfileDto = await new ViValidationPipe({ whitelist: true }).transform(
+      parsed,
+      { type: 'body', metatype: UpsertCvProfileDto },
+    );
 
     // Process avatar upload if provided
     if (avatarFile) {
