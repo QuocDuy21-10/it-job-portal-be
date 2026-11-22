@@ -51,7 +51,7 @@ export class AuthAccountDeletionService {
         throw new BadRequestException('Cần nhập mật khẩu để xoá tài khoản.');
       }
 
-      const valid = this.usersService.isValidPassword(dto.password, user.password);
+      const valid = await this.usersService.isValidPassword(dto.password, user.password);
       if (!valid) {
         throw new UnauthorizedException('Mật khẩu không chính xác.');
       }

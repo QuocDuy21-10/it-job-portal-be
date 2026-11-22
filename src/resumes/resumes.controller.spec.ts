@@ -193,7 +193,10 @@ describe('ResumesController', () => {
         'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent('Đinh Duy.txt')}`,
       });
       expect(file).toBeInstanceOf(StreamableFile);
-      file.getStream().destroy();
+      // createReadStream opens the file asynchronously: deleting it before 'close' made that open fail
+      // with an unhandled ENOENT that crashed the Jest worker.
+      const stream = file.getStream();
+      await new Promise(resolve => stream.once('close', resolve).destroy());
       fs.unlinkSync(tmp);
     });
   });

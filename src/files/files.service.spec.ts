@@ -46,6 +46,17 @@ describe('FilesService', () => {
       expect(service.buildFileUrl('avatar', 'test.jpg')).toBe(`${BASE_URL}/images/avatar/test.jpg`);
     });
 
+    // Production stored http://localhost:<PORT> URLs, which no browser outside the server can load.
+    it('uses https://<API_DOMAIN> when API_DOMAIN is set', () => {
+      const env: Record<string, string> = { PORT, API_DOMAIN: 'api.example.test' };
+      const config = { get: (key: string, fallback?: string) => env[key] ?? fallback };
+      const withDomain = new FilesService(config as unknown as ConfigService);
+
+      expect(withDomain.buildFileUrl('avatar', 'test.jpg')).toBe(
+        'https://api.example.test/images/avatar/test.jpg',
+      );
+    });
+
     it('throws BadRequestException when fileName is empty', () => {
       expect(() => service.buildFileUrl('avatar', '')).toThrow(BadRequestException);
     });

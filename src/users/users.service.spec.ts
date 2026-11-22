@@ -148,7 +148,9 @@ describe('UsersService', () => {
         createdBy: { _id: actingUser._id, email: actingUser.email },
       });
       expect(createPayload.password).not.toBe('Secret123!');
-      expect(service.isValidPassword('Secret123!', createPayload.password)).toBe(true);
+      await expect(service.isValidPassword('Secret123!', createPayload.password)).resolves.toBe(
+        true,
+      );
       expect(result).toEqual({ _id: createdUser._id, createAt: createdUser.createdAt });
     });
 
@@ -222,7 +224,9 @@ describe('UsersService', () => {
         role: ERole.NORMAL_USER,
       });
       expect(createPayload.password).not.toBe('StrongPass1!');
-      expect(service.isValidPassword('StrongPass1!', createPayload.password)).toBe(true);
+      await expect(service.isValidPassword('StrongPass1!', createPayload.password)).resolves.toBe(
+        true,
+      );
       expect(createPayload.verificationExpires).toBeInstanceOf(Date);
       expect(createPayload.verificationExpires.getTime()).toBeGreaterThan(now);
       expect(createPayload.verificationExpires.getTime()).toBeLessThanOrEqual(
@@ -394,9 +398,9 @@ describe('UsersService', () => {
   });
 
   describe('isValidPassword', () => {
-    it('should return false when hash is missing', () => {
-      expect(service.isValidPassword('secret', undefined)).toBe(false);
-      expect(service.isValidPassword('secret', null)).toBe(false);
+    it('should return false when hash is missing', async () => {
+      await expect(service.isValidPassword('secret', undefined)).resolves.toBe(false);
+      await expect(service.isValidPassword('secret', null)).resolves.toBe(false);
     });
 
     it('should compare plaintext against a hash', () => {
@@ -419,10 +423,10 @@ describe('UsersService', () => {
           },
           actingUser,
         )
-        .then(() => {
+        .then(async () => {
           const hash = mockUserRepository.create.mock.calls[0][0].password;
-          expect(service.isValidPassword(password, hash)).toBe(true);
-          expect(service.isValidPassword('wrong-password', hash)).toBe(false);
+          await expect(service.isValidPassword(password, hash)).resolves.toBe(true);
+          await expect(service.isValidPassword('wrong-password', hash)).resolves.toBe(false);
         });
     });
   });

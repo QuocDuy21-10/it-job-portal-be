@@ -39,6 +39,8 @@ import { FilesService } from '../files/files.service';
 import { UpsertCvProfileDto } from './dto/upsert-cv-profile.dto';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { ViValidationPipe } from 'src/utils/validation/vi-validation.pipe';
+import { Throttle } from '@nestjs/throttler';
+import { UPLOAD_THROTTLE } from 'src/config/throttle.constants';
 import { Roles } from 'src/casl/decorators/roles.decorator';
 import { ERole } from 'src/casl/enums/role.enum';
 
@@ -52,6 +54,7 @@ export class CvProfilesController {
   ) {}
 
   @Post('upsert')
+  @Throttle(UPLOAD_THROTTLE)
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(
     FileInterceptor('avatar', {

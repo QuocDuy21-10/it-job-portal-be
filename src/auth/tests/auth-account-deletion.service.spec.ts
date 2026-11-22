@@ -38,7 +38,7 @@ describe('AuthAccountDeletionService', () => {
     it('should schedule deletion for a local account with a valid password', async () => {
       const response = makeResponse();
       usersService.findOneByUserEmail.mockResolvedValue(makeUser());
-      usersService.isValidPassword.mockReturnValue(true);
+      usersService.isValidPassword.mockResolvedValue(true);
 
       const result = await service.requestAccountDeletion(
         currentUser,
@@ -68,7 +68,7 @@ describe('AuthAccountDeletionService', () => {
       usersService.findOneByUserEmail.mockResolvedValue(
         makeUser({ authProvider: EAuthProvider.LOCAL }),
       );
-      usersService.isValidPassword.mockReturnValue(false);
+      usersService.isValidPassword.mockResolvedValue(false);
 
       await expect(
         service.requestAccountDeletion(currentUser, { password: 'wrong' }, makeResponse()),
@@ -89,7 +89,7 @@ describe('AuthAccountDeletionService', () => {
     it('should not fail if sending the email throws', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
       usersService.findOneByUserEmail.mockResolvedValue(makeUser());
-      usersService.isValidPassword.mockReturnValue(true);
+      usersService.isValidPassword.mockResolvedValue(true);
       mailService.sendAccountDeletionScheduled.mockRejectedValue(new Error('SMTP down'));
 
       const result = await service.requestAccountDeletion(

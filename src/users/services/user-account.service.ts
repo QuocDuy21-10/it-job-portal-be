@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { genSaltSync, hashSync } from 'bcryptjs';
+import { hash } from 'bcryptjs';
 import { AuthRegisterDto } from 'src/auth/dto/auth-register.dto';
 import { SessionsService } from 'src/sessions/sessions.service';
 import { IUser } from '../user.interface';
@@ -13,9 +13,8 @@ export class UserAccountService {
     private readonly sessionsService: SessionsService,
   ) {}
 
-  private hashPassword(password: string): string {
-    const salt = genSaltSync(10);
-    return hashSync(password, salt);
+  private hashPassword(password: string): Promise<string> {
+    return hash(password, 10);
   }
 
   async activateUser(id: string) {
@@ -51,7 +50,7 @@ export class UserAccountService {
 
   async updateUnverifiedUser(id: string, dto: AuthRegisterDto) {
     this.userRepository.validateObjectId(id);
-    const hashedPassword = this.hashPassword(dto.password);
+    const hashedPassword = await this.hashPassword(dto.password);
     const verificationExpires = new Date(Date.now() + 15 * 60 * 1000);
     await this.userRepository.updateOne(id, {
       name: dto.name,

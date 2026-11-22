@@ -57,7 +57,7 @@ describe('AuthCredentialsService', () => {
     it('should return the user object when credentials are valid, account is active, and not locked', async () => {
       const user = makeUser();
       usersService.findOneByUserEmail.mockResolvedValue(user);
-      usersService.isValidPassword.mockReturnValue(true);
+      usersService.isValidPassword.mockResolvedValue(true);
 
       const result = await service.validateUser('test@example.com', 'correct-password');
 
@@ -77,7 +77,7 @@ describe('AuthCredentialsService', () => {
     it('should return null when the password is incorrect', async () => {
       const user = makeUser();
       usersService.findOneByUserEmail.mockResolvedValue(user);
-      usersService.isValidPassword.mockReturnValue(false);
+      usersService.isValidPassword.mockResolvedValue(false);
 
       const result = await service.validateUser('test@example.com', 'wrong-password');
 
@@ -94,7 +94,7 @@ describe('AuthCredentialsService', () => {
 
     it('should throw BadRequestException when account is not activated', async () => {
       usersService.findOneByUserEmail.mockResolvedValue(makeUser({ isActive: false }));
-      usersService.isValidPassword.mockReturnValue(true);
+      usersService.isValidPassword.mockResolvedValue(true);
 
       await expect(service.validateUser('test@example.com', 'correct-password')).rejects.toThrow(
         BadRequestException,
@@ -103,7 +103,7 @@ describe('AuthCredentialsService', () => {
 
     it('should throw UnauthorizedException when account is locked', async () => {
       usersService.findOneByUserEmail.mockResolvedValue(makeUser({ isLocked: true }));
-      usersService.isValidPassword.mockReturnValue(true);
+      usersService.isValidPassword.mockResolvedValue(true);
 
       await expect(service.validateUser('test@example.com', 'correct-password')).rejects.toThrow(
         UnauthorizedException,
@@ -112,7 +112,7 @@ describe('AuthCredentialsService', () => {
 
     it('should not return a user when the locked-account guard is reached', async () => {
       usersService.findOneByUserEmail.mockResolvedValue(makeUser({ isLocked: true }));
-      usersService.isValidPassword.mockReturnValue(true);
+      usersService.isValidPassword.mockResolvedValue(true);
 
       await expect(service.validateUser('test@example.com', 'correct-password')).rejects.toThrow(
         UnauthorizedException,
@@ -123,7 +123,7 @@ describe('AuthCredentialsService', () => {
       usersService.findOneByUserEmail.mockResolvedValue(
         makeUser({ scheduledDeletionAt: new Date(Date.now() + 60_000) }),
       );
-      usersService.isValidPassword.mockReturnValue(true);
+      usersService.isValidPassword.mockResolvedValue(true);
 
       await expect(service.validateUser('test@example.com', 'correct-password')).rejects.toThrow(
         ForbiddenException,
@@ -145,7 +145,7 @@ describe('AuthCredentialsService', () => {
     it('counts a wrong password against the email with a 15-minute window', async () => {
       redisClient.get.mockResolvedValue('3');
       usersService.findOneByUserEmail.mockResolvedValue(makeUser());
-      usersService.isValidPassword.mockReturnValue(false);
+      usersService.isValidPassword.mockResolvedValue(false);
 
       await expect(service.validateUser('test@example.com', 'wrong')).resolves.toBeNull();
       expect(redisPipeline.incr).toHaveBeenCalledWith('login:fail:test@example.com');
@@ -164,7 +164,7 @@ describe('AuthCredentialsService', () => {
     it('clears the failure count after a successful login', async () => {
       redisClient.get.mockResolvedValue('9');
       usersService.findOneByUserEmail.mockResolvedValue(makeUser());
-      usersService.isValidPassword.mockReturnValue(true);
+      usersService.isValidPassword.mockResolvedValue(true);
 
       await expect(
         service.validateUser('test@example.com', 'correct-password'),
@@ -175,17 +175,17 @@ describe('AuthCredentialsService', () => {
   });
 
   describe('hashPassword', () => {
-    it('should return a bcrypt hash different from the original password', () => {
-      const hash = service.hashPassword('plainPassword123');
+    it('should return a bcrypt hash different from the original password', async () => {
+      const hash = await service.hashPassword('plainPassword123');
 
       expect(hash).toBeDefined();
       expect(hash).not.toBe('plainPassword123');
       expect(hash.startsWith('$2')).toBe(true);
     });
 
-    it('should produce different hashes for the same input', () => {
-      const hash1 = service.hashPassword('samePass');
-      const hash2 = service.hashPassword('samePass');
+    it('should produce different hashes for the same input', async () => {
+      const hash1 = await service.hashPassword('samePass');
+      const hash2 = await service.hashPassword('samePass');
 
       expect(hash1).not.toBe(hash2);
     });
@@ -233,7 +233,7 @@ describe('AuthCredentialsService', () => {
     it('should change password, revoke all sessions, and return success', async () => {
       const dbUser = makeUser();
       usersService.findOneByUserEmail.mockResolvedValue(dbUser);
-      usersService.isValidPassword.mockReturnValue(true);
+      usersService.isValidPassword.mockResolvedValue(true);
 
       const result = await service.changePassword(user, changePasswordDto);
 
@@ -267,7 +267,7 @@ describe('AuthCredentialsService', () => {
 
     it('should throw BadRequestException when current password is wrong', async () => {
       usersService.findOneByUserEmail.mockResolvedValue(makeUser());
-      usersService.isValidPassword.mockReturnValue(false);
+      usersService.isValidPassword.mockResolvedValue(false);
 
       await expect(service.changePassword(user, changePasswordDto)).rejects.toThrow(
         BadRequestException,

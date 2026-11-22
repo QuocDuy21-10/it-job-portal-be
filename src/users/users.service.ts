@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserDocument } from './schemas/user.schema';
-import { compareSync, genSaltSync, hashSync } from 'bcryptjs';
+import { compare, hash } from 'bcryptjs';
 import { IUser } from './user.interface';
 import {
   buildPaginationMeta,
@@ -54,9 +54,9 @@ export class UsersService {
     private readonly profileIdentitySyncService: ProfileIdentitySyncService,
   ) {}
 
-  private hashPassword(password: string): string {
-    const salt = genSaltSync(10);
-    return hashSync(password, salt);
+  // Async bcryptjs yields to the event loop between rounds instead of holding it for the whole hash.
+  private hashPassword(password: string): Promise<string> {
+    return hash(password, 10);
   }
   async create(createUserDto: CreateUserDto, user: IUser) {
     const { name, email, password, role, company, avatar } = createUserDto;
@@ -69,7 +69,7 @@ export class UsersService {
       role,
       company,
     );
-    const hashedPassword = this.hashPassword(password);
+    const hashedPassword = await this.hashPassword(password);
     const newUser = await this.userRepository.create({
       name,
       email,
@@ -89,7 +89,7 @@ export class UsersService {
       throw new BadRequestException(`Email đã tồn tại trong hệ thống. Vui lòng dùng email khác.`);
     }
 
-    const hashedPassword = this.hashPassword(password);
+    const hashedPassword = await this.hashPassword(password);
     // verificationExpires: 15 minutes from now — MongoDB TTL index auto-deletes if not verified
     const verificationExpires = new Date(Date.now() + 15 * 60 * 1000);
     return this.userRepository.create({
@@ -132,9 +132,9 @@ export class UsersService {
     return this.userRepository.findOneByUserEmail(email);
   }
 
-  isValidPassword(password: string, hash: string | null | undefined) {
-    if (!hash) return false;
-    return compareSync(password, hash);
+  async isValidPassword(password: string, passwordHash: string | null | undefined) {
+    if (!passwordHash) return false;
+    return compare(password, passwordHash);
   }
 
   async update(id: string, updateUserDto: UpdateUserDto, user: IUser) {

@@ -48,6 +48,8 @@ Tải một file lên thư mục chọn bằng header `folder_type`
 - **Auth:** Đăng nhập (mọi vai trò), cần header `folder_type`
 - **Handler:** `uploadFile` trong [files.controller.ts](../../../src/files/files.controller.ts)
 - **Mã thành công:** 201, `message` = "Upload single file"
+- **Giới hạn tốc độ:** 10 lần mỗi phút mỗi IP (`UPLOAD_THROTTLE`)
+- **URL trả về:** `https://<API_DOMAIN>/images/<folder>/<file>` ở production, `http://localhost:<PORT>/...` khi không đặt `API_DOMAIN`
 
 **Upload:** nhận file qua `multipart/form-data` (`@UploadedFile`).
 

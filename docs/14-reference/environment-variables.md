@@ -11,6 +11,7 @@ Ký hiệu cột "Bắt buộc": `Boot` = thiếu thì ứng dụng không khở
 | Biến | Bắt buộc | Mặc định | Dùng cho |
 |---|---|---|---|
 | `PORT` | Không | `8081` | Cổng HTTP |
+| `API_DOMAIN` | Production | trống | Tên miền public của API (Caddy dùng để xin chứng chỉ). Backend dựng URL file là `https://<API_DOMAIN>/images/...`; để trống thì dùng `http://localhost:<PORT>` (dev) |
 | `NODE_ENV` | Không | `development` | `production` bật cookie `Secure`, tắt Swagger, log JSON, yêu cầu thêm biến |
 | `FE_URL` | Prod | `http://localhost:3000` | Liên kết trong email; danh sách CORS khi không có `CORS_ORIGINS` |
 | `CORS_ORIGINS` | Prod | rơi về `FE_URL` | Danh sách origin cho phép, cách nhau bằng dấu phẩy |

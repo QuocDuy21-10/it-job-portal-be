@@ -34,9 +34,9 @@ export class AuthCredentialsService {
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
   ) {}
 
-  hashPassword(password: string): string {
-    const salt = bcrypt.genSaltSync(10);
-    return bcrypt.hashSync(password, salt);
+  // Async bcryptjs yields to the event loop between rounds instead of holding it for the whole hash.
+  hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, 10);
   }
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -57,7 +57,7 @@ export class AuthCredentialsService {
         );
       }
 
-      const isValid = this.usersService.isValidPassword(password, user.password);
+      const isValid = await this.usersService.isValidPassword(password, user.password);
       if (isValid) {
         assertAuthenticatedAccountState(user);
         await this.redisClient.del(failureKey);
@@ -123,12 +123,12 @@ export class AuthCredentialsService {
       );
     }
 
-    const isValid = this.usersService.isValidPassword(currentPassword, userInDb.password);
+    const isValid = await this.usersService.isValidPassword(currentPassword, userInDb.password);
     if (!isValid) {
       throw new BadRequestException('Mật khẩu hiện tại không chính xác');
     }
 
-    const newPasswordHash = this.hashPassword(newPassword);
+    const newPasswordHash = await this.hashPassword(newPassword);
     await this.usersService.updatePassword(userInDb._id.toString(), newPasswordHash);
     await this.sessionsService.deleteAllUserSessions(userInDb._id.toString());
 
@@ -147,7 +147,7 @@ export class AuthCredentialsService {
       );
     }
 
-    const newPasswordHash = this.hashPassword(newPassword);
+    const newPasswordHash = await this.hashPassword(newPassword);
     await this.usersService.updatePassword(userInDb._id.toString(), newPasswordHash);
     await this.sessionsService.deleteAllUserSessions(userInDb._id.toString());
 
@@ -209,7 +209,7 @@ export class AuthCredentialsService {
     const user = await this.usersService.findUserByEmail(email);
     if (!user) throw new BadRequestException('Không tìm thấy người dùng');
 
-    const newPasswordHash = this.hashPassword(newPassword);
+    const newPasswordHash = await this.hashPassword(newPassword);
     await this.usersService.updatePassword(user._id.toString(), newPasswordHash);
     await this.sessionsService.deleteAllUserSessions(user._id.toString());
 
