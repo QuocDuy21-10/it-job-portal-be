@@ -18,7 +18,9 @@ services:
     env_file: .env.production
     environment:
       NODE_ENV: production
-      MONGO_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME:?}:${MONGO_INITDB_ROOT_PASSWORD:?}@mongodb:27017/${MONGO_INITDB_DATABASE:-my-job-portal}?authSource=admin
+      # Least privilege: set MONGO_APP_USERNAME/PASSWORD (readWrite + dbAdmin on the app database only, see
+      # docs/08-security/production-security-checklist.md). Falls back to root until that user exists.
+      MONGO_URL: mongodb://${MONGO_APP_USERNAME:-${MONGO_INITDB_ROOT_USERNAME:?}}:${MONGO_APP_PASSWORD:-${MONGO_INITDB_ROOT_PASSWORD:?}}@mongodb:27017/${MONGO_INITDB_DATABASE:-my-job-portal}?authSource=admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
       # Internal only (not in ports): scraped by the monitoring profile's Prometheus.

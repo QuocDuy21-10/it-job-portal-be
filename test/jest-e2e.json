@@ -3,7 +3,7 @@
   "moduleFileExtensions": ["js", "json", "ts"],
   "testRegex": "test/.*\\.e2e-spec\\.ts$",
   "transform": { "^.+\\.(t|j)s$": "ts-jest" },
-  "transformIgnorePatterns": ["node_modules/(?!(api-query-params|uuid)/)"],
+  "transformIgnorePatterns": ["node_modules/(?!(api-query-params|uuid|htmlparser2|dom-serializer|domelementtype|domhandler|domutils|entities)/)"],
   "moduleNameMapper": { "^src/(.*)$": "<rootDir>/src/$1" },
   "setupFiles": ["<rootDir>/test/setup-env.ts"],
   "testEnvironment": "node",

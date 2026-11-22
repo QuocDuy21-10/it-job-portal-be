@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Called by docker-publish.yml so a release tag is only built and deployed after these checks pass.
+  workflow_call:
 
 permissions:
   contents: read
