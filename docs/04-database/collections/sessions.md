@@ -28,25 +28,16 @@ Mỗi bản ghi là một phiên đăng nhập trên một thiết bị, gắn v
 | Keys | Thuộc tính | Mục đích |
 |---|---|---|
 | `{ refreshToken: 1 }` | unique | Ràng buộc unique trên token đã băm |
-| `{ refreshTokenHash: 1 }` | — | Tra cứu phiên theo hash (khai báo thường, xem Known Limitation) |
-| `{ expiresAt: 1 }` | — | Index thường từ `index: true` (xem Known Limitation) |
 | `{ userId: 1, isActive: 1 }` | — | Đếm và liệt kê phiên đang hoạt động của người dùng |
 | `{ userId: 1, expiresAt: 1 }` | — | Liệt kê phiên còn hạn của người dùng |
-| `{ expiresAt: 1 }` | TTL 0s | Khai báo TTL `expireAfterSeconds: 0` (xem Known Limitation) |
-| `{ refreshTokenHash: 1 }` | unique, sparse | Khai báo unique sparse (xem Known Limitation) |
+| `{ expiresAt: 1 }` | TTL 0s | MongoDB tự xóa phiên khi hết hạn |
+| `{ refreshTokenHash: 1 }` | unique | Tra cứu phiên theo hash, mỗi hash một phiên |
 
 ### Known Limitation: index trùng key pattern
 
-Schema khai báo hai cặp index cùng key nhưng khác option:
+**Đã sửa ngày 2026-11-22.** Trước đây schema khai báo `expiresAt` và `refreshTokenHash` hai lần (`index: true` trên field và `SessionSchema.index(...)` với TTL hoặc unique). Hai khai báo có cùng tên tự sinh, nên Mongoose tạo index thường trước và lần tạo TTL/unique lỗi im lặng. Production (kiểm tra ngày 2026-11-21) có `expiresAt_1` không TTL và `refreshTokenHash_1` không unique; phiên hết hạn vẫn nằm lại.
 
-| Key | Khai báo 1 (từ `index: true` trên field) | Khai báo 2 (gọi `SessionSchema.index`) |
-|---|---|---|
-| `{ expiresAt: 1 }` | index thường | TTL `expireAfterSeconds: 0` |
-| `{ refreshTokenHash: 1 }` | index thường | `unique: true, sparse: true` |
-
-MongoDB không cho hai index cùng key pattern với option khác nhau cùng tồn tại. Một trong hai lần tạo sẽ lỗi, và index nào thắng phụ thuộc thứ tự Mongoose gửi lệnh tạo. Hệ quả có thể là **TTL không tồn tại** (phiên hết hạn không tự bị xóa) hoặc **không có ràng buộc unique** trên `refreshTokenHash`.
-
-Trạng thái: `Chưa xác minh`. Cần chạy `db.sessions.getIndexes()` trên database thật. Code có hàm xóa phiên hết hạn thủ công (`expiresAt: { $lt: now }` ở [sessions.service.ts](../../../src/sessions/sessions.service.ts)) nên rủi ro bị giảm nhẹ, nhưng chưa kiểm tra có được gọi định kỳ không.
+Nay mỗi trường chỉ khai báo một lần ([session.schema.ts](../../../src/sessions/schemas/session.schema.ts), có test). Database đã tồn tại cần chạy một lần migration [session-indexes.ts](../../../src/databases/migrations/session-indexes.ts) (`npm run migrate:session-indexes`, hoặc `node dist/databases/migrations/session-indexes.js` trong container backend). Migration dùng `collMod` để đổi index tại chỗ, chạy lại không làm gì, và dừng lại báo cáo nếu có hash trùng thay vì xóa dữ liệu.
 
 ## Quan hệ
 

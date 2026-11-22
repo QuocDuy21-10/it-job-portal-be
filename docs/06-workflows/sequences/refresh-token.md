@@ -63,4 +63,4 @@ sequenceDiagram
 | Hai lần làm mới đồng thời | Lần thứ hai thấy phiên đã bị xóa, nhận `400` và bị xóa cookie. Ứng dụng nhiều tab cần tự điều phối việc gọi làm mới |
 | Không phát hiện tái sử dụng | Dùng lại token cũ chỉ báo lỗi, không thu hồi các phiên khác của người dùng |
 | Mọi lỗi gộp thành một thông điệp | Mọi ngoại lệ trong khối `try` trả `400` "Refresh token không hợp lệ" kèm thông điệp lỗi gốc, lẫn lộn lỗi hạ tầng với token sai |
-| Index trùng trên `sessions` | TTL và unique của phiên có thể không tồn tại, xem [sessions](../../04-database/collections/sessions.md#known-limitation-index-trùng-key-pattern) |
+| Index trùng trên `sessions` (đã sửa, database cũ cần migration `session-indexes`) | Trước migration, TTL và unique của phiên không tồn tại, xem [sessions](../../04-database/collections/sessions.md#known-limitation-index-trùng-key-pattern) |

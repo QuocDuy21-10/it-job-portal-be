@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -67,6 +68,7 @@ export class CompaniesService {
     if (exists) {
       throw new BadRequestException(`Công ty có tên ${createCompanyDto.name} đã tồn tại`);
     }
+    await this.assertLogoNotTaken(createCompanyDto.logo);
 
     const company = await this.companyRepository.create({
       ...createCompanyDto,
@@ -167,6 +169,9 @@ export class CompaniesService {
     // Always fetch the company first so we can enforce HR ownership before mutating
     const company = await this.companyRepository.findById(id);
     await this.assertHrOwnership(company, id, user);
+    if (updateCompanyDto.logo !== company?.logo) {
+      await this.assertLogoNotTaken(updateCompanyDto.logo, id);
+    }
 
     // Delete the old logo file only after ownership is confirmed
     if (updateCompanyDto.logo !== undefined) {
@@ -200,6 +205,8 @@ export class CompaniesService {
       throw new NotFoundException(`Không tìm thấy công ty có id = ${id}`);
     }
 
+    // Same cascade as bulkRemove: jobs of a deleted company must leave the public site
+    await this.companyRepository.deactivateJobsForCompanies([id]);
     const result = await this.companyRepository.softDeleteById(id, {
       _id: user._id,
       email: user.email,
@@ -210,6 +217,14 @@ export class CompaniesService {
     await this.clearJobListCaches();
 
     return result;
+  }
+
+  // A logo file belongs to one company: replacing a logo deletes the old file, so taking another
+  // company's file name would let the next update delete that company's logo.
+  private async assertLogoNotTaken(logo: string | undefined, exceptCompanyId?: string) {
+    if (logo && (await this.companyRepository.isLogoUsedByAnotherCompany(logo, exceptCompanyId))) {
+      throw new ConflictException('Logo này đang được công ty khác sử dụng');
+    }
   }
 
   async bulkRemove(

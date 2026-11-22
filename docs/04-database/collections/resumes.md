@@ -151,4 +151,4 @@ Dữ liệu giả.
 
 - **Known Limitation:** không kiểm tra chuyển trạng thái, và `histories` không giới hạn kích thước.
 - **Known Limitation:** `cvStructuredData` là bản sao đầy đủ CV (dữ liệu cá nhân), nên khi người dùng xóa hoặc sửa CV, bản trong hồ sơ ứng tuyển **không** đổi. Cách xử lý khi xóa tài khoản cần được kiểm tra ở `account-deletion`. Trạng thái: `Chưa xác minh`.
-- `adminNotes` và `hrNotes` là ghi chú nội bộ, không nên trả về cho ứng viên. Quyền xem cụ thể: `Chưa xác minh`.
+- `adminNotes` và `hrNotes` là ghi chú nội bộ: `POST /resumes/by-user` (ứng viên) bỏ hai field này cùng `histories.updatedBy`, và `GET /resumes/:id/analysis` chỉ trả `notes` cho HR và SUPER ADMIN.

@@ -46,15 +46,19 @@ export class ResumeRepository {
   }
 
   async findByUserId(userId: string): Promise<ResumeDocument[]> {
-    return this.resumeModel
-      .find({ userId: userId })
-      .sort('-createdAt')
-      .populate([
-        { path: 'companyId', select: { name: 1, logo: 1 } },
-        { path: 'jobId', select: { name: 1, location: 1, salary: 1 } },
-      ])
-      .lean()
-      .exec() as unknown as ResumeDocument[];
+    return (
+      this.resumeModel
+        .find({ userId: userId, isDeleted: { $ne: true } })
+        // The candidate reads this list: HR/admin notes and the reviewers' emails stay internal.
+        .select('-hrNotes -adminNotes -histories.updatedBy -updatedBy -deletedBy')
+        .sort('-createdAt')
+        .populate([
+          { path: 'companyId', select: { name: 1, logo: 1 } },
+          { path: 'jobId', select: { name: 1, location: 1, salary: 1 } },
+        ])
+        .lean()
+        .exec() as unknown as ResumeDocument[]
+    );
   }
 
   async findUrlsByUserId(userId: string): Promise<ResumeDocument[]> {

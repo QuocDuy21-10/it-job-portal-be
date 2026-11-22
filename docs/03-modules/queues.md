@@ -80,10 +80,10 @@ Múi giờ của cả bốn là `Asia/Ho_Chi_Minh`.
 Mỗi việc xử lý **một** người đăng ký ([job-recommendation-queue.processor.ts](../../src/queues/processors/job-recommendation-queue.processor.ts)):
 
 1. Đọc `email`, `name`, `skills`, `location`, `locationCode`; bỏ qua nếu không có người đăng ký hoặc không có email.
-2. Truy vấn tin `isActive`, chưa xóa mềm, `endDate` chưa qua, có **giao** kỹ năng với đăng ký (`skills: { $in: ... }`), và địa điểm nếu có.
+2. Truy vấn tin đang hiển thị công khai (`buildPublicJobVisibilityFilter`: `isActive`, `APPROVED`, `endDate` chưa qua hoặc không có), chưa xóa mềm, có **giao** kỹ năng với đăng ký (`skills: { $in: ... }`), và địa điểm nếu có.
 3. Lấy tối đa **5 tin** và gửi một email.
 
-Truy vấn này **không lọc `approvalStatus`** (đã `grep` cả file processor, không có `approvalStatus` hay `APPROVED`), nên email gợi ý có thể chứa tin `PENDING` hoặc `REJECTED`, trái với quy tắc hiển thị công khai ([job-approval](../06-workflows/state-machines/job-approval.md#điều-kiện-hiển-thị-công-khai)).
+Trước ngày 2026-11-22 truy vấn này không lọc `approvalStatus`, nên email gợi ý có thể chứa tin `PENDING` hoặc `REJECTED`. Nay dùng chung quy tắc hiển thị công khai ([job-approval](../06-workflows/state-machines/job-approval.md#điều-kiện-hiển-thị-công-khai)), có test trong `job-recommendation-queue.processor.spec.ts`.
 
 ### `account-deletion`
 
@@ -106,7 +106,6 @@ Việc `delete-account` được lên lịch trễ 30 ngày khi người dùng y
 - **Xóa tài khoản không triệt để dữ liệu cá nhân.** Chỉ `email` của `resumes` được ẩn danh. `parsedData` (họ tên, điện thoại, email, kinh nghiệm), `cvStructuredData` (bản sao toàn bộ CV), `url` (đường dẫn file CV), `createdBy.email` và `histories.updatedBy.email` vẫn còn. File CV, ảnh đại diện trên đĩa không bị xóa (không có bước xóa file). `notifications`, `chat_tool_actions`, `ai_usage_logs` của người dùng không bị xóa. Comment trong code gọi bước 3 và 4 là "GDPR hard-delete", nhưng phạm vi xóa không bao gồm các mục trên. Đã đọc mã; chưa chạy thử. Cần xác nhận với yêu cầu pháp lý áp dụng, tài liệu không đánh giá tuân thủ.
 - **Email người dùng được ghi vào log** khi xóa tài khoản: dòng `Starting cascade deletion for user <id> (<email>)` và dòng hoàn tất ([account-deletion-queue.processor.ts](../../src/queues/processors/account-deletion-queue.processor.ts)).
 - **Việc lỗi giữ vô thời hạn** ở bốn hàng đợi email và xóa tài khoản (`removeOnFail: false`), trong khi mặc định toàn cục là 24 giờ; không có tác vụ dọn dẹp.
-- **Email gợi ý việc làm có thể chứa tin chưa duyệt hoặc bị từ chối**, xem mục `job-recommendation` ở trên. Cùng với email "tin mới" gửi lúc tạo tin ([jobs](jobs.md#known-limitation)), có hai đường để tin chưa duyệt tới người dùng qua email.
 - **Email có thể gửi trùng** khi retry (không có khóa chống trùng), và lỗi gửi từng email ở `send-new-job-notification` không được thử lại.
 - **Một tiến trình duy nhất**: worker chia sẻ CPU và bộ nhớ với API, và mọi hàng đợi chạy trong cùng tiến trình ([scalability](../02-architecture/scalability.md)).
 - **Cron không có khóa**: với nhiều instance, cron chạy nhiều lần; chỉ `job-ingestion` được loại trùng nhờ `jobId`. Với `job-recommendation`, `addBulk` không có `jobId`, nên nhiều instance có thể đưa trùng việc.

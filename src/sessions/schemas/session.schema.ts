@@ -12,7 +12,7 @@ export class Session {
   @Prop({ required: true, unique: true, index: true, select: false })
   refreshToken: string;
 
-  @Prop({ required: true, index: true })
+  @Prop({ required: true })
   refreshTokenHash: string;
 
   @Prop({ required: true })
@@ -21,7 +21,7 @@ export class Session {
   @Prop({ required: true })
   ipAddress: string;
 
-  @Prop({ required: true, index: true })
+  @Prop({ required: true })
   expiresAt: Date;
 
   @Prop({ default: true })
@@ -41,5 +41,6 @@ export const SessionSchema = SchemaFactory.createForClass(Session);
 
 SessionSchema.index({ userId: 1, isActive: 1 });
 SessionSchema.index({ userId: 1, expiresAt: 1 });
+// Declared only here: a second `index: true` on the field made Mongoose skip these (see session-indexes migration).
 SessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-SessionSchema.index({ refreshTokenHash: 1 }, { unique: true, sparse: true });
+SessionSchema.index({ refreshTokenHash: 1 }, { unique: true });

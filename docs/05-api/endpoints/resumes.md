@@ -8,7 +8,6 @@ Hai nhóm người dùng: **ứng viên** nộp và xem hồ sơ của mình (`c
 
 | Route | Auth | Mô tả |
 |---|---|---|
-| `POST /api/v1/resumes` | Đăng nhập, vai trò: SUPER ADMIN, HR | Tạo hồ sơ thủ công (quản trị viên hoặc HR) |
 | `GET /api/v1/resumes` | Đăng nhập, vai trò: SUPER ADMIN, HR | Danh sách hồ sơ có phân trang. HR chỉ thấy hồ sơ công ty mình |
 | `GET /api/v1/resumes/:id` | Đăng nhập, vai trò: SUPER ADMIN, HR | Chi tiết một hồ sơ. HR chỉ xem hồ sơ công ty mình |
 | `PATCH /api/v1/resumes/:id` | Đăng nhập, vai trò: SUPER ADMIN, HR | Cập nhật hồ sơ. Đổi `status` ghi `histories` và gửi thông báo cho ứng viên |
@@ -54,22 +53,6 @@ Chấm điểm được processor tự xếp hàng sau khi đọc CV xong; respo
 - Điểm phù hợp chỉ ảnh hưởng `priority`; trạng thái tự động đã bị tắt trong processor ([resumes (collection)](../../04-database/collections/resumes.md#quy-tắc-nghiệp-vụ)).
 
 ## Chi tiết từng route
-
-### `POST /api/v1/resumes`
-
-Tạo hồ sơ thủ công (quản trị viên hoặc HR)
-
-- **Auth:** Đăng nhập, vai trò: SUPER ADMIN, HR
-- **Handler:** `create` trong [resumes.controller.ts](../../../src/resumes/resumes.controller.ts)
-- **Mã thành công:** 201, `message` = "Resume created successfully"
-
-**Body: `CreateUserCvDto`** ([create-resume.dto.ts](../../../src/resumes/dto/create-resume.dto.ts))
-
-| Field | Kiểu | Bắt buộc | Validation | Ví dụ |
-|---|---|---|---|---|
-| `url` | string | Có | IsNotEmpty | 'https://example.com/resume.pdf' |
-| `companyId` | mongoose.Schema.Types.ObjectId | Không | IsNotEmpty, IsMongoId | '507f1f77bcf86cd799439011' |
-| `jobId` | mongoose.Schema.Types.ObjectId | Không | IsNotEmpty, IsMongoId | '507f1f77bcf86cd799439011' |
 
 ### `GET /api/v1/resumes`
 
@@ -192,6 +175,7 @@ Lấy các hồ sơ ứng tuyển của chính người gọi (dùng POST, khôn
 - **Auth:** Đăng nhập (mọi vai trò)
 - **Handler:** `getResumeByUser` trong [resumes.controller.ts](../../../src/resumes/resumes.controller.ts)
 - **Mã thành công:** 200, `message` = "Resume has been retrieved successfully"
+- **Dữ liệu trả về:** chỉ hồ sơ chưa xóa; không có `hrNotes`, `adminNotes`, `updatedBy`, `deletedBy` và người cập nhật trong `histories` (email của HR).
 
 ### `POST /api/v1/resumes/my-resumes`
 

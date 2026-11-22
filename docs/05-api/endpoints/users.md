@@ -132,6 +132,7 @@ Xem danh sách tin đã lưu
 - **Auth:** Đăng nhập (mọi vai trò)
 - **Handler:** `getSavedJobs` trong [users.controller.ts](../../../src/users/users.controller.ts)
 - **Mã thành công:** 200, `message` = "Get saved jobs successfully"
+- **Dữ liệu trả về:** chỉ những tin còn hiển thị công khai (đã duyệt, đang bật, chưa hết hạn); tin đã lưu nhưng bị gỡ hoặc quay lại chờ duyệt không xuất hiện và không được tính vào `total`.
 
 **Query**
 

@@ -29,6 +29,11 @@ export class CompanyRepository {
     return count > 0;
   }
 
+  async isLogoUsedByAnotherCompany(logo: string, exceptCompanyId?: string): Promise<boolean> {
+    const filter = exceptCompanyId ? { logo, _id: { $ne: exceptCompanyId } } : { logo };
+    return (await this.companyModel.countDocuments(filter)) > 0;
+  }
+
   async create(data: Record<string, any>): Promise<CompanyDocument> {
     return this.companyModel.create(data);
   }

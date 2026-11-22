@@ -21,7 +21,6 @@ import { SkipTransform } from 'src/utils/decorators/skip-transform.decorator';
 import { Throttle } from '@nestjs/throttler';
 import { BulkDeleteDto } from 'src/utils/dto/bulk-delete.dto';
 import { ResumesService } from './resumes.service';
-import { CreateUserCvDto } from './dto/create-resume.dto';
 import { UpdateResumeDto } from './dto/update-resume.dto';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
@@ -52,16 +51,6 @@ export class ResumesController {
     private readonly resumeQueueService: ResumeQueueService,
     private readonly applicationSubmissionService: ApplicationSubmissionService,
   ) {}
-
-  @Post()
-  @Roles(ERole.SUPER_ADMIN, ERole.HR)
-  @ApiOperation({
-    description: 'Creates a new resume with the provided information. Requires authentication.',
-  })
-  @ResponseMessage('Tạo hồ sơ ứng tuyển thành công')
-  create(@Body() createUserCvDto: CreateUserCvDto, @User() user: IUser) {
-    return this.resumesService.create(createUserCvDto, user);
-  }
 
   @Get()
   @Roles(ERole.SUPER_ADMIN, ERole.HR)
