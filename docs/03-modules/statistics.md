@@ -47,7 +47,6 @@ Chỉ đọc từ `users`, `companies`, `jobs`, `resumes`. Không có collection
 
 ## Known Limitation
 
-- Cache dùng `CACHE_MANAGER`, nằm trong bộ nhớ và không dùng chung giữa instance ([data-flow](../02-architecture/data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis)). Hệ quả: số liệu có thể khác nhau giữa các instance trong tối đa vài phút.
 - `GET /statistics/hr-dashboard` chỉ cho vai trò `HR`, nên quản trị viên không xem được dashboard của một công ty cụ thể qua route này.
 - Số liệu "chat AI" của quản trị viên nằm ở `GET /chat/admin/usage/*`, không thuộc module này.
 

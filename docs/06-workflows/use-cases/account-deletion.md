@@ -40,7 +40,7 @@ sequenceDiagram
 | Cách | Hoạt động |
 |---|---|
 | Hủy khi đăng nhập | `POST /auth/account/cancel-deletion`. **Không dùng được**: người dùng đang chờ xóa bị `JwtStrategy` chặn `403`, nên không tới được route này ([known limitation](../../03-modules/auth-and-sessions.md#known-limitation)) |
-| Hủy bằng token | `POST /auth/account/cancel-deletion-by-token` với token trong email. Token lưu trong bộ nhớ tiến trình (sống 30 ngày), mất khi backend khởi động lại |
+| Hủy bằng token | `POST /auth/account/cancel-deletion-by-token` với token trong email. Token lưu trong Redis qua `CACHE_MANAGER` (sống 30 ngày), còn sau khi backend khởi động lại |
 
 Hủy thành công xóa việc theo `jobId`, gỡ `scheduledDeletionAt`.
 

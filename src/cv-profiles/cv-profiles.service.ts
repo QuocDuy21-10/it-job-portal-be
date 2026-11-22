@@ -123,8 +123,8 @@ export class CvProfilesService {
     createCvProfileDto: CreateCvProfileDto,
   ): Promise<CvProfile> {
     const cvProfile = new this.cvProfileModel({
-      userId: new Types.ObjectId(userId),
       ...createCvProfileDto,
+      userId: new Types.ObjectId(userId),
       isActive: true,
       lastUpdated: new Date(),
     });

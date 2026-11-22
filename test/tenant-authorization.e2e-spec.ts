@@ -153,5 +153,43 @@ describe('Tenant authorization (e2e)', () => {
     it('a candidate still reads its own CV profile', async () => {
       await request(t.server).get('/api/v1/cv-profiles/me').set(auth('c1')).expect(200);
     });
+
+    it('upsert ignores a userId inside cvData and only writes the caller profile', async () => {
+      const cvData = {
+        userId: world.users.c2._id,
+        personalInfo: { fullName: 'c1 updated', phone: '0900000000', email: world.users.c1.email },
+      };
+      const res = await request(t.server)
+        .post('/api/v1/cv-profiles/upsert')
+        .set(auth('c1'))
+        .field('cvData', JSON.stringify(cvData));
+      expect(res.status).toBe(200);
+
+      const profiles = t.model(CvProfile.name);
+      const own = await profiles.findOne({ userId: new Types.ObjectId(world.users.c1._id) }).lean();
+      const other = await profiles
+        .findOne({ userId: new Types.ObjectId(world.users.c2._id) })
+        .lean();
+      expect((own as any).personalInfo.fullName).toBe('c1 updated');
+      expect((other as any).personalInfo.fullName).toBe('c2');
+    });
+
+    it('upsert drops fields outside the DTO, like PUT /cv-profiles/me', async () => {
+      const cvData = {
+        isActive: false,
+        personalInfo: { fullName: 'c1 updated', phone: '0900000000', email: world.users.c1.email },
+      };
+      await request(t.server)
+        .post('/api/v1/cv-profiles/upsert')
+        .set(auth('c1'))
+        .field('cvData', JSON.stringify(cvData))
+        .expect(200);
+
+      const own = await t
+        .model(CvProfile.name)
+        .findOne({ userId: new Types.ObjectId(world.users.c1._id) })
+        .lean();
+      expect((own as any).isActive).toBe(true);
+    });
   });
 });

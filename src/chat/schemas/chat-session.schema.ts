@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, SchemaTypes, Types } from 'mongoose';
 import { EChatSessionType } from '../enums/chat-session-type.enum';
 
 export type ChatSessionDocument = ChatSession & Document;
@@ -10,7 +10,7 @@ export type ChatSessionDocument = ChatSession & Document;
 })
 export class ChatSession {
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'User',
     required: true,
   })
@@ -43,7 +43,7 @@ export class ChatSession {
   @Prop({ type: Number })
   messageSeq?: number;
 
-  @Prop({ type: Types.ObjectId, ref: 'Conversation', index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Conversation', index: true })
   legacyConversationId?: Types.ObjectId;
 
   @Prop({ type: Date })

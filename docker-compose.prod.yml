@@ -62,7 +62,8 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    mem_limit: 96m
+    # cache-manager entries (stats, chat context, parsed CVs) share this memory with BullMQ and the throttler.
+    mem_limit: 128m
     command:
       - redis-server
       - --requirepass
@@ -70,7 +71,7 @@ services:
       - --appendonly
       - 'yes'
       - --maxmemory
-      - 64mb
+      - 96mb
       # BullMQ requires noeviction; Redis rejects writes instead of dropping queue data when full
       - --maxmemory-policy
       - noeviction

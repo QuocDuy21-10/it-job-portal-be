@@ -80,17 +80,8 @@ Chat trả lời dạng stream qua `POST /api/v1/chat/message/stream`, nên ch�
 
 ## Known Limitation: `CACHE_MANAGER` chạy trong bộ nhớ, không phải Redis
 
-[redis.module.ts](../../src/redis/redis.module.ts) cấu hình `CacheModule` với tùy chọn `store: redisStore`. Phiên bản `@nestjs/cache-manager` đang cài là 3.0.1 và mã nguồn `dist/cache.providers.js` của gói này chỉ đọc `options.stores`, không đọc `options.store`.
+**Đã sửa ngày 2026-11-22.** Cấu hình cũ truyền `store: redisStore`, nhưng `@nestjs/cache-manager` 3.0.1 chỉ đọc `options.stores`, nên `CACHE_MANAGER` thực chất là một `Keyv` trong bộ nhớ (thực nghiệm 2026-11-05): token hủy xóa tài khoản và mọi cache khác mất sau mỗi lần khởi động lại, không giới hạn kích thước.
 
-**Đã kiểm chứng bằng thực nghiệm (2026-11-05).** Dựng đúng cấu hình `CacheModule` của dự án (cùng `redisStore`, `host`, `db`, `ttl`) trỏ tới một cổng không có Redis, rồi gọi `set` và `get`. Cả hai hoàn tất trong 0 ms và trả đúng giá trị, store là `Keyv`. Nếu dữ liệu thật sự đi qua Redis thì thao tác phải lỗi hoặc quá hạn kết nối. Thực nghiệm không cần chạy MongoDB hay Redis.
+Hiện tại [redis.module.ts](../../src/redis/redis.module.ts) truyền `stores: [createKeyv(...)]` của `@keyv/redis`, trỏ tới `REDIS_CACHE_DB`. Dữ liệu đi qua `CACHE_MANAGER` nằm trong Redis: còn sau khi khởi động lại và dùng chung giữa các instance. E2E [account-deletion.e2e-spec.ts](../../test/account-deletion.e2e-spec.ts) kiểm tra link hủy xóa trong email vẫn dùng được sau khi app khởi động lại.
 
-**Hệ quả:** dữ liệu đi qua `CACHE_MANAGER` nằm trong bộ nhớ của từng tiến trình, mất khi khởi động lại và không chia sẻ giữa các instance. Nơi đang dùng (tìm bằng `grep CACHE_MANAGER src`):
-
-| Nơi dùng | Dữ liệu | Tác động khi mất cache |
-|---|---|---|
-| [auth-credentials.service.ts](../../src/auth/services/auth-credentials.service.ts) | Token đặt lại mật khẩu (`reset_password:<token>`) | Link đặt lại mật khẩu đã gửi mail mất hiệu lực sau khi backend khởi động lại |
-| [auth-account-deletion.service.ts](../../src/auth/services/auth-account-deletion.service.ts) | Token hủy xóa tài khoản (`cancel_deletion:<token>`), sống **30 ngày** | Link hủy xóa trong email mất hiệu lực khi khởi động lại. Người dùng vẫn hủy được khi đã đăng nhập |
-| `src/chat/` (service, context, cache) và `cv-profiles.service.ts` | Cache ngữ cảnh và phản hồi chat | Chỉ chậm hơn, tính lại được |
-| `src/statistics/statistics-cache.service.ts`, `skills.service.ts` | Cache thống kê và kỹ năng | Chỉ chậm hơn |
-
-Hai dòng đầu là thay đổi chức năng chứ không chỉ hiệu năng. Phần OTP, quota và rate limit **không** bị ảnh hưởng vì chúng dùng `REDIS_CLIENT` (ioredis) trực tiếp. Cách khắc phục là `Future Improvement`: truyền `stores` đúng với phiên bản thư viện.
+Lưu ý: các khóa này dùng chung bộ nhớ Redis (`maxmemory 96mb`, `noeviction`) với BullMQ và throttler, nên cần theo dõi `used_memory`. Giá trị đi qua JSON của Keyv, nên `Date` hay `ObjectId` đọc ra là chuỗi.

@@ -30,7 +30,7 @@ Không import module nghiệp vụ nào. `jobs`, `matching`, `subscribers`, `job
 - `normalizeExtractedSkills` là đường mềm hơn, dành cho kỹ năng trích từ CV: kỹ năng không khớp được trả về trong nhóm riêng (`unmappedSkills` của hồ sơ) thay vì gây lỗi.
 - `aliases` được chuẩn hóa khi lưu: gọn khoảng trắng, bỏ giá trị rỗng, bỏ alias trùng với `label`, loại trùng lặp.
 - `catalog` và `popular` công khai (`@Public`); các route còn lại chỉ `SUPER ADMIN`.
-- Danh mục dùng `CACHE_MANAGER`, nên cache này nằm trong bộ nhớ, xem [data-flow](../02-architecture/data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis).
+- Danh mục dùng `CACHE_MANAGER`, lưu trong Redis, xem [data-flow](../02-architecture/data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis).
 
 ## Data Model
 

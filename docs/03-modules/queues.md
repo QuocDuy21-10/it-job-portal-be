@@ -110,7 +110,7 @@ Việc `delete-account` được lên lịch trễ 30 ngày khi người dùng y
 - **Email có thể gửi trùng** khi retry (không có khóa chống trùng), và lỗi gửi từng email ở `send-new-job-notification` không được thử lại.
 - **Một tiến trình duy nhất**: worker chia sẻ CPU và bộ nhớ với API, và mọi hàng đợi chạy trong cùng tiến trình ([scalability](../02-architecture/scalability.md)).
 - **Cron không có khóa**: với nhiều instance, cron chạy nhiều lần; chỉ `job-ingestion` được loại trùng nhờ `jobId`. Với `job-recommendation`, `addBulk` không có `jobId`, nên nhiều instance có thể đưa trùng việc.
-- Cache kết quả parse (`parsed_cv:<resumeId>`) dùng `CACHE_MANAGER` nằm trong bộ nhớ, nên không tồn tại sau khi khởi động lại.
+- Cache kết quả parse (`parsed_cv:<resumeId>`) dùng `CACHE_MANAGER` (Redis), nhưng TTL truyền vào là `3600` ms, tức 3,6 giây.
 
 ## Future Improvement
 

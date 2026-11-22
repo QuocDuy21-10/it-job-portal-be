@@ -23,7 +23,7 @@ Tiền tố `/api/v1/skills`. Controller: [skills.controller.ts](../../../src/sk
 - `slug` sinh tự động từ `label`.
 - `aliases` tối đa 30 phần tử, mỗi phần tử tối đa 100 ký tự; alias trùng `label` bị bỏ.
 - `GET /skills` (quản trị) dùng `api-query-params` **không** có allowlist trường lọc, xem [api-overview](../api-overview.md#lọc-và-sắp-xếp-bằng-query-string).
-- `catalog` và `popular` được cache trong bộ nhớ tiến trình ([data-flow](../../02-architecture/data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis)).
+- `catalog` và `popular` được cache trong Redis qua `CACHE_MANAGER` ([data-flow](../../02-architecture/data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis)).
 
 ## Chi tiết từng route
 

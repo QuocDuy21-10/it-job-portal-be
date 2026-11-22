@@ -12,7 +12,7 @@ Tiền tố `/api/v1/statistics`. Controller: [statistics.controller.ts](../../.
 ## Ghi chú
 
 - `admin-dashboard` chỉ `SUPER ADMIN`, cache 15 phút. `hr-dashboard` chỉ `HR` (quản trị viên **không** gọi được), cache 3 phút theo công ty.
-- Cache nằm trong bộ nhớ tiến trình, nên số liệu có thể khác nhau giữa các instance ([data-flow](../../02-architecture/data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis)).
+- Cache nằm trong Redis qua `CACHE_MANAGER`, dùng chung giữa các instance ([data-flow](../../02-architecture/data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis)).
 - Cấu trúc phản hồi được định nghĩa bởi `AdminDashboardStatsDto` và `HrDashboardStatsDto` trong [src/statistics/dto/](../../../src/statistics/dto/); chưa liệt kê field ở đây. Xem Swagger để có ví dụ.
 
 ## Chi tiết từng route

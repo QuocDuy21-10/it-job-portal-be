@@ -13,7 +13,7 @@ Tình trạng hiện có: [`scripts/backup-mongo.sh`](../../scripts/backup-mongo
 | `.env.production` | VPS | Bí mật; lưu riêng và an toàn, **không** để chung với sao lưu dữ liệu |
 | `Caddyfile`, chứng chỉ TLS | Repository và volume `caddy_data` | `Caddyfile` có trong git; chứng chỉ tự cấp lại được nên không cần sao lưu |
 
-Dữ liệu trong `CACHE_MANAGER` (token đặt lại mật khẩu, hủy xóa) nằm trong bộ nhớ nên **không thể sao lưu**.
+Token hủy xóa tài khoản (`CACHE_MANAGER`) và token đặt lại mật khẩu nằm trong Redis (AOF bật), không có trong bản sao lưu MongoDB; sau khi khôi phục sang VPS mới, các link đã gửi qua email sẽ không còn dùng được.
 
 ## Sao lưu: `scripts/backup-mongo.sh`
 

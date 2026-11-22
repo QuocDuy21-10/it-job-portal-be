@@ -9,7 +9,7 @@
 | ATS | Applicant Tracking System: hệ thống quản lý tuyển dụng của công ty (Greenhouse, Lever) |
 | Backoff mũ | Thời gian chờ giữa các lần thử lại tăng theo cấp số nhân |
 | BullMQ | Thư viện hàng đợi dùng Redis ([queues](../03-modules/queues.md)) |
-| `CACHE_MANAGER` | Provider cache của NestJS; trong dự án chạy trong bộ nhớ, không phải Redis |
+| `CACHE_MANAGER` | Provider cache của NestJS; trong dự án lưu trong Redis qua `@keyv/redis` |
 | CASL | Thư viện khai báo quyền; có trong code nhưng không được thực thi trên route |
 | C4 | Mô hình sơ đồ kiến trúc nhiều mức (context, container, component) |
 | Collection | Tập hợp document trong MongoDB, tương tự bảng trong cơ sở dữ liệu quan hệ |

@@ -80,7 +80,7 @@ sequenceDiagram
 | Lỗi khác khi đọc | Ghi `parseError`, `isParsed = false`, ném lại để BullMQ retry (3 lần, backoff mũ từ 2 giây) |
 | Việc `analyze` chạy khi chưa parse xong | Ném `Resume must be parsed before analysis`, ghi `analysisError`, retry |
 | Tin đã hết hoạt động khi phân tích | Ném `Job is no longer active`, ghi `analysisError` |
-| Đã có kết quả parse trong cache | Trả ngay từ cache, bỏ qua bước trích xuất (cache nằm trong bộ nhớ tiến trình) |
+| Đã có kết quả parse trong cache | Trả ngay từ cache, bỏ qua bước trích xuất (cache `CACHE_MANAGER` trong Redis, TTL thực tế 3,6 giây) |
 | Quản trị viên hoặc HR gọi `reparse` hoặc `reanalyze` | Đưa lại việc tương ứng vào hàng đợi |
 
 ## Ghi chú

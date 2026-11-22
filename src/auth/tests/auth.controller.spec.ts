@@ -113,7 +113,7 @@ describe('AuthController', () => {
     it('should delegate to authService.resendCode with email', () => {
       authService.resendCode.mockResolvedValue({ message: 'sent' });
 
-      controller.handleResendCode('u@ex.com');
+      controller.handleResendCode({ email: 'u@ex.com' });
 
       expect(authService.resendCode).toHaveBeenCalledWith('u@ex.com');
     });

@@ -60,8 +60,7 @@ Route auth đều có `ThrottlerGuard`; giới hạn riêng của từng route n
 
 ## Known Limitation
 
-- `POST /auth/account/cancel-deletion` yêu cầu JWT nhưng không dùng được khi tài khoản đang chờ xóa, xem [auth-and-sessions](../../03-modules/auth-and-sessions.md#known-limitation). Đường dùng được là `cancel-deletion-by-token`, với token lưu trong bộ nhớ tiến trình.
-- Link đặt lại mật khẩu cũng lưu trong bộ nhớ tiến trình, mất khi backend khởi động lại.
+- `POST /auth/account/cancel-deletion` yêu cầu JWT nhưng không dùng được khi tài khoản đang chờ xóa, xem [auth-and-sessions](../../03-modules/auth-and-sessions.md#known-limitation). Đường dùng được là `cancel-deletion-by-token`, với token lưu trong Redis (còn sau khi backend khởi động lại).
 - **Chính sách mật khẩu không nhất quán.** `POST /auth/register` và `POST /users` chỉ yêu cầu mật khẩu không rỗng (`IsNotEmpty`), nên mật khẩu một ký tự được chấp nhận khi đăng ký. `change-password`, `set-password` và `reset-password` yêu cầu tối thiểu 6 ký tự (`MinLength(6)`). Không route nào yêu cầu độ phức tạp (chữ hoa, số, ký tự đặc biệt). Ví dụ `123456` trong Swagger chỉ để minh họa.
 
 ## Chi tiết từng route

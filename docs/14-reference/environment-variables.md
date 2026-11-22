@@ -47,7 +47,7 @@ Ký hiệu cột "Bắt buộc": `Boot` = thiếu thì ứng dụng không khở
 | `REDIS_PASSWORD` | Compose | không | Mật khẩu; compose prod bắt buộc |
 | `REDIS_QUEUE_DB` | Không | `0` | DB cho hàng đợi BullMQ |
 | `REDIS_CACHE_DB` | Không | `1` | DB cho cache danh sách, OTP, quota, rate limit |
-| `REDIS_TTL` | Không | `3600000` | TTL mặc định truyền cho `CacheModule`; lưu ý `CACHE_MANAGER` thực tế chạy trong bộ nhớ ([data-flow](../02-architecture/data-flow.md#known-limitation-cache_manager-chạy-trong-bộ-nhớ-không-phải-redis)) |
+| `REDIS_TTL` | Không | `3600000` | TTL mặc định (mili giây) của `CACHE_MANAGER`, lưu trong Redis DB `REDIS_CACHE_DB` qua `@keyv/redis` |
 
 ## Xác thực
 

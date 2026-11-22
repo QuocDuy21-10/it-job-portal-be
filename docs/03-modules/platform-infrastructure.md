@@ -10,7 +10,7 @@ Gộp các module nhỏ không chứa nghiệp vụ: `redis`, `health`, `databas
 |---|---|---|---|
 | `BullModule` | BullMQ | `REDIS_QUEUE_DB` (mặc định 0) | Bảy hàng đợi |
 | `REDIS_CLIENT` | ioredis | `REDIS_CACHE_DB` (mặc định 1) | OTP, quota chat, cache danh sách, health check, throttler (kết nối riêng cùng DB) |
-| `CACHE_MANAGER` | `@nestjs/cache-manager` | Cấu hình ghi `db: 1` nhưng **thực tế chạy trong bộ nhớ** | Token đặt lại mật khẩu, token hủy xóa, cache chat, thống kê, kỹ năng |
+| `CACHE_MANAGER` | `@nestjs/cache-manager` + `@keyv/redis` | Redis, DB `REDIS_CACHE_DB` | Token đặt lại mật khẩu, token hủy xóa, cache chat, thống kê, kỹ năng |
 
 Tùy chọn mặc định của mọi hàng đợi: 3 lần thử, backoff mũ bắt đầu 2 giây, giữ 100 job hoàn thành tối đa 1 giờ, giữ 500 job lỗi tối đa 24 giờ.
 

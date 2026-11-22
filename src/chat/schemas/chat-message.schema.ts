@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, SchemaTypes, Types } from 'mongoose';
 import { EChatMessageRole } from '../enums/chat-message-role.enum';
 import { IChatMessageMetadata } from '../interfaces/chat-message-metadata.interface';
 
@@ -11,14 +11,14 @@ export type ChatMessageDocument = ChatMessage & Document;
 })
 export class ChatMessage {
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'ChatSession',
     required: true,
   })
   sessionId: Types.ObjectId;
 
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'User',
     required: true,
   })
