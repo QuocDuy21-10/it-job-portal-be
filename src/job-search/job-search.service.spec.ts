@@ -119,6 +119,16 @@ describe('JobSearchService', () => {
       expect(response.meta.pagination.total).toBe(0);
     });
 
+    it('passes a trimmed skill to both pipelines and ignores a blank one', async () => {
+      const { service, jobModel } = setup();
+
+      await service.search({ skills: '  Go  ' });
+      expect(jobModel.aggregate.mock.calls[0][0][0].$match.skills.test('go')).toBe(true);
+
+      await service.search({ skills: '   ' });
+      expect(jobModel.aggregate.mock.calls[1][0][0].$match.skills).toBeUndefined();
+    });
+
     it('rejects salaryMin greater than salaryMax', async () => {
       const { service } = setup();
 

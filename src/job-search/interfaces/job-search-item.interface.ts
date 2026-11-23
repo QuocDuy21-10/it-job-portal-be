@@ -3,6 +3,7 @@ import { JobSearchSort, JobSearchSource } from '../job-search.constants';
 
 export interface INormalizedJobSearch {
   keyword?: string;
+  skills?: string;
   locationCode?: string;
   level?: string;
   formOfWork?: string;

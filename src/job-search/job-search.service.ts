@@ -133,6 +133,7 @@ export class JobSearchService {
 
     return {
       keyword: query.keyword?.trim() || undefined,
+      skills: query.skills?.trim() || undefined,
       locationCode: this.normalizeLocationCode(query.locationCode),
       level: query.level,
       formOfWork: query.formOfWork,

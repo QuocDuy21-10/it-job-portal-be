@@ -24,6 +24,9 @@ const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]
 
 const buildKeywordRegex = (keyword: string): RegExp => new RegExp(escapeRegex(keyword), 'i');
 
+// Exact tag match, so "Java" does not return JavaScript jobs.
+const buildSkillRegex = (skill: string): RegExp => new RegExp(`^${escapeRegex(skill)}$`, 'i');
+
 const hasSalaryFilter = (search: INormalizedJobSearch): boolean =>
   search.salaryMin !== undefined || search.salaryMax !== undefined;
 
@@ -40,6 +43,10 @@ export const buildInternalStages = (
   if (search.keyword) {
     const regex = buildKeywordRegex(search.keyword);
     match.$and = [{ $or: [{ name: regex }, { skills: regex }, { 'company.name': regex }] }];
+  }
+
+  if (search.skills) {
+    match.skills = buildSkillRegex(search.skills);
   }
 
   if (search.locationCode) {
@@ -119,6 +126,10 @@ export const buildExternalStages = (
     status: { $in: VISIBLE_EXTERNAL_JOB_STATUSES },
     $and: conditions,
   };
+
+  if (search.skills) {
+    match.skills = buildSkillRegex(search.skills);
+  }
 
   if (hiddenSourceKeys.length > 0) {
     match.sourceKey = { $nin: hiddenSourceKeys };
