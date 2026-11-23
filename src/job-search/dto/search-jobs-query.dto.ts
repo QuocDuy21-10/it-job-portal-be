@@ -26,6 +26,17 @@ export class SearchJobsQueryDto {
   @Transform(trim)
   keyword?: string;
 
+  @ApiProperty({
+    required: false,
+    example: 'React',
+    description: 'One skill tag, matched exactly (case-insensitive)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  @Transform(trim)
+  skills?: string;
+
   @ApiProperty({ required: false, example: 'ho-chi-minh' })
   @IsOptional()
   @IsString()

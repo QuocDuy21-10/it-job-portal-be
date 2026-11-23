@@ -91,6 +91,22 @@ describe('job-search-pipeline', () => {
         }),
       );
     });
+
+    it('matches one skill exactly and case-insensitively', () => {
+      const match = matchOf(buildInternalStages(buildSearch({ skills: 'node.js' }), NOW));
+
+      expect(match.skills.source).toBe('^node\\.js$');
+      expect(match.skills.flags).toBe('i');
+      expect(match.skills.test('Node.js')).toBe(true);
+      expect(match.skills.test('NodeXjs')).toBe(false);
+    });
+
+    it('does not match a longer skill that starts the same', () => {
+      const match = matchOf(buildInternalStages(buildSearch({ skills: 'Java' }), NOW));
+
+      expect(match.skills.test('Java')).toBe(true);
+      expect(match.skills.test('JavaScript')).toBe(false);
+    });
   });
 
   describe('buildExternalStages', () => {
@@ -158,6 +174,13 @@ describe('job-search-pipeline', () => {
           salaryText: 1,
         }),
       );
+    });
+
+    it('matches one skill exactly on external jobs', () => {
+      const match = matchOf(buildExternalStages(buildSearch({ skills: 'React' }), NOW, []));
+
+      expect(match.skills.test('react')).toBe(true);
+      expect(match.skills.test('React Native')).toBe(false);
     });
   });
 
