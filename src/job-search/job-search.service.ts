@@ -30,7 +30,7 @@ import {
 import { buildJobSearchPlan, JobSearchPlan } from './job-search-pipeline';
 
 const EXTERNAL_DETAIL_FIELDS =
-  'sourceKey title companyName location locationCode isRemote skills level descriptionHtml publishedAt createdAt expiresAt sourceUrl applyUrl status salaryText';
+  'sourceKey title companyName location locationCode isRemote skills level descriptionHtml publishedAt createdAt expiresAt sourceUrl applyUrl status salaryText removedAt';
 
 const toOptionalNumber = (value: unknown): number | undefined =>
   value === undefined || value === null || value === '' ? undefined : Number(value);
@@ -93,7 +93,7 @@ export class JobSearchService {
 
     const job = await this.externalJobModel.findById(id).select(EXTERNAL_DETAIL_FIELDS).lean();
 
-    if (!job) {
+    if (!job || job.removedAt) {
       throw new NotFoundException(`Không tìm thấy tin tuyển dụng bên ngoài có ID ${id}`);
     }
 
@@ -103,7 +103,7 @@ export class JobSearchService {
       .lean();
     const displayPolicy = source?.displayPolicy ?? DEFAULT_DISPLAY_POLICY;
 
-    if (displayPolicy === EJobSourceDisplayPolicy.HIDDEN) {
+    if (!source || displayPolicy === EJobSourceDisplayPolicy.HIDDEN) {
       throw new NotFoundException(`Không tìm thấy tin tuyển dụng bên ngoài có ID ${id}`);
     }
 

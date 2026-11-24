@@ -115,6 +115,7 @@ describe('job-search-pipeline', () => {
 
       expect(match).toEqual({
         status: { $in: [EExternalJobStatus.ACTIVE, EExternalJobStatus.STALE] },
+        removedAt: null,
         $and: [{ $or: [{ expiresAt: { $gt: NOW } }, { expiresAt: null }] }],
       });
     });
