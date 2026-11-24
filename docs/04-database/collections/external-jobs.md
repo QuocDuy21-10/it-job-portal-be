@@ -32,7 +32,10 @@ Tin tuyển dụng được đồng bộ từ nguồn bên ngoài (ATS của cô
 | `contentHash` | String | Không | — | — | SHA-1 của 13 field nội dung, dùng để phát hiện thay đổi |
 | `staleSince` | Date | Không | — | — | Thời điểm chuyển sang `STALE`. Dùng để tính thời gian ân hạn |
 | `closedAt` | Date | Không | — | — | Thời điểm đóng tin |
-| `closeReason` | String | Không | — | enum: `NO_LONGER_MATCHES`, `EXPIRED`, `NOT_FOUND`, `GONE_FROM_SOURCE` | Lý do đóng tin |
+| `closeReason` | String | Không | — | enum: `NO_LONGER_MATCHES`, `EXPIRED`, `NOT_FOUND`, `GONE_FROM_SOURCE`, `SOURCE_DELETED` | Lý do đóng tin |
+| `removedAt` | Date | Không | — | — | Thời điểm admin gỡ tin. Crawler không bao giờ ghi field này |
+| `removedBy` | Object `{ _id, email }` | Không | — | — | Admin đã gỡ tin |
+| `removeReason` | String | Không | — | — | Lý do gỡ (tối đa 500 ký tự) |
 | `createdAt` | Date | Không | — | — | Thời điểm tạo, do `timestamps` hoặc plugin |
 | `updatedAt` | Date | Không | — | — | Thời điểm sửa gần nhất, do `timestamps` |
 | `isDeleted` | Boolean | Có | `false` | thêm bởi plugin xóa mềm | Cờ xóa mềm. `true` nghĩa là bản ghi đã bị xóa khỏi nghiệp vụ nhưng vẫn còn trong database |

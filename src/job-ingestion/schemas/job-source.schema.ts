@@ -2,10 +2,8 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 import { EJobSourceDisplayPolicy } from '../enums/job-source-display-policy.enum';
 import { EJobSourceProvider } from '../enums/job-source-provider.enum';
-import { ERejectionReason } from '../enums/rejection-reason.enum';
 import { ESyncStatus } from '../enums/sync-status.enum';
 import { ICrawlRunStats } from '../interfaces/crawl-run-stats.interface';
-import { ISourceRejection } from '../interfaces/job-lifecycle.interface';
 
 export type JobSourceDocument = HydratedDocument<JobSource>;
 
@@ -46,19 +44,6 @@ export class JobSource {
 
   @Prop({ default: 0 })
   consecutiveFailures?: number;
-
-  @Prop({
-    type: [
-      {
-        _id: false,
-        externalId: { type: String, required: true },
-        reason: { type: String, enum: ERejectionReason, required: true },
-        retryAt: { type: Date, required: true },
-      },
-    ],
-    default: [],
-  })
-  rejections?: ISourceRejection[];
 }
 
 export const JobSourceSchema = SchemaFactory.createForClass(JobSource);

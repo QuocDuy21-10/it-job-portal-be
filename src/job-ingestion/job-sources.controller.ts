@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -12,6 +13,7 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ERole, Roles } from 'src/casl';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
+import { CreateJobSourceDto } from './dto/create-job-source.dto';
 import { ListCrawlRunsQueryDto } from './dto/list-crawl-runs-query.dto';
 import { UpdateJobSourceDto } from './dto/update-job-source.dto';
 import { JobIngestionService } from './job-ingestion.service';
@@ -27,6 +29,20 @@ export class JobSourcesController {
   @ResponseMessage('Lấy danh sách nguồn tin tuyển dụng thành công')
   findAll() {
     return this.jobIngestionService.findAllSources();
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Add a Greenhouse or Lever board and queue its first sync' })
+  @ResponseMessage('Thêm nguồn tin tuyển dụng thành công')
+  create(@Body() dto: CreateJobSourceDto) {
+    return this.jobIngestionService.createSource(dto);
+  }
+
+  @Delete(':key')
+  @ApiOperation({ summary: 'Delete a disabled source and close its jobs' })
+  @ResponseMessage('Xoá nguồn tin tuyển dụng thành công')
+  remove(@Param('key') key: string) {
+    return this.jobIngestionService.deleteSource(key);
   }
 
   @Patch(':key')

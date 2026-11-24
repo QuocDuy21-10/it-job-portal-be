@@ -147,6 +147,7 @@ export const buildExternalMatch = (
 
   const match: Match = {
     status: { $in: VISIBLE_EXTERNAL_JOB_STATUSES },
+    removedAt: null,
     $and: conditions,
   };
 

@@ -22,7 +22,7 @@ Cấu hình từng nguồn tin bên ngoài: dùng nhà cung cấp nào, bảng t
 | `lastSyncStats` | Mixed | Không | — | — | Số liệu lần đồng bộ gần nhất, theo `ICrawlRunStats` |
 | `lastSuccessfulListedCount` | Number | Không | — | — | Số tin liệt kê ở lần thành công gần nhất, dùng làm mức nền phát hiện danh sách co bất thường |
 | `consecutiveFailures` | Number | Không | `0` | — | Số lần lỗi liên tiếp |
-| `rejections` | [Subdoc] | Không | `[]` | — | Danh sách tin bị loại và thời điểm được thử lại |
+| `rejections` | [Subdoc] | Không | — | — | **Không còn được đọc hay ghi.** Dữ liệu cũ còn trong tài liệu đến khi mảng bị bỏ ở bản sau; đã chuyển sang [crawl-failures](crawl-failures.md) |
 | `rejections.externalId` | String | Có | — | — | Mã tin tại nguồn bị loại |
 | `rejections.reason` | String | Có | — | enum: `NOT_IT`, `MISSING_FIELDS`, `NO_STRUCTURED_DATA`, `NOT_FOUND` | Lý do loại |
 | `rejections.retryAt` | Date | Có | — | — | Thời điểm được phép tải lại |

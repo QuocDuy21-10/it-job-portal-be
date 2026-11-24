@@ -21,8 +21,10 @@ export const REJECTION_RETRY_DAYS: Record<ERejectionReason, number> = {
   [ERejectionReason.NOT_FOUND]: 3,
   [ERejectionReason.NO_STRUCTURED_DATA]: 3,
   [ERejectionReason.MISSING_FIELDS]: 7,
+  [ERejectionReason.FETCH_ERROR]: 0,
   [ERejectionReason.NOT_IT]: 30,
 };
+export const FAILURE_DETAIL_MAX_LENGTH = 300;
 export const ALERT_AFTER_FAILURES = 3;
 
 export const CRAWL_RUN_TTL_SECONDS = 90 * 24 * 60 * 60;

@@ -77,6 +77,16 @@ export class ExternalJob {
   @Prop({ enum: EExternalJobCloseReason })
   closeReason?: EExternalJobCloseReason;
 
+  // Admin takedown. The crawler never writes these three, so no sync can bring the job back.
+  @Prop()
+  removedAt?: Date;
+
+  @Prop({ type: Object })
+  removedBy?: { _id: string; email: string };
+
+  @Prop()
+  removeReason?: string;
+
   @Prop()
   createdAt?: Date;
 

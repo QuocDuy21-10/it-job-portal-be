@@ -24,6 +24,14 @@ export interface IRawAtsJob {
 export interface IRejectedAtsJob {
   externalId: string;
   reason: ERejectionReason;
+  url?: string;
+  title?: string;
+}
+
+export interface IAtsFetchError {
+  externalId: string;
+  url: string;
+  detail: string;
 }
 
 export interface IAtsFetchOptions {
@@ -37,6 +45,8 @@ export interface IAtsFetchResult {
   listedIds: string[];
   // Fetched but unusable (404, no structured data)
   rejected?: IRejectedAtsJob[];
+  // Could not be read this time. Kept apart from rejected, which closes the stored job.
+  fetchErrors?: IAtsFetchError[];
   stoppedEarly?: string;
 }
 

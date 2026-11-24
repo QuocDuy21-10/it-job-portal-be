@@ -44,3 +44,18 @@ export interface IJobTransitions {
   staleIds: string[];
   closures: IJobClosure[];
 }
+
+export interface ICrawlFailureInput extends IFetchedRejection {
+  url?: string;
+  title?: string;
+  detail?: string;
+}
+
+export interface ICrawlFailureObservation {
+  failures: ICrawlFailureInput[];
+  keptIds: string[];
+  listedIds: string[];
+  // False for a SUSPECT listing: absence then proves nothing.
+  listingComplete: boolean;
+  now: Date;
+}

@@ -47,6 +47,7 @@ const setup = ({
   result = { jobs: [buildRaw()], listedIds: ['1'] } as IAtsFetchResult | Error,
   knownStates = new Map<string, IKnownJobState>(),
   visibleCount = 0,
+  waiting = [] as any[],
   upsertCounts = { created: 1, updated: 0, unchanged: 0, reactivated: 0 },
 } = {}) => {
   const jobSourceModel = {
@@ -67,6 +68,10 @@ const setup = ({
     countVisible: jest.fn().mockResolvedValue(visibleCount),
     clearDescriptions: jest.fn().mockResolvedValue(undefined),
   };
+  const crawlFailures = {
+    findWaiting: jest.fn().mockResolvedValue(waiting),
+    record: jest.fn().mockResolvedValue(undefined),
+  };
   const skillsService = { getAliasMap: jest.fn().mockResolvedValue({ 'node.js': 'Node.js' }) };
   let plannedIds: string[] | undefined;
   const greenhouseAdapter = {
@@ -86,6 +91,7 @@ const setup = ({
     jobSourceModel as any,
     crawlRunModel as any,
     repository as any,
+    crawlFailures as any,
     new JobLifecycleService(),
     skillsService as any,
     greenhouseAdapter as any,
@@ -99,6 +105,7 @@ const setup = ({
     jobSourceModel,
     crawlRunModel,
     repository,
+    crawlFailures,
     greenhouseAdapter,
     plannedIds: () => plannedIds,
     sourceUpdate: () => jobSourceModel.updateOne.mock.calls[0][1],
@@ -118,16 +125,17 @@ describe('SourceSyncCoordinator', () => {
   afterEach(() => jest.restoreAllMocks());
 
   it('stores kept jobs, remembers rejected ids and records a successful run', async () => {
-    const { coordinator, repository, crawlRunModel, sourceUpdate, runUpdate } = setup({
-      result: {
-        jobs: [
-          buildRaw(),
-          buildRaw({ externalId: '2', title: 'Office Administrator' }),
-          buildRaw({ externalId: '3', sourceUrl: '' }),
-        ],
-        listedIds: ['1', '2', '3'],
-      },
-    });
+    const { coordinator, repository, crawlFailures, crawlRunModel, sourceUpdate, runUpdate } =
+      setup({
+        result: {
+          jobs: [
+            buildRaw(),
+            buildRaw({ externalId: '2', title: 'Office Administrator' }),
+            buildRaw({ externalId: '3', sourceUrl: '' }),
+          ],
+          listedIds: ['1', '2', '3'],
+        },
+      });
 
     await coordinator.run(KEY);
 
@@ -150,12 +158,29 @@ describe('SourceSyncCoordinator', () => {
         lastSyncStatus: ESyncStatus.SUCCESS,
         consecutiveFailures: 0,
         lastSuccessfulListedCount: 3,
-        rejections: [
-          { externalId: '2', reason: ERejectionReason.NOT_IT, retryAt: expect.any(Date) },
-          { externalId: '3', reason: ERejectionReason.MISSING_FIELDS, retryAt: expect.any(Date) },
-        ],
       }),
     );
+    expect($set.rejections).toBeUndefined();
+    expect(crawlFailures.record).toHaveBeenCalledWith(KEY, {
+      failures: [
+        {
+          externalId: '2',
+          reason: ERejectionReason.NOT_IT,
+          url: 'https://job-boards.greenhouse.io/axon/jobs/1',
+          title: 'Office Administrator',
+        },
+        {
+          externalId: '3',
+          reason: ERejectionReason.MISSING_FIELDS,
+          url: undefined,
+          title: 'Senior Backend Software Engineer',
+        },
+      ],
+      keptIds: ['1'],
+      listedIds: ['1', '2', '3'],
+      listingComplete: true,
+      now: expect.any(Date),
+    });
     expect($unset).toEqual({ rejectedExternalIds: 1, lastSyncError: 1 });
     expect(crawlRunModel.updateOne.mock.calls[0][0]).toEqual({ _id: 'run-1' });
     expect(runUpdate()).toEqual({
@@ -216,7 +241,7 @@ describe('SourceSyncCoordinator', () => {
   });
 
   it('marks a listing that lost most jobs as SUSPECT and closes nothing for absence', async () => {
-    const { coordinator, repository, sourceUpdate } = setup({
+    const { coordinator, repository, crawlFailures, sourceUpdate } = setup({
       source: { ...SOURCE, lastSuccessfulListedCount: 100 },
       knownStates: known([{ externalId: 'gone' }]),
       result: { jobs: [], listedIds: Array.from({ length: 20 }, (_, i) => `n${i}`) },
@@ -224,6 +249,7 @@ describe('SourceSyncCoordinator', () => {
 
     await coordinator.run(KEY);
 
+    expect(crawlFailures.record.mock.calls[0][1].listingComplete).toBe(false);
     expect(repository.markStale).toHaveBeenCalledWith(KEY, [], expect.any(Date));
     expect(repository.closeExpired).toHaveBeenCalledWith(KEY, expect.any(Date));
     const { $set } = sourceUpdate();
@@ -306,7 +332,7 @@ describe('SourceSyncCoordinator', () => {
   });
 
   it('marks the run and source FAILED and rethrows', async () => {
-    const { coordinator, repository, sourceUpdate, runUpdate } = setup({
+    const { coordinator, repository, crawlFailures, sourceUpdate, runUpdate } = setup({
       source: { ...SOURCE, consecutiveFailures: 1 },
       result: new Error('boom'),
     });
@@ -325,7 +351,49 @@ describe('SourceSyncCoordinator', () => {
     );
     expect(sourceUpdate().$set.rejections).toBeUndefined();
     expect(repository.upsertFetched).not.toHaveBeenCalled();
+    expect(crawlFailures.record).not.toHaveBeenCalled();
     expect(loggerError).not.toHaveBeenCalled();
+  });
+
+  it('records a fetch error without closing the stored job', async () => {
+    const { coordinator, repository, crawlFailures } = setup({
+      knownStates: known([{ externalId: '5' }]),
+      result: {
+        jobs: [],
+        listedIds: ['5'],
+        fetchErrors: [{ externalId: '5', url: 'https://x/5', detail: 'timeout' }],
+      },
+    });
+
+    await coordinator.run(KEY);
+
+    expect(repository.close).toHaveBeenCalledWith(KEY, [], expect.any(Date));
+    expect(repository.markSeen).toHaveBeenCalledWith(KEY, ['5'], expect.any(Date));
+    expect(crawlFailures.record.mock.calls[0][1].failures).toEqual([
+      {
+        externalId: '5',
+        reason: ERejectionReason.FETCH_ERROR,
+        url: 'https://x/5',
+        detail: 'timeout',
+      },
+    ]);
+  });
+
+  it('does not refetch failures that still have to wait', async () => {
+    const { coordinator, plannedIds } = setup({
+      waiting: [
+        {
+          externalId: '9',
+          reason: ERejectionReason.NOT_IT,
+          retryAt: new Date(Date.now() + HOUR_MS),
+        },
+      ],
+      result: { jobs: [], listedIds: ['8', '9'] },
+    });
+
+    await coordinator.run(KEY);
+
+    expect(plannedIds()).toEqual(['8']);
   });
 
   it('alerts once failures reach the threshold', async () => {

@@ -288,16 +288,34 @@ describe('JobSearchService', () => {
       await expect(service.findExternalJob(EXTERNAL_ID)).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it.each([
-      ['LINK_ONLY', { displayPolicy: 'LINK_ONLY' }],
-      ['missing', null],
-    ])('withholds the description when the policy is %s', async (_label, sourceDoc) => {
-      const { service } = setup({ externalDoc: buildDoc(), sourceDoc });
+    it('withholds the description of LINK_ONLY sources', async () => {
+      const { service } = setup({
+        externalDoc: buildDoc(),
+        sourceDoc: { displayPolicy: 'LINK_ONLY' },
+      });
 
       const detail = await service.findExternalJob(EXTERNAL_ID);
 
       expect(detail.descriptionHtml).toBe('');
       expect(detail.displayPolicy).toBe('LINK_ONLY');
+    });
+
+    it('treats a source without a stored policy as LINK_ONLY', async () => {
+      const { service } = setup({ externalDoc: buildDoc(), sourceDoc: {} });
+
+      expect((await service.findExternalJob(EXTERNAL_ID)).displayPolicy).toBe('LINK_ONLY');
+    });
+
+    it('hides jobs whose source was deleted', async () => {
+      const { service } = setup({ externalDoc: buildDoc(), sourceDoc: null });
+
+      await expect(service.findExternalJob(EXTERNAL_ID)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('hides jobs taken down by an admin', async () => {
+      const { service } = setup({ externalDoc: buildDoc({ removedAt: CREATED_AT }) });
+
+      await expect(service.findExternalJob(EXTERNAL_ID)).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('shows STALE jobs as ACTIVE and expired jobs as CLOSED', async () => {

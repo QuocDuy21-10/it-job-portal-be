@@ -3,4 +3,5 @@ export enum EExternalJobCloseReason {
   NOT_FOUND = 'NOT_FOUND',
   EXPIRED = 'EXPIRED',
   NO_LONGER_MATCHES = 'NO_LONGER_MATCHES',
+  SOURCE_DELETED = 'SOURCE_DELETED',
 }

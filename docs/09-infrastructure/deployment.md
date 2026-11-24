@@ -124,6 +124,17 @@ Sao lưu MongoDB và hai volume `uploads`, `cv_storage` **trước** (xem [backu
 
 4. Deploy frontend (nút "Xem CV" gọi `GET /resumes/:id/file`).
 
+### Nâng cấp quản lý crawl (chạy một lần)
+
+Sao lưu MongoDB **trước**. Deploy xa các mốc 0h, 6h, 12h, 18h (cron đồng bộ). Ngay sau khi deploy xong, chạy:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production exec backend \
+  node dist/databases/migrations/crawl-failures.js
+```
+
+Script chép `job_sources.rejections` sang `crawl_failures`, chạy lại an toàn, giữ nguyên mảng cũ. Nếu một lần đồng bộ chen vào giữa, nó chỉ tải lại tối đa 150 tin mỗi nguồn. **Trước khi rollback**, đặt các nguồn bị ảnh hưởng sang `HIDDEN`, vì code cũ sẽ hiện lại tin đã gỡ.
+
 ### Nâng cấp chat QA đợt 1 (chạy một lần)
 
 Sao lưu MongoDB **trước** (xem [backup-and-recovery](../11-operations/backup-and-recovery.md)).

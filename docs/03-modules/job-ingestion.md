@@ -66,7 +66,9 @@ Do `SourceSyncCoordinator.sync`:
 1. Bỏ qua nếu nguồn không tồn tại hoặc `enabled = false`. Tạo bản ghi `crawl_runs` trạng thái `RUNNING`.
 2. Nếu nguồn `LINK_ONLY`, xóa mô tả đã lưu (`clearDescriptions`).
 3. Nạp trạng thái đã biết của các tin thuộc nguồn (`loadKnownStates`).
-4. Adapter lấy danh sách tin. Hàm `selectForFetch` dùng `planFetch` quyết định **tin nào cần tải chi tiết** theo thứ tự ưu tiên: mới, xuất hiện lại, `STALE`, rồi tin cần làm mới sau 7 ngày. Tin đang chờ thử lại (danh sách `rejections`) bị bỏ qua.
+4. Adapter lấy danh sách tin. Hàm `selectForFetch` dùng `planFetch` quyết định **tin nào cần tải chi tiết** theo thứ tự ưu tiên: mới, xuất hiện lại, `STALE`, rồi tin cần làm mới sau 7 ngày. Tin đang chờ thử lại (bản ghi `crawl_failures` có `retryAt` ở tương lai) bị bỏ qua.
+
+**Lỗi theo tin và gỡ tin.** Mỗi tin không lưu được có một bản ghi trong [crawl_failures](../04-database/collections/crawl-failures.md) thay cho mảng `rejections`. Lỗi tải (timeout, mạng, trang quá lớn, HTTP lạ) là `FETCH_ERROR`: adapter trả về trong `fetchErrors`, **không bao giờ** vào `rejected` nên không đóng tin đang lưu. Admin gỡ tin bằng `removedAt` mà crawler không bao giờ ghi, nên đồng bộ không làm tin trở lại. Quản lý qua `/crawled-jobs`, `/crawl-failures`, `/job-sources` (xem [crawled-jobs](../05-api/endpoints/crawled-jobs.md), [crawl-failures](../05-api/endpoints/crawl-failures.md)).
 5. Tính mức nền (`lastSuccessfulListedCount`, hoặc số tin hiển thị hiện có) và kiểm tra danh sách có **đáng ngờ** không (`isSuspectListing`).
 6. Lọc từng tin tải về: thiếu `externalId`, `title` hoặc `sourceUrl` https thì loại với lý do `MISSING_FIELDS`; tiêu đề không phải IT hoặc không ở Việt Nam và không làm từ xa phù hợp thì loại với lý do `NOT_IT`; còn lại được chuẩn hóa.
 7. Ghi theo lô (`upsertFetched`): tạo mới, cập nhật, không đổi (so `contentHash`), kích hoạt lại tin `CLOSED`. Mỗi tin ghi xong được xóa `staleSince`, `closedAt`, `closeReason`.

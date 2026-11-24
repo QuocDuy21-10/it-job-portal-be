@@ -208,4 +208,33 @@ describe('ExternalJobRepository', () => {
       { $unset: { lastFetchedAt: 1 } },
     );
   });
+
+  it('counts each job once: removed wins over the crawl status', async () => {
+    const aggregate = jest
+      .fn()
+      .mockResolvedValue([{ _id: 'topdev', total: 2, active: 1, stale: 0, closed: 0, removed: 1 }]);
+    const repository = new ExternalJobRepository({ aggregate } as any);
+
+    await expect(repository.countByState()).resolves.toEqual(
+      new Map([['topdev', { total: 2, active: 1, stale: 0, closed: 0, removed: 1 }]]),
+    );
+  });
+
+  it('closes every visible job of a deleted source', async () => {
+    const updateMany = jest.fn().mockResolvedValue({ modifiedCount: 4 });
+    const repository = new ExternalJobRepository({ updateMany } as any);
+
+    await expect(repository.closeSource('topdev', NOW)).resolves.toBe(4);
+    expect(updateMany).toHaveBeenCalledWith(
+      { sourceKey: 'topdev', status: VISIBLE },
+      {
+        $set: {
+          status: EExternalJobStatus.CLOSED,
+          closedAt: NOW,
+          closeReason: EExternalJobCloseReason.SOURCE_DELETED,
+        },
+        $unset: { staleSince: 1 },
+      },
+    );
+  });
 });

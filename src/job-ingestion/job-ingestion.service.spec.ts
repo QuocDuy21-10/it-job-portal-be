@@ -1,5 +1,6 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { EJobSourceDisplayPolicy } from './enums/job-source-display-policy.enum';
+import { EJobSourceProvider } from './enums/job-source-provider.enum';
 import { JobIngestionService } from './job-ingestion.service';
 
 const SOURCE = { key: 'topdev', displayPolicy: EJobSourceDisplayPolicy.LINK_ONLY, enabled: true };
@@ -7,10 +8,16 @@ const SOURCE = { key: 'topdev', displayPolicy: EJobSourceDisplayPolicy.LINK_ONLY
 const setup = ({
   previous = SOURCE as Record<string, any> | null,
   runs = [] as unknown[],
+  current = { enabled: false } as Record<string, any> | null,
 } = {}) => {
   const jobSourceModel = {
     find: jest.fn(),
     exists: jest.fn(),
+    create: jest.fn(async (doc: any) => ({ toObject: () => doc })),
+    findOne: jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(current) }),
+    }),
+    deleteOne: jest.fn().mockResolvedValue({ deletedCount: 1 }),
     findOneAndUpdate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(previous) }),
   };
   const runsQuery = {
@@ -22,8 +29,17 @@ const setup = ({
   const repository = {
     clearDescriptions: jest.fn().mockResolvedValue(undefined),
     resetFetchedAt: jest.fn().mockResolvedValue(undefined),
+    countByState: jest.fn().mockResolvedValue(new Map()),
+    closeSource: jest.fn().mockResolvedValue(3),
   };
-  const queueService = { enqueueSync: jest.fn().mockResolvedValue(undefined) };
+  const crawlFailures = {
+    countByGroup: jest.fn().mockResolvedValue(new Map()),
+    deleteBySource: jest.fn().mockResolvedValue(undefined),
+  };
+  const queueService = {
+    enqueueSync: jest.fn().mockResolvedValue(undefined),
+    cancelSync: jest.fn().mockResolvedValue(true),
+  };
   const coordinator = { run: jest.fn().mockResolvedValue(undefined) };
 
   const cronLock = {
@@ -36,6 +52,7 @@ const setup = ({
     jobSourceModel as any,
     crawlRunModel as any,
     repository as any,
+    crawlFailures as any,
     queueService as any,
     coordinator as any,
     cronLock as any,
@@ -48,6 +65,7 @@ const setup = ({
     crawlRunModel,
     runsQuery,
     repository,
+    crawlFailures,
     queueService,
     coordinator,
   };
@@ -97,17 +115,95 @@ describe('JobIngestionService', () => {
   });
 
   describe('findAllSources', () => {
-    it('leaves the rejection list out of the response', async () => {
-      const { service, jobSourceModel } = setup();
+    it('adds job and failure counts and leaves the old rejection list out', async () => {
+      const { service, jobSourceModel, repository, crawlFailures } = setup();
       const query = {
         select: jest.fn().mockReturnThis(),
         sort: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([SOURCE]),
+        lean: jest.fn().mockResolvedValue([SOURCE, { ...SOURCE, key: 'empty' }]),
       };
       jobSourceModel.find.mockReturnValue(query);
+      repository.countByState.mockResolvedValue(
+        new Map([['topdev', { total: 6, active: 3, stale: 1, closed: 1, removed: 1 }]]),
+      );
+      crawlFailures.countByGroup.mockResolvedValue(
+        new Map([['topdev', { errors: 2, filtered: 9 }]]),
+      );
 
-      await expect(service.findAllSources()).resolves.toEqual([SOURCE]);
+      const [topdev, empty] = await service.findAllSources();
+
       expect(query.select).toHaveBeenCalledWith('-rejections');
+      expect(topdev.counts).toEqual({
+        total: 6,
+        active: 3,
+        stale: 1,
+        closed: 1,
+        removed: 1,
+        errors: 2,
+        filtered: 9,
+      });
+      expect(Object.values(empty.counts)).toEqual([0, 0, 0, 0, 0, 0, 0]);
+    });
+  });
+
+  describe('createSource', () => {
+    it('stores the source and queues its first sync', async () => {
+      const { service, jobSourceModel, queueService } = setup();
+
+      await service.createSource({
+        provider: EJobSourceProvider.LEVER,
+        boardToken: 'acme',
+        companyName: 'Acme',
+      } as any);
+
+      expect(jobSourceModel.create).toHaveBeenCalledWith({
+        key: 'lever-acme',
+        provider: EJobSourceProvider.LEVER,
+        boardToken: 'acme',
+        companyName: 'Acme',
+        displayPolicy: EJobSourceDisplayPolicy.LINK_ONLY,
+        enabled: true,
+      });
+      expect(queueService.enqueueSync).toHaveBeenCalledWith('lever-acme');
+    });
+  });
+
+  describe('deleteSource', () => {
+    it('closes the jobs, forgets the failures and deletes the source last', async () => {
+      const { service, jobSourceModel, repository, crawlFailures } = setup();
+
+      await expect(service.deleteSource('topdev')).resolves.toEqual({ key: 'topdev', closed: 3 });
+
+      expect(repository.closeSource).toHaveBeenCalledWith('topdev', expect.any(Date));
+      expect(crawlFailures.deleteBySource).toHaveBeenCalledWith('topdev');
+      expect(jobSourceModel.deleteOne).toHaveBeenCalledWith({ key: 'topdev', enabled: false });
+      expect(jobSourceModel.deleteOne.mock.invocationCallOrder[0]).toBeGreaterThan(
+        crawlFailures.deleteBySource.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('throws 404 for an unknown source', async () => {
+      const { service } = setup({ current: null });
+      await expect(service.deleteSource('nope')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('refuses an enabled source', async () => {
+      const { service, repository } = setup({ current: { enabled: true } });
+      await expect(service.deleteSource('topdev')).rejects.toBeInstanceOf(ConflictException);
+      expect(repository.closeSource).not.toHaveBeenCalled();
+    });
+
+    it('refuses while a sync is running', async () => {
+      const { service, repository, queueService } = setup();
+      queueService.cancelSync.mockResolvedValue(false);
+      await expect(service.deleteSource('topdev')).rejects.toBeInstanceOf(ConflictException);
+      expect(repository.closeSource).not.toHaveBeenCalled();
+    });
+
+    it('reports a source re-enabled in the meantime', async () => {
+      const { service, jobSourceModel } = setup();
+      jobSourceModel.deleteOne.mockResolvedValue({ deletedCount: 0 });
+      await expect(service.deleteSource('topdev')).rejects.toBeInstanceOf(ConflictException);
     });
   });
 
@@ -143,7 +239,7 @@ describe('JobIngestionService', () => {
       expect(jobSourceModel.findOneAndUpdate).toHaveBeenCalledWith(
         { key: 'topdev' },
         { $set: { enabled: false } },
-        { new: false },
+        { new: false, projection: { rejections: 0 } },
       );
     });
 
