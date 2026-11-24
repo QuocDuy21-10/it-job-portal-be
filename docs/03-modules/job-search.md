@@ -75,6 +75,7 @@ Trường `hasSalary` (1 cho tin nội bộ, 0 cho tin ngoài) đưa tin không 
 | Quy tắc | Chi tiết |
 |---|---|
 | Tin nội bộ chỉ khi đã duyệt | Dùng chung bộ lọc hiển thị với `GET /jobs` |
+| Tin đã gỡ (`removedAt`) hoặc nguồn đã xoá | Loại khỏi danh sách (`removedAt: null`) và `404` ở chi tiết |
 | Nguồn `HIDDEN` | Loại khỏi danh sách (lấy `distinct('key', { displayPolicy: 'HIDDEN' })` mỗi lần tìm) và `404` ở chi tiết |
 | Nguồn `LINK_ONLY` | Danh sách chỉ có liên kết; mô tả rỗng ở chi tiết. Nguồn cũ chưa có `displayPolicy` được coi là `LINK_ONLY` (`DEFAULT_DISPLAY_POLICY`) |
 | `salaryMin > salaryMax` | `400` "salaryMin must not be greater than salaryMax" |
