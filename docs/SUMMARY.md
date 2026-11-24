@@ -41,6 +41,7 @@
 - [CV Profiles](03-modules/cv-profiles.md)
 - [Skills](03-modules/skills.md)
 - [Files](03-modules/files.md)
+- [Site Content](03-modules/site-content.md)
 - [Notifications, Mail và Subscribers](03-modules/notifications-and-mail.md)
 - [Statistics](03-modules/statistics.md)
 - [Hạ tầng dùng chung](03-modules/platform-infrastructure.md)
@@ -54,13 +55,13 @@
 
 - [Tổng quan cơ sở dữ liệu](04-database/database-overview.md)
 - [Quan hệ giữa các collection](04-database/collection-relationships.md)
-- Collection: [users](04-database/collections/users.md), [sessions](04-database/collections/sessions.md), [notifications](04-database/collections/notifications.md), [subscribers](04-database/collections/subscribers.md), [companies](04-database/collections/companies.md), [jobs](04-database/collections/jobs.md), [resumes](04-database/collections/resumes.md), [cv-profiles](04-database/collections/cv-profiles.md), [skills](04-database/collections/skills.md), [job-sources](04-database/collections/job-sources.md), [external-jobs](04-database/collections/external-jobs.md), [crawl-runs](04-database/collections/crawl-runs.md), [chat-sessions](04-database/collections/chat-sessions.md), [chat-messages](04-database/collections/chat-messages.md), [chat-tool-actions](04-database/collections/chat-tool-actions.md), [chat-quota-policies](04-database/collections/chat-quota-policies.md), [ai-usage-logs](04-database/collections/ai-usage-logs.md)
+- Collection: [users](04-database/collections/users.md), [sessions](04-database/collections/sessions.md), [notifications](04-database/collections/notifications.md), [subscribers](04-database/collections/subscribers.md), [companies](04-database/collections/companies.md), [jobs](04-database/collections/jobs.md), [resumes](04-database/collections/resumes.md), [cv-profiles](04-database/collections/cv-profiles.md), [skills](04-database/collections/skills.md), [job-sources](04-database/collections/job-sources.md), [external-jobs](04-database/collections/external-jobs.md), [crawl-runs](04-database/collections/crawl-runs.md), [banners](04-database/collections/banners.md), [legal-pages](04-database/collections/legal-pages.md), [chat-sessions](04-database/collections/chat-sessions.md), [chat-messages](04-database/collections/chat-messages.md), [chat-tool-actions](04-database/collections/chat-tool-actions.md), [chat-quota-policies](04-database/collections/chat-quota-policies.md), [ai-usage-logs](04-database/collections/ai-usage-logs.md)
 
 ## 05 · API
 
 - [Tổng quan API](05-api/api-overview.md)
 - [Thời gian thực: Socket.IO và stream chat](05-api/realtime.md)
-- Endpoint: [auth](05-api/endpoints/auth.md), [users](05-api/endpoints/users.md), [companies](05-api/endpoints/companies.md), [jobs](05-api/endpoints/jobs.md), [resumes](05-api/endpoints/resumes.md), [cv-profiles](05-api/endpoints/cv-profiles.md), [skills](05-api/endpoints/skills.md), [subscribers](05-api/endpoints/subscribers.md), [notifications](05-api/endpoints/notifications.md), [chat](05-api/endpoints/chat.md), [job-search](05-api/endpoints/job-search.md), [job-sources](05-api/endpoints/job-sources.md), [files](05-api/endpoints/files.md), [statistics](05-api/endpoints/statistics.md), [mail](05-api/endpoints/mail.md), [health](05-api/endpoints/health.md)
+- Endpoint: [auth](05-api/endpoints/auth.md), [users](05-api/endpoints/users.md), [companies](05-api/endpoints/companies.md), [jobs](05-api/endpoints/jobs.md), [resumes](05-api/endpoints/resumes.md), [cv-profiles](05-api/endpoints/cv-profiles.md), [skills](05-api/endpoints/skills.md), [subscribers](05-api/endpoints/subscribers.md), [notifications](05-api/endpoints/notifications.md), [chat](05-api/endpoints/chat.md), [job-search](05-api/endpoints/job-search.md), [job-sources](05-api/endpoints/job-sources.md), [files](05-api/endpoints/files.md), [site-content](05-api/endpoints/site-content.md), [statistics](05-api/endpoints/statistics.md), [mail](05-api/endpoints/mail.md), [health](05-api/endpoints/health.md)
 
 ## 06 · Workflows
 

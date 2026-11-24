@@ -34,6 +34,7 @@ Thư mục đích lấy từ header `folder_type` (không phân biệt hoa thư�
 | `cv` | pdf, doc, docx | 5 MB | Mọi người dùng đăng nhập |
 | `resumes` | pdf, doc, docx, txt | 5 MB | Mọi người dùng đăng nhập |
 | `company` | jpg, jpeg, png, gif (không có webp) | 5 MB | Chỉ `HR` và `SUPER ADMIN` (`403` nếu không) |
+| `banner` | jpg, jpeg, png, webp | 5 MB | Chỉ `SUPER ADMIN` (`403` nếu không) |
 
 Nguồn: [upload-policy.ts](../../src/files/constants/upload-policy.ts).
 
