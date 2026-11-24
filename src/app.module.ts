@@ -9,6 +9,7 @@ import { JobsModule } from './jobs/jobs.module';
 import { JobIngestionModule } from './job-ingestion/job-ingestion.module';
 import { JobSearchModule } from './job-search/job-search.module';
 import { FilesModule } from './files/files.module';
+import { SiteContentModule } from './site-content/site-content.module';
 import { ResumesModule } from './resumes/resumes.module';
 import { DatabasesModule } from './databases/databases.module';
 import { SubscribersModule } from './subscribers/subscribers.module';
@@ -113,6 +114,7 @@ import { resolveRequestId } from './utils/helpers/request-id.helper';
     JobIngestionModule,
     JobSearchModule,
     FilesModule,
+    SiteContentModule,
     ResumesModule,
     QueuesModule.forRoot(),
     CvProfilesModule,

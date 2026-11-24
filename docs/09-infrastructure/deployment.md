@@ -71,6 +71,8 @@ Cần thêm `DOCKERHUB_USER`, `IMAGE_NAME`, `IMAGE_TAG`, `API_DOMAIN` vào `.env
 
 `npm run seed` tạo kỹ năng, nguồn tin và tài khoản quản trị `EMAIL_ADMIN`. Công ty, tin, CV và các tài khoản mẫu `@seed.local` chỉ được tạo khi `NODE_ENV` là `development` hoặc `test`; mọi giá trị khác, kể cả không đặt, đều chỉ tạo admin ([seed.service.ts](../../src/databases/seeds/seed.service.ts)). Ở chế độ này `INIT_PASSWORD` phải dài ít nhất 12 ký tự. Đổi mật khẩu admin sau lần đăng nhập đầu.
 
+Chạy một lần `node dist/databases/seeds/run-seed-legal-pages.js` trong container backend để nạp 4 văn bản Điều khoản/Chính sách (bản nháp, không ghi đè bản đã sửa). **Làm trước khi deploy frontend** đọc văn bản pháp lý từ API, nếu không hai trang này trả 404.
+
 ### 5. Reverse proxy và TLS
 
 Caddy chạy trong compose, cấu hình ở [Caddyfile](../../Caddyfile), tự cấp và gia hạn chứng chỉ Let's Encrypt cho `API_DOMAIN`:

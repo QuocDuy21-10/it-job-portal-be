@@ -3,6 +3,7 @@ import { ERole } from 'src/casl/enums/role.enum';
 export enum UploadFolderType {
   AVATAR = 'avatar',
   COMPANY = 'company',
+  BANNER = 'banner',
 }
 
 export interface UploadPolicy {
@@ -26,6 +27,13 @@ export const UPLOAD_POLICIES: Readonly<Record<UploadFolderType, UploadPolicy>> =
     allowedExtensions: ['jpg', 'jpeg', 'png', 'gif'],
     maxSizeBytes: 5 * 1024 * 1024,
     requiredRoles: [ERole.SUPER_ADMIN, ERole.HR],
+  },
+  [UploadFolderType.BANNER]: {
+    folder: UploadFolderType.BANNER,
+    allowedMimeTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+    maxSizeBytes: 5 * 1024 * 1024,
+    requiredRoles: [ERole.SUPER_ADMIN],
   },
 };
 
