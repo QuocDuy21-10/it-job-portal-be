@@ -87,7 +87,8 @@ export class ExternalJob {
 export const ExternalJobSchema = SchemaFactory.createForClass(ExternalJob);
 
 ExternalJobSchema.index({ sourceKey: 1, externalId: 1 }, { unique: true });
-ExternalJobSchema.index({ status: 1, publishedAt: -1 });
+// Job search reads the newest rows of each visible status and stops at the page it needs.
+ExternalJobSchema.index({ status: 1, publishedAt: -1, _id: 1 });
 ExternalJobSchema.index({ locationCode: 1, status: 1 });
 ExternalJobSchema.index({ skills: 1 });
 ExternalJobSchema.index({ sourceKey: 1, status: 1, lastFetchedAt: 1 });

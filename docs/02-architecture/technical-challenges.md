@@ -33,9 +33,9 @@ Tài liệu này chọn các bài toán khó nhất của DevLink Backend, nêu 
 
 **Khó ở đâu.** Tin nội bộ có lương dạng số, hình thức làm việc, trạng thái duyệt; tin ngoài có lương dạng văn bản, cờ từ xa, chính sách hiển thị theo nguồn. Cần phân trang, sắp xếp và tổng số thống nhất.
 
-**Cách giải.** Một pipeline aggregation: chiếu mỗi phía về cùng dạng, ghép bằng `$unionWith`, `$sort` rồi `$facet` để lấy trang và tổng. Bộ lọc không áp dụng được cho tin ngoài (lương, hình thức khác `Remote`) loại phía ngoài một cách tường minh; tin không có lương luôn xuống cuối khi sắp theo lương. Logic dựng pipeline tách thành hàm thuần để test.
+**Cách giải.** Một pipeline aggregation: mỗi nhánh lấy `page * limit` tin đầu theo index rồi chiếu về cùng dạng, ghép bằng `$unionWith` và sắp lại; tổng đếm riêng và cache. Bộ lọc không áp dụng được cho tin ngoài (lương, hình thức khác `Remote`) loại phía ngoài một cách tường minh; tin không có lương luôn xuống cuối khi sắp theo lương. Logic dựng pipeline tách thành hàm thuần để test.
 
-**Đánh đổi.** Không cache, tìm từ khóa bằng regex không tận dụng index, `$sort` sau `$unionWith` không dùng index, và việc loại im lặng tin ngoài có thể gây bất ngờ. Chi tiết: [job-search](../03-modules/job-search.md), [unified-job-search](../06-workflows/sequences/unified-job-search.md).
+**Đánh đổi.** Tìm từ khóa bằng regex không tận dụng index, sắp theo lương hoặc `oldest` vẫn đọc mọi tin khớp, và việc loại im lặng tin ngoài có thể gây bất ngờ. Chi tiết: [job-search](../03-modules/job-search.md), [unified-job-search](../06-workflows/sequences/unified-job-search.md).
 
 ## 4. Chat AI an toàn, rẻ và có kiểm soát
 

@@ -6,6 +6,7 @@ export const LIST_CACHE_TTL = {
 export const LIST_CACHE_ENDPOINTS = {
   JOBS: 'jobs',
   COMPANIES: 'companies',
+  JOB_SEARCH_TOTAL: 'job-search-total',
 } as const;
 
 export const LIST_CACHE_SCOPES = {

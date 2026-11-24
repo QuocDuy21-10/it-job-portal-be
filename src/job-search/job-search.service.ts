@@ -7,6 +7,13 @@ import { DEFAULT_DISPLAY_POLICY } from 'src/job-ingestion/job-ingestion.constant
 import { ExternalJob, ExternalJobDocument } from 'src/job-ingestion/schemas/external-job.schema';
 import { JobSource, JobSourceDocument } from 'src/job-ingestion/schemas/job-source.schema';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
+import {
+  LIST_CACHE_ENDPOINTS,
+  LIST_CACHE_SCOPES,
+  LIST_CACHE_TAGS,
+  LIST_CACHE_TTL,
+} from 'src/redis/list-cache.constants';
+import { ListCacheService } from 'src/redis/list-cache.service';
 import { getLocationByCode, resolveLocationFromInput } from 'src/utils/location-catalog';
 import { SearchJobsQueryDto } from './dto/search-jobs-query.dto';
 import {
@@ -15,13 +22,15 @@ import {
   IJobSearchResponse,
   INormalizedJobSearch,
 } from './interfaces/job-search-item.interface';
-import { JOB_SEARCH_DEFAULT_LIMIT, JOB_SEARCH_DEFAULT_PAGE } from './job-search.constants';
-import { buildJobSearchPlan } from './job-search-pipeline';
+import {
+  JOB_SEARCH_DEFAULT_LIMIT,
+  JOB_SEARCH_DEFAULT_PAGE,
+  JOB_SEARCH_MAX_PAGE,
+} from './job-search.constants';
+import { buildJobSearchPlan, JobSearchPlan } from './job-search-pipeline';
 
 const EXTERNAL_DETAIL_FIELDS =
   'sourceKey title companyName location locationCode isRemote skills level descriptionHtml publishedAt createdAt expiresAt sourceUrl applyUrl status salaryText';
-
-type JobSearchFacet = { items: IJobSearchItem[]; total: Array<{ count: number }> };
 
 const toOptionalNumber = (value: unknown): number | undefined =>
   value === undefined || value === null || value === '' ? undefined : Number(value);
@@ -34,6 +43,7 @@ export class JobSearchService {
     private readonly externalJobModel: Model<ExternalJobDocument>,
     @InjectModel(JobSource.name)
     private readonly jobSourceModel: Model<JobSourceDocument>,
+    private readonly listCacheService: ListCacheService,
   ) {}
 
   async search(query: SearchJobsQueryDto): Promise<IJobSearchResponse> {
@@ -44,7 +54,6 @@ export class JobSearchService {
         : await this.jobSourceModel.distinct('key', {
             displayPolicy: EJobSourceDisplayPolicy.HIDDEN,
           });
-    // shortcut: uncached aggregate, add ListCacheService with ingestion-sync invalidation if p95 latency grows
     const plan = buildJobSearchPlan(
       search,
       new Date(),
@@ -52,23 +61,25 @@ export class JobSearchService {
       hiddenSourceKeys,
     );
 
-    let facet: JobSearchFacet | undefined;
-
-    if (plan.target === 'internal') {
-      [facet] = await this.jobModel.aggregate<JobSearchFacet>(plan.pipeline);
-    } else if (plan.target === 'external') {
-      [facet] = await this.externalJobModel.aggregate<JobSearchFacet>(plan.pipeline);
-    }
-
-    const total = facet?.total[0]?.count ?? 0;
+    const items = await this.findPage(plan);
+    const skipped = (search.page - 1) * search.limit;
+    // A short page is the last one, so its size already gives the total without a second scan.
+    const isLastPage = items.length < search.limit && (items.length > 0 || search.page === 1);
+    const total = isLastPage
+      ? skipped + items.length
+      : // The cached total can lag behind a job published in the last minute.
+        Math.max(
+          await this.countTotal(plan, search, hiddenSourceKeys),
+          items.length > 0 ? skipped + items.length : 0,
+        );
 
     return {
-      result: facet?.items ?? [],
+      result: items,
       meta: {
         pagination: {
           current_page: search.page,
           per_page: search.limit,
-          total_pages: Math.ceil(total / search.limit),
+          total_pages: Math.min(Math.ceil(total / search.limit), JOB_SEARCH_MAX_PAGE),
           total,
         },
       },
@@ -120,6 +131,53 @@ export class JobSearchService {
       status: isClosed ? 'CLOSED' : 'ACTIVE',
       displayPolicy,
     };
+  }
+
+  private async findPage(plan: JobSearchPlan): Promise<IJobSearchItem[]> {
+    if (plan.target === 'empty') return [];
+
+    return plan.target === 'internal'
+      ? this.jobModel.aggregate<IJobSearchItem>(plan.pipeline)
+      : this.externalJobModel.aggregate<IJobSearchItem>(plan.pipeline);
+  }
+
+  // Counting reads every match, so it is cached under the filters alone: all pages and sorts share it.
+  private async countTotal(
+    plan: JobSearchPlan,
+    search: INormalizedJobSearch,
+    hiddenSourceKeys: string[],
+  ): Promise<number> {
+    if (plan.target === 'empty') return 0;
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { page: _page, limit: _limit, sort: _sort, ...filters } = search;
+
+    return this.listCacheService.getOrSet({
+      keyInput: {
+        endpoint: LIST_CACHE_ENDPOINTS.JOB_SEARCH_TOTAL,
+        scope: LIST_CACHE_SCOPES.PUBLIC,
+        payload: { ...filters, hiddenSourceKeys },
+      },
+      ttlMs: LIST_CACHE_TTL.JOBS,
+      tags: [LIST_CACHE_TAGS.jobs.all],
+      loader: async () => {
+        const counts = await Promise.all([
+          plan.internalMatch ? this.countMatches(this.jobModel, plan.internalMatch) : 0,
+          plan.externalMatch ? this.countMatches(this.externalJobModel, plan.externalMatch) : 0,
+        ]);
+
+        return counts[0] + counts[1];
+      },
+    });
+  }
+
+  private async countMatches(model: Model<any>, match: Record<string, any>): Promise<number> {
+    const [row] = await model.aggregate<{ count: number }>([
+      { $match: match },
+      { $count: 'count' },
+    ]);
+
+    return row?.count ?? 0;
   }
 
   // Normalizes independently of ValidationPipe so the service is safe to call directly.

@@ -25,7 +25,8 @@ sequenceDiagram
     S->>DB: distinct(job_sources.key, displayPolicy = HIDDEN)
     DB-->>S: hiddenSourceKeys
     S->>S: buildJobSearchPlan
-    S->>DB: jobs.aggregate: match, project, unionWith external_jobs, sort, facet
+    S->>DB: jobs.aggregate: match, sort, limit, unionWith external_jobs (2 nhánh), sort, skip, limit
+    S->>DB: đếm tổng (chỉ khi trang đầy hoặc rỗng và cache 60 giây trống)
     DB-->>S: items và total
     S-->>C: result, meta.pagination
     C-->>U: 200, data bọc trong envelope
@@ -68,5 +69,5 @@ sequenceDiagram
 
 ## Ghi chú
 
-- Mỗi request chạy một aggregation và một truy vấn `distinct`; không có cache ([job-search](../../03-modules/job-search.md#known-limitation)).
+- Mỗi request chạy một aggregation và một truy vấn `distinct`; tổng số tin được cache 60 giây ([job-search](../../03-modules/job-search.md#known-limitation)).
 - Phản hồi dùng envelope chung `{ statusCode, message, data }` vì route không có `@SkipTransform`.

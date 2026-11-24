@@ -2,14 +2,14 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestj
 import { BulkDeleteDto } from 'src/utils/dto/bulk-delete.dto';
 import { JobsService } from './jobs.service';
 import { CreateJobDto } from './dto/create-job.dto';
+import { ListJobsQueryDto } from './dto/list-jobs-query.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { ApproveJobDto } from './dto/approve-job.dto';
 import { OptionalAuth } from 'src/utils/decorators/optional-auth.decorator';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
-import { PaginationQueryDto } from 'src/utils/dto/pagination-query.dto';
 import { IUser } from 'src/users/user.interface';
-import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from 'src/casl';
 import { ERole } from 'src/casl';
 @ApiTags('Job')
@@ -36,21 +36,15 @@ export class JobsController {
     description:
       'Retrieves a paginated list of all active job postings. Supports filtering and sorting.',
   })
-  @ApiQuery({
-    name: 'keyword',
-    required: false,
-    type: String,
-    description: 'Search keyword — matches job title, skills, and company name',
-    example: 'React',
-  })
   @ResponseMessage('Lấy danh sách tin tuyển dụng thành công')
-  findAll(
-    @Query() pagination: PaginationQueryDto,
-    @Query('keyword') keyword: string,
-    @Query() query: string,
-    @User() user: IUser,
-  ) {
-    return this.jobsService.findAll(pagination.page, pagination.limit, query, user, keyword);
+  findAll(@Query() listQuery: ListJobsQueryDto, @Query() query: string, @User() user: IUser) {
+    return this.jobsService.findAll(
+      listQuery.page,
+      listQuery.limit,
+      query,
+      user,
+      listQuery.keyword,
+    );
   }
 
   @OptionalAuth()

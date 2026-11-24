@@ -28,7 +28,7 @@ Danh sách được cache 60 giây trong Redis, tách theo phạm vi (`public`, 
 
 ## Lọc, tìm kiếm và sắp xếp
 
-- `keyword` tìm trên tên tin, kỹ năng và tên công ty.
+- `keyword` (một chuỗi, tối đa 100 ký tự) tìm trên tên tin, kỹ năng và tên công ty.
 - Bộ lọc khác đọc từ query string bằng `api-query-params`, **chỉ** các trường: `name`, `skills`, `location`, `locationCode`, `salary`, `quantity`, `level`, `formOfWork`, `isActive`, `approvalStatus`, `company._id`, `startDate`, `endDate`, `createdAt`. Trường khác bị bỏ qua.
 - Sắp xếp **chỉ** theo các trường trong `ALLOWED_SORT_FIELDS` (ví dụ `name`, `salary`, `createdAt`, `updatedAt`, `level`, `location`), giá trị `1` hoặc `-1`.
 - `skills` được chuẩn hóa qua danh mục kỹ năng; giá trị không có trong danh mục làm yêu cầu bị `400`.

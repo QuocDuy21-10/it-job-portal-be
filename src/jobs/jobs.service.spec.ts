@@ -732,6 +732,32 @@ describe('JobsService', () => {
       );
     });
 
+    it('matches a location outside the catalog literally, not as a regex', async () => {
+      mockJobRepository.findLean.mockResolvedValue([]);
+
+      await service.searchJobs(undefined, undefined, '(a+)+$');
+
+      expect(mockJobRepository.findLean.mock.calls[0][0].location).toEqual({
+        $regex: '\\(a\\+\\)\\+\\$',
+        $options: 'i',
+      });
+    });
+
+    // Job skills are catalog labels, so "Java" must not match "JavaScript"; unknown skills stay a substring match.
+    it('matches catalog skills exactly and unknown skills by substring', async () => {
+      (mockSkillsService as any).normalizeExtractedSkills = jest
+        .fn()
+        .mockResolvedValue({ normalizedSkills: ['Java'], unmappedSkills: ['Bun'] });
+      mockJobRepository.findLean.mockResolvedValue([]);
+
+      await service.searchJobs(['java', 'Bun']);
+      await service.findMatchingJobs(['java', 'Bun']);
+
+      for (const [filter] of mockJobRepository.findLean.mock.calls) {
+        expect(filter.skills).toEqual({ $in: ['Java', /Bun/i] });
+      }
+    });
+
     it('sorts by salary when asked to rank', async () => {
       mockJobRepository.findLean.mockResolvedValue([]);
 
@@ -774,7 +800,7 @@ describe('JobsService', () => {
       });
       const countFilter = mockJobRepository.countDocuments.mock.calls[0][0];
       expect(countFilter).toEqual(expect.objectContaining({ isDeleted: false }));
-      expect(countFilter.skills).toEqual({ $in: [expect.any(RegExp)] });
+      expect(countFilter.skills).toEqual({ $in: ['Node.js'] });
       expect(mockJobRepository.findLean).toHaveBeenCalledWith(
         expect.objectContaining({ skills: countFilter.skills, salary: { $gt: 0 } }),
         'name company salary',

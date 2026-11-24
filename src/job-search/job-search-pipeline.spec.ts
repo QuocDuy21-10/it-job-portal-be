@@ -3,7 +3,9 @@ import { EJobFormOfWork } from 'src/jobs/enums/job-form-of-work.enum';
 import { EJobApprovalStatus } from 'src/jobs/enums/job-approval-status.enum';
 import { INormalizedJobSearch } from './interfaces/job-search-item.interface';
 import {
+  buildExternalMatch,
   buildExternalStages,
+  buildInternalMatch,
   buildInternalStages,
   buildJobSearchPlan,
   buildTailStages,
@@ -20,13 +22,13 @@ const buildSearch = (overrides: Partial<INormalizedJobSearch> = {}): INormalized
   ...overrides,
 });
 
-const matchOf = (stages: any[]) => stages.find(stage => stage.$match).$match;
+const buildMatch = () => ({ marker: true });
 const projectOf = (stages: any[]) => stages.find(stage => stage.$project).$project;
 
 describe('job-search-pipeline', () => {
   describe('buildInternalStages', () => {
     it('always applies public visibility and excludes soft-deleted jobs', () => {
-      const match = matchOf(buildInternalStages(buildSearch(), NOW));
+      const match = buildInternalMatch(buildSearch(), NOW);
 
       expect(match).toEqual({
         isActive: true,
@@ -37,7 +39,7 @@ describe('job-search-pipeline', () => {
     });
 
     it('puts an escaped keyword regex in $and without replacing the visibility $or', () => {
-      const match = matchOf(buildInternalStages(buildSearch({ keyword: 'c++' }), NOW));
+      const match = buildInternalMatch(buildSearch({ keyword: 'c++' }), NOW);
       const keywordOr = match.$and[0].$or;
 
       expect(match.$or).toHaveLength(2);
@@ -49,17 +51,15 @@ describe('job-search-pipeline', () => {
     });
 
     it('applies equality filters and the salary range', () => {
-      const match = matchOf(
-        buildInternalStages(
-          buildSearch({
-            locationCode: 'ho-chi-minh',
-            level: 'Senior',
-            formOfWork: EJobFormOfWork.FULL_TIME,
-            salaryMin: 10000000,
-            salaryMax: 20000000,
-          }),
-          NOW,
-        ),
+      const match = buildInternalMatch(
+        buildSearch({
+          locationCode: 'ho-chi-minh',
+          level: 'Senior',
+          formOfWork: EJobFormOfWork.FULL_TIME,
+          salaryMin: 10000000,
+          salaryMax: 20000000,
+        }),
+        NOW,
       );
 
       expect(match.locationCode).toBe('ho-chi-minh');
@@ -69,13 +69,13 @@ describe('job-search-pipeline', () => {
     });
 
     it('sets only the provided salary bound', () => {
-      const match = matchOf(buildInternalStages(buildSearch({ salaryMin: 5 }), NOW));
+      const match = buildInternalMatch(buildSearch({ salaryMin: 5 }), NOW);
 
       expect(match.salary).toEqual({ $gte: 5 });
     });
 
     it('projects internal jobs into the unified shape with literals', () => {
-      const project = projectOf(buildInternalStages(buildSearch(), NOW));
+      const project = projectOf(buildInternalStages(buildSearch(), buildMatch()));
 
       expect(project).toEqual(
         expect.objectContaining({
@@ -93,7 +93,7 @@ describe('job-search-pipeline', () => {
     });
 
     it('matches one skill exactly and case-insensitively', () => {
-      const match = matchOf(buildInternalStages(buildSearch({ skills: 'node.js' }), NOW));
+      const match = buildInternalMatch(buildSearch({ skills: 'node.js' }), NOW);
 
       expect(match.skills.source).toBe('^node\\.js$');
       expect(match.skills.flags).toBe('i');
@@ -102,7 +102,7 @@ describe('job-search-pipeline', () => {
     });
 
     it('does not match a longer skill that starts the same', () => {
-      const match = matchOf(buildInternalStages(buildSearch({ skills: 'Java' }), NOW));
+      const match = buildInternalMatch(buildSearch({ skills: 'Java' }), NOW);
 
       expect(match.skills.test('Java')).toBe(true);
       expect(match.skills.test('JavaScript')).toBe(false);
@@ -111,7 +111,7 @@ describe('job-search-pipeline', () => {
 
   describe('buildExternalStages', () => {
     it('returns visible, unexpired external jobs', () => {
-      const match = matchOf(buildExternalStages(buildSearch(), NOW, []));
+      const match = buildExternalMatch(buildSearch(), NOW, []);
 
       expect(match).toEqual({
         status: { $in: [EExternalJobStatus.ACTIVE, EExternalJobStatus.STALE] },
@@ -120,18 +120,16 @@ describe('job-search-pipeline', () => {
     });
 
     it('excludes hidden sources', () => {
-      const match = matchOf(buildExternalStages(buildSearch(), NOW, ['topdev']));
+      const match = buildExternalMatch(buildSearch(), NOW, ['topdev']);
 
       expect(match.sourceKey).toEqual({ $nin: ['topdev'] });
     });
 
     it('matches keyword, location and level', () => {
-      const match = matchOf(
-        buildExternalStages(
-          buildSearch({ keyword: 'backend', locationCode: 'ho-chi-minh', level: 'Senior' }),
-          NOW,
-          [],
-        ),
+      const match = buildExternalMatch(
+        buildSearch({ keyword: 'backend', locationCode: 'ho-chi-minh', level: 'Senior' }),
+        NOW,
+        [],
       );
 
       expect(match.$and[0].$or).toHaveLength(2);
@@ -145,9 +143,7 @@ describe('job-search-pipeline', () => {
     });
 
     it('maps the Remote form of work to isRemote', () => {
-      const match = matchOf(
-        buildExternalStages(buildSearch({ formOfWork: EJobFormOfWork.REMOTE }), NOW, []),
-      );
+      const match = buildExternalMatch(buildSearch({ formOfWork: EJobFormOfWork.REMOTE }), NOW, []);
 
       expect(match.isRemote).toBe(true);
     });
@@ -157,11 +153,11 @@ describe('job-search-pipeline', () => {
       [{ salaryMin: 10000000 }],
       [{ salaryMax: 20000000 }],
     ])('excludes external jobs for %j', overrides => {
-      expect(buildExternalStages(buildSearch(overrides), NOW, [])).toBeNull();
+      expect(buildExternalMatch(buildSearch(overrides), NOW, [])).toBeNull();
     });
 
     it('projects external jobs into the unified shape', () => {
-      const project = projectOf(buildExternalStages(buildSearch(), NOW, []));
+      const project = projectOf(buildExternalStages(buildSearch(), buildMatch())[0]);
 
       expect(project).toEqual(
         expect.objectContaining({
@@ -177,10 +173,52 @@ describe('job-search-pipeline', () => {
     });
 
     it('matches one skill exactly on external jobs', () => {
-      const match = matchOf(buildExternalStages(buildSearch({ skills: 'React' }), NOW, []));
+      const match = buildExternalMatch(buildSearch({ skills: 'React' }), NOW, []);
 
       expect(match.skills.test('react')).toBe(true);
       expect(match.skills.test('React Native')).toBe(false);
+    });
+  });
+
+  // Each branch sorts on stored fields and keeps page * limit rows, so the union never sorts everything.
+  describe('top-k branches', () => {
+    it.each([
+      ['newest', { createdAt: -1, _id: 1 }],
+      ['oldest', { createdAt: 1, _id: 1 }],
+      ['salary_desc', { salary: -1, createdAt: -1, _id: 1 }],
+      ['salary_asc', { salary: 1, createdAt: -1, _id: 1 }],
+    ] as const)('limits internal jobs sorted %s before projecting them', (sort, expected) => {
+      const stages = buildInternalStages(buildSearch({ sort, page: 3, limit: 5 }), buildMatch());
+
+      expect(stages.slice(0, 3)).toEqual([
+        { $match: { marker: true } },
+        { $sort: expected },
+        { $limit: 15 },
+      ]);
+      expect(Object.keys(stages[3])).toEqual(['$project']);
+    });
+
+    // postedAt is publishedAt, or createdAt when there is none: two branches keep both sorts on stored fields.
+    it.each([
+      ['newest', -1],
+      ['oldest', 1],
+      ['salary_desc', -1],
+      ['salary_asc', -1],
+    ] as const)('splits external jobs on publishedAt for %s', (sort, direction) => {
+      const branches = buildExternalStages(buildSearch({ sort, page: 2, limit: 10 }), buildMatch());
+
+      expect(branches.map(stages => stages.slice(0, 3))).toEqual([
+        [
+          { $match: { marker: true, publishedAt: { $ne: null } } },
+          { $sort: { publishedAt: direction, _id: 1 } },
+          { $limit: 20 },
+        ],
+        [
+          { $match: { marker: true, publishedAt: null } },
+          { $sort: { createdAt: direction, _id: 1 } },
+          { $limit: 20 },
+        ],
+      ]);
     });
   });
 
@@ -190,97 +228,67 @@ describe('job-search-pipeline', () => {
       ['oldest', { postedAt: 1, id: 1 }],
       ['salary_desc', { hasSalary: -1, salary: -1, postedAt: -1, id: 1 }],
       ['salary_asc', { hasSalary: -1, salary: 1, postedAt: -1, id: 1 }],
-    ] as const)('sorts %s as %j', (sort, expected) => {
-      const [sortStage] = buildTailStages(buildSearch({ sort })) as any[];
-
-      expect(sortStage.$sort).toEqual(expected);
-    });
-
-    it('paginates inside $facet and drops hasSalary', () => {
-      const [, facetStage] = buildTailStages(buildSearch({ page: 3, limit: 5 })) as any[];
-
-      expect(facetStage.$facet).toEqual({
-        items: [{ $skip: 10 }, { $limit: 5 }, { $project: { hasSalary: 0 } }],
-        total: [{ $count: 'count' }],
-      });
+    ] as const)('merges the branches sorted %s, then pages', (sort, expected) => {
+      expect(buildTailStages(buildSearch({ sort, page: 3, limit: 5 }))).toEqual([
+        { $sort: expected },
+        { $skip: 10 },
+        { $limit: 5 },
+        { $project: { hasSalary: 0 } },
+      ]);
     });
   });
 
   describe('buildJobSearchPlan', () => {
-    const hasUnionWith = (pipeline: any[]) => pipeline.some(stage => stage.$unionWith);
+    const plan = (overrides: Partial<INormalizedJobSearch> = {}) =>
+      buildJobSearchPlan(buildSearch(overrides), NOW, EXTERNAL_COLLECTION, []) as any;
+    const unions = (pipeline: any[]) => pipeline.filter(stage => stage.$unionWith);
+    const visibleStatuses = { $in: [EExternalJobStatus.ACTIVE, EExternalJobStatus.STALE] };
 
-    it('unions both collections for source=all', () => {
-      const plan = buildJobSearchPlan(buildSearch(), NOW, EXTERNAL_COLLECTION, []) as any;
-      const unionStage = plan.pipeline.find((stage: any) => stage.$unionWith);
+    it('unions internal jobs with both external branches and counts each collection once', () => {
+      const { target, pipeline, internalMatch, externalMatch } = plan();
 
-      expect(plan.target).toBe('internal');
-      expect(unionStage.$unionWith.coll).toBe(EXTERNAL_COLLECTION);
-      expect(matchOf(unionStage.$unionWith.pipeline).status).toEqual({
-        $in: [EExternalJobStatus.ACTIVE, EExternalJobStatus.STALE],
-      });
+      expect(target).toBe('internal');
+      expect(unions(pipeline).map(stage => stage.$unionWith.coll)).toEqual([
+        EXTERNAL_COLLECTION,
+        EXTERNAL_COLLECTION,
+      ]);
+      expect(internalMatch.isActive).toBe(true);
+      expect(externalMatch.status).toEqual(visibleStatuses);
+      expect(externalMatch).not.toHaveProperty('publishedAt');
     });
 
-    it('skips the union when external jobs are excluded by filters', () => {
-      const plan = buildJobSearchPlan(
-        buildSearch({ salaryMin: 1 }),
-        NOW,
-        EXTERNAL_COLLECTION,
-        [],
-      ) as any;
+    it.each([[{ salaryMin: 1 }], [{ source: 'internal' as const }]])(
+      'queries and counts only internal jobs for %j',
+      overrides => {
+        const { target, pipeline, externalMatch } = plan(overrides);
 
-      expect(plan.target).toBe('internal');
-      expect(hasUnionWith(plan.pipeline)).toBe(false);
-    });
+        expect(target).toBe('internal');
+        expect(unions(pipeline)).toEqual([]);
+        expect(externalMatch).toBeNull();
+      },
+    );
 
-    it('queries only internal jobs for source=internal', () => {
-      const plan = buildJobSearchPlan(
-        buildSearch({ source: 'internal' }),
-        NOW,
-        EXTERNAL_COLLECTION,
-        [],
-      ) as any;
+    it('queries and counts only the external collection for source=external', () => {
+      const { target, pipeline, internalMatch, externalMatch } = plan({ source: 'external' });
 
-      expect(plan.target).toBe('internal');
-      expect(hasUnionWith(plan.pipeline)).toBe(false);
-    });
-
-    it('queries the external collection for source=external', () => {
-      const plan = buildJobSearchPlan(
-        buildSearch({ source: 'external' }),
-        NOW,
-        EXTERNAL_COLLECTION,
-        [],
-      ) as any;
-
-      expect(plan.target).toBe('external');
-      expect(matchOf(plan.pipeline).status).toEqual({
-        $in: [EExternalJobStatus.ACTIVE, EExternalJobStatus.STALE],
-      });
+      expect(target).toBe('external');
+      expect(pipeline[0].$match.status).toEqual(visibleStatuses);
+      expect(unions(pipeline)).toHaveLength(1);
+      expect(internalMatch).toBeNull();
+      expect(externalMatch.status).toEqual(visibleStatuses);
     });
 
     it('returns an empty plan for source=external with a salary filter', () => {
-      expect(
-        buildJobSearchPlan(
-          buildSearch({ source: 'external', salaryMin: 1 }),
-          NOW,
-          EXTERNAL_COLLECTION,
-          [],
-        ),
-      ).toEqual({ target: 'empty' });
-    });
-
-    it('ends every pipeline with $sort then $facet', () => {
-      const plan = buildJobSearchPlan(buildSearch(), NOW, EXTERNAL_COLLECTION, []) as any;
-      const lastTwo = plan.pipeline.slice(-2).map((stage: object) => Object.keys(stage)[0]);
-
-      expect(lastTwo).toEqual(['$sort', '$facet']);
+      expect(plan({ source: 'external', salaryMin: 1 })).toEqual({ target: 'empty' });
     });
   });
 
   describe('endDate exposure', () => {
     it('projects endDate for internal jobs only', () => {
-      expect(projectOf(buildInternalStages(buildSearch(), NOW)).endDate).toBe(1);
-      expect(projectOf(buildExternalStages(buildSearch(), NOW, [])).endDate).toBeUndefined();
+      expect(projectOf(buildInternalStages(buildSearch(), buildMatch())).endDate).toBe(1);
+      expect(
+        projectOf(buildExternalStages(buildSearch(), buildMatch())[0]).endDate,
+      ).toBeUndefined();
     });
   });
 });

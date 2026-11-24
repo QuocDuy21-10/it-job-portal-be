@@ -20,6 +20,7 @@ Nguồn: [list-cache.service.ts](../../src/redis/list-cache.service.ts), hằng 
 | Danh sách | TTL | Phạm vi cache | Nơi dùng |
 |---|---|---|---|
 | Tin tuyển dụng (`GET /jobs`) | 60 giây | `public`, `super-admin`, `hr:<companyId>` | [jobs.service.ts](../../src/jobs/jobs.service.ts) |
+| Tổng số tin (`GET /job-search`) | 60 giây | `public` | [job-search.service.ts](../../src/job-search/job-search.service.ts) |
 | Công ty (`GET /companies`) | 3 phút | như trên | [companies.service.ts](../../src/companies/companies.service.ts) |
 
 - **Khóa:** `list-cache:entry:<endpoint>:<sha256 của tham số chuẩn hóa>`. Tham số được `stableStringify` để cùng truy vấn luôn cho cùng khóa dù thứ tự tham số khác.
@@ -93,7 +94,7 @@ Redis DB: `REDIS_CACHE_DB` (mặc định 1) cho các mục trên; hàng đợi 
 
 ## Không có cache ở
 
-- `GET /job-search` (code ghi chú `shortcut: uncached aggregate`) ([job-search](../03-modules/job-search.md#known-limitation)).
+- Danh sách của `GET /job-search` (chỉ tổng số được cache) ([job-search](../03-modules/job-search.md#known-limitation)).
 - Chi tiết tin `GET /jobs/:id`: chưa thấy dùng `ListCacheService` (chỉ danh sách). `Chưa xác minh` cho các route còn lại.
 
 ## Known Limitation
@@ -111,4 +112,4 @@ Redis DB: `REDIS_CACHE_DB` (mặc định 1) cho các mục trên; hàng đợi 
 
 - Truyền `stores` đúng cho `@nestjs/cache-manager` để lớp 2 thật sự dùng Redis, hoặc bỏ lớp này và chuyển dữ liệu quan trọng (token) sang `REDIS_CLIENT`.
 - Đổi TTL cache đọc CV sang mili giây đúng ý định.
-- Cache cho `GET /job-search` kèm vô hiệu hóa sau mỗi lần đồng bộ nguồn.
+- Vô hiệu hóa cache tổng số của `GET /job-search` sau mỗi lần đồng bộ nguồn.

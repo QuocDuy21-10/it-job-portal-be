@@ -2,7 +2,7 @@
 
 Tiền tố `/api/v1/job-search`. Controller: [job-search.controller.ts](../../../src/job-search/job-search.controller.ts). Tài liệu sâu: `03-modules/job-search.md` (Phase 3).
 
-Công khai (`@Public` ở cấp class), có `ThrottlerGuard` (throttler `burst` 5/giây, `sustained` 20/10 giây, `default` 60/phút) và **không cache**. Tìm kiếm hợp nhất trong cả tin nội bộ ([jobs](../../04-database/collections/jobs.md)) và tin ngoài ([external-jobs](../../04-database/collections/external-jobs.md)).
+Công khai (`@Public` ở cấp class), có `ThrottlerGuard` (throttler `burst` 5/giây, `sustained` 20/10 giây, `default` 60/phút) và chỉ cache tổng số tin (60 giây). Tìm kiếm hợp nhất trong cả tin nội bộ ([jobs](../../04-database/collections/jobs.md)) và tin ngoài ([external-jobs](../../04-database/collections/external-jobs.md)).
 
 ## Danh sách route
 
@@ -17,7 +17,7 @@ Công khai (`@Public` ở cấp class), có `ThrottlerGuard` (throttler `burst` 
 |---|---|---|
 | `source` | `all` (mặc định), `internal`, `external` | Chọn nguồn |
 | `sort` | `newest`, `oldest`, `salary_desc`, `salary_asc` | Sắp xếp |
-| `page`, `limit` | `page` từ 1; `limit` mặc định 10, **tối đa 50** | [job-search.constants.ts](../../../src/job-search/job-search.constants.ts) |
+| `page`, `limit` | `page` từ 1 đến 200; `limit` mặc định 10, **tối đa 50** | [job-search.constants.ts](../../../src/job-search/job-search.constants.ts) |
 | `keyword` | Tối đa 100 ký tự | |
 | `salaryMin`, `salaryMax` | Số nguyên ≥ 0 | Quy tắc riêng của lương xem tài liệu module |
 
@@ -80,7 +80,7 @@ Tìm kiếm hợp nhất tin nội bộ và tin ngoài, có phân trang, lọc t
 | `salaryMax` | number | Không | IsInt, Min(0) | 50000000 |
 | `source` | JobSearchSource | Không | IsIn(JOB_SEARCH_SOURCES) | — |
 | `sort` | JobSearchSort | Không | IsIn(JOB_SEARCH_SORTS) | — |
-| `page` | number | Không | IsInt, Min(1) | — |
+| `page` | number | Không | IsInt, Min(1), Max(JOB_SEARCH_MAX_PAGE) | — |
 | `limit` | number | Không | IsInt, Min(1), Max(JOB_SEARCH_MAX_LIMIT) | — |
 
 ### `GET /api/v1/job-search/external/:id`
