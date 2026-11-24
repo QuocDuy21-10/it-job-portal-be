@@ -51,7 +51,7 @@ Cần người vận hành tự xác nhận các mục `Chưa xác minh` trên h
 | Phân quyền theo vai trò | Một phần | Có `@Roles`; CASL chưa được thực thi ([authorization](authorization.md)) |
 | Chính sách mật khẩu | Một phần | Không nhất quán, không độ phức tạp |
 | 2FA, khóa tài khoản sau nhiều lần sai | Chưa có | |
-| Chống đoán OTP | Đã có | 5 lần sai, chờ 60 giây |
+| Chống đoán OTP | Đã có | 5 lần nhập mỗi mã, 15 lần mỗi 24 giờ mỗi email, chờ 60 giây |
 | Container chạy không phải root | Đã có | `USER nestjs` ở stage `production` |
 | Ảnh Docker | Một phần | `node:24-alpine`; Dependabot theo dõi; không quét image trong CI |
 
@@ -65,7 +65,7 @@ Cần người vận hành tự xác nhận các mục `Chưa xác minh` trên h
 | File CV cần xác thực để tải | Đã có | Lưu ngoài `public/`, trả qua endpoint có kiểm tra quyền (`test/resumes.e2e-spec.ts`) |
 | Xóa tài khoản xóa đủ dữ liệu cá nhân | Chưa có | [account-deletion](../06-workflows/use-cases/account-deletion.md#dữ-liệu-sau-khi-xóa) |
 | Seed không tạo tài khoản mẫu ở production | Đã có | Dữ liệu mẫu chỉ tạo khi `NODE_ENV` là `development` hoặc `test` ([seed.service.ts](../../src/databases/seeds/seed.service.ts)) |
-| Backend dùng user MongoDB quyền tối thiểu | Hỗ trợ, cần bật | Compose đọc `MONGO_APP_USERNAME`/`MONGO_APP_PASSWORD`, nếu trống thì dùng root. Tạo user (chạy trong container `mongodb`, mật khẩu dạng hex): `db.getSiblingDB('admin').createUser({ user: '<app-user>', pwd: '<hex>', roles: [{ role: 'readWrite', db: 'my-job-portal' }, { role: 'dbAdmin', db: 'my-job-portal' }] })`, thêm hai biến vào `.env.production`, rồi chạy lại `./scripts/deploy.sh`. Sao lưu vẫn dùng root bên trong container |
+| Backend dùng user MongoDB quyền tối thiểu | Đã có | Bật trên production từ 2026-11-23. Compose đọc `MONGO_APP_USERNAME`/`MONGO_APP_PASSWORD`, nếu trống thì dùng root. Tạo user (chạy trong container `mongodb`, mật khẩu dạng hex): `db.getSiblingDB('admin').createUser({ user: '<app-user>', pwd: '<hex>', roles: [{ role: 'readWrite', db: 'my-job-portal' }, { role: 'dbAdmin', db: 'my-job-portal' }] })`, thêm hai biến vào `.env.production`, rồi chạy lại `./scripts/deploy.sh`. Sao lưu vẫn dùng root bên trong container |
 | Sentry không gửi dữ liệu cá nhân | Đã có | `dataCollection` trong [instrument.ts](../../src/instrument.ts) tắt cookie, header, body, thông tin user, nội dung gửi AI, dữ liệu query và biến trên stack (có test) |
 | Sao lưu có lịch và đã thử khôi phục | Chưa xác minh | Chỉ có lệnh mẫu trong `DEPLOYMENT.md` |
 | Sao lưu được mã hóa, giữ ngoài máy chủ | Chưa xác minh | `DEPLOYMENT.md` chỉ nói "copy off the server" |

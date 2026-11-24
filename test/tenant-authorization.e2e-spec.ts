@@ -1,4 +1,6 @@
 import request from 'supertest';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Types } from 'mongoose';
 import { EResumeStatus } from 'src/resumes/enums/resume-status.enum';
 import { Resume } from 'src/resumes/schemas/resume.schema';
@@ -249,6 +251,28 @@ describe('Tenant authorization (e2e)', () => {
         .findOne({ userId: new Types.ObjectId(world.users.c1._id) })
         .lean();
       expect((own as any).isActive).toBe(true);
+    });
+
+    // multer stores the avatar before the handler runs, so a rejected body used to leave the file on disk.
+    it.each([
+      ['malformed JSON', '{not json'],
+      ['a body that fails validation', JSON.stringify({ personalInfo: { fullName: 42 } })],
+    ])('upsert with %s keeps no avatar file on disk', async (_case, cvData) => {
+      const avatarDir = path.join(process.cwd(), 'public', 'images', 'avatar');
+      const list = () => (fs.existsSync(avatarDir) ? fs.readdirSync(avatarDir) : []);
+      const before = new Set(list());
+
+      await request(t.server)
+        .post('/api/v1/cv-profiles/upsert')
+        .set(auth('c1'))
+        .field('cvData', cvData)
+        .attach('avatar', Buffer.from('89504E470D0A1A0A0000000D49484452', 'hex'), {
+          filename: 'a.png',
+          contentType: 'image/png',
+        })
+        .expect(400);
+
+      expect(list().filter(name => !before.has(name))).toEqual([]);
     });
   });
 });

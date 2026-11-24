@@ -6,6 +6,7 @@ describe('ProfileIdentitySyncService', () => {
   let service: ProfileIdentitySyncService;
   let userModel: any;
   let cvProfileModel: any;
+  let resumeModel: any;
 
   const userId = new mongoose.Types.ObjectId().toString();
 
@@ -18,7 +19,36 @@ describe('ProfileIdentitySyncService', () => {
       updateOne: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
     };
 
-    service = new ProfileIdentitySyncService(userModel, cvProfileModel);
+    resumeModel = {};
+
+    service = new ProfileIdentitySyncService(userModel, cvProfileModel, resumeModel);
+  });
+
+  it('collects avatar file names from users, CV profiles and submitted CV snapshots, deleted ones included', async () => {
+    userModel.collection = {
+      distinct: jest
+        .fn()
+        .mockResolvedValue(['https://api.example.test/images/avatar/a.jpg', null, '']),
+    };
+    cvProfileModel.collection = {
+      distinct: jest
+        .fn()
+        .mockResolvedValue(['http://localhost:8081/images/avatar/b.png?v=2', 'c.webp']),
+    };
+
+    // An application keeps the avatar it was sent with after the candidate picks a new one.
+    resumeModel.collection = {
+      distinct: jest.fn().mockResolvedValue(['https://api.example.test/images/avatar/sent.jpg']),
+    };
+
+    await expect(service.findReferencedAvatarFileNames()).resolves.toEqual(
+      new Set(['a.jpg', 'b.png', 'c.webp', 'sent.jpg']),
+    );
+    expect(resumeModel.collection.distinct).toHaveBeenCalledWith(
+      'cvStructuredData.personalInfo.avatar',
+    );
+    expect(userModel.collection.distinct).toHaveBeenCalledWith('avatar');
+    expect(cvProfileModel.collection.distinct).toHaveBeenCalledWith('personalInfo.avatar');
   });
 
   it('should reject CV emails that do not match the account email', () => {

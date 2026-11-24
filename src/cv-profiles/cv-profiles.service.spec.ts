@@ -9,6 +9,7 @@ describe('CvProfilesService', () => {
   let model: any;
   let cacheManager: { del: jest.Mock };
   let profileIdentitySyncService: jest.Mocked<ProfileIdentitySyncService>;
+  let filesService: { buildFileUrl: jest.Mock; cleanupOrphanedFiles: jest.Mock };
 
   const userId = new mongoose.Types.ObjectId().toString();
   const userIdentity = {
@@ -58,16 +59,48 @@ describe('CvProfilesService', () => {
       syncUserIdentityFromCv: jest.fn(),
     } as any;
 
+    filesService = {
+      buildFileUrl: jest.fn((folderType: string, fileName: string) => `/${folderType}/${fileName}`),
+      cleanupOrphanedFiles: jest.fn(),
+    };
+
     service = new CvProfilesService(
       model,
       cacheManager as any,
-      {
-        buildFileUrl: jest.fn(
-          (folderType: string, fileName: string) => `/${folderType}/${fileName}`,
-        ),
-      } as any,
+      filesService as any,
       profileIdentitySyncService,
+      { runExclusive: jest.fn((_name: string, fn: () => Promise<unknown>) => fn()) } as any,
     );
+  });
+
+  describe('cleanupOrphanedAvatars', () => {
+    it('deletes only avatar files that no user or CV profile references', async () => {
+      const referenced = new Set(['keep.jpg']);
+      profileIdentitySyncService.findReferencedAvatarFileNames = jest
+        .fn()
+        .mockResolvedValue(referenced);
+      filesService.cleanupOrphanedFiles.mockResolvedValue({ scanned: 2, deleted: 1, errors: 0 });
+
+      await expect(service.cleanupOrphanedAvatars()).resolves.toEqual({
+        scanned: 2,
+        deleted: 1,
+        errors: 0,
+      });
+      expect(filesService.cleanupOrphanedFiles).toHaveBeenCalledWith('avatar', referenced);
+    });
+
+    it('deletes nothing when the reference lookup fails', async () => {
+      profileIdentitySyncService.findReferencedAvatarFileNames = jest
+        .fn()
+        .mockRejectedValue(new Error('db down'));
+
+      await expect(service.cleanupOrphanedAvatars()).resolves.toEqual({
+        scanned: 0,
+        deleted: 0,
+        errors: 1,
+      });
+      expect(filesService.cleanupOrphanedFiles).not.toHaveBeenCalled();
+    });
   });
 
   describe('getCurrentUserCv', () => {

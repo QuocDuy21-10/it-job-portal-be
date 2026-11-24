@@ -13,6 +13,12 @@ import { UsersService } from 'src/users/users.service';
 import { VerifyAuthDto } from '../dto/verify-auth.dto';
 import { generateOtp, hashOtp, verifyOtp } from '../utils/otp.utils';
 
+const OTP_TTL_SECONDS = 300;
+const OTP_ATTEMPT_LIMIT = 5;
+// Each resend gives a fresh code 5 guesses; this caps the guesses per email across codes.
+const OTP_DAILY_ATTEMPT_LIMIT = 15;
+const OTP_DAILY_WINDOW_SECONDS = 24 * 60 * 60;
+
 @Injectable()
 export class AuthVerificationService {
   private readonly logger = new Logger(AuthVerificationService.name);
@@ -30,8 +36,8 @@ export class AuthVerificationService {
     const email = user.email;
 
     const pipeline = this.redisClient.pipeline();
-    pipeline.set(`otp:value:${email}`, hash, 'EX', 300);
-    pipeline.set(`otp:attempts:${email}`, '0', 'EX', 300);
+    pipeline.set(`otp:value:${email}`, hash, 'EX', OTP_TTL_SECONDS);
+    pipeline.set(`otp:attempts:${email}`, '0', 'EX', OTP_TTL_SECONDS);
     pipeline.set(`otp:cooldown:${email}`, '1', 'EX', 60, 'NX' as any);
     await pipeline.exec();
 
@@ -53,9 +59,20 @@ export class AuthVerificationService {
     const { email, code } = dto;
     const otpSecret = this.configService.get<string>('OTP_SECRET');
 
-    const attemptsRaw = await this.redisClient.get(`otp:attempts:${email}`);
-    const attempts = attemptsRaw ? parseInt(attemptsRaw, 10) : 0;
-    if (attempts >= 5) {
+    const attemptsKey = `otp:attempts:${email}`;
+    const dailyKey = `otp:attempts:day:${email}`;
+    // INCR before comparing: each parallel guess takes its own slot, so at most the limit are compared.
+    const attempts = await this.redisClient.incr(attemptsKey);
+    const dailyAttempts = await this.redisClient.incr(dailyKey);
+    if (attempts === 1) await this.redisClient.expire(attemptsKey, OTP_TTL_SECONDS);
+    if (dailyAttempts === 1) await this.redisClient.expire(dailyKey, OTP_DAILY_WINDOW_SECONDS);
+
+    if (dailyAttempts > OTP_DAILY_ATTEMPT_LIMIT) {
+      throw new ForbiddenException(
+        'Quá nhiều lần thử không thành công. Vui lòng thử lại sau 24 giờ.',
+      );
+    }
+    if (attempts > OTP_ATTEMPT_LIMIT) {
       throw new ForbiddenException(
         'Quá nhiều lần thử không thành công. Vui lòng yêu cầu mã xác thực mới.',
       );
@@ -67,8 +84,7 @@ export class AuthVerificationService {
     }
 
     if (!verifyOtp(code, storedHash, otpSecret)) {
-      await this.redisClient.incr(`otp:attempts:${email}`);
-      const remaining = 4 - attempts;
+      const remaining = OTP_ATTEMPT_LIMIT - attempts;
       throw new BadRequestException(`Mã xác thực không chính xác. Còn ${remaining} lần thử.`);
     }
 

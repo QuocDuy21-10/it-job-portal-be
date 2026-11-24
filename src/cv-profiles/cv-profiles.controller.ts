@@ -181,18 +181,14 @@ export class CvProfilesController {
     @Body('cvData') cvDataString: string,
     @UploadedFile() avatarFile?: Express.Multer.File,
   ) {
-    // Parse CV data from JSON string
-    let parsed: unknown;
+    let cvData: UpsertCvProfileDto;
     try {
-      parsed = JSON.parse(cvDataString);
-    } catch {
-      throw new BadRequestException('Trường cvData không đúng định dạng JSON');
+      cvData = await this.parseUpsertBody(cvDataString);
+    } catch (error) {
+      // multer already stored the avatar; a rejected body must not leave it on disk.
+      if (avatarFile) await fs.promises.unlink(avatarFile.path).catch(() => undefined);
+      throw error;
     }
-    // A JSON string inside multipart skips the global pipe, so run the same pipe as PUT /cv-profiles/me.
-    const cvData: UpsertCvProfileDto = await new ViValidationPipe({ whitelist: true }).transform(
-      parsed,
-      { type: 'body', metatype: UpsertCvProfileDto },
-    );
 
     // Process avatar upload if provided
     if (avatarFile) {
@@ -208,6 +204,20 @@ export class CvProfilesController {
     const cvProfile = await this.cvProfilesService.upsertCvProfile(user._id, cvData);
 
     return cvProfile;
+  }
+
+  private async parseUpsertBody(cvDataString: string): Promise<UpsertCvProfileDto> {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(cvDataString);
+    } catch {
+      throw new BadRequestException('Trường cvData không đúng định dạng JSON');
+    }
+    // A JSON string inside multipart skips the global pipe, so run the same pipe as PUT /cv-profiles/me.
+    return new ViValidationPipe({ whitelist: true }).transform(parsed, {
+      type: 'body',
+      metatype: UpsertCvProfileDto,
+    });
   }
 
   /**

@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { JwtService } from '@nestjs/jwt';
 import { createTestApp, TestApp } from './utils/test-app';
 import { resetState } from './utils/reset';
 import { createJobBody, login, seedWorld, World } from './utils/fixtures';
@@ -24,6 +25,25 @@ describe('Auth (e2e)', () => {
 
     expect(accessToken).toEqual(expect.any(String));
     expect(refreshCookie).toMatch(/^refresh_token=.+/);
+  });
+
+  // Only HS256 is issued; the strategy used to take any HMAC algorithm signed with the same secret.
+  it('rejects an access token signed with another algorithm', async () => {
+    const { accessToken } = await login(t.server, world.users.c1.email);
+    const jwt = new JwtService();
+    const forged = jwt.sign(jwt.decode<object>(accessToken), {
+      secret: process.env.JWT_ACCESS_TOKEN_SECRET,
+      algorithm: 'HS512',
+    });
+
+    await request(t.server)
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    await request(t.server)
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${forged}`)
+      .expect(401);
   });
 
   it('login with a wrong password is 401', async () => {

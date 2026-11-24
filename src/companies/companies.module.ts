@@ -4,6 +4,7 @@ import { CompaniesController } from './companies.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Company, CompanySchema } from './schemas/company.schema';
 import { Job, JobSchema } from 'src/jobs/schemas/job.schema';
+import { User, UserSchema } from 'src/users/schemas/user.schema';
 import { FilesModule } from 'src/files/files.module';
 import { CompanyRepository } from './repositories/company.repository';
 import { StatisticsModule } from 'src/statistics/statistics.module';
@@ -13,6 +14,7 @@ import { StatisticsModule } from 'src/statistics/statistics.module';
     MongooseModule.forFeature([
       { name: Company.name, schema: CompanySchema },
       { name: Job.name, schema: JobSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     FilesModule,
     StatisticsModule,

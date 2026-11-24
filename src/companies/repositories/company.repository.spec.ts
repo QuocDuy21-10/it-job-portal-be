@@ -1,16 +1,33 @@
+import mongoose from 'mongoose';
 import { CompanyRepository } from './company.repository';
 import { EJobApprovalStatus } from 'src/jobs/enums/job-approval-status.enum';
 
 describe('CompanyRepository', () => {
   let repository: CompanyRepository;
-  let mockJobModel: { aggregate: jest.Mock };
+  let mockJobModel: { aggregate: jest.Mock; updateMany: jest.Mock };
+  let mockUserModel: { updateMany: jest.Mock };
 
   beforeEach(() => {
     mockJobModel = {
       aggregate: jest.fn().mockResolvedValue([]),
+      updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
     };
+    mockUserModel = { updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }) };
 
-    repository = new CompanyRepository({} as any, mockJobModel as any);
+    repository = new CompanyRepository({} as any, mockJobModel as any, mockUserModel as any);
+  });
+
+  describe('syncCompanySnapshot', () => {
+    it('updates the embedded name and logo in jobs and users, whether company._id is a string or an ObjectId', async () => {
+      const id = new mongoose.Types.ObjectId().toString();
+
+      await repository.syncCompanySnapshot(id, { name: 'New', logo: 'new.png' });
+
+      const filter = { 'company._id': { $in: [id, new mongoose.Types.ObjectId(id)] } };
+      const update = { $set: { 'company.name': 'New', 'company.logo': 'new.png' } };
+      expect(mockJobModel.updateMany).toHaveBeenCalledWith(filter, update);
+      expect(mockUserModel.updateMany).toHaveBeenCalledWith(filter, update);
+    });
   });
 
   describe('findTopHiringCompanies', () => {

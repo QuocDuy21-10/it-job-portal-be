@@ -177,7 +177,8 @@ export class AuthCredentialsService {
     if (previousToken) pipeline.del(`reset_password:${previousToken}`);
     await pipeline.exec();
 
-    const url = `${this.configService.get<string>('FE_URL')}/reset-password?token=${token}&email=${email}`;
+    const query = new URLSearchParams({ token, email });
+    const url = `${this.configService.get<string>('FE_URL')}/reset-password?${query}`;
 
     // Not awaited: waiting on SMTP made known emails answer seconds slower than unknown ones.
     // shortcut: no retry if the process dies mid-send, move to a BullMQ job if delivery must be guaranteed.
@@ -212,6 +213,8 @@ export class AuthCredentialsService {
     const newPasswordHash = await this.hashPassword(newPassword);
     await this.usersService.updatePassword(user._id.toString(), newPasswordHash);
     await this.sessionsService.deleteAllUserSessions(user._id.toString());
+    // Anyone can lock an email's login with wrong passwords; proving ownership of the email ends it.
+    await this.redisClient.del(`login:fail:${email.toLowerCase()}`);
 
     return { message: 'Đặt lại mật khẩu thành công' };
   }

@@ -1,11 +1,13 @@
 import {
   Injectable,
   Inject,
+  Logger,
   NotFoundException,
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { Cron } from '@nestjs/schedule';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Model, Types } from 'mongoose';
@@ -17,6 +19,9 @@ import {
   ProfileIdentitySyncService,
   UserIdentitySnapshot,
 } from 'src/profile-identity/profile-identity-sync.service';
+import { CronLockService } from 'src/redis/cron-lock.service';
+
+const ORPHANED_AVATAR_CLEANUP_CRON = 'cleanup-orphaned-avatars';
 
 export interface CvProfileDraft {
   isDraft: true;
@@ -51,7 +56,35 @@ export class CvProfilesService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly filesService: FilesService,
     private readonly profileIdentitySyncService: ProfileIdentitySyncService,
+    private readonly cronLockService: CronLockService,
   ) {}
+
+  private readonly logger = new Logger(CvProfilesService.name);
+
+  // Every signed-in user can upload avatars, and replacing one never deletes the old file.
+  @Cron('30 2 * * *', {
+    name: ORPHANED_AVATAR_CLEANUP_CRON,
+    timeZone: 'Asia/Ho_Chi_Minh',
+  })
+  async runOrphanedAvatarCleanupCron(): Promise<void> {
+    await this.cronLockService.runExclusive(ORPHANED_AVATAR_CLEANUP_CRON, () =>
+      this.cleanupOrphanedAvatars(),
+    );
+  }
+
+  async cleanupOrphanedAvatars(): Promise<{ scanned: number; deleted: number; errors: number }> {
+    try {
+      const referenced = await this.profileIdentitySyncService.findReferencedAvatarFileNames();
+      // cleanupOrphanedFiles keeps files younger than 24 h: an upload not yet saved to a profile.
+      return await this.filesService.cleanupOrphanedFiles('avatar', referenced);
+    } catch (error) {
+      this.logger.error(
+        `Orphaned avatar cleanup failed: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      return { scanned: 0, deleted: 0, errors: 1 };
+    }
+  }
 
   /**
    * Upsert CV Profile

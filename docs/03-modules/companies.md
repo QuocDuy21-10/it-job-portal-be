@@ -32,7 +32,7 @@ Import `files` (xóa file logo) và `statistics` (xóa cache số liệu). `jobs
 | Sửa công ty | `SUPER ADMIN` hoặc `HR`. HR phải gắn với công ty và chỉ sửa công ty của mình, ngược lại `403` |
 | Xem chi tiết | HR chỉ xem công ty của mình, ngược lại `400` "You can only view your own company" |
 | Danh sách | HR chỉ thấy công ty của mình. Các vai trò khác thấy tất cả |
-| Đổi logo | Xóa file logo cũ khi logo mới khác logo cũ |
+| Đổi tên, logo | Cập nhật `company.name`/`company.logo` nhúng trong `jobs` và `users`, sau đó mới xóa file logo cũ (khi logo mới khác logo cũ) |
 | Cron dọn logo | 2 giờ sáng (`Asia/Ho_Chi_Minh`), xóa logo không công ty nào dùng |
 | Cache | Danh sách công ty cache 3 phút trong Redis qua `ListCacheService`, xóa khi dữ liệu đổi |
 

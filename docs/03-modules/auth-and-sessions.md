@@ -35,7 +35,7 @@ Xử lý toàn bộ vòng đời danh tính: đăng ký, xác thực OTP, đăng
 | Chủ đề | Quy tắc | Nguồn |
 |---|---|---|
 | OTP | 6 chữ số ngẫu nhiên bằng `crypto.randomInt`. Lưu HMAC-SHA256 trong Redis `otp:value:<email>` hiệu lực 300 giây | [otp.utils.ts](../../src/auth/utils/otp.utils.ts), verification service |
-| Chống đoán OTP | Đếm `otp:attempts:<email>`, từ 5 lần sai trở lên bị `403`. Chờ 60 giây giữa hai lần gửi (`otp:cooldown:<email>`) | verification service |
+| Chống đoán OTP | Tăng `otp:attempts:<email>` (tối đa 5 cho mỗi mã) và `otp:attempts:day:<email>` (tối đa 15 mỗi 24 giờ) trước khi so mã, vượt thì `403`. Chờ 60 giây giữa hai lần gửi (`otp:cooldown:<email>`) | verification service |
 | Access token | Ký bằng `JWT_ACCESS_TOKEN_SECRET`, thời hạn `JWT_ACCESS_EXPIRES_IN`. Trả trong body phản hồi | session service |
 | Refresh token | Ký bằng `JWT_REFRESH_TOKEN_SECRET`, đặt cookie `refresh_token`: `httpOnly`, `secure` khi `NODE_ENV=production`, `sameSite=strict`, `maxAge` theo `JWT_REFRESH_EXPIRES_IN` | `setRefreshCookie` |
 | Lưu phiên | Chỉ lưu HMAC-SHA256 của refresh token, không lưu token thô | [sessions.service.ts](../../src/sessions/sessions.service.ts) |

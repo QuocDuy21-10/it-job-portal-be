@@ -315,6 +315,21 @@ describe('AuthCredentialsService', () => {
       expect(redisClient.set).not.toHaveBeenCalled();
     });
 
+    // IsEmail accepts '+', which an unencoded query string turns into a space on the FE.
+    it('should URL-encode the email in the reset link', async () => {
+      usersService.findUserByEmail.mockResolvedValue(makeUser({ email: 'a+b@example.com' }));
+
+      await service.forgotPassword({ email: 'a+b@example.com' });
+
+      expect(mailerService.sendMail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          context: expect.objectContaining({
+            url: expect.stringContaining('email=a%2Bb%40example.com'),
+          }),
+        }),
+      );
+    });
+
     it('should store the reset token for 10 minutes and send email when the user exists', async () => {
       usersService.findUserByEmail.mockResolvedValue(makeUser());
 
@@ -373,6 +388,8 @@ describe('AuthCredentialsService', () => {
         expect.any(String),
       );
       expect(sessionsService.deleteAllUserSessions).toHaveBeenCalledWith('user-id-123');
+      // Anyone can lock an email's login with wrong passwords; the owner proving the email ends it.
+      expect(redisClient.del).toHaveBeenCalledWith('login:fail:test@example.com');
       expect(result).toHaveProperty('message');
     });
 

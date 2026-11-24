@@ -53,6 +53,7 @@ export interface MockRedisClient {
   del: AsyncMock<string[], void>;
   setex: AsyncMock<[string, number, string], void>;
   incr: AsyncMock<[string], number>;
+  expire: AsyncMock<[string, number], number>;
   ttl: AsyncMock<[string], number>;
   pipeline: SyncMock<[], MockRedisPipeline>;
 }
@@ -105,6 +106,7 @@ export async function createAuthTestingModule(
     del: jest.fn<(...keys: string[]) => Promise<void>>(),
     setex: jest.fn<(key: string, ttl: number, value: string) => Promise<void>>(),
     incr: jest.fn<(key: string) => Promise<number>>(),
+    expire: jest.fn<(key: string, seconds: number) => Promise<number>>(),
     ttl: jest.fn<(key: string) => Promise<number>>(),
     pipeline: jest.fn<() => MockRedisPipeline>(() => redisPipeline),
   };
