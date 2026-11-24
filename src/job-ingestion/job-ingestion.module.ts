@@ -5,6 +5,7 @@ import { GreenhouseAdapter } from './adapters/greenhouse.adapter';
 import { ItviecAdapter } from './adapters/itviec.adapter';
 import { LeverAdapter } from './adapters/lever.adapter';
 import { TopDevAdapter } from './adapters/topdev.adapter';
+import { CrawlFailuresController } from './crawl-failures.controller';
 import { CrawlFailureRepository } from './crawl-failure.repository';
 import { CrawledJobsController } from './crawled-jobs.controller';
 import { CrawledJobsService } from './crawled-jobs.service';
@@ -29,7 +30,7 @@ import { SourceSyncCoordinator } from './source-sync-coordinator';
     ]),
     SkillsModule,
   ],
-  controllers: [JobSourcesController, CrawledJobsController],
+  controllers: [JobSourcesController, CrawledJobsController, CrawlFailuresController],
   providers: [
     JobIngestionService,
     CrawledJobsService,

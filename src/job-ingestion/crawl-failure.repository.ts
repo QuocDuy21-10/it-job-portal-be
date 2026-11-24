@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { buildPaginationMeta, resolvePagination } from 'src/utils/helpers/list-query.helper';
+import { ListCrawlFailuresQueryDto } from './dto/list-crawl-failures-query.dto';
 import { ERejectionReason } from './enums/rejection-reason.enum';
 import {
   ICrawlFailureInput,
@@ -54,6 +56,33 @@ export class CrawlFailureRepository {
     if (listingComplete) {
       await this.crawlFailureModel.deleteMany({ sourceKey, externalId: { $nin: listedIds } });
     }
+  }
+
+  async findAll({ sourceKey, reason, group, page, limit }: ListCrawlFailuresQueryDto) {
+    const pagination = resolvePagination(page, limit);
+    const filter = {
+      ...(sourceKey && { sourceKey }),
+      reason: reason ?? (group === 'filtered' ? ERejectionReason.NOT_IT : { $in: ERROR_REASONS }),
+    };
+    const [result, total] = await Promise.all([
+      this.crawlFailureModel
+        .find(filter)
+        .sort({ failedAt: -1, _id: -1 })
+        .skip(pagination.offset)
+        .limit(pagination.limit)
+        .lean<CrawlFailure[]>(),
+      this.crawlFailureModel.countDocuments(filter),
+    ]);
+
+    return { result, meta: buildPaginationMeta(pagination.page, pagination.limit, total) };
+  }
+
+  async retry(ids: string[]): Promise<{ modified: number }> {
+    const { modifiedCount } = await this.crawlFailureModel.updateMany(
+      { _id: { $in: ids } },
+      { $set: { retryAt: new Date() } },
+    );
+    return { modified: modifiedCount };
   }
 
   private buildUpdate({ reason, url, title, detail }: ICrawlFailureInput, now: Date) {

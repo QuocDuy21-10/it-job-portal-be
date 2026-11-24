@@ -1,4 +1,4 @@
-import { CrawlFailureRepository } from './crawl-failure.repository';
+import { CrawlFailureRepository, ERROR_REASONS } from './crawl-failure.repository';
 import { ERejectionReason } from './enums/rejection-reason.enum';
 import { DAY_MS } from './job-ingestion.constants';
 
@@ -83,5 +83,46 @@ describe('CrawlFailureRepository', () => {
     await repository.record(KEY, observe({ listingComplete: false }));
 
     expect(model.deleteMany).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CrawlFailureRepository admin reads', () => {
+  const setupList = () => {
+    const query: Record<string, jest.Mock> = { lean: jest.fn().mockResolvedValue([]) };
+    for (const method of ['sort', 'skip', 'limit']) {
+      query[method] = jest.fn().mockReturnValue(query);
+    }
+    const model = {
+      find: jest.fn().mockReturnValue(query),
+      countDocuments: jest.fn().mockResolvedValue(0),
+      updateMany: jest.fn().mockResolvedValue({ modifiedCount: 2 }),
+    };
+    return { repository: new CrawlFailureRepository(model as any), model, query };
+  };
+
+  it.each([
+    [{}, { reason: { $in: ERROR_REASONS } }],
+    [{ group: 'filtered' as const }, { reason: ERejectionReason.NOT_IT }],
+    [
+      { sourceKey: 'topdev', reason: ERejectionReason.FETCH_ERROR },
+      { sourceKey: 'topdev', reason: ERejectionReason.FETCH_ERROR },
+    ],
+  ])('filters %j', async (filter, expected) => {
+    const { repository, model, query } = setupList();
+
+    await repository.findAll(filter);
+
+    expect(model.find).toHaveBeenCalledWith(expected);
+    expect(query.sort).toHaveBeenCalledWith({ failedAt: -1, _id: -1 });
+  });
+
+  it('makes failures due now', async () => {
+    const { repository, model } = setupList();
+
+    await expect(repository.retry(['a'])).resolves.toEqual({ modified: 2 });
+    expect(model.updateMany).toHaveBeenCalledWith(
+      { _id: { $in: ['a'] } },
+      { $set: { retryAt: expect.any(Date) } },
+    );
   });
 });
