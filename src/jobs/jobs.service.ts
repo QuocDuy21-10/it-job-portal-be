@@ -300,12 +300,9 @@ export class JobsService {
       return [];
     }
 
-    const { normalizedSkills, unmappedSkills } =
-      await this.skillsService.normalizeExtractedSkills(skills);
-    const searchTerms = [...normalizedSkills, ...unmappedSkills].filter(Boolean);
-    const skillRegexes = searchTerms.map(skill => new RegExp(this.escapeRegex(skill), 'i'));
+    const skillConditions = await this.buildSkillConditions(skills);
 
-    if (skillRegexes.length === 0) {
+    if (skillConditions.length === 0) {
       return [];
     }
 
@@ -313,7 +310,7 @@ export class JobsService {
       {
         ...this.buildActiveJobFilter(),
         isDeleted: false,
-        skills: { $in: skillRegexes },
+        skills: { $in: skillConditions },
       },
       'name company location locationCode skills level salary',
       { createdAt: -1 },
@@ -608,11 +605,9 @@ export class JobsService {
     };
 
     if (skills && skills.length > 0) {
-      const { normalizedSkills, unmappedSkills } =
-        await this.skillsService.normalizeExtractedSkills(skills);
-      const searchTerms = [...normalizedSkills, ...unmappedSkills].filter(Boolean);
-      if (searchTerms.length > 0) {
-        filter.skills = { $in: searchTerms.map(s => new RegExp(this.escapeRegex(s), 'i')) };
+      const skillConditions = await this.buildSkillConditions(skills);
+      if (skillConditions.length > 0) {
+        filter.skills = { $in: skillConditions };
       }
     }
 
@@ -629,7 +624,7 @@ export class JobsService {
       if (resolvedLocation) {
         filter.locationCode = resolvedLocation.locationCode;
       } else {
-        filter.location = { $regex: location, $options: 'i' };
+        filter.location = { $regex: this.escapeRegex(location), $options: 'i' };
       }
     }
 
@@ -637,6 +632,17 @@ export class JobsService {
   }
 
   // Private helpers
+
+  // Jobs store catalog labels, so a mapped skill matches exactly (and can use the skills index).
+  private async buildSkillConditions(skills: string[]): Promise<Array<string | RegExp>> {
+    const { normalizedSkills, unmappedSkills } =
+      await this.skillsService.normalizeExtractedSkills(skills);
+
+    return [
+      ...normalizedSkills,
+      ...unmappedSkills.map(skill => new RegExp(this.escapeRegex(skill), 'i')),
+    ];
+  }
 
   private async normalizeSkillsFilter(filter: Record<string, any>): Promise<void> {
     if (typeof filter.skills === 'undefined') {

@@ -43,7 +43,7 @@ Tin tuyển dụng được đồng bộ từ nguồn bên ngoài (ATS của cô
 | Keys | Thuộc tính | Mục đích |
 |---|---|---|
 | `{ sourceKey: 1, externalId: 1 }` | unique | Khóa tự nhiên, đảm bảo không trùng tin trong cùng nguồn |
-| `{ status: 1, publishedAt: -1 }` | — | Liệt kê tin hiển thị, mới đăng trước |
+| `{ status: 1, publishedAt: -1, _id: 1 }` | — | Tìm việc: tin hiển thị, mới đăng trước, dừng ở trang cần lấy |
 | `{ locationCode: 1, status: 1 }` | — | Lọc theo địa điểm và trạng thái |
 | `{ skills: 1 }` | — | Lọc theo kỹ năng |
 | `{ sourceKey: 1, status: 1, lastFetchedAt: 1 }` | — | Chọn tin cần tải lại của một nguồn |

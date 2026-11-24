@@ -41,7 +41,7 @@ describe('index audit schemas', () => {
 
   it('JobSchema declares the home page compound index in ESR order', () => {
     expect(declaredIndexNames(JobSchema)).toContain(
-      'approvalStatus_1_isActive_1_createdAt_-1_isDeleted_1_endDate_1',
+      'approvalStatus_1_isActive_1_createdAt_-1__id_1_isDeleted_1_endDate_1',
     );
   });
 

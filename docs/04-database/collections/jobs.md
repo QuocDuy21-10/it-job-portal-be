@@ -50,7 +50,7 @@ Hai điểm khai báo kiểu cần lưu ý:
 | `{ company._id: 1, isActive: 1, isDeleted: 1 }` | — | Liệt kê tin đang mở của một công ty |
 | `{ isActive: 1, endDate: 1, isDeleted: 1 }` | — | Cron tìm tin hết hạn |
 | `{ approvalStatus: 1, isActive: 1, isDeleted: 1, endDate: 1, company._id: 1 }` | — | Truy vấn công khai: tin đã duyệt, đang mở, còn hạn, theo công ty |
-| `{ approvalStatus: 1, isActive: 1, createdAt: -1, isDeleted: 1, endDate: 1 }` | — | Trang chủ: tin công khai, mới nhất trước. `isDeleted` đứng sau `createdAt` vì plugin xóa mềm lọc bằng `$ne` |
+| `{ approvalStatus: 1, isActive: 1, createdAt: -1, _id: 1, isDeleted: 1, endDate: 1 }` | — | Trang chủ và tìm việc: tin công khai, mới nhất trước. `isDeleted` đứng sau `createdAt` vì plugin xóa mềm lọc bằng `$ne` |
 | `{ skills: 1 }` | — | Lọc theo kỹ năng |
 | `{ level: 1 }` | — | Lọc theo cấp bậc |
 | `{ location: 1 }` | — | Lọc theo tên địa điểm |

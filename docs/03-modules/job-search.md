@@ -31,13 +31,15 @@ Pipeline chạy trên collection `jobs` và ghép `external_jobs` bằng `$union
 
 ```mermaid
 flowchart LR
-    A["jobs: $match hiển thị công khai<br/>và bộ lọc"] --> B["$project về dạng chung"]
-    B --> U["$unionWith external_jobs<br/>sub-pipeline: $match + $project"]
-    U --> S["$sort"]
-    S --> F["$facet"]
-    F --> I["items: $skip, $limit"]
-    F --> T["total: $count"]
+    A["jobs: $match, $sort, $limit<br/>(page * limit tin đầu)"] --> U["$unionWith"]
+    B["external_jobs có publishedAt:<br/>$match, $sort, $limit"] --> U
+    C["external_jobs không có publishedAt:<br/>$match, $sort createdAt, $limit"] --> U
+    U --> S["$sort, $skip, $limit"]
+    S --> I["items"]
+    T["$match + $count từng collection<br/>(cache 60 giây)"] --> M["total"]
 ```
+
+Mỗi nhánh sắp theo trường có sẵn trong document và chỉ giữ `page * limit` tin, nên `newest` đọc theo index và dừng sớm. Tin ngoài tách hai nhánh vì `postedAt` là `publishedAt`, hoặc `createdAt` khi không có.
 
 Mỗi phía được chiếu về cùng một dạng (`IJobSearchItem`) trước khi ghép; trường chỉ có ở một phía để trống ở phía kia. Chi tiết trường: [job-search endpoint](../05-api/endpoints/job-search.md#phản-hồi-danh-sách).
 
@@ -66,7 +68,7 @@ Trường `hasSalary` (1 cho tin nội bộ, 0 cho tin ngoài) đưa tin không 
 
 ### Phân trang
 
-`$facet` tính cùng lúc `items` (`$skip`, `$limit`) và `total` (`$count`). `limit` tối đa 50, mặc định 10. Kết quả theo dạng `{ result, meta.pagination }`.
+`items` lấy bằng `$skip`, `$limit` sau khi gộp các nhánh. Trang chưa đầy là trang cuối nên cho biết luôn `total`; các trang khác đếm riêng, cache 60 giây theo bộ lọc (`ListCacheService`, dùng chung cho mọi trang và kiểu sắp xếp) và không bao giờ nhỏ hơn số tin đã trả. `limit` tối đa 50, mặc định 10; `page` tối đa 200, `total_pages` cũng dừng ở 200. Kết quả theo dạng `{ result, meta.pagination }`.
 
 ## Business Rules
 
@@ -88,15 +90,15 @@ Trường `hasSalary` (1 cho tin nội bộ, 0 cho tin ngoài) đưa tin không 
 
 ## Known Limitation
 
-- **Không cache.** Code ghi chú `shortcut: uncached aggregate, add ListCacheService with ingestion-sync invalidation if p95 latency grows`. Mỗi lần tìm chạy một aggregation trên cả hai collection.
-- **Tìm từ khóa bằng regex không neo đầu** (`/keyword/i` sau khi thoát ký tự đặc biệt) nên không tận dụng được index và quét rộng. Index văn bản `{ name: text, description: text }` của `jobs` không được dùng ở đây. Hiệu năng khi dữ liệu lớn: `Chưa xác minh`.
-- **`$sort` sau `$unionWith`** phải sắp xếp toàn bộ tập kết quả, không dùng index. Pipeline không đặt `allowDiskUse`, nên có thể chạm giới hạn bộ nhớ của MongoDB cho `$sort` khi tập dữ liệu rất lớn. Chưa đo, `Chưa xác minh`.
+- **Chỉ cache `total`**, không cache danh sách. Tổng có thể lệch tối đa khoảng 60 giây sau khi đồng bộ nguồn ngoài; thay đổi tin nội bộ xóa cache ngay.
+- **Tìm từ khóa bằng regex không neo đầu** (`/keyword/i` sau khi thoát ký tự đặc biệt) không dùng được index. Đo cục bộ với khoảng 32.000 tin hiển thị, 10 kết nối: từ khóa hiếm khoảng 17 rps, p95 khoảng 1 giây. Cần index tìm kiếm khi có trên khoảng 5.000 tin.
+- **`oldest` và sắp theo lương** vẫn đọc mọi tin khớp (giữ `page * limit` tin trong bộ nhớ), chỉ `newest` dừng sớm nhờ index.
 - Việc loại im lặng tin ngoài khi có lọc lương hoặc hình thức khác `Remote` có thể gây bất ngờ cho giao diện; API không trả cờ nào báo điều này.
 - Giới hạn tốc độ `ThrottlerGuard` dùng IP; cần `TRUST_PROXY` đúng khi chạy sau proxy ([component-diagram](../02-architecture/component-diagram.md)).
 
 ## Testing
 
-Có test cho `buildJobSearchPlan` và các hàm dựng stage ([job-search-pipeline.spec.ts](../../src/job-search/job-search-pipeline.spec.ts)) và cho service ([job-search.service.spec.ts](../../src/job-search/job-search.service.spec.ts)). Chưa chạy pipeline với MongoDB thật.
+Có test cho `buildJobSearchPlan` và các hàm dựng stage ([job-search-pipeline.spec.ts](../../src/job-search/job-search-pipeline.spec.ts)) và cho service ([job-search.service.spec.ts](../../src/job-search/job-search.service.spec.ts)). Thứ tự và phân trang khi gộp được kiểm với MongoDB thật trong [public-api.e2e-spec.ts](../../test/public-api.e2e-spec.ts).
 
 ## Source References
 

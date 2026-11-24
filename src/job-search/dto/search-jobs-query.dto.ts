@@ -6,6 +6,7 @@ import { EJobLevel } from 'src/jobs/enums/job-level.enum';
 import {
   JOB_SEARCH_MAX_KEYWORD_LENGTH,
   JOB_SEARCH_MAX_LIMIT,
+  JOB_SEARCH_MAX_PAGE,
   JOB_SEARCH_SORTS,
   JOB_SEARCH_SOURCES,
   JobSearchSort,
@@ -78,11 +79,12 @@ export class SearchJobsQueryDto {
   @IsIn(JOB_SEARCH_SORTS)
   sort?: JobSearchSort;
 
-  @ApiProperty({ required: false, default: 1, minimum: 1 })
+  @ApiProperty({ required: false, default: 1, minimum: 1, maximum: JOB_SEARCH_MAX_PAGE })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(JOB_SEARCH_MAX_PAGE)
   page?: number;
 
   @ApiProperty({ required: false, default: 10, minimum: 1, maximum: JOB_SEARCH_MAX_LIMIT })

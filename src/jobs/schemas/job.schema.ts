@@ -118,9 +118,16 @@ JobSchema.index({
   endDate: 1,
   'company._id': 1,
 });
-// Public home list (sort -createdAt). isDeleted sits after the sort key because the
+// Public home list and job search (sort -createdAt, _id). isDeleted sits after the sort key because the
 // soft-delete plugin filters it with $ne, which is a range, not an equality.
-JobSchema.index({ approvalStatus: 1, isActive: 1, createdAt: -1, isDeleted: 1, endDate: 1 });
+JobSchema.index({
+  approvalStatus: 1,
+  isActive: 1,
+  createdAt: -1,
+  _id: 1,
+  isDeleted: 1,
+  endDate: 1,
+});
 
 // Individual field indexes for filtering
 JobSchema.index({ skills: 1 });

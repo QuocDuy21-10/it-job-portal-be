@@ -1,18 +1,24 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { JOB_SEARCH_MAX_PAGE } from './job-search.constants';
 import { JobSearchService } from './job-search.service';
 
 const EXTERNAL_ID = '6720a1b2c3d4e5f6a7b8c9d0';
 
 const setup = ({
-  facet = [{ items: [], total: [] }] as any[],
+  items = [] as any[],
+  internalCount = 0,
+  externalCount = 0,
   externalDoc = null as Record<string, any> | null,
   hiddenKeys = [] as string[],
   sourceDoc = { displayPolicy: 'FULL' } as Record<string, any> | null,
 } = {}) => {
-  const jobModel = { aggregate: jest.fn().mockResolvedValue(facet) };
+  // A count pipeline is [$match, $count]; anything else asks for the page.
+  const aggregate = (count: number) =>
+    jest.fn(async (pipeline: any[]) => (pipeline[1]?.$count ? (count ? [{ count }] : []) : items));
+  const jobModel = { aggregate: aggregate(internalCount) };
   const externalJobModel = {
     collection: { collectionName: 'external_jobs' },
-    aggregate: jest.fn().mockResolvedValue(facet),
+    aggregate: aggregate(externalCount),
     findById: jest.fn().mockReturnValue({
       select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(externalDoc) }),
     }),
@@ -23,13 +29,17 @@ const setup = ({
       select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(sourceDoc) }),
     }),
   };
+  const listCacheService = {
+    getOrSet: jest.fn((options: { loader: () => Promise<unknown> }) => options.loader()),
+  };
   const service = new JobSearchService(
     jobModel as any,
     externalJobModel as any,
     jobSourceModel as any,
+    listCacheService as any,
   );
 
-  return { service, jobModel, externalJobModel, jobSourceModel };
+  return { service, jobModel, externalJobModel, jobSourceModel, listCacheService };
 };
 
 const CREATED_AT = new Date('2026-10-01T00:00:00Z');
@@ -51,7 +61,9 @@ const buildDoc = (overrides: Record<string, any> = {}) => ({
   ...overrides,
 });
 
-const facetStageOf = (pipeline: any[]) => pipeline.find(stage => stage.$facet).$facet;
+const fullPage = (size: number) => Array.from({ length: size }, (_, i) => ({ id: String(i) }));
+const pageCallsOf = (model: { aggregate: jest.Mock }): any[][] =>
+  model.aggregate.mock.calls.map(([pipeline]) => pipeline).filter(stages => !stages[1]?.$count);
 
 describe('JobSearchService', () => {
   describe('search', () => {
@@ -60,10 +72,13 @@ describe('JobSearchService', () => {
 
       await service.search({});
 
-      const pipeline = jobModel.aggregate.mock.calls[0][0];
+      const pipeline = pageCallsOf(jobModel)[0];
       expect(pipeline.some((stage: any) => stage.$unionWith)).toBe(true);
-      expect(pipeline.find((stage: any) => stage.$sort).$sort).toEqual({ postedAt: -1, id: 1 });
-      expect(facetStageOf(pipeline).items.slice(0, 2)).toEqual([{ $skip: 0 }, { $limit: 10 }]);
+      expect(pipeline.slice(-4, -1)).toEqual([
+        { $sort: { postedAt: -1, id: 1 } },
+        { $skip: 0 },
+        { $limit: 10 },
+      ]);
     });
 
     it('coerces string query values', async () => {
@@ -71,14 +86,14 @@ describe('JobSearchService', () => {
 
       await service.search({ page: '2', limit: '5', salaryMin: '100' } as any);
 
-      const pipeline = jobModel.aggregate.mock.calls[0][0];
-      expect(facetStageOf(pipeline).items.slice(0, 2)).toEqual([{ $skip: 5 }, { $limit: 5 }]);
+      const pipeline = pageCallsOf(jobModel)[0];
+      expect(pipeline.slice(-3, -1)).toEqual([{ $skip: 5 }, { $limit: 5 }]);
       expect(pipeline[0].$match.salary).toEqual({ $gte: 100 });
     });
 
-    it('builds pagination meta from the facet total', async () => {
-      const items = [{ id: 'a' }];
-      const { service } = setup({ facet: [{ items, total: [{ count: 23 }] }] });
+    it('builds pagination meta from the internal and external counts', async () => {
+      const items = fullPage(10);
+      const { service } = setup({ items, internalCount: 20, externalCount: 3 });
 
       await expect(service.search({ page: 1, limit: 10 })).resolves.toEqual({
         result: items,
@@ -87,7 +102,7 @@ describe('JobSearchService', () => {
     });
 
     it('returns zero totals when nothing matches', async () => {
-      const { service } = setup({ facet: [{ items: [], total: [] }] });
+      const { service } = setup();
 
       const response = await service.search({});
 
@@ -97,6 +112,56 @@ describe('JobSearchService', () => {
         total_pages: 0,
         total: 0,
       });
+    });
+
+    it('caches the total under the filters only, so every page and sort shares it', async () => {
+      const { service, listCacheService } = setup({ hiddenKeys: ['topdev'] });
+
+      await service.search({ keyword: 'go', page: 2, sort: 'oldest' });
+      await service.search({ keyword: 'go', page: 3, limit: 20 });
+      await service.search({ keyword: 'rust', page: 2 });
+
+      const [first, second, third] = listCacheService.getOrSet.mock.calls.map(
+        ([options]) => (options as any).keyInput,
+      );
+      expect(first).toEqual(second);
+      expect(first).not.toEqual(third);
+      expect(first.payload.hiddenSourceKeys).toEqual(['topdev']);
+    });
+
+    // A rare keyword scans everything once to fill the page; counting would scan it all again.
+    it('takes the total from a last page instead of counting', async () => {
+      const { service, listCacheService } = setup({ items: fullPage(3), internalCount: 999 });
+
+      const response = await service.search({ keyword: 'rare', page: 2, limit: 10 });
+
+      expect(response.meta.pagination).toMatchObject({ total: 13, total_pages: 2 });
+      expect(listCacheService.getOrSet).not.toHaveBeenCalled();
+    });
+
+    it('counts when a page past the end is empty', async () => {
+      const { service } = setup({ internalCount: 7 });
+
+      const response = await service.search({ page: 5, limit: 10 });
+
+      expect(response.meta.pagination.total).toBe(7);
+    });
+
+    // The cached total can lag behind a job published in the last minute.
+    it('never reports a total smaller than the rows already served', async () => {
+      const { service } = setup({ items: fullPage(10), internalCount: 0 });
+
+      const response = await service.search({ page: 2, limit: 10 });
+
+      expect(response.meta.pagination.total).toBe(20);
+    });
+
+    it('does not advertise pages past the last one it accepts', async () => {
+      const { service } = setup({ items: fullPage(10), internalCount: 1_000_000 });
+
+      const response = await service.search({ limit: 10 });
+
+      expect(response.meta.pagination.total_pages).toBe(JOB_SEARCH_MAX_PAGE);
     });
 
     it('queries the external model for source=external', async () => {
@@ -123,10 +188,10 @@ describe('JobSearchService', () => {
       const { service, jobModel } = setup();
 
       await service.search({ skills: '  Go  ' });
-      expect(jobModel.aggregate.mock.calls[0][0][0].$match.skills.test('go')).toBe(true);
+      expect(pageCallsOf(jobModel)[0][0].$match.skills.test('go')).toBe(true);
 
       await service.search({ skills: '   ' });
-      expect(jobModel.aggregate.mock.calls[1][0][0].$match.skills).toBeUndefined();
+      expect(pageCallsOf(jobModel)[1][0].$match.skills).toBeUndefined();
     });
 
     it('rejects salaryMin greater than salaryMax', async () => {
@@ -142,7 +207,7 @@ describe('JobSearchService', () => {
 
       await service.search({ locationCode: 'hcm' });
 
-      expect(jobModel.aggregate.mock.calls[0][0][0].$match.locationCode).toBe('ho-chi-minh');
+      expect(pageCallsOf(jobModel)[0][0].$match.locationCode).toBe('ho-chi-minh');
     });
 
     it('excludes hidden sources from the external union', async () => {
@@ -151,7 +216,7 @@ describe('JobSearchService', () => {
       await service.search({});
 
       expect(jobSourceModel.distinct).toHaveBeenCalledWith('key', { displayPolicy: 'HIDDEN' });
-      const union = jobModel.aggregate.mock.calls[0][0].find((stage: any) => stage.$unionWith);
+      const union = pageCallsOf(jobModel)[0].find((stage: any) => stage.$unionWith);
       expect(union.$unionWith.pipeline[0].$match.sourceKey).toEqual({ $nin: ['topdev'] });
     });
 
@@ -168,7 +233,7 @@ describe('JobSearchService', () => {
 
       await service.search({ keyword: '   ' });
 
-      expect(jobModel.aggregate.mock.calls[0][0][0].$match.$and).toBeUndefined();
+      expect(pageCallsOf(jobModel)[0][0].$match.$and).toBeUndefined();
     });
   });
 
