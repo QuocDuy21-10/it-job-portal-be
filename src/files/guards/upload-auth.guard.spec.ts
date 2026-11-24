@@ -92,4 +92,13 @@ describe('UploadAuthGuard', () => {
       expect(() => guard.canActivate(ctx)).toThrow(ForbiddenException);
     });
   });
+
+  describe('role-restricted folder (banner)', () => {
+    it('allows only SUPER_ADMIN', () => {
+      expect(guard.canActivate(buildContext('banner', ERole.SUPER_ADMIN))).toBe(true);
+      for (const role of [ERole.HR, ERole.NORMAL_USER]) {
+        expect(() => guard.canActivate(buildContext('banner', role))).toThrow(ForbiddenException);
+      }
+    });
+  });
 });
