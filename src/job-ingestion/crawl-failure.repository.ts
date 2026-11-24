@@ -85,6 +85,29 @@ export class CrawlFailureRepository {
     return { modified: modifiedCount };
   }
 
+  async countByGroup(): Promise<Map<string, { errors: number; filtered: number }>> {
+    const isFiltered = { $eq: ['$reason', ERejectionReason.NOT_IT] };
+    const rows = await this.crawlFailureModel.aggregate<{
+      _id: string;
+      errors: number;
+      filtered: number;
+    }>([
+      {
+        $group: {
+          _id: '$sourceKey',
+          errors: { $sum: { $cond: [isFiltered, 0, 1] } },
+          filtered: { $sum: { $cond: [isFiltered, 1, 0] } },
+        },
+      },
+    ]);
+
+    return new Map(rows.map(({ _id, errors, filtered }) => [_id, { errors, filtered }]));
+  }
+
+  async deleteBySource(sourceKey: string): Promise<void> {
+    await this.crawlFailureModel.deleteMany({ sourceKey });
+  }
+
   private buildUpdate({ reason, url, title, detail }: ICrawlFailureInput, now: Date) {
     return {
       $set: {

@@ -19,6 +19,20 @@ const closeUpdate = (reason: EExternalJobCloseReason, now: Date) => ({
   $unset: { staleSince: 1 },
 });
 
+// A missing or null removedAt sorts below every date.
+const IS_REMOVED = { $gt: ['$removedAt', null] };
+const countIf = (condition: object) => ({ $sum: { $cond: [condition, 1, 0] } });
+const countStatus = (status: EExternalJobStatus) =>
+  countIf({ $and: [{ $eq: ['$status', status] }, { $not: [IS_REMOVED] }] });
+
+export type ExternalJobCounts = {
+  total: number;
+  active: number;
+  stale: number;
+  closed: number;
+  removed: number;
+};
+
 @Injectable()
 export class ExternalJobRepository {
   constructor(
@@ -152,5 +166,30 @@ export class ExternalJobRepository {
       { sourceKey, status: VISIBLE },
       { $unset: { lastFetchedAt: 1 } },
     );
+  }
+
+  async countByState(): Promise<Map<string, ExternalJobCounts>> {
+    const rows = await this.externalJobModel.aggregate<ExternalJobCounts & { _id: string }>([
+      {
+        $group: {
+          _id: '$sourceKey',
+          total: { $sum: 1 },
+          active: countStatus(EExternalJobStatus.ACTIVE),
+          stale: countStatus(EExternalJobStatus.STALE),
+          closed: countStatus(EExternalJobStatus.CLOSED),
+          removed: countIf(IS_REMOVED),
+        },
+      },
+    ]);
+
+    return new Map(rows.map(({ _id, ...counts }) => [_id, counts]));
+  }
+
+  async closeSource(sourceKey: string, now: Date): Promise<number> {
+    const result = await this.externalJobModel.updateMany(
+      { sourceKey, status: VISIBLE },
+      closeUpdate(EExternalJobCloseReason.SOURCE_DELETED, now),
+    );
+    return result.modifiedCount;
   }
 }
