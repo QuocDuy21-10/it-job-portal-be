@@ -62,7 +62,7 @@ export class JobIngestionService {
 
   async updateSource(key: string, dto: UpdateJobSourceDto): Promise<JobSource> {
     const previous = await this.jobSourceModel
-      .findOneAndUpdate({ key }, { $set: dto }, { new: false })
+      .findOneAndUpdate({ key }, { $set: dto }, { new: false, projection: { rejections: 0 } })
       .lean<JobSource>();
 
     if (!previous) {

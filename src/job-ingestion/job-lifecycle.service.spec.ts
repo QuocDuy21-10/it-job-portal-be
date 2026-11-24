@@ -187,27 +187,4 @@ describe('JobLifecycleService', () => {
       ).toEqual({ seenIds: [], staleIds: [], closures: [] });
     });
   });
-
-  describe('mergeRejections', () => {
-    it('adds fresh rejections with a retry date, drops kept and unlisted ids', () => {
-      const previous = [
-        { externalId: 'old', reason: ERejectionReason.NOT_IT, retryAt: later(DAY_MS) },
-        { externalId: 'unlisted', reason: ERejectionReason.NOT_IT, retryAt: later(DAY_MS) },
-        { externalId: 'kept', reason: ERejectionReason.NOT_FOUND, retryAt: ago(DAY_MS) },
-      ];
-
-      const merged = lifecycle.mergeRejections(
-        previous,
-        [{ externalId: 'new', reason: ERejectionReason.NOT_FOUND }],
-        ['kept'],
-        ['old', 'kept', 'new'],
-        NOW,
-      );
-
-      expect(merged).toEqual([
-        previous[0],
-        { externalId: 'new', reason: ERejectionReason.NOT_FOUND, retryAt: later(3 * DAY_MS) },
-      ]);
-    });
-  });
 });

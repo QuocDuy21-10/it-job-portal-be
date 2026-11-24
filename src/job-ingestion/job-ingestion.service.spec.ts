@@ -143,7 +143,7 @@ describe('JobIngestionService', () => {
       expect(jobSourceModel.findOneAndUpdate).toHaveBeenCalledWith(
         { key: 'topdev' },
         { $set: { enabled: false } },
-        { new: false },
+        { new: false, projection: { rejections: 0 } },
       );
     });
 

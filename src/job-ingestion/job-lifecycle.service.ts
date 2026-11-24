@@ -3,7 +3,6 @@ import { EExternalJobCloseReason } from './enums/external-job-close-reason.enum'
 import { EExternalJobStatus } from './enums/external-job-status.enum';
 import { ERejectionReason } from './enums/rejection-reason.enum';
 import {
-  IFetchedRejection,
   IJobClosure,
   IJobTransitions,
   IKnownJobState,
@@ -16,7 +15,6 @@ import {
   MIN_BASELINE_FOR_RATIO,
   MIN_LISTED_RATIO,
   REFRESH_AFTER_DAYS,
-  REJECTION_RETRY_DAYS,
   STALE_GRACE_HOURS,
 } from './job-ingestion.constants';
 
@@ -137,30 +135,5 @@ export class JobLifecycleService {
     }
 
     return { seenIds, staleIds, closures };
-  }
-
-  mergeRejections(
-    previous: ISourceRejection[],
-    fresh: IFetchedRejection[],
-    keptIds: string[],
-    listedIds: string[],
-    now: Date,
-  ): ISourceRejection[] {
-    const listed = new Set(listedIds);
-    const kept = new Set(keptIds);
-    const merged = new Map(previous.map(rejection => [rejection.externalId, rejection]));
-
-    for (const { externalId, reason } of fresh) {
-      merged.set(externalId, {
-        externalId,
-        reason,
-        retryAt: new Date(now.getTime() + REJECTION_RETRY_DAYS[reason] * DAY_MS),
-      });
-    }
-
-    // Pruned to listed ids so the list never outgrows the source.
-    return [...merged.values()].filter(
-      rejection => listed.has(rejection.externalId) && !kept.has(rejection.externalId),
-    );
   }
 }

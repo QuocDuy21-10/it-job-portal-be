@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { UnrecoverableError } from 'bullmq';
 import { Model } from 'mongoose';
 import { SkillsService } from 'src/skills/skills.service';
-import { IAtsAdapter, IRejectedAtsJob } from './adapters/ats-adapter.interface';
+import { IAtsAdapter, IRawAtsJob, IRejectedAtsJob } from './adapters/ats-adapter.interface';
 import { GreenhouseAdapter } from './adapters/greenhouse.adapter';
 import { ItviecAdapter } from './adapters/itviec.adapter';
 import { LeverAdapter } from './adapters/lever.adapter';
@@ -12,6 +12,7 @@ import { EJobSourceDisplayPolicy } from './enums/job-source-display-policy.enum'
 import { EJobSourceProvider } from './enums/job-source-provider.enum';
 import { ERejectionReason } from './enums/rejection-reason.enum';
 import { ESyncStatus } from './enums/sync-status.enum';
+import { CrawlFailureRepository } from './crawl-failure.repository';
 import { ExternalJobRepository } from './external-job.repository';
 import {
   hasRequiredFields,
@@ -20,7 +21,6 @@ import {
   normalizeExternalJob,
 } from './ingestion-filters';
 import { ICrawlRunStats } from './interfaces/crawl-run-stats.interface';
-import { ISourceRejection } from './interfaces/job-lifecycle.interface';
 import { INormalizedExternalJob } from './interfaces/normalized-external-job.interface';
 import { ALERT_AFTER_FAILURES, DEFAULT_DISPLAY_POLICY } from './job-ingestion.constants';
 import { JobLifecycleService } from './job-lifecycle.service';
@@ -32,7 +32,6 @@ type SyncOutcome = {
   message?: string;
   stoppedReason?: string;
   stats?: ICrawlRunStats;
-  rejections?: ISourceRejection[];
   listedCount?: number;
 };
 
@@ -50,6 +49,7 @@ export class SourceSyncCoordinator {
     @InjectModel(CrawlRun.name)
     private readonly crawlRunModel: Model<CrawlRunDocument>,
     private readonly repository: ExternalJobRepository,
+    private readonly crawlFailures: CrawlFailureRepository,
     private readonly lifecycle: JobLifecycleService,
     private readonly skillsService: SkillsService,
     greenhouseAdapter: GreenhouseAdapter,
@@ -107,16 +107,17 @@ export class SourceSyncCoordinator {
     }
 
     const known = await this.repository.loadKnownStates(sourceKey);
-    const previousRejections = source.rejections ?? [];
+    const waiting = await this.crawlFailures.findWaiting(sourceKey, now);
     let planned: number | undefined;
     const {
       jobs: raws,
       listedIds,
       rejected: adapterRejected = [],
+      fetchErrors = [],
       stoppedEarly,
     } = await adapter.fetchJobs(source.boardToken, {
       selectForFetch: ids => {
-        const plan = this.lifecycle.planFetch(ids, known, previousRejections, now);
+        const plan = this.lifecycle.planFetch(ids, known, waiting, now);
         planned = plan.length;
         return plan;
       },
@@ -132,10 +133,10 @@ export class SourceSyncCoordinator {
     for (const raw of raws) {
       if (!hasRequiredFields(raw)) {
         if (raw.externalId) {
-          rejected.push({ externalId: raw.externalId, reason: ERejectionReason.MISSING_FIELDS });
+          rejected.push(this.toRejected(raw, ERejectionReason.MISSING_FIELDS));
         }
       } else if (!isItJob(raw.title) || !isVnOrRemote(raw)) {
-        rejected.push({ externalId: raw.externalId, reason: ERejectionReason.NOT_IT });
+        rejected.push(this.toRejected(raw, ERejectionReason.NOT_IT));
       } else {
         kept.push(
           normalizeExternalJob(raw, {
@@ -164,6 +165,18 @@ export class SourceSyncCoordinator {
       (await this.repository.close(sourceKey, transitions.closures, now)) +
       (await this.repository.closeExpired(sourceKey, now));
 
+    await this.crawlFailures.record(sourceKey, {
+      failures: [
+        ...rejected,
+        // Not part of `rejected`: that list closes stored jobs, a timeout must not.
+        ...fetchErrors.map(error => ({ ...error, reason: ERejectionReason.FETCH_ERROR })),
+      ],
+      keptIds,
+      listedIds,
+      listingComplete: !suspect,
+      now,
+    });
+
     this.logger.log(`Synced job source ${sourceKey}: ${kept.length} kept of ${raws.length}`);
 
     return {
@@ -186,19 +199,21 @@ export class SourceSyncCoordinator {
         staled,
         closed,
       },
-      rejections: this.lifecycle.mergeRejections(
-        previousRejections,
-        rejected,
-        keptIds,
-        listedIds,
-        now,
-      ),
       listedCount: listedIds.length,
     };
   }
 
+  private toRejected(raw: IRawAtsJob, reason: ERejectionReason): IRejectedAtsJob {
+    return {
+      externalId: raw.externalId,
+      reason,
+      url: raw.sourceUrl || undefined,
+      title: raw.title || undefined,
+    };
+  }
+
   private async finish(source: JobSource, runId: unknown, outcome: SyncOutcome): Promise<void> {
-    const { status, message, stoppedReason, stats, rejections, listedCount } = outcome;
+    const { status, message, stoppedReason, stats, listedCount } = outcome;
     const failed = FAILED_STATUSES.has(status);
     const consecutiveFailures = failed ? (source.consecutiveFailures ?? 0) + 1 : 0;
     const finishedAt = new Date();
@@ -223,7 +238,6 @@ export class SourceSyncCoordinator {
           lastSyncStatus: status,
           consecutiveFailures,
           ...(stats && { lastSyncStats: stats }),
-          ...(rejections && { rejections }),
           ...(!failed && listedCount !== undefined && { lastSuccessfulListedCount: listedCount }),
           ...(message && { lastSyncError: message }),
         },
