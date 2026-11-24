@@ -5,6 +5,7 @@ import { buildExcerpt, formatSalaryText } from '../ingestion-filters';
 import { MAX_DETAIL_BYTES, MAX_SITEMAP_BYTES } from '../job-ingestion.constants';
 import {
   IAtsAdapter,
+  IAtsFetchError,
   IAtsFetchOptions,
   IAtsFetchResult,
   IRawAtsJob,
@@ -28,7 +29,7 @@ const MAX_DETAIL_FETCHES_PER_SYNC = 150;
 type DetailOutcome =
   | { kind: 'job'; job: IRawAtsJob }
   | { kind: 'rejected'; reason: ERejectionReason }
-  | { kind: 'retry-later' }
+  | { kind: 'retry-later'; detail: string }
   | { kind: 'blocked'; reason: string };
 
 const extractLocs = (xml: string): string[] =>
@@ -94,6 +95,7 @@ export abstract class SitemapJobPostingAdapter implements IAtsAdapter {
     const toFetch = selectForFetch([...listedUrls.keys()]).slice(0, MAX_DETAIL_FETCHES_PER_SYNC);
     const jobs: IRawAtsJob[] = [];
     const rejected: IRejectedAtsJob[] = [];
+    const fetchErrors: IAtsFetchError[] = [];
     let stoppedEarly: string | undefined;
 
     for (const id of toFetch) {
@@ -114,11 +116,13 @@ export abstract class SitemapJobPostingAdapter implements IAtsAdapter {
       if (outcome.kind === 'job') {
         jobs.push(outcome.job);
       } else if (outcome.kind === 'rejected') {
-        rejected.push({ externalId: id, reason: outcome.reason });
+        rejected.push({ externalId: id, reason: outcome.reason, url });
+      } else {
+        fetchErrors.push({ externalId: id, url, detail: outcome.detail });
       }
     }
 
-    return { jobs, listedIds: [...listedUrls.keys()], rejected, stoppedEarly };
+    return { jobs, listedIds: [...listedUrls.keys()], rejected, fetchErrors, stoppedEarly };
   }
 
   protected async sleep(ms: number): Promise<void> {
@@ -168,9 +172,9 @@ export abstract class SitemapJobPostingAdapter implements IAtsAdapter {
 
     try {
       response = await this.request(url, MAX_DETAIL_BYTES);
-    } catch {
+    } catch (error) {
       // Timeouts, network errors, oversized or redirected-away pages: retried next sync.
-      return { kind: 'retry-later' };
+      return { kind: 'retry-later', detail: error.message };
     }
 
     if (BLOCKED_STATUSES.has(response.status)) {
@@ -182,7 +186,7 @@ export abstract class SitemapJobPostingAdapter implements IAtsAdapter {
     }
 
     if (!response.ok) {
-      return { kind: 'retry-later' };
+      return { kind: 'retry-later', detail: `HTTP ${response.status}` };
     }
 
     const html = response.text;

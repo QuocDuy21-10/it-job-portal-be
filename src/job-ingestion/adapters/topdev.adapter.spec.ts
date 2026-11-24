@@ -79,7 +79,7 @@ describe('TopDevAdapter', () => {
       }),
     );
     expect(result.rejected).toEqual([
-      { externalId: '2140005', reason: ERejectionReason.NOT_FOUND },
+      { externalId: '2140005', reason: ERejectionReason.NOT_FOUND, url: DATA_URL },
     ]);
     expect(result.stoppedEarly).toBeUndefined();
     expect(result.jobs).toEqual([
@@ -164,7 +164,11 @@ describe('TopDevAdapter', () => {
 
     expect(result.jobs).toEqual([]);
     expect(result.rejected).toEqual([
-      { externalId: '2140001', reason: ERejectionReason.NO_STRUCTURED_DATA },
+      { externalId: '2140001', reason: ERejectionReason.NO_STRUCTURED_DATA, url: JAVA_URL },
+    ]);
+    expect(result.fetchErrors).toEqual([
+      { externalId: '2140004', url: QA_URL, detail: 'HTTP 500' },
+      { externalId: '2140005', url: DATA_URL, detail: 'timeout' },
     ]);
     expect(result.stoppedEarly).toBeUndefined();
   });
@@ -203,6 +207,9 @@ describe('TopDevAdapter', () => {
 
     expect(result.jobs).toEqual([]);
     expect(result.rejected).toEqual([]);
+    expect(result.fetchErrors).toEqual([
+      { externalId: '2140001', url: JAVA_URL, detail: expect.any(String) },
+    ]);
   });
 
   it('rejects an invalid board token without calling fetch', async () => {

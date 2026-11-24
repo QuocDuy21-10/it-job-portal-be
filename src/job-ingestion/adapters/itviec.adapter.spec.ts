@@ -97,7 +97,11 @@ describe('ItviecAdapter', () => {
 
     expect(result.stoppedEarly).toBeUndefined();
     expect(result.rejected).toEqual([
-      { externalId: BRIDGE_SLUG, reason: ERejectionReason.NO_STRUCTURED_DATA },
+      {
+        externalId: BRIDGE_SLUG,
+        reason: ERejectionReason.NO_STRUCTURED_DATA,
+        url: BRIDGE_URL,
+      },
     ]);
   });
 });
