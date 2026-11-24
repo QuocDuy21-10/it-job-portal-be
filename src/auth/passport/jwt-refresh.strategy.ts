@@ -7,7 +7,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { SessionsService } from 'src/sessions/sessions.service';
 import { User, UserDocument } from 'src/users/schemas/user.schema';
-import { IJwtRefreshPayload } from '../interfaces/jwt-payload.interface';
+import { IJwtRefreshPayload, JWT_ALGORITHM } from '../interfaces/jwt-payload.interface';
 import { IUser } from 'src/users/user.interface';
 import { assertAuthenticatedAccountState } from '../utils/assert-authenticated-account-state.util';
 import { ERole } from 'src/casl/enums/role.enum';
@@ -31,6 +31,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
         },
       ]),
       secretOrKey: configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
+      algorithms: [JWT_ALGORITHM],
       passReqToCallback: true, // Cho phép truy cập request object
       // Không ignore expiration - JWT sẽ tự động check hết hạn
       ignoreExpiration: false,

@@ -71,7 +71,7 @@ export class AuthAccountDeletionService {
     await this.cacheManager.set(`cancel_deletion_user:${userId}`, cancelToken, GRACE_PERIOD_MS);
 
     const frontendUrl = this.configService.get<string>('FE_URL');
-    const cancelUrl = `${frontendUrl}/account/cancel-deletion?token=${cancelToken}`;
+    const cancelUrl = `${frontendUrl}/account/cancel-deletion?${new URLSearchParams({ token: cancelToken })}`;
 
     try {
       await this.mailService.sendAccountDeletionScheduled({

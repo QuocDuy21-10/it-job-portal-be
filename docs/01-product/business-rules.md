@@ -8,7 +8,7 @@ Tổng hợp các quy tắc nghiệp vụ quan trọng, mỗi quy tắc kèm nơ
 |---|---|---|
 | Vai trò khi đăng ký | `NORMAL USER` | [users.service.ts](../../src/users/users.service.ts) |
 | Tài khoản mới chưa xác thực | `isActive = false`, bị xóa tự động sau 15 phút nếu không xác thực | `verificationExpires` và TTL index, xem [users](../04-database/collections/users.md) |
-| Mã OTP | 6 chữ số, hiệu lực 5 phút, tối đa 5 lần nhập sai, chờ 60 giây giữa hai lần gửi lại | [auth-verification.service.ts](../../src/auth/services/auth-verification.service.ts) |
+| Mã OTP | 6 chữ số, hiệu lực 5 phút, tối đa 5 lần nhập sai cho mỗi mã và 15 lần mỗi 24 giờ cho mỗi email, chờ 60 giây giữa hai lần gửi lại | [auth-verification.service.ts](../../src/auth/services/auth-verification.service.ts) |
 | Lưu OTP | Chỉ lưu HMAC-SHA256 trong Redis, so sánh bằng `timingSafeEqual` | [otp.utils.ts](../../src/auth/utils/otp.utils.ts) |
 | Số phiên đồng thời | Tối đa 5 mỗi người, vượt thì xóa phiên dùng lâu nhất | [auth-session.service.ts](../../src/auth/services/auth-session.service.ts) |
 | Làm mới token | Xóa phiên cũ, tạo phiên mới với refresh token mới | [auth-session.service.ts](../../src/auth/services/auth-session.service.ts) |

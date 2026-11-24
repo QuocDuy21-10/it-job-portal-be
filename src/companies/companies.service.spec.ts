@@ -29,6 +29,7 @@ describe('CompaniesService', () => {
       softDeleteById: jest.fn(),
       bulkSoftDelete: jest.fn(),
       deactivateJobsForCompanies: jest.fn(),
+      syncCompanySnapshot: jest.fn(),
       getJobCountsForCompanies: jest.fn(),
       findTopHiringCompanies: jest.fn(),
       findLogoReferences: jest.fn(),
@@ -407,6 +408,55 @@ describe('CompaniesService', () => {
       await service.update(companyId, { logo: 'new-logo.png' }, adminUser);
 
       expect(mockFilesService.deleteFile).toHaveBeenCalledWith('company', 'old-logo.png');
+    });
+
+    // Jobs and HR users embed {_id, name, logo}; without the sync they kept the old name and a deleted logo.
+    it('should copy a new name and logo into the embedded snapshots before deleting the old file', async () => {
+      const company = {
+        _id: new mongoose.Types.ObjectId(companyId),
+        name: 'Old Name',
+        logo: 'old-logo.png',
+      };
+      mockCompanyRepository.findById.mockResolvedValue(company as any);
+      mockCompanyRepository.updateOne.mockResolvedValue({ modifiedCount: 1 } as any);
+      const order: string[] = [];
+      mockCompanyRepository.syncCompanySnapshot.mockImplementation(async () => {
+        order.push('sync');
+      });
+      mockFilesService.deleteFile.mockImplementation(async () => {
+        order.push('delete');
+      });
+
+      await service.update(companyId, { name: 'New Name', logo: 'new-logo.png' }, adminUser);
+
+      expect(mockCompanyRepository.syncCompanySnapshot).toHaveBeenCalledWith(companyId, {
+        name: 'New Name',
+        logo: 'new-logo.png',
+      });
+      expect(order).toEqual(['sync', 'delete']);
+    });
+
+    it('should keep the stored logo in the snapshot when only the name changes', async () => {
+      const company = { _id: new mongoose.Types.ObjectId(companyId), name: 'Old', logo: 'a.png' };
+      mockCompanyRepository.findById.mockResolvedValue(company as any);
+      mockCompanyRepository.updateOne.mockResolvedValue({ modifiedCount: 1 } as any);
+
+      await service.update(companyId, { name: 'New' }, adminUser);
+
+      expect(mockCompanyRepository.syncCompanySnapshot).toHaveBeenCalledWith(companyId, {
+        name: 'New',
+        logo: 'a.png',
+      });
+    });
+
+    it('should not touch snapshots when neither name nor logo changes', async () => {
+      const company = { _id: new mongoose.Types.ObjectId(companyId), name: 'Same', logo: 'a.png' };
+      mockCompanyRepository.findById.mockResolvedValue(company as any);
+      mockCompanyRepository.updateOne.mockResolvedValue({ modifiedCount: 1 } as any);
+
+      await service.update(companyId, { name: 'Same', description: 'x' } as any, adminUser);
+
+      expect(mockCompanyRepository.syncCompanySnapshot).not.toHaveBeenCalled();
     });
 
     it('should not delete the logo when the same logo path is submitted', async () => {

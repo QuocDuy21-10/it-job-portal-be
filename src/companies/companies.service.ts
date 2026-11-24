@@ -173,26 +173,34 @@ export class CompaniesService {
       await this.assertLogoNotTaken(updateCompanyDto.logo, id);
     }
 
-    // Delete the old logo file only after ownership is confirmed
-    if (updateCompanyDto.logo !== undefined) {
-      if (company?.logo && company.logo !== updateCompanyDto.logo) {
-        try {
-          await this.filesService.deleteFile('company', company.logo);
-        } catch (error) {
-          this.logger.warn(
-            `Could not delete old company logo: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-      }
-    }
-
     const result = await this.companyRepository.updateOne(
       { _id: id },
       { ...updateCompanyDto, updatedBy: { _id: user._id, email: user.email } },
     );
 
+    const name = updateCompanyDto.name ?? company.name;
+    const logo =
+      updateCompanyDto.logo !== undefined ? updateCompanyDto.logo : (company.logo ?? null);
+    const snapshotChanged = name !== company.name || logo !== (company.logo ?? null);
+    if (snapshotChanged) {
+      // Jobs and HR users embed {_id, name, logo}; they showed the old name and a deleted logo.
+      await this.companyRepository.syncCompanySnapshot(id, { name, logo });
+    }
+
+    // Last, once nothing in the DB points at the old file any more.
+    if (company.logo && logo !== company.logo) {
+      try {
+        await this.filesService.deleteFile('company', company.logo);
+      } catch (error) {
+        this.logger.warn(
+          `Could not delete old company logo: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
     await this.statisticsCacheService.clearTopHiringCompanies();
     await this.clearCompanyListCaches();
+    if (snapshotChanged) await this.clearJobListCaches();
 
     return result;
   }

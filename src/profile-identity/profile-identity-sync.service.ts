@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CvProfile, CvProfileDocument } from 'src/cv-profiles/schemas/cv-profile.schema';
+import { Resume, ResumeDocument } from 'src/resumes/schemas/resume.schema';
 import { User, UserDocument } from 'src/users/schemas/user.schema';
 
 export interface UserIdentitySnapshot {
@@ -22,6 +23,7 @@ export class ProfileIdentitySyncService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     @InjectModel(CvProfile.name) private readonly cvProfileModel: Model<CvProfileDocument>,
+    @InjectModel(Resume.name) private readonly resumeModel: Model<ResumeDocument>,
   ) {}
 
   async getUserIdentity(userId: string): Promise<UserIdentitySnapshot> {
@@ -43,6 +45,22 @@ export class ProfileIdentitySyncService {
       email: user.email,
       avatar: user.avatar,
     };
+  }
+
+  /** File names under images/avatar that a user, CV profile or submitted CV snapshot points to. */
+  async findReferencedAvatarFileNames(): Promise<Set<string>> {
+    // The raw collection skips the soft-delete filter, so a restorable account keeps its avatar.
+    const [userAvatars, cvAvatars, sentAvatars] = await Promise.all([
+      this.userModel.collection.distinct('avatar'),
+      this.cvProfileModel.collection.distinct('personalInfo.avatar'),
+      this.resumeModel.collection.distinct('cvStructuredData.personalInfo.avatar'),
+    ]);
+
+    return new Set(
+      [...userAvatars, ...cvAvatars, ...sentAvatars]
+        .filter((value): value is string => typeof value === 'string' && value.length > 0)
+        .map(value => value.split('?')[0].split('/').pop() as string),
+    );
   }
 
   assertCvEmailMatchesUser(incomingEmail: string | undefined, userEmail: string): void {

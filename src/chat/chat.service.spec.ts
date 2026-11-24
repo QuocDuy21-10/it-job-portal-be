@@ -604,6 +604,8 @@ describe('ChatService', () => {
       );
 
       expect(mockAIService.generateChat).not.toHaveBeenCalled();
+      // The intent classifier can call the LLM too, so it must not run once the quota is spent.
+      expect(mockChatIntentService.detectIntent).not.toHaveBeenCalled();
       expect(mockChatQuotaService.rollback).not.toHaveBeenCalled();
       expect(mockAiUsageService.record).toHaveBeenCalledWith(
         expect.objectContaining({

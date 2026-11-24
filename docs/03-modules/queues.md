@@ -70,6 +70,7 @@ Bốn cron của ứng dụng, tất cả chạy trong tiến trình chính ([da
 | `weekly-job-recommendations` | `0 9 * * 1` | Duyệt `subscribers`, đưa `send-job-recommendations` theo lô 100 |
 | `deactivate-expired-jobs` | `0 * * * *` | Tắt tin hết hạn, đưa `send-job-expired-notification` |
 | `cleanup-orphaned-company-logos` | `0 2 * * *` | Xóa logo mồ côi (không dùng hàng đợi) |
+| `cleanup-orphaned-avatars` | `30 2 * * *` | Xóa avatar mồ côi (không dùng hàng đợi) |
 
 Múi giờ của cả bốn là `Asia/Ho_Chi_Minh`.
 

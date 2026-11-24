@@ -73,8 +73,18 @@ describe('AuthVerificationService', () => {
   });
 
   describe('verifyEmail', () => {
+    // Per-key INCR counters, like Redis.
+    const useRedisCounters = (start: Record<string, number> = {}) => {
+      const counters = { ...start };
+      redisClient.incr.mockImplementation(
+        async (key: string) => (counters[key] = (counters[key] ?? 0) + 1),
+      );
+      return counters;
+    };
+
     it('should verify email successfully and activate user', async () => {
-      redisClient.get.mockResolvedValueOnce('0').mockResolvedValueOnce('stored-hash');
+      useRedisCounters();
+      redisClient.get.mockResolvedValueOnce('stored-hash');
       jest.spyOn(otpUtils, 'verifyOtp').mockReturnValue(true);
       const user = makeUser();
       usersService.findUserByEmail.mockResolvedValue(user);
@@ -91,28 +101,62 @@ describe('AuthVerificationService', () => {
       expect(result).toHaveProperty('message');
     });
 
-    it('should throw ForbiddenException when attempt limit is exceeded', async () => {
-      redisClient.get.mockResolvedValueOnce('5');
+    it('should refuse a sixth guess for the same code without comparing it', async () => {
+      useRedisCounters({ 'otp:attempts:test@example.com': 5 });
+      const verify = jest.spyOn(otpUtils, 'verifyOtp');
 
       await expect(service.verifyEmail(verifyAuthDto)).rejects.toThrow(ForbiddenException);
+      expect(verify).not.toHaveBeenCalled();
     });
 
-    it('should throw BadRequestException when OTP is expired or missing', async () => {
-      redisClient.get.mockResolvedValueOnce('0').mockResolvedValueOnce(null);
+    // Resend gives each new code 5 guesses; the daily cap stops resend from resetting the budget forever.
+    it('should refuse guesses past the daily cap even with a fresh code', async () => {
+      useRedisCounters({ 'otp:attempts:day:test@example.com': 15 });
+      const verify = jest.spyOn(otpUtils, 'verifyOtp');
 
-      await expect(service.verifyEmail(verifyAuthDto)).rejects.toThrow(BadRequestException);
+      await expect(service.verifyEmail(verifyAuthDto)).rejects.toThrow(ForbiddenException);
+      expect(verify).not.toHaveBeenCalled();
     });
 
-    it('should throw BadRequestException and increment the attempt counter when OTP is incorrect', async () => {
-      redisClient.get.mockResolvedValueOnce('2').mockResolvedValueOnce('stored-hash');
+    it('should compare at most 5 of 20 parallel wrong guesses', async () => {
+      useRedisCounters();
+      redisClient.get.mockResolvedValue('stored-hash');
+      const verify = jest.spyOn(otpUtils, 'verifyOtp').mockReturnValue(false);
+
+      await Promise.allSettled(
+        Array.from({ length: 20 }, () => service.verifyEmail(verifyAuthDto)),
+      );
+
+      expect(verify).toHaveBeenCalledTimes(5);
+    });
+
+    it('should give the daily counter a 24 hour expiry on first use', async () => {
+      useRedisCounters();
+      redisClient.get.mockResolvedValueOnce('stored-hash');
       jest.spyOn(otpUtils, 'verifyOtp').mockReturnValue(false);
 
       await expect(service.verifyEmail(verifyAuthDto)).rejects.toThrow(BadRequestException);
-      expect(redisClient.incr).toHaveBeenCalledWith('otp:attempts:test@example.com');
+      expect(redisClient.expire).toHaveBeenCalledWith('otp:attempts:day:test@example.com', 86400);
+    });
+
+    it('should throw BadRequestException when OTP is expired or missing', async () => {
+      useRedisCounters();
+      redisClient.get.mockResolvedValueOnce(null);
+
+      await expect(service.verifyEmail(verifyAuthDto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should report the guesses left when OTP is incorrect', async () => {
+      useRedisCounters({ 'otp:attempts:test@example.com': 2 });
+      redisClient.get.mockResolvedValueOnce('stored-hash');
+      jest.spyOn(otpUtils, 'verifyOtp').mockReturnValue(false);
+
+      await expect(service.verifyEmail(verifyAuthDto)).rejects.toThrow('Còn 2 lần thử');
     });
 
     it('should throw BadRequestException when user is not found after OTP validation', async () => {
-      redisClient.get.mockResolvedValueOnce('0').mockResolvedValueOnce('stored-hash');
+      useRedisCounters();
+      redisClient.get.mockResolvedValueOnce('stored-hash');
       jest.spyOn(otpUtils, 'verifyOtp').mockReturnValue(true);
       usersService.findUserByEmail.mockResolvedValue(null);
 

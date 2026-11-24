@@ -24,3 +24,6 @@ export function isAccessTokenPayload(payload: JwtPayload): payload is IJwtAccess
 export function isRefreshTokenPayload(payload: JwtPayload): payload is IJwtRefreshPayload {
   return payload.type === 'refresh';
 }
+
+// Tokens are only ever signed with HS256; verifiers pin it so no other HMAC variant is accepted.
+export const JWT_ALGORITHM = 'HS256';

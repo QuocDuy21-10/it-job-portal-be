@@ -1,5 +1,10 @@
 import request from 'supertest';
+import { Types } from 'mongoose';
+import { CvProfile } from 'src/cv-profiles/schemas/cv-profile.schema';
 import { Job } from 'src/jobs/schemas/job.schema';
+import { ProfileIdentitySyncService } from 'src/profile-identity/profile-identity-sync.service';
+import { Resume } from 'src/resumes/schemas/resume.schema';
+import { User } from 'src/users/schemas/user.schema';
 import { EJobApprovalStatus } from 'src/jobs/enums/job-approval-status.enum';
 import { createTestApp, TestApp } from './utils/test-app';
 import { resetState } from './utils/reset';
@@ -37,6 +42,42 @@ describe('Data integrity (e2e)', () => {
 
     const res = await request(t.server).get('/api/v1/users/saved-jobs').set(auth).expect(200);
     expect(JSON.stringify(res.body.data)).not.toContain(world.jobB);
+  });
+
+  it('renaming a company updates the snapshot embedded in its jobs and HR users only', async () => {
+    const embedded = async () => ({
+      jobA: ((await t.model(Job.name).findById(world.jobA).lean()) as any).company.name,
+      jobB: ((await t.model(Job.name).findById(world.jobB).lean()) as any).company.name,
+      hrA: ((await t.model(User.name).findById(world.users.hrA._id).lean()) as any).company.name,
+    });
+    const before = await embedded();
+
+    await request(t.server)
+      .patch(`/api/v1/companies/${world.companyA}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Renamed Co' })
+      .expect(200);
+
+    expect(await embedded()).toEqual({ jobA: 'Renamed Co', jobB: before.jobB, hrA: 'Renamed Co' });
+  });
+
+  it('the avatar cleanup keeps files used by users, CV profiles and submitted applications', async () => {
+    const url = (file: string) => `https://api.example.test/images/avatar/${file}`;
+    const userId = new Types.ObjectId(world.users.c1._id);
+    await t.model(User.name).updateOne({ _id: userId }, { avatar: url('user.jpg') });
+    await t
+      .model(CvProfile.name)
+      .updateOne({ userId }, { $set: { 'personalInfo.avatar': url('cv.jpg') } });
+    await t.model(Resume.name).create({
+      userId,
+      email: world.users.c1.email,
+      jobId: new Types.ObjectId(world.jobB),
+      cvStructuredData: { personalInfo: { avatar: url('sent.jpg') } },
+    });
+
+    const names = await t.app.get(ProfileIdentitySyncService).findReferencedAvatarFileNames();
+
+    expect([...names]).toEqual(expect.arrayContaining(['user.jpg', 'cv.jpg', 'sent.jpg']));
   });
 
   it('deleting one company also takes its jobs off the public site', async () => {

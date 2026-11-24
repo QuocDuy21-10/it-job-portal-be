@@ -159,6 +159,9 @@ export class ChatService {
     const idempotencyKey = await this.chatIdempotencyService.acquire(user._id, clientMessageId);
 
     try {
+      // Before prepareChatTurn: its intent classifier may call the LLM, which a spent quota must not reach.
+      quotaReservation = await this.chatQuotaService.reserve(user);
+      const quotaStatus = quotaReservation.status;
       const turn = await this.prepareChatTurn(user, message, {
         sessionId,
         jobId,
@@ -170,8 +173,6 @@ export class ChatService {
       intent = turn.intent;
       intentDetectionSource = turn.intentDetectionSource;
 
-      quotaReservation = await this.chatQuotaService.reserve(user);
-      const quotaStatus = quotaReservation.status;
       const parsedResponse = await this.aiService.generateChat(
         turn.sanitizedMessage,
         turn.history,

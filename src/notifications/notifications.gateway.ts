@@ -15,6 +15,7 @@ import { assertAuthenticatedAccountState } from 'src/auth/utils/assert-authentic
 import { parseCorsOrigins } from 'src/config/cors-origins';
 import { User, UserDocument } from 'src/users/schemas/user.schema';
 import { SessionsService } from 'src/sessions/sessions.service';
+import { JWT_ALGORITHM } from 'src/auth/interfaces/jwt-payload.interface';
 
 @WebSocketGateway({
   namespace: '/notifications',
@@ -70,6 +71,7 @@ export class NotificationsGateway
 
       const payload = await this.jwtService.verifyAsync(token, {
         secret: this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET'),
+        algorithms: [JWT_ALGORITHM],
       });
 
       if (!payload?.sub || payload.type !== 'access') {

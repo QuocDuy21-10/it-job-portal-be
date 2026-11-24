@@ -76,7 +76,7 @@ Hai giá trị `CHAT_CONTEXT_CACHE_TTL_MS` (10 phút, trong `chat.constant.ts`) 
 
 | Dữ liệu | Khóa | TTL | Nơi |
 |---|---|---|---|
-| OTP | `otp:value:<email>`, `otp:attempts:<email>`, `otp:cooldown:<email>` | 300 giây, 300 giây, 60 giây | [auth-verification.service.ts](../../src/auth/services/auth-verification.service.ts) |
+| OTP | `otp:value:<email>`, `otp:attempts:<email>`, `otp:attempts:day:<email>`, `otp:cooldown:<email>` | 300 giây, 300 giây, 24 giờ, 60 giây | [auth-verification.service.ts](../../src/auth/services/auth-verification.service.ts) |
 | Bộ đếm quota chat | khóa theo `userId`, vai trò, ngày | đến hết ngày theo múi giờ | [chat-quota.service.ts](../../src/chat/chat-quota.service.ts) |
 | Quota gọi Gemini | `gemini:quota:minute:*`, `gemini:quota:day:*`, `gemini:quota:alert:*` | theo cửa sổ | [gemini-quota.service.ts](../../src/gemini/gemini-quota.service.ts) |
 | Rate limit | do `ThrottlerStorageRedisService` quản lý | theo throttler | [app.module.ts](../../src/app.module.ts) |

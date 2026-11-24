@@ -6,7 +6,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { IUser } from 'src/users/user.interface';
 import { User, UserDocument } from 'src/users/schemas/user.schema';
-import { IJwtAccessPayload } from '../interfaces/jwt-payload.interface';
+import { IJwtAccessPayload, JWT_ALGORITHM } from '../interfaces/jwt-payload.interface';
 import { assertAuthenticatedAccountState } from '../utils/assert-authenticated-account-state.util';
 import { ERole } from 'src/casl/enums/role.enum';
 import { SessionsService } from 'src/sessions/sessions.service';
@@ -22,6 +22,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_ACCESS_TOKEN_SECRET'),
+      algorithms: [JWT_ALGORITHM],
     });
   }
 

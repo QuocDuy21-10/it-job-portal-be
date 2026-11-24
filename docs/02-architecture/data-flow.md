@@ -49,6 +49,7 @@ Hai hàng đợi `application-notification` và `job-expiration-notification` m�
 | `0 9 * * 1` (9 giờ sáng thứ Hai) | `Asia/Ho_Chi_Minh` | [mail.controller.ts](../../src/mail/mail.controller.ts) | Đưa việc gợi ý việc làm vào hàng `job-recommendation` |
 | `0 * * * *` (mỗi giờ) | `Asia/Ho_Chi_Minh` | [jobs.service.ts](../../src/jobs/jobs.service.ts) | `deactivate-expired-jobs`: đặt `isActive = false` cho tin có `endDate` đã qua, rồi xóa cache liên quan |
 | `0 2 * * *` (2 giờ sáng hằng ngày) | `Asia/Ho_Chi_Minh` | [companies.service.ts](../../src/companies/companies.service.ts) | `cleanup-orphaned-company-logos`: xóa file logo không còn được công ty nào tham chiếu |
+| `30 2 * * *` (2 giờ 30 sáng hằng ngày) | `Asia/Ho_Chi_Minh` | [cv-profiles.service.ts](../../src/cv-profiles/cv-profiles.service.ts) | `cleanup-orphaned-avatars`: xóa file avatar quá 24 giờ không còn user, CV profile hay CV đã nộp (`resumes.cvStructuredData`) nào tham chiếu |
 
 Cron được khai báo trong một controller (`mail.controller.ts`) chứ không phải service, nên hàm cron nằm cùng file với route HTTP.
 

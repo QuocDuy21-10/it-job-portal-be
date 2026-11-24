@@ -13,7 +13,7 @@ Tổng hợp cơ chế xác thực hiện có và giới hạn, kèm bằng ch�
 | Xoay vòng refresh token | Dùng một lần; dùng lại bị từ chối | [refresh-token](../06-workflows/sequences/refresh-token.md) |
 | Giới hạn phiên | Tối đa 5 mỗi người | `enforceSessionLimit` |
 | Kiểm tra trạng thái mỗi request | Khóa, vô hiệu, đã xóa, chờ xóa có hiệu lực ngay | [jwt.strategy.ts](../../src/auth/passport/jwt.strategy.ts) |
-| OTP | 6 chữ số từ `crypto.randomInt`, lưu HMAC trong Redis 300 giây, so bằng `timingSafeEqual`, tối đa 5 lần sai, chờ 60 giây giữa hai lần gửi | [otp.utils.ts](../../src/auth/utils/otp.utils.ts) |
+| OTP | 6 chữ số từ `crypto.randomInt`, lưu HMAC trong Redis 300 giây, so bằng `timingSafeEqual`, tối đa 5 lần nhập cho mỗi mã và 15 lần mỗi 24 giờ cho mỗi email (đếm bằng `INCR` trước khi so), chờ 60 giây giữa hai lần gửi | [otp.utils.ts](../../src/auth/utils/otp.utils.ts) |
 | Đăng nhập Google | Xác minh ID token với `GOOGLE_CLIENT_ID`, yêu cầu `email_verified` | [google-oauth](../07-integrations/google-oauth.md) |
 | Rate limit | `ThrottlerGuard` và `@Throttle` trên mọi route auth, lưu Redis | [auth-and-sessions](../03-modules/auth-and-sessions.md#api) |
 | Kiểm tra cấu hình lúc khởi động | Thiếu secret bắt buộc thì không chạy | [env.validation.ts](../../src/config/env.validation.ts) |

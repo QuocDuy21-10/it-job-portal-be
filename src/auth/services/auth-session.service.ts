@@ -6,7 +6,11 @@ import ms from 'ms';
 import { randomUUID } from 'crypto';
 import { SessionsService } from 'src/sessions/sessions.service';
 import { IUser } from 'src/users/user.interface';
-import { IJwtAccessPayload, IJwtRefreshPayload } from '../interfaces/jwt-payload.interface';
+import {
+  IJwtAccessPayload,
+  IJwtRefreshPayload,
+  JWT_ALGORITHM,
+} from '../interfaces/jwt-payload.interface';
 
 @Injectable()
 export class AuthSessionService {
@@ -54,6 +58,7 @@ export class AuthSessionService {
   createAccessToken(payload: IJwtAccessPayload): string {
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET'),
+      algorithm: JWT_ALGORITHM,
       expiresIn: ms(this.configService.get<string>('JWT_ACCESS_EXPIRES_IN')) / 1000,
     });
   }
@@ -61,6 +66,7 @@ export class AuthSessionService {
   createRefreshToken(payload: IJwtRefreshPayload): string {
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
+      algorithm: JWT_ALGORITHM,
       expiresIn: ms(this.configService.get<string>('JWT_REFRESH_EXPIRES_IN')) / 1000,
       // Unique per token: two logins in the same second would otherwise hit the refreshTokenHash unique index.
       jwtid: randomUUID(),

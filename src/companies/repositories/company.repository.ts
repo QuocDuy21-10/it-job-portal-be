@@ -4,6 +4,7 @@ import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 import mongoose from 'mongoose';
 import { Company, CompanyDocument } from '../schemas/company.schema';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
+import { User, UserDocument } from 'src/users/schemas/user.schema';
 import { IUser } from 'src/users/user.interface';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
 import { bulkSoftDelete } from 'src/utils/helpers/bulk-soft-delete.helper';
@@ -16,6 +17,7 @@ export class CompanyRepository {
   constructor(
     @InjectModel(Company.name) private readonly companyModel: SoftDeleteModel<CompanyDocument>,
     @InjectModel(Job.name) private readonly jobModel: SoftDeleteModel<JobDocument>,
+    @InjectModel(User.name) private readonly userModel: SoftDeleteModel<UserDocument>,
   ) {}
 
   validateObjectId(id: string): void {
@@ -79,6 +81,19 @@ export class CompanyRepository {
 
   async bulkSoftDelete(ids: string[], user: IUser): Promise<IBulkDeleteResult> {
     return bulkSoftDelete(this.companyModel, ids, user);
+  }
+
+  /** Copies a company's current name and logo into the snapshot that jobs and HR users embed. */
+  async syncCompanySnapshot(
+    companyId: string,
+    snapshot: { name: string; logo: string | null },
+  ): Promise<void> {
+    const filter = { 'company._id': buildEmbeddedCompanyIdsInCondition([companyId]) };
+    const update = { $set: { 'company.name': snapshot.name, 'company.logo': snapshot.logo } };
+    await Promise.all([
+      this.jobModel.updateMany(filter, update),
+      this.userModel.updateMany(filter, update),
+    ]);
   }
 
   async deactivateJobsForCompanies(ids: string[]): Promise<number> {
