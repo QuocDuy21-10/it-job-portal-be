@@ -9,6 +9,7 @@ Hai nhóm người dùng: **ứng viên** nộp và xem hồ sơ của mình (`c
 | Route | Auth | Mô tả |
 |---|---|---|
 | `GET /api/v1/resumes` | Đăng nhập, vai trò: SUPER ADMIN, HR | Danh sách hồ sơ có phân trang. HR chỉ thấy hồ sơ công ty mình |
+| `GET /api/v1/resumes/status-counts` | Đăng nhập, vai trò: SUPER ADMIN, HR | Số hồ sơ theo trạng thái; nhận bộ lọc và `keyword`, bỏ qua `status` |
 | `GET /api/v1/resumes/:id` | Đăng nhập, vai trò: SUPER ADMIN, HR | Chi tiết một hồ sơ. HR chỉ xem hồ sơ công ty mình |
 | `PATCH /api/v1/resumes/:id` | Đăng nhập, vai trò: SUPER ADMIN, HR | Cập nhật hồ sơ. Đổi `status` ghi `histories` và gửi thông báo cho ứng viên |
 | `DELETE /api/v1/resumes/bulk` | Đăng nhập, vai trò: SUPER ADMIN, HR | Xóa mềm nhiều hồ sơ |
@@ -45,6 +46,8 @@ Chấm điểm được processor tự xếp hàng sau khi đọc CV xong; respo
 ## Lọc và sắp xếp
 
 `GET /resumes` chỉ nhận bộ lọc trên `status`, `priority`, `companyId`, `jobId`, `userId`, `isParsed`, `isAnalyzed`, `email`, `createdAt`, `updatedAt`, `aiAnalysis.matchingScore`; toán tử trong giá trị giới hạn ở so sánh (`$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`); regex được coi là chuỗi con (đã escape). `populate`/`fields` từ client bị bỏ qua, server luôn populate `companyId.name` và `jobId.name`. Phạm vi công ty của HR được gán sau bước lọc.
+
+- `keyword` tìm trên `email` và `parsedData.fullName`.
 
 ## Known Limitation
 

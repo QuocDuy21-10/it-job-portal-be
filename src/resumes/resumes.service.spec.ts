@@ -48,6 +48,7 @@ describe('ResumesService', () => {
       updateOne: jest.fn(),
       softDeleteById: jest.fn(),
       create: jest.fn(),
+      countDocuments: jest.fn().mockResolvedValue(2),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -150,6 +151,44 @@ describe('ResumesService', () => {
     });
   });
 
+  describe('keyword and counts', () => {
+    it('searches email and candidate name literally, inside the HR company', async () => {
+      await service.findAll(1, 10, {} as any, hr('c1'), ' c++ ');
+
+      const [filter] = repo.findPaginated.mock.calls[0];
+      expect(filter).toEqual({
+        companyId: 'c1',
+        $and: [{ $or: [{ email: /c\+\+/i }, { 'parsedData.fullName': /c\+\+/i }] }],
+      });
+    });
+
+    it('counts each status in the HR company and ignores the status filter', async () => {
+      const counts = await service.countByStatus(
+        { status: 'PENDING', priority: 'HIGH', companyId: 'other' },
+        hr('c1'),
+      );
+
+      expect(counts).toEqual({
+        ALL: 2,
+        PENDING: 2,
+        REVIEWING: 2,
+        INTERVIEWING: 2,
+        APPROVED: 2,
+        REJECTED: 2,
+      });
+      expect(repo.countDocuments).toHaveBeenNthCalledWith(1, { priority: 'HIGH', companyId: 'c1' });
+      expect(repo.countDocuments).toHaveBeenCalledWith({
+        priority: 'HIGH',
+        companyId: 'c1',
+        status: 'INTERVIEWING',
+      });
+    });
+
+    it('rejects HR without a company', async () => {
+      await expect(service.countByStatus({}, hr())).rejects.toThrow(ForbiddenException);
+      expect(repo.countDocuments).not.toHaveBeenCalled();
+    });
+  });
   describe('findOne', () => {
     it('rejects HR without a company', async () => {
       repo.findById.mockResolvedValue(resumeOf('c1'));

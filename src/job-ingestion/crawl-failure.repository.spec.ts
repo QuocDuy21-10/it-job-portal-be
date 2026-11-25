@@ -102,6 +102,16 @@ describe('CrawlFailureRepository admin reads', () => {
 
   it.each([
     [{}, { reason: { $in: ERROR_REASONS } }],
+    [
+      { from: '2026-11-01T00:00:00.000Z', to: '2026-11-02T00:00:00.000Z' },
+      {
+        reason: { $in: ERROR_REASONS },
+        failedAt: {
+          $gte: new Date('2026-11-01T00:00:00.000Z'),
+          $lte: new Date('2026-11-02T00:00:00.000Z'),
+        },
+      },
+    ],
     [{ group: 'filtered' as const }, { reason: ERejectionReason.NOT_IT }],
     [
       { sourceKey: 'topdev', reason: ERejectionReason.FETCH_ERROR },

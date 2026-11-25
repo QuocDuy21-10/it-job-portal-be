@@ -19,6 +19,7 @@ Các route `GET` công khai (`@OptionalAuth`). Với HR, danh sách và chi ti�
 
 ## Quy tắc
 
+- `GET /companies`: `keyword` tìm trên `name`; `createdAt` là trường lọc.
 - Tạo công ty: chỉ `SUPER ADMIN`, tên không được trùng.
 - Sửa công ty: `SUPER ADMIN` hoặc `HR` của chính công ty đó.
 - `top-hiring`: `limit` mặc định 8, tối đa 12 theo mô tả Swagger; cache 5 phút.

@@ -1,4 +1,8 @@
+import { BadRequestException } from '@nestjs/common';
 import {
+  andFilter,
+  buildDateRange,
+  buildKeywordFilter,
   buildPaginationMeta,
   MAX_PAGE_LIMIT,
   parseListQuery,
@@ -11,6 +15,16 @@ const options = {
 };
 
 describe('parseListQuery', () => {
+  it('answers 400 for a filter that is not a valid regex', () => {
+    expect(() => parseListQuery({ name: '/c++/i' }, options)).toThrow(BadRequestException);
+  });
+
+  it('never reads keyword as a filter', () => {
+    expect(parseListQuery({ keyword: '/c++/i', name: 'acme' }, options).filter).toEqual({
+      name: 'acme',
+    });
+  });
+
   it('keeps allowlisted fields and drops unknown and top-level operator keys', () => {
     const { filter } = parseListQuery(
       { name: 'acme', password: 'x', $where: '1', $or: '[{"a":1}]', page: '2', limit: '5' },
@@ -102,5 +116,42 @@ describe('buildPaginationMeta', () => {
     expect(buildPaginationMeta(2, 10, 21)).toEqual({
       pagination: { current_page: 2, per_page: 10, total_pages: 3, total: 21 },
     });
+  });
+});
+
+describe('buildKeywordFilter', () => {
+  it('matches the trimmed keyword literally in every field', () => {
+    expect(buildKeywordFilter(' c++ ', ['name', 'email'])).toEqual({
+      $or: [{ name: /c\+\+/i }, { email: /c\+\+/i }],
+    });
+  });
+
+  it('is undefined for a missing or blank keyword', () => {
+    expect(buildKeywordFilter(undefined, ['name'])).toBeUndefined();
+    expect(buildKeywordFilter('   ', ['name'])).toBeUndefined();
+  });
+});
+
+describe('andFilter', () => {
+  it('keeps existing $or and $and conditions', () => {
+    const filter: Record<string, any> = { $or: [{ a: 1 }], $and: [{ b: 1 }] };
+    andFilter(filter, { c: 1 });
+    expect(filter).toEqual({ $or: [{ a: 1 }], $and: [{ b: 1 }, { c: 1 }] });
+  });
+
+  it('does nothing without a condition', () => {
+    const filter = {};
+    andFilter(filter, undefined);
+    expect(filter).toEqual({});
+  });
+});
+
+describe('buildDateRange', () => {
+  it('is inclusive and accepts either end', () => {
+    const from = '2026-11-01T00:00:00.000Z';
+    const to = '2026-11-25T00:00:00.000Z';
+    expect(buildDateRange(from, to)).toEqual({ $gte: new Date(from), $lte: new Date(to) });
+    expect(buildDateRange(undefined, to)).toEqual({ $lte: new Date(to) });
+    expect(buildDateRange()).toBeUndefined();
   });
 });

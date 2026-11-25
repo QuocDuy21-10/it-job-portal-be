@@ -5,6 +5,8 @@ import { UserDocument } from './schemas/user.schema';
 import { compare, hash } from 'bcryptjs';
 import { IUser } from './user.interface';
 import {
+  andFilter,
+  buildKeywordFilter,
   buildPaginationMeta,
   parseListQuery,
   resolvePagination,
@@ -45,6 +47,8 @@ export class UsersService {
     'createdAt',
     'updatedAt',
   ]);
+
+  private readonly KEYWORD_FIELDS = ['name', 'email'];
 
   constructor(
     private readonly userRepository: UserRepository,
@@ -105,11 +109,8 @@ export class UsersService {
     return this.userAccountService.updateUnverifiedUser(id, dto);
   }
 
-  async findAll(page: unknown, limit: unknown, query: string) {
-    const { filter, sort } = parseListQuery(query, {
-      filterFields: this.ALLOWED_FILTER_FIELDS,
-      sortFields: this.ALLOWED_SORT_FIELDS,
-    });
+  async findAll(page: unknown, limit: unknown, query: string, keyword?: string) {
+    const { filter, sort } = this.buildListFilter(query, keyword);
     const pagination = resolvePagination(page, limit);
 
     const { result, totalItems } = await this.userRepository.findPaginated(
@@ -121,6 +122,30 @@ export class UsersService {
     );
 
     return { result, meta: buildPaginationMeta(pagination.page, pagination.limit, totalItems) };
+  }
+
+  async countByRole(query: unknown, keyword?: string): Promise<Record<string, number>> {
+    const { filter } = this.buildListFilter(query, keyword, ['role', 'isLocked']);
+    const roles = Object.values(ERole);
+    const [ALL, LOCKED, ...counts] = await Promise.all([
+      this.userRepository.countDocuments(filter),
+      this.userRepository.countDocuments({ ...filter, isLocked: true }),
+      ...roles.map(role => this.userRepository.countDocuments({ ...filter, role })),
+    ]);
+
+    return { ALL, ...Object.fromEntries(roles.map((role, i) => [role, counts[i]])), LOCKED };
+  }
+
+  private buildListFilter(query: unknown, keyword?: string, ignoredFields: string[] = []) {
+    const { filter, sort } = parseListQuery(query, {
+      filterFields: new Set(
+        [...this.ALLOWED_FILTER_FIELDS].filter(field => !ignoredFields.includes(field)),
+      ),
+      sortFields: this.ALLOWED_SORT_FIELDS,
+    });
+    andFilter(filter, buildKeywordFilter(keyword, this.KEYWORD_FIELDS));
+
+    return { filter, sort };
   }
 
   findOne(id: string) {

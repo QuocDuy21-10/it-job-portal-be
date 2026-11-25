@@ -17,6 +17,12 @@ const setup = (modifiedCount = 1) => {
 };
 
 describe('buildCrawledJobFilter', () => {
+  it('limits the crawl date', () => {
+    expect(buildCrawledJobFilter({ from: '2026-11-01T00:00:00.000Z' })).toEqual({
+      createdAt: { $gte: new Date('2026-11-01T00:00:00.000Z') },
+    });
+  });
+
   it('puts each job in exactly one state', () => {
     expect(buildCrawledJobFilter({ state: ECrawledJobState.REMOVED })).toEqual({
       removedAt: { $ne: null },

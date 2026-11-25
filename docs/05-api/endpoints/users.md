@@ -10,6 +10,7 @@ Nhóm route quản trị (`POST`, danh sách, xem, sửa, khóa, xóa) chỉ cho
 |---|---|---|
 | `POST /api/v1/users` | Đăng nhập, vai trò: SUPER ADMIN | Tạo người dùng với vai trò tùy chọn (quản trị viên), có thể gắn công ty cho HR |
 | `GET /api/v1/users` | Đăng nhập, vai trò: SUPER ADMIN | Liệt kê người dùng có phân trang, lọc và sắp xếp (quản trị viên) |
+| `GET /api/v1/users/status-counts` | Đăng nhập, vai trò: SUPER ADMIN | Số người dùng theo vai trò và số bị khóa (`LOCKED`); bỏ qua `role`, `isLocked` |
 | `PATCH /api/v1/users/:id` | Đăng nhập, vai trò: SUPER ADMIN | Cập nhật thông tin người dùng (quản trị viên) |
 | `POST /api/v1/users/save-job` | Đăng nhập (mọi vai trò) | Lưu một tin tuyển dụng vào danh sách của mình |
 | `DELETE /api/v1/users/save-job` | Đăng nhập (mọi vai trò) | Bỏ lưu một tin tuyển dụng |
@@ -25,7 +26,7 @@ Nhóm route quản trị (`POST`, danh sách, xem, sửa, khóa, xóa) chỉ cho
 
 ## Lọc và sắp xếp
 
-`GET /users` đọc bộ lọc bằng `api-query-params` và lọc qua allowlist trường và toán tử ([users.service.ts](../../../src/users/users.service.ts)), xem [api-overview](../api-overview.md#lọc-và-sắp-xếp-bằng-query-string). Các trường lọc theo văn bản gồm `name`, `email`, `company.name`.
+`GET /users` đọc bộ lọc bằng `api-query-params` và lọc qua allowlist trường và toán tử ([users.service.ts](../../../src/users/users.service.ts)), xem [api-overview](../api-overview.md#lọc-và-sắp-xếp-bằng-query-string). Các trường lọc theo văn bản gồm `name`, `email`, `company.name`. `keyword` tìm trên `name` và `email`.
 
 ## Quy tắc
 

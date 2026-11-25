@@ -120,6 +120,7 @@ Mọi route danh sách dùng aqp đều đi qua `parseListQuery` ([list-query.he
 - Trường ngoài allowlist và mọi key bắt đầu bằng `$` bị bỏ qua im lặng.
 - Toán tử trong giá trị chỉ giữ `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`.
 - Regex từ client (`name=/abc/i`) bị escape thành tìm chuỗi literal, chỉ giữ cờ `i`.
+- Giá trị regex không hợp lệ (ví dụ `name=/c++/i`) trả `400`. `keyword` không bao giờ được đọc như bộ lọc.
 - `populate`, `fields`, `projection` từ client luôn bị bỏ qua.
 - `sort` chỉ nhận trường trong allowlist; `GET /notifications` mặc định `-createdAt`.
 
@@ -150,10 +151,10 @@ Mức chặt áp cho `job-search`, `chat` và `POST /auth/forgot-password`. Các
 | Nhóm | Tài liệu | Số route |
 |---|---|---|
 | Xác thực | [auth](endpoints/auth.md) | 17 |
-| Người dùng | [users](endpoints/users.md) | 14 |
+| Người dùng | [users](endpoints/users.md) | 15 |
 | Công ty | [companies](endpoints/companies.md) | 8 |
-| Tin tuyển dụng | [jobs](endpoints/jobs.md) | 7 |
-| Hồ sơ ứng tuyển | [resumes](endpoints/resumes.md) | 14 |
+| Tin tuyển dụng | [jobs](endpoints/jobs.md) | 8 |
+| Hồ sơ ứng tuyển | [resumes](endpoints/resumes.md) | 15 |
 | CV trực tuyến | [cv-profiles](endpoints/cv-profiles.md) | 9 |
 | Kỹ năng | [skills](endpoints/skills.md) | 8 |
 | Đăng ký gợi ý | [subscribers](endpoints/subscribers.md) | 7 |

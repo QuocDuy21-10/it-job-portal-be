@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { IUser } from 'src/users/user.interface';
 import {
+  buildDateRange,
   buildPaginationMeta,
   escapeRegex,
   resolvePagination,
@@ -16,6 +17,8 @@ export const buildCrawledJobFilter = ({
   sourceKey,
   state,
   keyword,
+  from,
+  to,
 }: ListCrawledJobsQueryDto): Record<string, any> => {
   const filter: Record<string, any> = {};
   const trimmed = keyword?.trim();
@@ -34,6 +37,11 @@ export const buildCrawledJobFilter = ({
   if (trimmed) {
     const regex = new RegExp(escapeRegex(trimmed), 'i');
     filter.$or = [{ title: regex }, { companyName: regex }];
+  }
+
+  const createdAt = buildDateRange(from, to);
+  if (createdAt) {
+    filter.createdAt = createdAt;
   }
 
   return filter;

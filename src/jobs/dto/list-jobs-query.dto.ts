@@ -1,16 +1,15 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
-import { JOB_SEARCH_MAX_KEYWORD_LENGTH } from 'src/job-search/job-search.constants';
-import { PaginationQueryDto } from 'src/utils/dto/pagination-query.dto';
+import { IsEnum, IsOptional } from 'class-validator';
+import { KeywordListQueryDto } from 'src/utils/dto/keyword-list-query.dto';
+import { EJobListState } from '../enums/job-list-state.enum';
 
-export class ListJobsQueryDto extends PaginationQueryDto {
+/** `keyword` matches job title, skills and company name. */
+export class ListJobsQueryDto extends KeywordListQueryDto {
   @ApiPropertyOptional({
-    description: 'Search keyword — matches job title, skills, and company name',
-    example: 'React',
-    maxLength: JOB_SEARCH_MAX_KEYWORD_LENGTH,
+    enum: EJobListState,
+    description: 'Lifecycle state. Only for SUPER ADMIN and HR with a company; ignored otherwise',
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(JOB_SEARCH_MAX_KEYWORD_LENGTH)
-  keyword?: string;
+  @IsEnum(EJobListState)
+  state?: EJobListState;
 }

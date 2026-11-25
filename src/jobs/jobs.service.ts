@@ -10,7 +10,9 @@ import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { ApproveJobDto } from './dto/approve-job.dto';
 import { EJobApprovalStatus } from './enums/job-approval-status.enum';
+import { EJobListState } from './enums/job-list-state.enum';
 import {
+  buildJobStateFilter,
   buildPublicJobVisibilityFilter,
   isJobPubliclyVisible,
   PUBLIC_JOB_PROJECTION,
@@ -20,6 +22,8 @@ import { Job, JobDocument } from './schemas/job.schema';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
 import { ERole } from 'src/casl';
 import {
+  andFilter,
+  buildKeywordFilter,
   buildPaginationMeta,
   parseListQuery,
   resolvePagination,
@@ -86,6 +90,10 @@ export class JobsService {
     'endDate',
   ]);
 
+  // The status tabs replace these filters, so tab counts leave them out.
+  private readonly STATE_FIELDS = ['approvalStatus', 'isActive'];
+  private readonly KEYWORD_FIELDS = ['name', 'skills', 'company.name'];
+
   constructor(
     private readonly jobRepository: JobRepository,
     private readonly skillsService: SkillsService,
@@ -125,69 +133,69 @@ export class JobsService {
     return { _id: newJob._id, createdAt: newJob.createdAt };
   }
 
-  async findAll(page?: unknown, limit?: unknown, query?: string, user?: IUser, keyword?: string) {
-    const { filter, sort } = parseListQuery(query, {
-      filterFields: this.ALLOWED_FILTER_FIELDS,
-      sortFields: this.ALLOWED_SORT_FIELDS,
-    });
-    await this.normalizeSkillsFilter(filter);
-    this.normalizeLocationFilter(filter);
-
-    if (typeof filter['company._id'] === 'string') {
-      filter['company._id'] = {
-        $in: buildEmbeddedCompanyIdCandidates(filter['company._id']),
-      };
-    }
-
-    let projection: string | undefined;
-    if (user && user.role === ERole.HR && user.company?._id) {
-      Object.assign(filter, buildEmbeddedCompanyIdFilter(user.company._id));
-    } else if (!user || user.role !== ERole.SUPER_ADMIN) {
-      Object.assign(filter, this.buildActiveJobFilter());
-      projection = PUBLIC_JOB_PROJECTION;
-    }
-
-    const trimmedKeyword = keyword?.trim();
-    if (trimmedKeyword) {
-      const keywordFilter = this.buildKeywordFilter(trimmedKeyword);
-      if (Array.isArray(filter.$and)) {
-        filter.$and.push(keywordFilter);
-      } else {
-        filter.$and = [keywordFilter];
-      }
+  async findAll(
+    page?: unknown,
+    limit?: unknown,
+    query?: string,
+    user?: IUser,
+    keyword?: string,
+    state?: EJobListState,
+  ) {
+    const { filter, clientFilter, sort, scope } = await this.buildListFilter(query, user, keyword);
+    const isPublic = scope === LIST_CACHE_SCOPES.PUBLIC;
+    const appliedState = isPublic ? undefined : state;
+    if (appliedState) {
+      andFilter(filter, buildJobStateFilter(appliedState));
     }
 
     const { page: safePage, limit: safeLimit, offset: safeOffset } = resolvePagination(page, limit);
-    const cacheScope = this.resolveJobsListCacheScope(user);
-    const cacheFilter = this.buildJobsListCacheFilterSignature(filter);
+    const trimmedKeyword = keyword?.trim() || undefined;
 
     return this.listCacheService.getOrSet({
       keyInput: {
         endpoint: LIST_CACHE_ENDPOINTS.JOBS,
-        scope: cacheScope,
+        scope,
         payload: {
-          filter: cacheFilter,
+          filter: clientFilter,
           keyword: trimmedKeyword ?? null,
+          state: appliedState ?? null,
           limit: safeLimit,
           page: safePage,
           sort,
         },
       },
       ttlMs: LIST_CACHE_TTL.JOBS,
-      tags: response =>
-        this.buildJobsListCacheTags(cacheScope, filter, trimmedKeyword, response.result),
+      tags: response => this.buildJobsListCacheTags(scope, filter, trimmedKeyword, response.result),
       loader: async () => {
         const { result, totalItems } = await this.jobRepository.findPaginated(
           filter,
           safeOffset,
           safeLimit,
           sort,
-          projection,
+          isPublic ? PUBLIC_JOB_PROJECTION : undefined,
         );
 
         return { result, meta: buildPaginationMeta(safePage, safeLimit, totalItems) };
       },
     });
+  }
+
+  async countByState(
+    query: unknown,
+    user?: IUser,
+    keyword?: string,
+  ): Promise<Record<string, number>> {
+    const { filter } = await this.buildListFilter(query, user, keyword, this.STATE_FIELDS);
+    const now = new Date();
+    const states = Object.values(EJobListState);
+    const [ALL, ...counts] = await Promise.all([
+      this.jobRepository.countDocuments(filter),
+      ...states.map(state =>
+        this.jobRepository.countDocuments({ $and: [filter, buildJobStateFilter(state, now)] }),
+      ),
+    ]);
+
+    return { ALL, ...Object.fromEntries(states.map((state, index) => [state, counts[index]])) };
   }
 
   async findOne(id: string, user?: IUser) {
@@ -744,9 +752,36 @@ export class JobsService {
     return buildPublicJobVisibilityFilter();
   }
 
-  private buildKeywordFilter(keyword: string): Record<string, any> {
-    const regex = new RegExp(this.escapeRegex(keyword), 'i');
-    return { $or: [{ name: regex }, { skills: regex }, { 'company.name': regex }] };
+  private async buildListFilter(
+    query: unknown,
+    user?: IUser,
+    keyword?: string,
+    ignoredFields: string[] = [],
+  ) {
+    const { filter, sort } = parseListQuery(query, {
+      filterFields: new Set(
+        [...this.ALLOWED_FILTER_FIELDS].filter(field => !ignoredFields.includes(field)),
+      ),
+      sortFields: this.ALLOWED_SORT_FIELDS,
+    });
+    await this.normalizeSkillsFilter(filter);
+    this.normalizeLocationFilter(filter);
+
+    if (typeof filter['company._id'] === 'string') {
+      filter['company._id'] = { $in: buildEmbeddedCompanyIdCandidates(filter['company._id']) };
+    }
+
+    // The cache key: client dates must stay apart, the server's "now" below must not enter it.
+    const clientFilter = { ...filter };
+    const scope = this.resolveJobsListCacheScope(user);
+    if (scope === LIST_CACHE_SCOPES.PUBLIC) {
+      Object.assign(filter, this.buildActiveJobFilter());
+    } else if (user.role === ERole.HR) {
+      Object.assign(filter, buildEmbeddedCompanyIdFilter(user.company._id));
+    }
+    andFilter(filter, buildKeywordFilter(keyword, this.KEYWORD_FIELDS));
+
+    return { filter, clientFilter, sort, scope };
   }
 
   private resolveLocationOrThrow(locationCode?: string | null, location?: string | null) {
@@ -819,34 +854,6 @@ export class JobsService {
     }
 
     return tags;
-  }
-
-  private buildJobsListCacheFilterSignature(value: unknown): unknown {
-    if (value instanceof Date) {
-      return '__dynamic_now__';
-    }
-
-    if (value instanceof RegExp) {
-      return {
-        __type: 'RegExp',
-        flags: value.flags,
-        source: value.source,
-      };
-    }
-
-    if (Array.isArray(value)) {
-      return value.map(item => this.buildJobsListCacheFilterSignature(item));
-    }
-
-    if (value && typeof value === 'object') {
-      const objectValue = value as Record<string, unknown>;
-      return Object.keys(objectValue).reduce<Record<string, unknown>>((signature, key) => {
-        signature[key] = this.buildJobsListCacheFilterSignature(objectValue[key]);
-        return signature;
-      }, {});
-    }
-
-    return value;
   }
 
   private extractCompanyIdsFromFilter(companyFilter: any): string[] {
