@@ -87,7 +87,7 @@ Thiếu cấu hình SMTP không làm ứng dụng từ chối khởi động nh�
 | Biến | Bắt buộc | Mặc định | Dùng cho |
 |---|---|---|---|
 | `GEMINI_API_KEY` | Có | không | Khóa Gemini; `validateEnv` dừng boot nếu thiếu |
-| `GEMINI_MODEL` | Không | `gemini-3.1-flash-lite` | Mô hình Gemini |
+| `GEMINI_MODEL` | Không | `gemini-3.5-flash-lite` | Mô hình Gemini |
 | `GROQ_API_KEY` | Không | không | Khóa Groq; thiếu thì Groq không khả dụng |
 | `GROQ_CHAT_MODEL` | Không | `openai/gpt-oss-20b` | Mô hình chat |
 | `GROQ_SUMMARY_MODEL` | Không | như mô hình chat | Mô hình tóm tắt |
