@@ -59,9 +59,9 @@ describe('UsersController', () => {
     const expected = { result: [], meta: {} };
     mockUsersService.findAll.mockResolvedValue(expected as any);
 
-    const result = await controller.findAll({ page: '2', limit: '5' }, query);
+    const result = await controller.findAll({ page: '2', limit: '5', keyword: 'ali' }, query);
 
-    expect(mockUsersService.findAll).toHaveBeenCalledWith('2', '5', query);
+    expect(mockUsersService.findAll).toHaveBeenCalledWith('2', '5', query, 'ali');
     expect(result).toBe(expected);
   });
 

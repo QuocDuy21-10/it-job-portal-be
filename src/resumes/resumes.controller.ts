@@ -24,7 +24,7 @@ import { ResumesService } from './resumes.service';
 import { UpdateResumeDto } from './dto/update-resume.dto';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
-import { PaginationQueryDto } from 'src/utils/dto/pagination-query.dto';
+import { KeywordListQueryDto } from 'src/utils/dto/keyword-list-query.dto';
 import { IUser } from 'src/users/user.interface';
 import { ApiOperation, ApiTags, ApiConsumes, ApiBody, ApiResponse } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -59,8 +59,29 @@ export class ResumesController {
     description: 'Retrieves a paginated list of all resumes. Supports filtering and sorting.',
   })
   @ResponseMessage('Lấy danh sách hồ sơ ứng tuyển thành công')
-  findAll(@Query() pagination: PaginationQueryDto, @Query() query: string, @User() user: IUser) {
-    return this.resumesService.findAll(pagination.page, pagination.limit, query, user);
+  findAll(@Query() listQuery: KeywordListQueryDto, @Query() query: string, @User() user: IUser) {
+    return this.resumesService.findAll(
+      listQuery.page,
+      listQuery.limit,
+      query,
+      user,
+      listQuery.keyword,
+    );
+  }
+
+  @Get('status-counts')
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
+  @ApiOperation({
+    summary: 'Count resumes per status',
+    description: 'Takes the list filters and keyword; ignores status.',
+  })
+  @ResponseMessage('Lấy số lượng hồ sơ theo trạng thái thành công')
+  countByStatus(
+    @Query() listQuery: KeywordListQueryDto,
+    @Query() query: string,
+    @User() user: IUser,
+  ) {
+    return this.resumesService.countByStatus(query, user, listQuery.keyword);
   }
 
   @Get(':id')

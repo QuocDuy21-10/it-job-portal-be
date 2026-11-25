@@ -9,7 +9,10 @@ import { UpdateResumeDto } from './dto/update-resume.dto';
 import { IUser } from 'src/users/user.interface';
 import { IBulkDeleteResult } from 'src/utils/interfaces/bulk-delete-result.interface';
 import { ERole } from 'src/casl/enums/role.enum';
+import { EResumeStatus } from './enums/resume-status.enum';
 import {
+  andFilter,
+  buildKeywordFilter,
   buildPaginationMeta,
   parseListQuery,
   resolvePagination,
@@ -56,24 +59,16 @@ export class ResumesService {
     'aiAnalysis.matchingScore',
   ]);
 
+  private readonly KEYWORD_FIELDS = ['email', 'parsedData.fullName'];
+
   constructor(
     private readonly resumeRepository: ResumeRepository,
     private readonly applicationNotificationService: ApplicationNotificationService,
     private readonly statisticsCacheService: StatisticsCacheService,
   ) {}
 
-  async findAll(page?: unknown, limit?: unknown, query?: string, user?: IUser) {
-    const { filter, sort } = parseListQuery(query, {
-      filterFields: this.ALLOWED_FILTER_FIELDS,
-      sortFields: this.ALLOWED_SORT_FIELDS,
-    });
-
-    // Role-based scope applied after parsing — cannot be overridden by query string
-    if (user?.role === ERole.HR) {
-      assertCompanyAccess(user, user.company?._id);
-      filter.companyId = user.company._id;
-    }
-
+  async findAll(page?: unknown, limit?: unknown, query?: string, user?: IUser, keyword?: string) {
+    const { filter, sort } = this.buildListFilter(query, user, keyword);
     const pagination = resolvePagination(page, limit);
 
     const { result, totalItems } = await this.resumeRepository.findPaginated(
@@ -85,6 +80,44 @@ export class ResumesService {
     );
 
     return { result, meta: buildPaginationMeta(pagination.page, pagination.limit, totalItems) };
+  }
+
+  async countByStatus(
+    query: unknown,
+    user?: IUser,
+    keyword?: string,
+  ): Promise<Record<string, number>> {
+    const { filter } = this.buildListFilter(query, user, keyword, ['status']);
+    const statuses = Object.values(EResumeStatus);
+    const [ALL, ...counts] = await Promise.all([
+      this.resumeRepository.countDocuments(filter),
+      ...statuses.map(status => this.resumeRepository.countDocuments({ ...filter, status })),
+    ]);
+
+    return { ALL, ...Object.fromEntries(statuses.map((status, i) => [status, counts[i]])) };
+  }
+
+  private buildListFilter(
+    query: unknown,
+    user?: IUser,
+    keyword?: string,
+    ignoredFields: string[] = [],
+  ) {
+    const { filter, sort } = parseListQuery(query, {
+      filterFields: new Set(
+        [...this.ALLOWED_FILTER_FIELDS].filter(field => !ignoredFields.includes(field)),
+      ),
+      sortFields: this.ALLOWED_SORT_FIELDS,
+    });
+
+    // Role-based scope applied after parsing — cannot be overridden by query string
+    if (user?.role === ERole.HR) {
+      assertCompanyAccess(user, user.company?._id);
+      filter.companyId = user.company._id;
+    }
+    andFilter(filter, buildKeywordFilter(keyword, this.KEYWORD_FIELDS));
+
+    return { filter, sort };
   }
 
   async findOne(id: string, user?: IUser) {

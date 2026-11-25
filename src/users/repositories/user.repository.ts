@@ -71,6 +71,10 @@ export class UserRepository {
     return this.userModel.findOne(filter).select(select).lean();
   }
 
+  async countDocuments(filter: Record<string, any>): Promise<number> {
+    return this.userModel.countDocuments(filter);
+  }
+
   async findPaginated(
     filter: any,
     offset: number,

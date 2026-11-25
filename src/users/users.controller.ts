@@ -17,6 +17,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { LockUserDto } from './dto/lock-user.dto';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
+import { KeywordListQueryDto } from 'src/utils/dto/keyword-list-query.dto';
 import { PaginationQueryDto } from 'src/utils/dto/pagination-query.dto';
 import { resolvePagination } from 'src/utils/helpers/list-query.helper';
 import { IUser } from './user.interface';
@@ -51,8 +52,19 @@ export class UsersController {
       'API to get a list of all users with pagination and search. Supports filtering by fields.',
   })
   @ResponseMessage('Lấy danh sách người dùng thành công')
-  findAll(@Query() pagination: PaginationQueryDto, @Query() query: string) {
-    return this.usersService.findAll(pagination.page, pagination.limit, query);
+  findAll(@Query() listQuery: KeywordListQueryDto, @Query() query: string) {
+    return this.usersService.findAll(listQuery.page, listQuery.limit, query, listQuery.keyword);
+  }
+
+  @Get('status-counts')
+  @Roles(ERole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Count users per role and locked users',
+    description: 'Takes the list filters and keyword; ignores role and isLocked.',
+  })
+  @ResponseMessage('Lấy số lượng người dùng theo vai trò thành công')
+  countByRole(@Query() listQuery: KeywordListQueryDto, @Query() query: string) {
+    return this.usersService.countByRole(query, listQuery.keyword);
   }
 
   @Patch(':id')

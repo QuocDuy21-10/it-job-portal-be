@@ -55,6 +55,7 @@ describe('UsersService', () => {
       resolveCompanyAssignmentForRole: jest.fn(),
       create: jest.fn(),
       findPaginated: jest.fn(),
+      countDocuments: jest.fn(),
       findById: jest.fn(),
       findOneByUserEmail: jest.fn(),
       findWithSelect: jest.fn(),
@@ -371,6 +372,42 @@ describe('UsersService', () => {
     });
   });
 
+  describe('keyword and counts', () => {
+    it('searches name and email literally', async () => {
+      mockUserRepository.findPaginated.mockResolvedValue({
+        result: [],
+        totalItems: 0,
+        totalPages: 0,
+      } as any);
+
+      await service.findAll(1, 10, { role: 'HR' } as any, 'a+b@');
+
+      const [filter] = mockUserRepository.findPaginated.mock.calls[0];
+      expect(filter).toEqual({
+        role: 'HR',
+        $and: [{ $or: [{ name: /a\+b@/i }, { email: /a\+b@/i }] }],
+      });
+    });
+
+    it('counts each role plus locked accounts and ignores the tab fields', async () => {
+      mockUserRepository.countDocuments.mockResolvedValue(4);
+
+      const counts = await service.countByRole({ role: 'HR', isLocked: 'true', isActive: 'true' });
+
+      expect(counts).toEqual({
+        ALL: 4,
+        'SUPER ADMIN': 4,
+        HR: 4,
+        'NORMAL USER': 4,
+        LOCKED: 4,
+      });
+      expect(mockUserRepository.countDocuments).toHaveBeenNthCalledWith(1, { isActive: true });
+      expect(mockUserRepository.countDocuments).toHaveBeenCalledWith({
+        isActive: true,
+        isLocked: true,
+      });
+    });
+  });
   describe('findOne', () => {
     it('should validate the id and return repository data', async () => {
       const id = new mongoose.Types.ObjectId().toString();
