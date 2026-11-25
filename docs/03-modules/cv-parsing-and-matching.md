@@ -39,7 +39,7 @@ Sau đó văn bản bị **từ chối** nếu: dưới 100 ký tự, trên 50.0
 
 ### Trích xuất bằng AI
 
-`GeminiService.parseCV` gửi văn bản đã làm sạch cho Gemini với cấu hình `responseMimeType: application/json`, nhiệt độ và giới hạn token cố định trong code, rồi `JSON.parse` kết quả theo `ParsedDataDto`. Mô hình mặc định là `gemini-3.1-flash-lite`, đổi bằng `GEMINI_MODEL`. Mọi lần gọi đi qua bộ giữ quota và có retry với backoff khi gặp lỗi giới hạn tốc độ ([gemini.service.ts](../../src/gemini/gemini.service.ts)).
+`GeminiService.parseCV` gửi văn bản đã làm sạch cho Gemini với cấu hình `responseMimeType: application/json`, nhiệt độ và giới hạn token cố định trong code, rồi `JSON.parse` kết quả theo `ParsedDataDto`. Mô hình mặc định là `gemini-3.5-flash-lite`, đổi bằng `GEMINI_MODEL`. Mọi lần gọi đi qua bộ giữ quota và có retry với backoff khi gặp lỗi giới hạn tốc độ ([gemini.service.ts](../../src/gemini/gemini.service.ts)).
 
 ### Chuẩn hóa kỹ năng
 

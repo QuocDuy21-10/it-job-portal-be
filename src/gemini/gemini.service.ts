@@ -9,7 +9,7 @@ import { IAIChatResponse } from 'src/ai/interfaces/ai-chat-response.interface';
 import { IAIChatStreamResult } from 'src/ai/interfaces/ai-chat-stream-result.interface';
 import { IAIChatUsageMetadata } from 'src/ai/interfaces/ai-chat-usage-metadata.interface';
 
-const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-lite';
+const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite';
 
 @Injectable()
 export class GeminiService {
@@ -180,14 +180,18 @@ ${cvText}`;
       }
 
       const isRateLimitError = this.isRateLimitError(error);
+      const isOverloadedError = !isRateLimitError && this.isOverloadedError(error);
       // Only CV parsing runs in a queue worker; chat and summary calls have a user waiting on them,
       // so they fail fast instead of sleeping (up to a minute per attempt) inside the request.
-      const shouldRetry = workload === 'parse' && retryCount < this.MAX_RETRIES && isRateLimitError;
+      const shouldRetry =
+        workload === 'parse' &&
+        retryCount < this.MAX_RETRIES &&
+        (isRateLimitError || isOverloadedError);
 
       if (shouldRetry) {
         const retryDelay = this.calculateRetryDelay(error, retryCount);
         this.logger.warn(
-          `Rate limit hit. Retrying in ${retryDelay}ms (attempt ${retryCount + 1}/${this.MAX_RETRIES})`,
+          `${isOverloadedError ? 'Gemini overloaded (503)' : 'Rate limit hit'}. Retrying in ${retryDelay}ms (attempt ${retryCount + 1}/${this.MAX_RETRIES})`,
         );
         await this.sleep(retryDelay);
         return this.makeRequestWithRetry(workload, requestFn, retryCount + 1);
@@ -208,6 +212,16 @@ ${cvText}`;
       errorMessage.includes('Too Many Requests') ||
       errorMessage.includes('quota') ||
       errorMessage.includes('rate limit')
+    );
+  }
+
+  // Kept separate from isRateLimitError: ChatService maps rate limits to 429, overloads to 503.
+  private isOverloadedError(error: unknown): boolean {
+    const errorMessage = (error as { message?: string })?.message || '';
+    return (
+      errorMessage.includes('503') ||
+      errorMessage.includes('UNAVAILABLE') ||
+      errorMessage.toLowerCase().includes('overloaded')
     );
   }
 

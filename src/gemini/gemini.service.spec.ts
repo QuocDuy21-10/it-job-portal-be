@@ -77,6 +77,10 @@ describe('GeminiService request limits', () => {
     return { service, generateContent, sleep };
   };
   const rateLimited = () => new Error('429 Too Many Requests');
+  const overloaded = () =>
+    new Error(
+      '{"error":{"code":503,"message":"This model is currently experiencing high demand.","status":"UNAVAILABLE"}}',
+    );
 
   it('gives the Gemini client a request timeout', () => {
     createService();
@@ -107,5 +111,49 @@ describe('GeminiService request limits', () => {
     await expect(service.parseCV('cv text')).resolves.toEqual({ skills: [] });
     expect(generateContent).toHaveBeenCalledTimes(2);
     expect(sleep).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries CV parsing when Gemini is overloaded (503)', async () => {
+    const { service, generateContent, sleep } = createService();
+    generateContent
+      .mockRejectedValueOnce(overloaded())
+      .mockResolvedValueOnce({ text: '{"skills":[]}' });
+
+    await expect(service.parseCV('cv text')).resolves.toEqual({ skills: [] });
+    expect(generateContent).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up CV parsing after MAX_RETRIES overloaded attempts', async () => {
+    const { service, generateContent, sleep } = createService();
+    generateContent.mockRejectedValue(overloaded());
+
+    await expect(service.parseCV('cv text')).rejects.toThrow('CV parsing failed');
+    expect(generateContent).toHaveBeenCalledTimes(4); // 1 call + 3 retries
+    expect(sleep).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not sleep and retry user-facing calls when Gemini is overloaded', async () => {
+    const { service, generateContent, sleep } = createService();
+    generateContent.mockRejectedValue(overloaded());
+
+    await expect(service.summarizeConversation([{ role: 'user', content: 'hi' }])).resolves.toBe(
+      'Previous conversation context',
+    );
+    expect(generateContent).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  // ChatService maps isRateLimitError to HTTP 429; a 503 must keep mapping to SERVICE_UNAVAILABLE.
+  it('does not report an overload as a rate limit', () => {
+    const { service } = createService();
+
+    expect(service.isRateLimitError(overloaded())).toBe(false);
+  });
+
+  it('defaults to gemini-3.5-flash-lite when GEMINI_MODEL is not set', () => {
+    const { service } = createService();
+
+    expect(service.getChatModelName()).toBe('gemini-3.5-flash-lite');
   });
 });

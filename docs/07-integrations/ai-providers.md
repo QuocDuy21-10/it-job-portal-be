@@ -23,7 +23,7 @@ Nguồn: [ai.constants.ts](../../src/ai/ai.constants.ts) (`DEFAULT_AI_CHAT_PRIMA
 | `GROQ_TIMEOUT_MS` | Thời gian chờ | 30000 |
 | `GROQ_MAX_RETRIES` | Số lần SDK thử lại | 2 |
 | `GEMINI_API_KEY` | Khóa Gemini; **bắt buộc**, `GeminiService` không khởi động nếu thiếu | — |
-| `GEMINI_MODEL` | Mô hình Gemini | `gemini-3.1-flash-lite` |
+| `GEMINI_MODEL` | Mô hình Gemini | `gemini-3.5-flash-lite` |
 | `GEMINI_DAILY_BUDGET` và các biến dự trữ | Ngân sách quota | 450 mỗi ngày, 15 mỗi phút |
 | `AI_CHAT_PRIMARY_PROVIDER`, `AI_SUMMARY_PRIMARY_PROVIDER` | Đổi nhà cung cấp chính | `groq` |
 | `AI_CHAT_GEMINI_FALLBACK_ENABLED`, `AI_SUMMARY_GEMINI_FALLBACK_ENABLED` | Bật tắt dự phòng | bật |
