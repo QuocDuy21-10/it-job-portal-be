@@ -5,6 +5,7 @@ import { JobRepository } from './repositories/job.repository';
 import { CompanyFollowerQueueService } from 'src/queues/services/company-follower-queue.service';
 import { JobExpirationQueueService } from 'src/queues/services/job-expiration-queue.service';
 import { EJobApprovalStatus } from './enums/job-approval-status.enum';
+import { EJobListState } from './enums/job-list-state.enum';
 import { PUBLIC_JOB_PROJECTION } from './job-visibility.util';
 import { IUser } from 'src/users/user.interface';
 import { SkillsService } from 'src/skills/skills.service';
@@ -283,6 +284,76 @@ describe('JobsService', () => {
 
       const projections = mockJobRepository.findPaginated.mock.calls.map(call => call[4]);
       expect(projections).toEqual([PUBLIC_JOB_PROJECTION, undefined, undefined]);
+    });
+
+    it('adds the state for an admin without dropping the keyword', async () => {
+      mockJobRepository.findPaginated.mockResolvedValue(paginatedResponse([]));
+
+      await service.findAll(1, 10, '', superAdminUser(), 'c++', EJobListState.PENDING);
+
+      const passedFilter = (mockJobRepository.findPaginated as jest.Mock).mock.calls[0][0];
+      expect(passedFilter.$and).toEqual([
+        { $or: [{ name: /c\+\+/i }, { skills: /c\+\+/i }, { 'company.name': /c\+\+/i }] },
+        { approvalStatus: EJobApprovalStatus.PENDING },
+      ]);
+    });
+
+    it('ignores the state for public callers', async () => {
+      mockJobRepository.findPaginated.mockResolvedValue(paginatedResponse([]));
+
+      await service.findAll(1, 10, '', publicUser(), undefined, EJobListState.PENDING);
+
+      const passedFilter = (mockJobRepository.findPaginated as jest.Mock).mock.calls[0][0];
+      expect(passedFilter.approvalStatus).toBe(EJobApprovalStatus.APPROVED);
+      expect(passedFilter.$and).toBeUndefined();
+    });
+
+    it('keeps different date ranges and states apart in the cache, but not the server time', async () => {
+      mockJobRepository.findPaginated.mockResolvedValue(paginatedResponse([]));
+      const keyOf = async (query: string, state?: EJobListState) => {
+        mockListCacheService.getOrSet.mockClear();
+        await service.findAll(1, 10, query, superAdminUser(), undefined, state);
+        return JSON.stringify(mockListCacheService.getOrSet.mock.calls[0][0].keyInput);
+      };
+
+      const week = await keyOf('createdAt>=2026-11-19T00:00:00.000Z');
+      expect(await keyOf('createdAt>=2026-10-27T00:00:00.000Z')).not.toBe(week);
+      expect(await keyOf('createdAt>=2026-11-19T00:00:00.000Z')).toBe(week);
+
+      const active = await keyOf('', EJobListState.ACTIVE);
+      expect(await keyOf('', EJobListState.PENDING)).not.toBe(active);
+      expect(await keyOf('', EJobListState.ACTIVE)).toBe(active);
+
+      mockListCacheService.getOrSet.mockClear();
+      await service.findAll(1, 10, '', publicUser());
+      expect(mockListCacheService.getOrSet.mock.calls[0][0].keyInput.payload).toEqual(
+        expect.objectContaining({ filter: {} }),
+      );
+    });
+  });
+
+  describe('countByState', () => {
+    it('counts every state inside the caller scope and ignores the tab fields', async () => {
+      (mockJobRepository.countDocuments as jest.Mock).mockResolvedValue(3);
+      const companyId = '507f1f77bcf86cd799439041';
+
+      const counts = await service.countByState(
+        'approvalStatus=PENDING&isActive=true&level=Senior',
+        hrUser(companyId),
+      );
+
+      expect(counts).toEqual({
+        ALL: 3,
+        PENDING: 3,
+        ACTIVE: 3,
+        PAUSED: 3,
+        REJECTED: 3,
+        EXPIRED: 3,
+      });
+      const [base] = (mockJobRepository.countDocuments as jest.Mock).mock.calls[0];
+      expect(base).toEqual({ level: 'Senior', 'company._id': expect.anything() });
+      const [pending] = (mockJobRepository.countDocuments as jest.Mock).mock.calls[1];
+      expect(pending.$and[0]).toEqual(base);
     });
   });
 

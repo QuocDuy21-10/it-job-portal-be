@@ -44,7 +44,19 @@ export class JobsController {
       query,
       user,
       listQuery.keyword,
+      listQuery.state,
     );
+  }
+
+  @Get('status-counts')
+  @Roles(ERole.SUPER_ADMIN, ERole.HR)
+  @ApiOperation({
+    summary: 'Count jobs per lifecycle state',
+    description: 'Takes the list filters and keyword; ignores state, approvalStatus and isActive.',
+  })
+  @ResponseMessage('Lấy số lượng tin theo trạng thái thành công')
+  countByState(@Query() listQuery: ListJobsQueryDto, @Query() query: string, @User() user: IUser) {
+    return this.jobsService.countByState(query, user, listQuery.keyword);
   }
 
   @OptionalAuth()
