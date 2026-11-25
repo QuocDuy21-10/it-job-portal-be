@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsDateString, IsEnum, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { PaginationQueryDto } from 'src/utils/dto/pagination-query.dto';
 import { ERejectionReason } from '../enums/rejection-reason.enum';
 
@@ -22,4 +22,14 @@ export class ListCrawlFailuresQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(CRAWL_FAILURE_GROUPS)
   group?: CrawlFailureGroup;
+
+  @ApiPropertyOptional({ example: '2026-11-01T00:00:00.000Z', description: 'Inclusive' })
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @ApiPropertyOptional({ example: '2026-11-25T23:59:59.999Z', description: 'Inclusive' })
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 }

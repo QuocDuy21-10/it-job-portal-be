@@ -11,6 +11,8 @@ import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { IUser } from 'src/users/user.interface';
 import {
+  andFilter,
+  buildKeywordFilter,
   buildPaginationMeta,
   parseListQuery,
   resolvePagination,
@@ -45,6 +47,7 @@ export class CompaniesService {
     'address',
     'website',
     'numberOfEmployees',
+    'createdAt',
   ]);
 
   private readonly ALLOWED_SORT_FIELDS = new Set([
@@ -80,7 +83,7 @@ export class CompaniesService {
     return company;
   }
 
-  async findAll(page?: unknown, limit?: unknown, query?: string, user?: IUser) {
+  async findAll(page?: unknown, limit?: unknown, query?: string, user?: IUser, keyword?: string) {
     const { filter, sort } = parseListQuery(query, {
       filterFields: this.ALLOWED_FILTER_FIELDS,
       sortFields: this.ALLOWED_SORT_FIELDS,
@@ -90,6 +93,7 @@ export class CompaniesService {
     if (user && user.role === ERole.HR && user.company?._id) {
       filter._id = user.company._id;
     }
+    andFilter(filter, buildKeywordFilter(keyword, ['name']));
 
     const { page: safePage, limit: safeLimit, offset } = resolvePagination(page, limit);
     const cacheScope = this.resolveCompaniesListCacheScope(user);

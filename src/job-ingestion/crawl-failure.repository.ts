@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { buildPaginationMeta, resolvePagination } from 'src/utils/helpers/list-query.helper';
+import {
+  buildDateRange,
+  buildPaginationMeta,
+  resolvePagination,
+} from 'src/utils/helpers/list-query.helper';
 import { ListCrawlFailuresQueryDto } from './dto/list-crawl-failures-query.dto';
 import { ERejectionReason } from './enums/rejection-reason.enum';
 import {
@@ -58,10 +62,12 @@ export class CrawlFailureRepository {
     }
   }
 
-  async findAll({ sourceKey, reason, group, page, limit }: ListCrawlFailuresQueryDto) {
+  async findAll({ sourceKey, reason, group, from, to, page, limit }: ListCrawlFailuresQueryDto) {
     const pagination = resolvePagination(page, limit);
+    const failedAt = buildDateRange(from, to);
     const filter = {
       ...(sourceKey && { sourceKey }),
+      ...(failedAt && { failedAt }),
       reason: reason ?? (group === 'filtered' ? ERejectionReason.NOT_IT : { $in: ERROR_REASONS }),
     };
     const [result, total] = await Promise.all([

@@ -109,6 +109,18 @@ describe('CompaniesService', () => {
       mockCompanyRepository.getJobCountsForCompanies.mockResolvedValue(new Map());
     });
 
+    it('searches the name literally and keeps it in the cache key', async () => {
+      await service.findAll(1, 10, 'createdAt>=2026-11-01T00:00:00.000Z', undefined, ' c++ ');
+
+      const [filter] = mockCompanyRepository.findPaginated.mock.calls[0];
+      expect(filter).toEqual({
+        createdAt: { $gte: new Date('2026-11-01T00:00:00.000Z') },
+        $and: [{ $or: [{ name: /c\+\+/i }] }],
+      });
+      const { keyInput } = (mockListCacheService.getOrSet as jest.Mock).mock.calls[0][0];
+      expect(keyInput.payload.filter).toBe(filter);
+    });
+
     it('should return paginated results with job counts merged', async () => {
       const id1 = new mongoose.Types.ObjectId();
       const id2 = new mongoose.Types.ObjectId();

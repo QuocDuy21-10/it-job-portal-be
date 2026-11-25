@@ -7,7 +7,7 @@ import { IUser } from 'src/users/user.interface';
 import { OptionalAuth } from 'src/utils/decorators/optional-auth.decorator';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
-import { PaginationQueryDto } from 'src/utils/dto/pagination-query.dto';
+import { KeywordListQueryDto } from 'src/utils/dto/keyword-list-query.dto';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Roles, ERole } from 'src/casl';
 import { TopHiringCompaniesQueryDto, TopHiringCompanyDto } from './dto/top-hiring-company.dto';
@@ -48,8 +48,14 @@ export class CompaniesController {
       'Public API to get a list of all companies with pagination and search. Does not require authentication.',
   })
   @ResponseMessage('Lấy danh sách công ty thành công')
-  findAll(@Query() pagination: PaginationQueryDto, @Query() query: string, @User() user: IUser) {
-    return this.companiesService.findAll(pagination.page, pagination.limit, query, user);
+  findAll(@Query() listQuery: KeywordListQueryDto, @Query() query: string, @User() user: IUser) {
+    return this.companiesService.findAll(
+      listQuery.page,
+      listQuery.limit,
+      query,
+      user,
+      listQuery.keyword,
+    );
   }
 
   @OptionalAuth()
