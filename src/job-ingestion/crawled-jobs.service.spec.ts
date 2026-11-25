@@ -40,6 +40,12 @@ describe('buildCrawledJobFilter', () => {
     expect(filter.$or).toEqual([{ title: /c\+\+/i }, { companyName: /c\+\+/i }]);
   });
 
+  it('finds titles with or without accents', () => {
+    const [{ title }] = buildCrawledJobFilter({ keyword: 'ky su' }).$or;
+
+    expect(title.test('Kỹ sư phần mềm')).toBe(true);
+  });
+
   it('has no condition without filters', () => {
     expect(buildCrawledJobFilter({})).toEqual({});
   });

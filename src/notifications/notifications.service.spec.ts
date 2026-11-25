@@ -57,7 +57,7 @@ describe('NotificationsService.findAllByUser', () => {
   it('defaults to newest first and clamps limit to 100', async () => {
     const response = await service.findAllByUser(userId, 1, 1000, '');
 
-    expect(query.sort).toHaveBeenCalledWith({ createdAt: -1 });
+    expect(query.sort).toHaveBeenCalledWith({ createdAt: -1, _id: 1 });
     expect(query.limit).toHaveBeenCalledWith(100);
     expect(response.meta.pagination.per_page).toBe(100);
   });

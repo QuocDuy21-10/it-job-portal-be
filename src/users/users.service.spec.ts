@@ -383,10 +383,11 @@ describe('UsersService', () => {
       await service.findAll(1, 10, { role: 'HR' } as any, 'a+b@');
 
       const [filter] = mockUserRepository.findPaginated.mock.calls[0];
-      expect(filter).toEqual({
-        role: 'HR',
-        $and: [{ $or: [{ name: /a\+b@/i }, { email: /a\+b@/i }] }],
-      });
+      expect(filter.role).toBe('HR');
+      const [{ name }, { email }] = filter.$and[0].$or;
+      expect(email.test('x-a+b@seed.local')).toBe(true);
+      expect(email.test('aab@seed.local')).toBe(false);
+      expect(name).toEqual(email);
     });
 
     it('counts each role plus locked accounts and ignores the tab fields', async () => {

@@ -5,7 +5,7 @@ import { IUser } from 'src/users/user.interface';
 import {
   buildDateRange,
   buildPaginationMeta,
-  escapeRegex,
+  buildKeywordFilter,
   resolvePagination,
 } from 'src/utils/helpers/list-query.helper';
 import { ListCrawledJobsQueryDto } from './dto/list-crawled-jobs-query.dto';
@@ -21,7 +21,6 @@ export const buildCrawledJobFilter = ({
   to,
 }: ListCrawledJobsQueryDto): Record<string, any> => {
   const filter: Record<string, any> = {};
-  const trimmed = keyword?.trim();
 
   if (sourceKey) {
     filter.sourceKey = sourceKey;
@@ -34,10 +33,7 @@ export const buildCrawledJobFilter = ({
     filter.removedAt = null;
   }
 
-  if (trimmed) {
-    const regex = new RegExp(escapeRegex(trimmed), 'i');
-    filter.$or = [{ title: regex }, { companyName: regex }];
-  }
+  Object.assign(filter, buildKeywordFilter(keyword, ['title', 'companyName']));
 
   const createdAt = buildDateRange(from, to);
   if (createdAt) {

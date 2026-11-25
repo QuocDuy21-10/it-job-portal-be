@@ -122,7 +122,8 @@ Mọi route danh sách dùng aqp đều đi qua `parseListQuery` ([list-query.he
 - Regex từ client (`name=/abc/i`) bị escape thành tìm chuỗi literal, chỉ giữ cờ `i`.
 - Giá trị regex không hợp lệ (ví dụ `name=/c++/i`) trả `400`. `keyword` không bao giờ được đọc như bộ lọc.
 - `populate`, `fields`, `projection` từ client luôn bị bỏ qua.
-- `sort` chỉ nhận trường trong allowlist; `GET /notifications` mặc định `-createdAt`.
+- `sort` chỉ nhận trường trong allowlist; `GET /notifications` mặc định `-createdAt`. `_id` luôn được thêm làm khóa phụ để các trang không trùng hoặc mất bản ghi.
+- `keyword` không phân biệt hoa thường và dấu tiếng Việt (`Nguyen` tìm thấy `Nguyễn` và ngược lại).
 
 ## Giới hạn tốc độ
 
