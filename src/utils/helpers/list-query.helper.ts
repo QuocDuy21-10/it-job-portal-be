@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import aqp from 'api-query-params';
 
 export const DEFAULT_PAGE_LIMIT = 10;
@@ -15,6 +16,28 @@ const SAFE_VALUE_OPERATORS = new Set(['$eq', '$ne', '$gt', '$gte', '$lt', '$lte'
 
 export function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** `keyword` as a literal, case-insensitive search over the given fields. */
+export function buildKeywordFilter(keyword: string | undefined, fields: readonly string[]) {
+  const trimmed = keyword?.trim();
+  if (!trimmed) return undefined;
+
+  const regex = new RegExp(escapeRegex(trimmed), 'i');
+  return { $or: fields.map(field => ({ [field]: regex })) };
+}
+
+/** Adds a condition through $and so it cannot overwrite an existing $or or field. */
+export function andFilter(
+  filter: Record<string, any>,
+  condition: Record<string, unknown> | undefined,
+): void {
+  if (condition) filter.$and = [...(filter.$and ?? []), condition];
+}
+
+export function buildDateRange(from?: string, to?: string) {
+  if (!from && !to) return undefined;
+  return { ...(from && { $gte: new Date(from) }), ...(to && { $lte: new Date(to) }) };
 }
 
 // Client regex becomes a literal substring search so it cannot trigger ReDoS.
@@ -36,12 +59,25 @@ function sanitizeFilterValue(value: unknown): unknown {
   return sanitizeOperand(value);
 }
 
+// `keyword` is searched as plain text elsewhere; aqp would read "/c++/i" as a regex and throw.
+function parseRawQuery(rawQuery: unknown) {
+  const query =
+    rawQuery && typeof rawQuery === 'object'
+      ? Object.fromEntries(Object.entries(rawQuery).filter(([key]) => key !== 'keyword'))
+      : (rawQuery ?? '');
+  try {
+    return aqp(query as Parameters<typeof aqp>[0]);
+  } catch {
+    throw new BadRequestException('Bộ lọc không đúng định dạng');
+  }
+}
+
 /** Parses an aqp query string/object into an allowlisted Mongo filter and sort. Pagination is separate. */
 export function parseListQuery(
   rawQuery: unknown,
   options: ListQueryOptions,
 ): { filter: Record<string, any>; sort: Record<string, SortDirection> } {
-  const { filter: rawFilter, sort: rawSort } = aqp((rawQuery ?? '') as Parameters<typeof aqp>[0]);
+  const { filter: rawFilter, sort: rawSort } = parseRawQuery(rawQuery);
 
   const filter: Record<string, any> = {};
   for (const [key, value] of Object.entries(rawFilter ?? {})) {
