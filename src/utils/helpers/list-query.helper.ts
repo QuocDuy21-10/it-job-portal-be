@@ -18,12 +18,34 @@ export function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** `keyword` as a literal, case-insensitive search over the given fields. */
+const VIETNAMESE_LETTERS = [
+  'aàáảãạăằắẳẵặâầấẩẫậ',
+  'eèéẻẽẹêềếểễệ',
+  'iìíỉĩị',
+  'oòóỏõọôồốổỗộơờớởỡợ',
+  'uùúủũụưừứửữự',
+  'yỳýỷỹỵ',
+  'dđ',
+];
+
+/** Literal and case-insensitive; "Nguyen" and "Nguyễn" find each other. */
+const buildSearchRegex = (text: string): RegExp =>
+  new RegExp(
+    [...escapeRegex(text.normalize('NFC'))]
+      .map(char => {
+        const letters = VIETNAMESE_LETTERS.find(group => group.includes(char.toLowerCase()));
+        return letters ? `[${letters}]` : char;
+      })
+      .join(''),
+    'i',
+  );
+
+/** `keyword` as a plain-text search over the given fields. */
 export function buildKeywordFilter(keyword: string | undefined, fields: readonly string[]) {
   const trimmed = keyword?.trim();
   if (!trimmed) return undefined;
 
-  const regex = new RegExp(escapeRegex(trimmed), 'i');
+  const regex = buildSearchRegex(trimmed);
   return { $or: fields.map(field => ({ [field]: regex })) };
 }
 
@@ -91,10 +113,10 @@ export function parseListQuery(
     if (options.sortFields.has(key) && (value === 1 || value === -1)) sort[key] = value;
   }
 
-  if (Object.keys(sort).length === 0 && options.defaultSort) {
-    return { filter, sort: { ...options.defaultSort } };
-  }
-  return { filter, sort };
+  const applied = Object.keys(sort).length > 0 ? sort : { ...options.defaultSort };
+  // Equal sort values have no fixed order in MongoDB, so pages would repeat and skip documents.
+  if (Object.keys(applied).length > 0) applied._id = 1;
+  return { filter, sort: applied };
 }
 
 export function resolvePagination(

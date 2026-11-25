@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { Job } from 'src/jobs/schemas/job.schema';
 import { EJobListState } from 'src/jobs/enums/job-list-state.enum';
 import { EResumeStatus } from 'src/resumes/enums/resume-status.enum';
+import { User } from 'src/users/schemas/user.schema';
 import { Resume } from 'src/resumes/schemas/resume.schema';
 import { createTestApp, TestApp } from './utils/test-app';
 import { resetState } from './utils/reset';
@@ -103,10 +104,23 @@ describe('Admin list filters (e2e)', () => {
     expect(result.LOCKED).toBe(await total('admin', '/users', { isLocked: 'true' }));
   });
 
+  // Users seeded together share createdAt; without a tie-break pages repeated some and hid others.
+  it.each(['-createdAt', 'createdAt'])('pages through every user once, sort %s', async sort => {
+    await t.model(User.name).updateMany({}, { createdAt: new Date() }, { timestamps: false });
+    const ids: string[] = [];
+    const all = await total('admin', '/users', {});
+    for (let page = 1; page <= all; page++) {
+      const res = await get('admin', '/users', { sort, page: String(page), limit: '1' });
+      ids.push(...res.body.data.result.map((user: any) => user._id));
+    }
+    expect(new Set(ids).size).toBe(all);
+  });
+
   it('searches special characters as plain text', async () => {
     expect(await total('admin', '/jobs', { keyword: 'C++ (Qt)' })).toBe(1);
     expect(await total('admin', '/jobs', { keyword: '/c++/i' })).toBe(0);
     expect(await total('admin', '/resumes', { keyword: 'nguyễn văn' })).toBe(10);
+    expect(await total('admin', '/resumes', { keyword: 'Nguyen Van' })).toBe(10);
     expect(await total('admin', '/users', { keyword: 'HRA@e2e' })).toBe(1);
     expect(await total('admin', '/companies', { keyword: 'company a' })).toBe(1);
   });

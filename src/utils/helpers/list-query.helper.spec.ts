@@ -76,7 +76,11 @@ describe('parseListQuery', () => {
 
   it('keeps only allowlisted sort fields with 1/-1', () => {
     const { sort } = parseListQuery('sort=-createdAt,password,name', options);
-    expect(sort).toEqual({ createdAt: -1, name: 1 });
+    expect(Object.entries(sort)).toEqual([
+      ['createdAt', -1],
+      ['name', 1],
+      ['_id', 1],
+    ]);
   });
 
   it('falls back to defaultSort when no valid sort is given', () => {
@@ -84,7 +88,7 @@ describe('parseListQuery', () => {
       ...options,
       defaultSort: { createdAt: -1 },
     });
-    expect(sort).toEqual({ createdAt: -1 });
+    expect(sort).toEqual({ createdAt: -1, _id: 1 });
   });
 
   it('accepts empty or missing queries', () => {
@@ -120,6 +124,21 @@ describe('buildPaginationMeta', () => {
 });
 
 describe('buildKeywordFilter', () => {
+  it.each([
+    ['Nguyễn', 'Nguyen Van An'],
+    ['nguyen', 'NGUYỄN Văn An'],
+    ['đa nang', 'Đà Nẵng'],
+    ['Ha Noi', 'Hà Nội'],
+  ])('finds %s in %s: accents do not matter', (keyword, stored) => {
+    const [{ name }] = buildKeywordFilter(keyword, ['name']).$or;
+    expect(name.test(stored)).toBe(true);
+  });
+
+  it('still tells different letters apart', () => {
+    const [{ name }] = buildKeywordFilter('ha noi', ['name']).$or;
+    expect(name.test('Hai Noi')).toBe(false);
+  });
+
   it('matches the trimmed keyword literally in every field', () => {
     expect(buildKeywordFilter(' c++ ', ['name', 'email'])).toEqual({
       $or: [{ name: /c\+\+/i }, { email: /c\+\+/i }],
