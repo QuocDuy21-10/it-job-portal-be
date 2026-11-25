@@ -20,6 +20,7 @@ Danh sách được cache 60 giây trong Redis, tách theo phạm vi (`public`, 
 |---|---|---|
 | `POST /api/v1/jobs` | Đăng nhập, vai trò: SUPER ADMIN, HR | Tạo tin tuyển dụng, trạng thái duyệt mặc định `PENDING` (quản trị viên hoặc HR) |
 | `GET /api/v1/jobs` | Tùy chọn (khách hoặc đã đăng nhập) | Danh sách tin có phân trang, lọc, sắp xếp và tìm theo `keyword`. Kết quả phụ thuộc người gọi |
+| `GET /api/v1/jobs/status-counts` | Đăng nhập, vai trò: SUPER ADMIN, HR | Số tin theo từng trạng thái vòng đời, trong phạm vi của người gọi |
 | `GET /api/v1/jobs/:id` | Tùy chọn (khách hoặc đã đăng nhập) | Chi tiết một tin |
 | `PATCH /api/v1/jobs/:id` | Đăng nhập, vai trò: SUPER ADMIN, HR | Cập nhật tin. HR chỉ sửa tin công ty mình |
 | `DELETE /api/v1/jobs/bulk` | Đăng nhập, vai trò: SUPER ADMIN, HR | Xóa mềm nhiều tin |
@@ -29,6 +30,7 @@ Danh sách được cache 60 giây trong Redis, tách theo phạm vi (`public`, 
 ## Lọc, tìm kiếm và sắp xếp
 
 - `keyword` (một chuỗi, tối đa 100 ký tự) tìm trên tên tin, kỹ năng và tên công ty.
+- `state` (chỉ `SUPER ADMIN` và `HR` có công ty): `PENDING`, `ACTIVE`, `PAUSED`, `REJECTED`, `EXPIRED`; mỗi tin thuộc đúng một trạng thái. `status-counts` nhận cùng bộ lọc và `keyword`, bỏ qua `state`, `approvalStatus`, `isActive`.
 - Bộ lọc khác đọc từ query string bằng `api-query-params`, **chỉ** các trường: `name`, `skills`, `location`, `locationCode`, `salary`, `quantity`, `level`, `formOfWork`, `isActive`, `approvalStatus`, `company._id`, `startDate`, `endDate`, `createdAt`. Trường khác bị bỏ qua.
 - Sắp xếp **chỉ** theo các trường trong `ALLOWED_SORT_FIELDS` (ví dụ `name`, `salary`, `createdAt`, `updatedAt`, `level`, `location`), giá trị `1` hoặc `-1`.
 - `skills` được chuẩn hóa qua danh mục kỹ năng; giá trị không có trong danh mục làm yêu cầu bị `400`.

@@ -12,7 +12,7 @@ Toàn bộ route chỉ cho `SUPER ADMIN` (`@Roles` ở cấp class); vai trò kh
 
 ## `GET /api/v1/crawled-jobs`
 
-- **Query:** `page`, `limit` (tối đa 100), `sourceKey`, `state` (`ACTIVE`, `STALE`, `CLOSED`, `REMOVED`), `keyword` (khớp `title` và `companyName`, tối đa 100 ký tự, khớp nguyên văn).
+- **Query:** `page`, `limit` (tối đa 100), `sourceKey`, `state` (`ACTIVE`, `STALE`, `CLOSED`, `REMOVED`), `keyword` (khớp `title` và `companyName`, tối đa 100 ký tự, khớp nguyên văn), `from`, `to` (IsDateString, bao gồm hai đầu, lọc theo `createdAt`).
 - Mỗi tin thuộc đúng một `state`: tin đã gỡ luôn là `REMOVED`, bất kể `status` crawl.
 - **Thành công:** 200, `message` = "Lấy danh sách tin đã crawl thành công".
 
