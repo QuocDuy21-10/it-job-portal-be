@@ -2,13 +2,14 @@
 
 ## Overview
 
-Tính số liệu tổng hợp cho hai dashboard: quản trị viên (toàn hệ thống) và nhà tuyển dụng (theo công ty). Kết quả được cache ngắn hạn.
+Tính số liệu tổng hợp cho hai dashboard: quản trị viên (toàn hệ thống) và nhà tuyển dụng (theo công ty), cùng số liệu công khai cho trang chủ. Kết quả được cache ngắn hạn.
 
 ## Responsibilities
 
 - Dashboard quản trị: số tin 24 giờ qua, tin đã duyệt đang mở, tin chờ duyệt, số công ty, số công ty đang tuyển, số người dùng, xu hướng 7 ngày của tin và hồ sơ, kỹ năng được cần nhiều nhất, và tình trạng xử lý hồ sơ (tỉ lệ đã đọc, đã phân tích).
 - Dashboard HR: tổng hồ sơ, hồ sơ 24 giờ qua, phân bố trạng thái hồ sơ, top tin theo số hồ sơ, tỉ lệ phản hồi, thời gian phản hồi đầu tiên trung bình, điểm phù hợp trung bình, tin hết hạn.
 - Danh sách công ty tuyển nhiều nhất cho trang chủ (cache riêng).
+- Số liệu công khai trang chủ: tin đang hiển thị (nội bộ + crawl), tin mới 7 ngày, công ty đang tuyển (chỉ tin nội bộ), số ứng viên chưa xóa.
 
 Danh sách trên suy từ tên các hàm trong [statistics.service.ts](../../src/statistics/statistics.service.ts); định nghĩa chính xác từng chỉ số (ví dụ "tỉ lệ phản hồi") chưa được kiểm tra. Trạng thái: `Chưa xác minh`.
 
@@ -16,19 +17,20 @@ Danh sách trên suy từ tên các hàm trong [statistics.service.ts](../../src
 
 | Thành phần | File |
 |---|---|
-| Controller (2 route, `/api/v1/statistics`) | [statistics.controller.ts](../../src/statistics/statistics.controller.ts) |
+| Controller (3 route, `/api/v1/statistics`) | [statistics.controller.ts](../../src/statistics/statistics.controller.ts) |
 | Service tính số liệu | [statistics.service.ts](../../src/statistics/statistics.service.ts) |
 | Cache | [statistics-cache.service.ts](../../src/statistics/statistics-cache.service.ts) |
 | Hằng số | [statistics.constants.ts](../../src/statistics/constants/statistics.constants.ts) |
 
 ## Dependencies
 
-Không import module nghiệp vụ nào. Module tự đăng ký schema của các collection cần đọc (`MongooseModule.forFeature`) và truy vấn trực tiếp. Nhiều module khác import `statistics` để xóa cache khi dữ liệu đổi (`jobs`, `companies`, `resumes`, `queues`).
+Không import module nghiệp vụ nào. Module tự đăng ký schema của các collection cần đọc (`MongooseModule.forFeature`) và truy vấn trực tiếp; số liệu công khai dùng lại bộ lọc của `job-search` (hàm thuần, không import module). Nhiều module khác import `statistics` để xóa cache khi dữ liệu đổi (`jobs`, `companies`, `resumes`, `queues`).
 
 ## Business Rules
 
 | Dashboard | Route | Quyền | Cache (TTL) | Khóa |
 |---|---|---|---|---|
+| Công khai (trang chủ) | `GET /statistics/public` | công khai | 15 phút | `homepage:public-stats` |
 | Quản trị | `GET /statistics/admin-dashboard` | `SUPER ADMIN` | 15 phút | `dashboard:admin` |
 | HR | `GET /statistics/hr-dashboard` | `HR` (quản trị viên **không** gọi được) | 3 phút | `dashboard:hr:<companyId>` |
 | Top công ty tuyển dụng | trong `GET /companies/top-hiring` | công khai | 5 phút | `homepage:top-hiring-companies:<limit>` |
@@ -39,11 +41,11 @@ Khi dữ liệu liên quan đổi, các service khác gọi `clearScopedDashboar
 
 ## Data Model
 
-Chỉ đọc từ `users`, `companies`, `jobs`, `resumes`. Không có collection riêng.
+Chỉ đọc từ `users`, `companies`, `jobs`, `resumes`, `externaljobs`, `jobsources`. Không có collection riêng.
 
 ## API
 
-`GET /statistics/admin-dashboard`, `GET /statistics/hr-dashboard`. Chi tiết ở `05-api/endpoints/statistics.md` (Phase 3).
+`GET /statistics/public`, `GET /statistics/admin-dashboard`, `GET /statistics/hr-dashboard`. Chi tiết ở `05-api/endpoints/statistics.md` (Phase 3).
 
 ## Known Limitation
 

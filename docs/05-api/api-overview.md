@@ -1,6 +1,6 @@
 # Tổng quan API
 
-REST API của DevLink Backend: 116 route trên 16 controller. Tài liệu này mô tả các quy ước chung; từng route nằm ở [endpoints/](endpoints/). Phần thời gian thực (Socket.IO, stream chat) ở [realtime.md](realtime.md).
+REST API của DevLink Backend: 117 route trên 16 controller. Tài liệu này mô tả các quy ước chung; từng route nằm ở [endpoints/](endpoints/). Phần thời gian thực (Socket.IO, stream chat) ở [realtime.md](realtime.md).
 
 ## Địa chỉ và tài liệu tương tác
 
@@ -164,7 +164,7 @@ Mức chặt áp cho `job-search`, `chat` và `POST /auth/forgot-password`. Các
 | Tìm kiếm hợp nhất | [job-search](endpoints/job-search.md) | 2 |
 | Nguồn tin ngoài | [job-sources](endpoints/job-sources.md) | 4 |
 | File | [files](endpoints/files.md) | 2 |
-| Thống kê | [statistics](endpoints/statistics.md) | 2 |
+| Thống kê | [statistics](endpoints/statistics.md) | 3 |
 | Email | [mail](endpoints/mail.md) | 1 |
 | Sức khỏe | [health](endpoints/health.md) | 1 |
 
