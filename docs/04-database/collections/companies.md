@@ -16,6 +16,10 @@ Hồ sơ công ty tuyển dụng. HR thuộc về một công ty, và mỗi tin 
 | `website` | String | Không | `null` | trim | Địa chỉ website |
 | `numberOfEmployees` | Number | Không | `0` | — | Số nhân viên |
 | `logo` | String | Không | `null` | trim | Đường dẫn file logo trên đĩa (`public/`) |
+| `coverImage` | String \| null | Không | `null` | `<uuid>.(jpg\|png\|gif\|webp)` | Ảnh bìa trong `public/images/company/`; mỗi file thuộc một công ty |
+| `industry` | String \| null | Không | `null` | một trong 13 giá trị `ECompanyIndustry` | Lĩnh vực |
+| `techStack` | String[] | Không | `[]` | tối đa 20, nhãn chuẩn của danh mục kỹ năng | Công nghệ sử dụng |
+| `benefits` | Array `{ type, note }` | Không | `[]` | tối đa 12, `type` là `ECompanyBenefit` không trùng, `note` ≤ 120 | Phúc lợi |
 | `createdAt` | Date | Không | — | — | Thời điểm tạo, do `timestamps` hoặc plugin |
 | `updatedAt` | Date | Không | — | — | Thời điểm sửa gần nhất, do `timestamps` |
 | `deletedAt` | Date | Không | — | — | Thời điểm xóa mềm |
@@ -44,6 +48,7 @@ Khai báo `{ _id: false, id: false }`: snapshot không tự sinh `_id` riêng, `
 |---|---|---|
 | `{ name: 1, isDeleted: 1 }` | — | Tra cứu và sắp xếp công ty theo tên |
 | `{ createdAt: -1 }` | — | Liệt kê công ty mới nhất trước |
+| `{ industry: 1, isDeleted: 1 }` | — | Lọc danh sách công ty theo lĩnh vực |
 
 ## Quan hệ
 
@@ -74,5 +79,5 @@ Công ty không tham chiếu collection nào. Các collection khác trỏ tới 
 
 ## Vòng đời
 
-- Logo tải lên được lưu trên đĩa. Cron `cleanup-orphaned-company-logos` (2 giờ sáng, múi giờ `Asia/Ho_Chi_Minh`) xóa các file logo không còn công ty nào tham chiếu ([companies.service.ts](../../../src/companies/companies.service.ts)).
+- Logo và ảnh bìa tải lên được lưu trên đĩa, chung thư mục `company`. Cron `cleanup-orphaned-company-logos` (2 giờ sáng, múi giờ `Asia/Ho_Chi_Minh`) xóa các file không còn công ty nào dùng làm logo hay ảnh bìa ([companies.service.ts](../../../src/companies/companies.service.ts)).
 - Số tin đang tuyển của công ty là giá trị tính khi truy vấn, không lưu trong schema này.
