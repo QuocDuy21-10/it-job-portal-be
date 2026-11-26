@@ -121,6 +121,7 @@
 
 - [Hướng dẫn viết và bảo trì tài liệu](13-contributing/documentation-guide.md)
 - [Quy trình phát triển](13-contributing/development-workflow.md)
+- [Sử dụng NestJS Agent Skills](13-contributing/nestjs-agent-skills.md)
 
 ## 14 · Reference
 

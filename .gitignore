@@ -62,6 +62,7 @@ lerna-debug.log*
 !.cache/.gitkeep
 *.tsbuildinfo
 .agents/
+.claude/skills/
 agent_docs
 
 # Runtime data
