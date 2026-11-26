@@ -1,7 +1,16 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { ERole } from 'src/casl/enums/role.enum';
 import { buildEmbeddedCompanyIdFilter } from 'src/companies/company-snapshot.util';
+import { ExternalJob, ExternalJobDocument } from 'src/job-ingestion/schemas/external-job.schema';
+import { JobSource, JobSourceDocument } from 'src/job-ingestion/schemas/job-source.schema';
+import { INormalizedJobSearch } from 'src/job-search/interfaces/job-search-item.interface';
+import {
+  buildExternalMatch,
+  buildInternalMatch,
+  findHiddenSourceKeys,
+} from 'src/job-search/job-search-pipeline';
 import { Company, CompanyDocument } from 'src/companies/schemas/company.schema';
 import { EJobApprovalStatus } from 'src/jobs/enums/job-approval-status.enum';
 import { Job, JobDocument } from 'src/jobs/schemas/job.schema';
@@ -18,7 +27,16 @@ import {
   TopSkillDemandDto,
   TrendPointDto,
 } from './dto/dashboard-stats.dto';
+import { PublicStatsDto } from './dto/public-stats.dto';
 import { StatisticsCacheService } from './statistics-cache.service';
+
+// The public job list with no filters: the stats count exactly what /viec-lam shows.
+const UNFILTERED_SEARCH: INormalizedJobSearch = {
+  source: 'all',
+  sort: 'newest',
+  page: 1,
+  limit: 1,
+};
 
 @Injectable()
 export class StatisticsService {
@@ -40,6 +58,10 @@ export class StatisticsService {
     private readonly companyModel: Model<CompanyDocument>,
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
+    @InjectModel(ExternalJob.name)
+    private readonly externalJobModel: Model<ExternalJobDocument>,
+    @InjectModel(JobSource.name)
+    private readonly jobSourceModel: Model<JobSourceDocument>,
     private readonly statisticsCacheService: StatisticsCacheService,
   ) {}
 
@@ -116,6 +138,14 @@ export class StatisticsService {
     }
 
     this.logger.log(`HR dashboard stats computed and cached in ${Date.now() - startTime}ms`);
+    return value;
+  }
+
+  async getPublicStats(): Promise<PublicStatsDto> {
+    const { value } = await this.statisticsCacheService.getOrSetPublicStats(() =>
+      this.computePublicStats(),
+    );
+
     return value;
   }
 
@@ -252,6 +282,71 @@ export class StatisticsService {
 
   private async getUsersCount(): Promise<number> {
     return this.userModel.countDocuments(this.buildNonDeletedFilter());
+  }
+
+  private async computePublicStats(): Promise<PublicStatsDto> {
+    const now = new Date();
+    const since = new Date(now.getTime() - TIME_RANGES.DAYS_7 * 24 * 60 * 60 * 1000);
+    const hiddenSourceKeys = await findHiddenSourceKeys(this.jobSourceModel);
+    const internalMatch = buildInternalMatch(UNFILTERED_SEARCH, now);
+    const externalMatch = buildExternalMatch(UNFILTERED_SEARCH, now, hiddenSourceKeys);
+    // A crawled job without publishedAt is dated by when we first saw it.
+    const externalSinceMatch = externalMatch && {
+      ...externalMatch,
+      $and: [
+        ...externalMatch.$and,
+        {
+          $or: [
+            { publishedAt: { $gte: since } },
+            { publishedAt: null, createdAt: { $gte: since } },
+          ],
+        },
+      ],
+    };
+
+    const [internalActive, externalActive, internalNew, externalNew, hiringCompanies, candidates] =
+      await Promise.all([
+        this.countMatching(this.jobModel, internalMatch),
+        this.countMatching(this.externalJobModel, externalMatch),
+        this.countMatching(this.jobModel, { ...internalMatch, createdAt: { $gte: since } }),
+        this.countMatching(this.externalJobModel, externalSinceMatch),
+        this.countPublicHiringCompanies(internalMatch),
+        this.userModel.countDocuments({
+          ...this.buildNonDeletedFilter(),
+          role: ERole.NORMAL_USER,
+        }),
+      ]);
+
+    return {
+      activeJobs: internalActive + externalActive,
+      newJobsThisWeek: internalNew + externalNew,
+      hiringCompanies,
+      candidates,
+    };
+  }
+
+  // aggregate() bypasses the soft-delete plugin; the public matches already exclude deleted rows.
+  private async countMatching(
+    model: Model<any>,
+    match: Record<string, any> | null,
+  ): Promise<number> {
+    if (!match) {
+      return 0;
+    }
+
+    const [row] = await model.aggregate([{ $match: match }, { $count: 'total' }]);
+
+    return row?.total ?? 0;
+  }
+
+  private async countPublicHiringCompanies(internalMatch: Record<string, any>): Promise<number> {
+    const [row] = await this.jobModel.aggregate([
+      { $match: internalMatch },
+      { $group: { _id: '$company._id' } },
+      { $count: 'total' },
+    ]);
+
+    return row?.total ?? 0;
   }
 
   private async getJobTrendLast7Days(companyId?: string): Promise<TrendPointDto[]> {

@@ -6,11 +6,30 @@ import { Roles, ERole } from 'src/casl';
 import { ResponseMessage } from 'src/utils/decorators/response-message.decorator';
 import { User } from 'src/utils/decorators/user.decorator';
 import { IUser } from 'src/users/user.interface';
+import { Public } from 'src/utils/decorators/public.decorator';
+import { PublicStatsDto } from './dto/public-stats.dto';
 
 @ApiTags('Statistics')
 @Controller('statistics')
 export class StatisticsController {
   constructor(private readonly statisticsService: StatisticsService) {}
+
+  @Public()
+  @Get('public')
+  @ApiOperation({
+    summary: 'Get public homepage statistics',
+    description:
+      'Counts of publicly visible jobs (internal and crawled), jobs posted in the last 7 days, hiring companies and candidates. Cached for 15 minutes.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Public statistics retrieved successfully',
+    type: PublicStatsDto,
+  })
+  @ResponseMessage('Lấy thống kê công khai thành công')
+  async getPublicStats(): Promise<PublicStatsDto> {
+    return this.statisticsService.getPublicStats();
+  }
 
   @Get('admin-dashboard')
   @Roles(ERole.SUPER_ADMIN)

@@ -32,6 +32,10 @@ export class StatisticsCacheService {
     );
   }
 
+  getOrSetPublicStats<T>(loader: () => Promise<T>): Promise<CachedResult<T>> {
+    return this.getOrSet(CACHE_KEYS.PUBLIC_STATS, CACHE_TTL.PUBLIC_STATS, loader);
+  }
+
   // shortcut: no epoch guard, so a load racing an invalidation can cache stale stats for one TTL (3-15 min); port ListCacheService's epoch write if dashboards must be exact.
   private async getOrSet<T>(
     key: string,
