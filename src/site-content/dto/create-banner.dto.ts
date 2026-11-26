@@ -4,6 +4,7 @@ import {
   IsDateString,
   IsDefined,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   Matches,
@@ -54,12 +55,14 @@ export class SlideTextDto {
 export class SlideContentDto {
   @ApiProperty({ type: SlideTextDto })
   @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => SlideTextDto)
   vi: SlideTextDto;
 
   @ApiProperty({ type: SlideTextDto })
   @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => SlideTextDto)
   en: SlideTextDto;
@@ -84,6 +87,7 @@ export class CreateBannerDto {
 
   @ApiPropertyOptional({ type: SlideContentDto, nullable: true })
   @IsOptional()
+  @IsObject()
   @ValidateNested()
   @Type(() => SlideContentDto)
   content?: SlideContentDto | null;

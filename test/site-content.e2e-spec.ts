@@ -170,6 +170,8 @@ describe('Site content (e2e)', () => {
 
     it.each([
       ['text in one language only', { content: { vi: { title: 'Tết' } } }],
+      ['campaign text sent as an array', { content: [] }],
+      ['a language sent as an array', { content: { vi: [], en: { title: 'b' } } }],
       [
         'a CTA label without a link',
         { content: { vi: { title: 'a', ctaLabel: 'Xem' }, en: { title: 'b' } } },
