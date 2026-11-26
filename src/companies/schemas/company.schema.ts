@@ -40,7 +40,8 @@ export class Company {
   @Prop({ type: String, default: null })
   coverImage?: string | null;
 
-  @Prop({ type: String, enum: Object.values(ECompanyIndustry), default: null })
+  // Mongoose applies `enum` to the null default too, so null has to be listed.
+  @Prop({ type: String, enum: [...Object.values(ECompanyIndustry), null], default: null })
   industry?: ECompanyIndustry | null;
 
   // Canonical skill labels from the skills catalog.
