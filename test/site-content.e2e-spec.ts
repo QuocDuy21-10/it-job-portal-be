@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import request from 'supertest';
+import { runBannerSlidesMigration } from 'src/databases/migrations/banner-slides';
 import { Banner } from 'src/site-content/schemas/banner.schema';
 import { createTestApp, TestApp } from './utils/test-app';
 import { resetState } from './utils/reset';
@@ -214,6 +215,39 @@ describe('Site content (e2e)', () => {
         .set(auth('admin'))
         .send({ ids: [first.id] })
         .expect(400);
+    });
+
+    it('migration drops the single-banner index and orders old banners newest first', async () => {
+      const model = t.model(Banner.name);
+      const collection = model.collection;
+      await collection.createIndex(
+        { isActive: 1 },
+        { unique: true, partialFilterExpression: { isActive: true } },
+      );
+      const old = (name: string, day: number) => ({
+        name,
+        fileName: `00000000-0000-4000-8000-00000000000${day}.png`,
+        isActive: false,
+        createdAt: new Date(Date.UTC(2026, 0, day)),
+      });
+      await collection.insertMany([old('older', 1), old('newer', 2)]);
+
+      await expect(runBannerSlidesMigration(model)).resolves.toEqual({
+        droppedLegacyIndex: true,
+        backfilled: 2,
+      });
+
+      const docs = await collection.find().sort({ order: 1 }).toArray();
+      expect(docs.map(doc => [doc.name, doc.order, doc.content, doc.mobileFileName])).toEqual([
+        ['newer', 0, null, null],
+        ['older', 1, null, null],
+      ]);
+      await expect(runBannerSlidesMigration(model)).resolves.toEqual({
+        droppedLegacyIndex: false,
+        backfilled: 0,
+      });
+      // Two shown banners are allowed now.
+      await expect(collection.updateMany({}, { $set: { isActive: true } })).resolves.toBeTruthy();
     });
   });
 

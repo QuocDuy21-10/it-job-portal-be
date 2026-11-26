@@ -46,7 +46,7 @@ Vì vậy ma trận CASL **không ảnh hưởng** đến quyền thực tế hi
 
 ## Ma trận quyền theo nhóm route
 
-Rút từ decorator của 117 route. `Có` nghĩa là được phép, `Một phần` nghĩa là có thêm điều kiện sở hữu ở service. Chi tiết từng route nằm ở `05-api/endpoints/` (Phase 3).
+Rút từ decorator của 121 route. `Có` nghĩa là được phép, `Một phần` nghĩa là có thêm điều kiện sở hữu ở service. Chi tiết từng route nằm ở `05-api/endpoints/` (Phase 3).
 
 | Nhóm | Khách | Ứng viên | HR | Quản trị viên |
 |---|---|---|---|---|
