@@ -41,7 +41,7 @@ Khi dữ liệu liên quan đổi, các service khác gọi `clearScopedDashboar
 
 ## Data Model
 
-Chỉ đọc từ `users`, `companies`, `jobs`, `resumes`, `externaljobs`, `jobsources`. Không có collection riêng.
+Chỉ đọc từ `users`, `companies`, `jobs`, `resumes`, `external_jobs`, `job_sources`. Không có collection riêng.
 
 ## API
 
