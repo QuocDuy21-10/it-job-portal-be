@@ -1,5 +1,7 @@
-import { PipelineStage } from 'mongoose';
+import { Model, PipelineStage } from 'mongoose';
+import { EJobSourceDisplayPolicy } from 'src/job-ingestion/enums/job-source-display-policy.enum';
 import { VISIBLE_EXTERNAL_JOB_STATUSES } from 'src/job-ingestion/job-ingestion.constants';
+import { JobSourceDocument } from 'src/job-ingestion/schemas/job-source.schema';
 import { EJobFormOfWork } from 'src/jobs/enums/job-form-of-work.enum';
 import { buildPublicJobVisibilityFilter } from 'src/jobs/job-visibility.util';
 import { INormalizedJobSearch } from './interfaces/job-search-item.interface';
@@ -176,6 +178,14 @@ export const buildExternalMatch = (
 
 // postedAt is publishedAt, or createdAt when there is none. One branch per case keeps both sorts on
 // stored fields; external jobs have no salary, so the salary sorts order them by newest.
+// Jobs from these sources stay out of every public list and count.
+export const findHiddenSourceKeys = async (
+  jobSourceModel: Model<JobSourceDocument>,
+): Promise<string[]> =>
+  (await jobSourceModel.distinct('key', {
+    displayPolicy: EJobSourceDisplayPolicy.HIDDEN,
+  })) as string[];
+
 export const buildExternalStages = (
   search: INormalizedJobSearch,
   match: Match,

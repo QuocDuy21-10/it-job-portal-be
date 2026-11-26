@@ -1,7 +1,11 @@
 import { ForbiddenException } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ERole } from 'src/casl/enums/role.enum';
 import { Company } from 'src/companies/schemas/company.schema';
+import { ExternalJob } from 'src/job-ingestion/schemas/external-job.schema';
+import { JobSource } from 'src/job-ingestion/schemas/job-source.schema';
+import { EJobApprovalStatus } from 'src/jobs/enums/job-approval-status.enum';
 import { Job } from 'src/jobs/schemas/job.schema';
 import { EResumeStatus } from 'src/resumes/enums/resume-status.enum';
 import { Resume } from 'src/resumes/schemas/resume.schema';
@@ -15,6 +19,8 @@ describe('StatisticsService', () => {
   let resumeModel: { aggregate: jest.Mock; countDocuments: jest.Mock };
   let companyModel: { countDocuments: jest.Mock };
   let userModel: { countDocuments: jest.Mock };
+  let externalJobModel: { aggregate: jest.Mock };
+  let jobSourceModel: { distinct: jest.Mock };
   let statisticsCacheService: jest.Mocked<StatisticsCacheService>;
 
   beforeEach(async () => {
@@ -35,12 +41,24 @@ describe('StatisticsService', () => {
       countDocuments: jest.fn(),
     };
 
+    externalJobModel = {
+      aggregate: jest.fn(),
+    };
+
+    jobSourceModel = {
+      distinct: jest.fn(),
+    };
+
     statisticsCacheService = {
       getOrSetAdminDashboard: jest.fn(async loader => ({
         value: await loader(),
         fromCache: false,
       })),
       getOrSetHrDashboard: jest.fn(async (_companyId, loader) => ({
+        value: await loader(),
+        fromCache: false,
+      })),
+      getOrSetPublicStats: jest.fn(async loader => ({
         value: await loader(),
         fromCache: false,
       })),
@@ -68,6 +86,14 @@ describe('StatisticsService', () => {
         {
           provide: getModelToken(User.name),
           useValue: userModel,
+        },
+        {
+          provide: getModelToken(ExternalJob.name),
+          useValue: externalJobModel,
+        },
+        {
+          provide: getModelToken(JobSource.name),
+          useValue: jobSourceModel,
         },
         {
           provide: StatisticsCacheService,
@@ -227,6 +253,95 @@ describe('StatisticsService', () => {
       expect(result.responseRate).toBe(58.33);
       expect(result.averageFirstResponseHours).toBe(14.24);
       expect(result.averageMatchingScore).toBe(76.44);
+    });
+  });
+
+  describe('getPublicStats', () => {
+    const total = (n: number) => [{ total: n }];
+
+    beforeEach(() => {
+      jobSourceModel.distinct.mockResolvedValue(['hidden-src']);
+      // Internal: the $group pipeline is hiring companies, a createdAt match is the 7-day window.
+      jobModel.aggregate.mockImplementation(async (pipeline: any[]) => {
+        if (pipeline.some(stage => '$group' in stage)) return total(2);
+        return pipeline[0].$match.createdAt ? total(1) : total(3);
+      });
+      // External: the 7-day window adds a second $and condition.
+      externalJobModel.aggregate.mockImplementation(async (pipeline: any[]) =>
+        pipeline[0].$match.$and.length > 1 ? total(4) : total(5),
+      );
+      userModel.countDocuments.mockResolvedValue(7);
+    });
+
+    it('adds external jobs to internal ones and returns the four counts', async () => {
+      await expect(service.getPublicStats()).resolves.toEqual({
+        activeJobs: 8,
+        newJobsThisWeek: 5,
+        hiringCompanies: 2,
+        candidates: 7,
+      });
+    });
+
+    it('counts only publicly visible internal jobs', async () => {
+      await service.getPublicStats();
+
+      expect(jobModel.aggregate).toHaveBeenCalledTimes(3);
+      for (const [pipeline] of jobModel.aggregate.mock.calls) {
+        expect(pipeline[0].$match).toMatchObject({
+          isActive: true,
+          approvalStatus: EJobApprovalStatus.APPROVED,
+          isDeleted: { $ne: true },
+        });
+      }
+    });
+
+    it('leaves out hidden sources and closed or removed external jobs', async () => {
+      await service.getPublicStats();
+
+      expect(externalJobModel.aggregate).toHaveBeenCalledTimes(2);
+      for (const [pipeline] of externalJobModel.aggregate.mock.calls) {
+        expect(pipeline[0].$match).toMatchObject({
+          sourceKey: { $nin: ['hidden-src'] },
+          status: { $in: ['ACTIVE', 'STALE'] },
+          removedAt: null,
+        });
+      }
+    });
+
+    it('dates an external job by publishedAt, falling back to createdAt', async () => {
+      await service.getPublicStats();
+
+      const windowed = externalJobModel.aggregate.mock.calls
+        .map(([pipeline]) => pipeline[0].$match)
+        .find(match => match.$and.length > 1);
+
+      expect(windowed.$and[windowed.$and.length - 1]).toEqual({
+        $or: [
+          { publishedAt: { $gte: expect.any(Date) } },
+          { publishedAt: null, createdAt: { $gte: expect.any(Date) } },
+        ],
+      });
+    });
+
+    it('counts candidates only', async () => {
+      await service.getPublicStats();
+
+      expect(userModel.countDocuments).toHaveBeenCalledWith({
+        isDeleted: { $ne: true },
+        role: ERole.NORMAL_USER,
+      });
+    });
+
+    it('serves a cached value without querying', async () => {
+      const cached = { activeJobs: 1, newJobsThisWeek: 0, hiringCompanies: 1, candidates: 1 };
+      statisticsCacheService.getOrSetPublicStats.mockResolvedValueOnce({
+        value: cached,
+        fromCache: true,
+      });
+
+      await expect(service.getPublicStats()).resolves.toEqual(cached);
+      expect(jobModel.aggregate).not.toHaveBeenCalled();
+      expect(externalJobModel.aggregate).not.toHaveBeenCalled();
     });
   });
 });

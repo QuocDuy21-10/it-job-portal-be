@@ -27,7 +27,7 @@ import {
   JOB_SEARCH_DEFAULT_PAGE,
   JOB_SEARCH_MAX_PAGE,
 } from './job-search.constants';
-import { buildJobSearchPlan, JobSearchPlan } from './job-search-pipeline';
+import { buildJobSearchPlan, findHiddenSourceKeys, JobSearchPlan } from './job-search-pipeline';
 
 const EXTERNAL_DETAIL_FIELDS =
   'sourceKey title companyName location locationCode isRemote skills level descriptionHtml publishedAt createdAt expiresAt sourceUrl applyUrl status salaryText removedAt';
@@ -49,11 +49,7 @@ export class JobSearchService {
   async search(query: SearchJobsQueryDto): Promise<IJobSearchResponse> {
     const search = this.normalize(query);
     const hiddenSourceKeys =
-      search.source === 'internal'
-        ? []
-        : await this.jobSourceModel.distinct('key', {
-            displayPolicy: EJobSourceDisplayPolicy.HIDDEN,
-          });
+      search.source === 'internal' ? [] : await findHiddenSourceKeys(this.jobSourceModel);
     const plan = buildJobSearchPlan(
       search,
       new Date(),
