@@ -9,7 +9,7 @@ Quản lý hồ sơ công ty tuyển dụng, tạo snapshot công ty để nhún
 - CRUD công ty, cache danh sách.
 - Cung cấp `CompanySnapshot` ([company-snapshot.util.ts](../../src/companies/company-snapshot.util.ts)).
 - Danh sách công ty tuyển nhiều nhất (`top-hiring`) cho trang chủ.
-- Cron dọn file logo không còn được tham chiếu.
+- Cron dọn file logo và ảnh bìa không còn được tham chiếu.
 
 ## Architecture
 
@@ -22,7 +22,7 @@ Quản lý hồ sơ công ty tuyển dụng, tạo snapshot công ty để nhún
 
 ## Dependencies
 
-Import `files` (xóa file logo) và `statistics` (xóa cache số liệu). `jobs`, `chat` import `companies`.
+Import `files` (kiểm tra và xóa file ảnh), `statistics` (xóa cache số liệu) và `skills` (chuẩn hóa công nghệ). `jobs`, `chat` import `companies`.
 
 ## Business Rules
 
@@ -32,8 +32,12 @@ Import `files` (xóa file logo) và `statistics` (xóa cache số liệu). `jobs
 | Sửa công ty | `SUPER ADMIN` hoặc `HR`. HR phải gắn với công ty và chỉ sửa công ty của mình, ngược lại `403` |
 | Xem chi tiết | HR chỉ xem công ty của mình, ngược lại `400` "You can only view your own company" |
 | Danh sách | HR chỉ thấy công ty của mình. Các vai trò khác thấy tất cả |
-| Đổi tên, logo | Cập nhật `company.name`/`company.logo` nhúng trong `jobs` và `users`, sau đó mới xóa file logo cũ (khi logo mới khác logo cũ) |
-| Cron dọn logo | 2 giờ sáng (`Asia/Ho_Chi_Minh`), xóa logo không công ty nào dùng |
+| Đổi tên, logo | Cập nhật `company.name`/`company.logo` nhúng trong `jobs` và `users` |
+| Công nghệ | `techStack` được chuẩn hóa bằng `SkillsService.normalizeControlledSkills`: bí danh thành nhãn chuẩn, bỏ trùng, kỹ năng lạ trả `400` |
+| Phúc lợi | Mỗi loại chỉ chọn một lần; ghi chú rỗng lưu `null` |
+| File ảnh | Logo và ảnh bìa không dùng chung giữa các công ty (`409`); ảnh bìa phải đã tải lên và khác logo (`400`) |
+| Xóa file cũ | Chỉ sau khi lưu thành công, và chỉ khi file không còn là logo hay ảnh bìa. Xóa lỗi thì ghi log |
+| Cron dọn file | 2 giờ sáng (`Asia/Ho_Chi_Minh`), giữ mọi logo và ảnh bìa, xóa file không công ty nào dùng |
 | Cache | Danh sách công ty cache 3 phút trong Redis qua `ListCacheService`, xóa khi dữ liệu đổi |
 
 ## Data Model

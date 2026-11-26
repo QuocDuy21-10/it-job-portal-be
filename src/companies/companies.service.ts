@@ -31,11 +31,14 @@ import {
   LIST_CACHE_TAGS,
   LIST_CACHE_TTL,
 } from 'src/redis/list-cache.constants';
+import { CronLockService } from 'src/redis/cron-lock.service';
+import { SkillsService } from 'src/skills/skills.service';
+import { UploadFolderType } from 'src/files/constants/upload-policy';
 
 const ORPHANED_LOGO_CLEANUP_CRON = 'cleanup-orphaned-company-logos';
 // Audit fields (admin/HR emails and IDs) are only for SUPER_ADMIN and the company's own HR.
 const PUBLIC_COMPANY_PROJECTION = '-createdBy -updatedBy -deletedBy -isDeleted -deletedAt -__v';
-import { CronLockService } from 'src/redis/cron-lock.service';
+const COVER_IS_LOGO_MESSAGE = 'Ảnh bìa phải khác logo';
 
 @Injectable()
 export class CompaniesService {
@@ -48,6 +51,7 @@ export class CompaniesService {
     'website',
     'numberOfEmployees',
     'createdAt',
+    'industry',
   ]);
 
   private readonly ALLOWED_SORT_FIELDS = new Set([
@@ -64,6 +68,7 @@ export class CompaniesService {
     private readonly statisticsCacheService: StatisticsCacheService,
     private readonly listCacheService: ListCacheService,
     private readonly cronLockService: CronLockService,
+    private readonly skillsService: SkillsService,
   ) {}
 
   async create(createCompanyDto: CreateCompanyDto, user: IUser) {
@@ -71,10 +76,12 @@ export class CompaniesService {
     if (exists) {
       throw new BadRequestException(`Công ty có tên ${createCompanyDto.name} đã tồn tại`);
     }
-    await this.assertLogoNotTaken(createCompanyDto.logo);
+    await this.assertFileNotTaken(createCompanyDto.logo);
+    await this.assertCoverUsable(createCompanyDto.coverImage, createCompanyDto.logo);
+    const prepared = await this.prepareProfile(createCompanyDto);
 
     const company = await this.companyRepository.create({
-      ...createCompanyDto,
+      ...prepared,
       createdBy: { _id: user._id, email: user.email },
     });
 
@@ -174,31 +181,38 @@ export class CompaniesService {
     const company = await this.companyRepository.findById(id);
     await this.assertHrOwnership(company, id, user);
     if (updateCompanyDto.logo !== company?.logo) {
-      await this.assertLogoNotTaken(updateCompanyDto.logo, id);
+      await this.assertFileNotTaken(updateCompanyDto.logo, id);
     }
+    const logo =
+      updateCompanyDto.logo !== undefined ? updateCompanyDto.logo : (company.logo ?? null);
+    const coverImage =
+      updateCompanyDto.coverImage !== undefined
+        ? updateCompanyDto.coverImage
+        : (company.coverImage ?? null);
+    if (coverImage !== (company.coverImage ?? null)) {
+      await this.assertCoverUsable(coverImage, logo, id);
+    } else if (coverImage && coverImage === logo) {
+      throw new BadRequestException(COVER_IS_LOGO_MESSAGE);
+    }
+    const prepared = await this.prepareProfile(updateCompanyDto);
 
     const result = await this.companyRepository.updateOne(
       { _id: id },
-      { ...updateCompanyDto, updatedBy: { _id: user._id, email: user.email } },
+      { ...prepared, updatedBy: { _id: user._id, email: user.email } },
     );
 
     const name = updateCompanyDto.name ?? company.name;
-    const logo =
-      updateCompanyDto.logo !== undefined ? updateCompanyDto.logo : (company.logo ?? null);
     const snapshotChanged = name !== company.name || logo !== (company.logo ?? null);
     if (snapshotChanged) {
       // Jobs and HR users embed {_id, name, logo}; they showed the old name and a deleted logo.
       await this.companyRepository.syncCompanySnapshot(id, { name, logo });
     }
 
-    // Last, once nothing in the DB points at the old file any more.
-    if (company.logo && logo !== company.logo) {
-      try {
-        await this.filesService.deleteFile('company', company.logo);
-      } catch (error) {
-        this.logger.warn(
-          `Could not delete old company logo: ${error instanceof Error ? error.message : String(error)}`,
-        );
+    // Last, once nothing in the DB points at the old file any more. A file may have moved between
+    // logo and cover, so skip any that is still in use.
+    for (const oldFile of [company.logo, company.coverImage]) {
+      if (oldFile && oldFile !== logo && oldFile !== coverImage) {
+        await this.deleteCompanyFileQuietly(oldFile);
       }
     }
 
@@ -231,11 +245,62 @@ export class CompaniesService {
     return result;
   }
 
-  // A logo file belongs to one company: replacing a logo deletes the old file, so taking another
-  // company's file name would let the next update delete that company's logo.
-  private async assertLogoNotTaken(logo: string | undefined, exceptCompanyId?: string) {
-    if (logo && (await this.companyRepository.isLogoUsedByAnotherCompany(logo, exceptCompanyId))) {
-      throw new ConflictException('Logo này đang được công ty khác sử dụng');
+  // A logo or cover file belongs to one company: replacing it deletes the old file, so taking another
+  // company's file name would let the next update delete that company's image.
+  private async assertFileNotTaken(fileName: string | null | undefined, exceptCompanyId?: string) {
+    if (
+      fileName &&
+      (await this.companyRepository.isFileUsedByAnotherCompany(fileName, exceptCompanyId))
+    ) {
+      throw new ConflictException('Ảnh này đang được công ty khác sử dụng');
+    }
+  }
+
+  private async assertCoverUsable(
+    cover: string | null | undefined,
+    logo: string | null | undefined,
+    exceptCompanyId?: string,
+  ) {
+    if (!cover) return;
+    if (cover === logo) {
+      throw new BadRequestException(COVER_IS_LOGO_MESSAGE);
+    }
+    const files = await this.filesService.listFilesWithAge(UploadFolderType.COMPANY);
+    if (!files.some(file => file.fileName === cover)) {
+      throw new BadRequestException('Không tìm thấy ảnh bìa đã tải lên');
+    }
+    await this.assertFileNotTaken(cover, exceptCompanyId);
+  }
+
+  // Normalizes the tech stack against the skills catalog and checks the benefit list.
+  private async prepareProfile<T extends UpdateCompanyDto>(dto: T): Promise<T> {
+    const prepared = { ...dto };
+
+    if (dto.techStack !== undefined) {
+      prepared.techStack = await this.skillsService.normalizeControlledSkills(dto.techStack ?? []);
+    }
+
+    if (dto.benefits !== undefined) {
+      const benefits = dto.benefits ?? [];
+      if (new Set(benefits.map(benefit => benefit.type)).size !== benefits.length) {
+        throw new BadRequestException('Mỗi loại phúc lợi chỉ được chọn một lần');
+      }
+      prepared.benefits = benefits.map(benefit => ({
+        type: benefit.type,
+        note: benefit.note || null,
+      }));
+    }
+
+    return prepared;
+  }
+
+  private async deleteCompanyFileQuietly(fileName: string): Promise<void> {
+    try {
+      await this.filesService.deleteFile(UploadFolderType.COMPANY, fileName);
+    } catch (error) {
+      this.logger.warn(
+        `Could not delete old company file: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -266,22 +331,25 @@ export class CompaniesService {
   }
 
   async cleanupOrphanedLogos(): Promise<{ scanned: number; deleted: number; errors: number }> {
-    this.logger.log('Starting orphaned company logo cleanup');
+    this.logger.log('Starting orphaned company file cleanup');
 
     try {
-      const allLogos = await this.companyRepository.findLogoReferences();
-      const referencedLogos = new Set<string>(allLogos);
+      const allFiles = await this.companyRepository.findFileReferences();
+      const referencedFiles = new Set<string>(allFiles);
 
-      const stats = await this.filesService.cleanupOrphanedFiles('company', referencedLogos);
+      const stats = await this.filesService.cleanupOrphanedFiles(
+        UploadFolderType.COMPANY,
+        referencedFiles,
+      );
 
       this.logger.log(
-        `Orphaned logo cleanup complete: scanned=${stats.scanned}, deleted=${stats.deleted}, errors=${stats.errors}`,
+        `Orphaned company file cleanup complete: scanned=${stats.scanned}, deleted=${stats.deleted}, errors=${stats.errors}`,
       );
 
       return stats;
     } catch (error) {
       this.logger.error(
-        `Orphaned logo cleanup failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Orphaned company file cleanup failed: ${error instanceof Error ? error.message : String(error)}`,
         error instanceof Error ? error.stack : undefined,
       );
       return { scanned: 0, deleted: 0, errors: 1 };

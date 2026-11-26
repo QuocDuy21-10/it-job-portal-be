@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsOptional } from 'class-validator';
+import { ECompanyIndustry } from '../enums/company-industry.enum';
 
 export class TopHiringCompaniesQueryDto {
   @IsOptional()
@@ -54,6 +55,12 @@ export class TopHiringCompanyDto {
     example: 500,
   })
   numberOfEmployees?: number;
+
+  @ApiPropertyOptional({ enum: ECompanyIndustry, nullable: true })
+  industry?: ECompanyIndustry | null;
+
+  @ApiPropertyOptional({ description: 'Cover image file name', nullable: true })
+  coverImage?: string | null;
 
   @ApiProperty({
     description: 'Number of approved active non-expired jobs',

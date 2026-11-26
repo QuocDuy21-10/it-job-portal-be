@@ -19,10 +19,11 @@ Các route `GET` công khai (`@OptionalAuth`). Với HR, danh sách và chi ti�
 
 ## Quy tắc
 
-- `GET /companies`: `keyword` tìm trên `name`; `createdAt` là trường lọc.
+- `GET /companies`: `keyword` tìm trên `name`; `createdAt` và `industry` là trường lọc. `industry` không hợp lệ cho danh sách rỗng, không báo lỗi.
 - Tạo công ty: chỉ `SUPER ADMIN`, tên không được trùng.
 - Sửa công ty: `SUPER ADMIN` hoặc `HR` của chính công ty đó.
-- `top-hiring`: `limit` mặc định 8, tối đa 12 theo mô tả Swagger; cache 5 phút.
+- `top-hiring`: `limit` mặc định 8, tối đa 12 theo mô tả Swagger; cache 5 phút. Mỗi công ty gồm `_id`, `name`, `logo`, `address`, `website`, `numberOfEmployees`, `industry`, `coverImage`, `totalOpenJobs`.
+- Hồ sơ công ty: `techStack` nhận nhãn hoặc bí danh trong danh mục kỹ năng và được lưu theo nhãn chuẩn; mỗi loại phúc lợi chỉ chọn một lần; `coverImage` là file đã tải lên thư mục `company` và khác `logo`. Mỗi file ảnh chỉ thuộc một công ty.
 - Tên và logo công ty được **sao chép** vào tin tuyển dụng; sửa công ty không cập nhật các bản sao này ([companies](../../04-database/collections/companies.md#tài-liệu-nhúng-companysnapshot)).
 
 ## Chi tiết từng route
@@ -45,6 +46,15 @@ Tạo công ty (quản trị viên), từ chối nếu trùng tên
 | `logo` | string | Không | IsNotEmpty, IsString | 'logo.png' |
 | `website` | string | Có | IsNotEmpty, IsString, MaxLength(100) | 'https://google.com' |
 | `numberOfEmployees` | number | Không | IsNumber | 5000 |
+| `coverImage` | string \| null | Không | Matches `<uuid>.(jpg\|png\|gif\|webp)` | '3f2b8c1e-0000-4000-8000-000000000000.webp' |
+| `industry` | string \| null | Không | IsEnum(`ECompanyIndustry`) | 'FINTECH_BANKING' |
+| `techStack` | string[] | Không | IsArray, ArrayMaxSize(20), mỗi phần tử IsString, MaxLength(50), có trong danh mục kỹ năng | ['NestJS'] |
+| `benefits` | `{ type, note? }[]` | Không | IsArray, ArrayMaxSize(12), `type` IsEnum(`ECompanyBenefit`) không trùng, `note` MaxLength(120), rỗng lưu `null` | [{ "type": "REMOTE_HYBRID", "note": "2 ngày/tuần" }] |
+
+**Lỗi**
+
+- **400:** kỹ năng không có trong danh mục, loại phúc lợi trùng, ảnh bìa chưa được tải lên, ảnh bìa trùng logo.
+- **409:** `logo` hoặc `coverImage` là file đang được công ty khác dùng (làm logo hoặc ảnh bìa).
 
 ### `POST /api/v1/companies/cleanup-orphaned-logos`
 
@@ -112,7 +122,8 @@ Cập nhật công ty (quản trị viên, hoặc HR của công ty đó)
 - **Auth:** Đăng nhập, vai trò: SUPER ADMIN, HR
 - **Handler:** `update` trong [companies.controller.ts](../../../src/companies/companies.controller.ts)
 - **Mã thành công:** 200, `message` = "Update company by id"
-- **409:** `logo` là tên file đang thuộc công ty khác (đổi logo sẽ xóa file cũ, nên mỗi file chỉ thuộc một công ty). Tạo công ty cũng kiểm tra như vậy.
+- **400:** kỹ năng không có trong danh mục, loại phúc lợi trùng, ảnh bìa chưa được tải lên, ảnh bìa trùng logo.
+- **409:** `logo` hoặc `coverImage` là file đang được công ty khác dùng (đổi ảnh sẽ xóa file cũ, nên mỗi file chỉ thuộc một công ty). Tạo công ty cũng kiểm tra như vậy.
 
 **Path params**
 
