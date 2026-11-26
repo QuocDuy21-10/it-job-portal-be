@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import mongoose from 'mongoose';
 import { CompaniesService } from './companies.service';
 import { CompanyRepository } from './repositories/company.repository';
@@ -9,6 +14,8 @@ import { CronLockService } from 'src/redis/cron-lock.service';
 import { StatisticsCacheService } from 'src/statistics/statistics-cache.service';
 import { ListCacheService } from 'src/redis/list-cache.service';
 import { LIST_CACHE_SCOPES, LIST_CACHE_TAGS } from 'src/redis/list-cache.constants';
+import { SkillsService } from 'src/skills/skills.service';
+import { ECompanyBenefit } from './enums/company-benefit.enum';
 
 describe('CompaniesService', () => {
   let service: CompaniesService;
@@ -16,12 +23,13 @@ describe('CompaniesService', () => {
   let mockFilesService: jest.Mocked<FilesService>;
   let mockStatisticsCacheService: jest.Mocked<StatisticsCacheService>;
   let mockListCacheService: jest.Mocked<Partial<ListCacheService>>;
+  let mockSkillsService: { normalizeControlledSkills: jest.Mock };
 
   beforeEach(async () => {
     mockCompanyRepository = {
       validateObjectId: jest.fn(),
       existsByName: jest.fn(),
-      isLogoUsedByAnotherCompany: jest.fn().mockResolvedValue(false),
+      isFileUsedByAnotherCompany: jest.fn().mockResolvedValue(false),
       create: jest.fn(),
       findPaginated: jest.fn(),
       findById: jest.fn(),
@@ -32,13 +40,14 @@ describe('CompaniesService', () => {
       syncCompanySnapshot: jest.fn(),
       getJobCountsForCompanies: jest.fn(),
       findTopHiringCompanies: jest.fn(),
-      findLogoReferences: jest.fn(),
+      findFileReferences: jest.fn(),
       findByNameRegex: jest.fn(),
     } as any;
 
     mockFilesService = {
       deleteFile: jest.fn(),
       cleanupOrphanedFiles: jest.fn(),
+      listFilesWithAge: jest.fn().mockResolvedValue([]),
     } as any;
 
     mockStatisticsCacheService = {
@@ -53,6 +62,10 @@ describe('CompaniesService', () => {
       reclaimByTags: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockSkillsService = {
+      normalizeControlledSkills: jest.fn(async (skills: string[]) => skills),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CompaniesService,
@@ -61,6 +74,7 @@ describe('CompaniesService', () => {
         { provide: StatisticsCacheService, useValue: mockStatisticsCacheService },
         { provide: ListCacheService, useValue: mockListCacheService },
         { provide: CronLockService, useValue: { runExclusive: jest.fn() } },
+        { provide: SkillsService, useValue: mockSkillsService },
       ],
     }).compile();
 
@@ -607,6 +621,200 @@ describe('CompaniesService', () => {
       expect(escapedArg).toContain('\\[');
       expect(escapedArg).toContain('\\.');
       expect(escapedArg).not.toContain('(Company)');
+    });
+  });
+
+  describe('profile fields', () => {
+    const companyId = new mongoose.Types.ObjectId().toString();
+    const admin = { _id: 'uid', email: 'admin@test.com', role: ERole.SUPER_ADMIN } as any;
+    const COVER = '3f2b8c1e-0000-4000-8000-000000000000.webp';
+    const stored = (extra: object = {}) => ({
+      _id: new mongoose.Types.ObjectId(companyId),
+      name: 'Acme',
+      logo: 'logo.png',
+      coverImage: null,
+      ...extra,
+    });
+
+    beforeEach(() => {
+      mockCompanyRepository.findById.mockResolvedValue(stored() as any);
+      mockCompanyRepository.updateOne.mockResolvedValue({ modifiedCount: 1 } as any);
+      mockFilesService.listFilesWithAge.mockResolvedValue([{ fileName: COVER, ageInMs: 1 }]);
+    });
+
+    it('stores the catalog labels of the tech stack', async () => {
+      mockSkillsService.normalizeControlledSkills.mockResolvedValue(['NestJS']);
+
+      await service.update(companyId, { techStack: ['nest', 'NEST'] }, admin);
+
+      expect(mockSkillsService.normalizeControlledSkills).toHaveBeenCalledWith(['nest', 'NEST']);
+      expect(mockCompanyRepository.updateOne).toHaveBeenCalledWith(
+        { _id: companyId },
+        expect.objectContaining({ techStack: ['NestJS'] }),
+      );
+    });
+
+    it('rejects an unknown skill before writing', async () => {
+      mockSkillsService.normalizeControlledSkills.mockRejectedValue(new BadRequestException('x'));
+
+      await expect(service.update(companyId, { techStack: ['cobol++'] }, admin)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockCompanyRepository.updateOne).not.toHaveBeenCalled();
+    });
+
+    it('rejects a benefit type chosen twice', async () => {
+      const benefits = [
+        { type: ECompanyBenefit.HEALTH_INSURANCE },
+        { type: ECompanyBenefit.HEALTH_INSURANCE, note: 'Gói cao cấp' },
+      ];
+
+      await expect(service.update(companyId, { benefits }, admin)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockCompanyRepository.updateOne).not.toHaveBeenCalled();
+    });
+
+    it('stores an empty benefit note as null', async () => {
+      await service.update(
+        companyId,
+        { benefits: [{ type: ECompanyBenefit.REMOTE_HYBRID, note: '' }] },
+        admin,
+      );
+
+      expect(mockCompanyRepository.updateOne).toHaveBeenCalledWith(
+        { _id: companyId },
+        expect.objectContaining({
+          benefits: [{ type: ECompanyBenefit.REMOTE_HYBRID, note: null }],
+        }),
+      );
+    });
+
+    it('rejects a cover that was never uploaded', async () => {
+      mockFilesService.listFilesWithAge.mockResolvedValue([]);
+
+      await expect(service.update(companyId, { coverImage: COVER }, admin)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockCompanyRepository.updateOne).not.toHaveBeenCalled();
+    });
+
+    it('rejects a cover another company uses', async () => {
+      mockCompanyRepository.isFileUsedByAnotherCompany.mockResolvedValue(true);
+
+      await expect(service.update(companyId, { coverImage: COVER }, admin)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(mockCompanyRepository.isFileUsedByAnotherCompany).toHaveBeenCalledWith(
+        COVER,
+        companyId,
+      );
+    });
+
+    it('rejects the own logo as the cover', async () => {
+      await expect(service.update(companyId, { coverImage: 'logo.png' }, admin)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockCompanyRepository.updateOne).not.toHaveBeenCalled();
+    });
+
+    it('deletes the old cover only after saving', async () => {
+      mockCompanyRepository.findById.mockResolvedValue(
+        stored({ coverImage: 'old-cover.png' }) as any,
+      );
+
+      await service.update(companyId, { coverImage: COVER }, admin);
+
+      expect(mockFilesService.deleteFile).toHaveBeenCalledWith('company', 'old-cover.png');
+      expect(mockCompanyRepository.updateOne.mock.invocationCallOrder[0]).toBeLessThan(
+        mockFilesService.deleteFile.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('keeps the old cover when saving fails', async () => {
+      mockCompanyRepository.findById.mockResolvedValue(
+        stored({ coverImage: 'old-cover.png' }) as any,
+      );
+      mockCompanyRepository.updateOne.mockRejectedValue(new Error('db'));
+
+      await expect(service.update(companyId, { coverImage: COVER }, admin)).rejects.toThrow('db');
+      expect(mockFilesService.deleteFile).not.toHaveBeenCalled();
+    });
+
+    it('deletes the cover file when the cover is cleared', async () => {
+      mockCompanyRepository.findById.mockResolvedValue(
+        stored({ coverImage: 'old-cover.png' }) as any,
+      );
+
+      await service.update(companyId, { coverImage: null }, admin);
+
+      expect(mockFilesService.deleteFile).toHaveBeenCalledWith('company', 'old-cover.png');
+    });
+
+    it('checks the cover on create too', async () => {
+      mockCompanyRepository.existsByName.mockResolvedValue(false);
+      mockCompanyRepository.isFileUsedByAnotherCompany.mockResolvedValue(true);
+
+      await expect(
+        service.create(
+          {
+            name: 'New',
+            address: 'HN',
+            description: 'A new company',
+            website: '',
+            coverImage: COVER,
+          },
+          admin,
+        ),
+      ).rejects.toThrow(ConflictException);
+      expect(mockCompanyRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('keeps cover files during the orphan cleanup', async () => {
+      mockCompanyRepository.findFileReferences.mockResolvedValue(['logo.png', COVER]);
+      mockFilesService.cleanupOrphanedFiles.mockResolvedValue({
+        scanned: 2,
+        deleted: 0,
+        errors: 0,
+      });
+
+      await service.cleanupOrphanedLogos();
+
+      expect(mockFilesService.cleanupOrphanedFiles).toHaveBeenCalledWith(
+        'company',
+        new Set(['logo.png', COVER]),
+      );
+    });
+
+    it('passes the industry filter to the repository', async () => {
+      mockCompanyRepository.findPaginated.mockResolvedValue({ result: [], totalItems: 0 } as any);
+      mockCompanyRepository.getJobCountsForCompanies.mockResolvedValue(new Map());
+
+      await service.findAll(1, 10, { industry: 'FINTECH_BANKING' } as any);
+
+      expect(mockCompanyRepository.findPaginated.mock.calls[0][0]).toMatchObject({
+        industry: 'FINTECH_BANKING',
+      });
+    });
+
+    it.each([
+      ['the old cover becomes the logo', { logo: 'old-cover.png', coverImage: COVER }, 'logo.png'],
+      [
+        'the old logo becomes the cover',
+        { logo: 'new.png', coverImage: 'logo.png' },
+        'old-cover.png',
+      ],
+    ])('keeps a file still in use when %s', async (_case, dto, replaced) => {
+      mockCompanyRepository.findById.mockResolvedValue(
+        stored({ coverImage: 'old-cover.png' }) as any,
+      );
+      mockFilesService.listFilesWithAge.mockResolvedValue(
+        [COVER, 'logo.png'].map(fileName => ({ fileName, ageInMs: 1 })),
+      );
+
+      await service.update(companyId, dto, admin);
+
+      expect(mockFilesService.deleteFile.mock.calls).toEqual([['company', replaced]]);
     });
   });
 });

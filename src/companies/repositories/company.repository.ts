@@ -31,8 +31,12 @@ export class CompanyRepository {
     return count > 0;
   }
 
-  async isLogoUsedByAnotherCompany(logo: string, exceptCompanyId?: string): Promise<boolean> {
-    const filter = exceptCompanyId ? { logo, _id: { $ne: exceptCompanyId } } : { logo };
+  // Logos and covers share the `company` folder, so a file name must be unique across both fields.
+  async isFileUsedByAnotherCompany(fileName: string, exceptCompanyId?: string): Promise<boolean> {
+    const filter: Record<string, unknown> = {
+      $or: [{ logo: fileName }, { coverImage: fileName }],
+    };
+    if (exceptCompanyId) filter._id = { $ne: exceptCompanyId };
     return (await this.companyModel.countDocuments(filter)) > 0;
   }
 
@@ -201,27 +205,27 @@ export class CompanyRepository {
           address: '$company.address',
           website: '$company.website',
           numberOfEmployees: '$company.numberOfEmployees',
+          industry: '$company.industry',
+          coverImage: '$company.coverImage',
           totalOpenJobs: 1,
         },
       },
     ]);
   }
 
-  async findLogoReferences(): Promise<string[]> {
+  async findFileReferences(): Promise<string[]> {
+    const hasFile = { $or: [{ logo: { $ne: null } }, { coverImage: { $ne: null } }] };
     const [activeCompanies, deletedCompanies] = await Promise.all([
+      this.companyModel.find(hasFile).select('logo coverImage').lean(),
       this.companyModel
-        .find({ logo: { $ne: null } })
-        .select('logo')
-        .lean(),
-      this.companyModel
-        .find({ isDeleted: true, logo: { $ne: null } })
-        .select('logo')
+        .find({ isDeleted: true, ...hasFile })
+        .select('logo coverImage')
         .lean(),
     ]);
 
     return [...activeCompanies, ...deletedCompanies]
-      .map(c => (c as any).logo)
-      .filter((logo): logo is string => Boolean(logo));
+      .flatMap(company => [company.logo, company.coverImage])
+      .filter((name): name is string => Boolean(name));
   }
 
   async findByNameRegex(

@@ -1,7 +1,21 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
+import { MAX_BENEFIT_NOTE_LENGTH } from '../company-profile.constants';
+import { ECompanyBenefit } from '../enums/company-benefit.enum';
+import { ECompanyIndustry } from '../enums/company-industry.enum';
 
 export type CompanyDocument = HydratedDocument<Company>;
+
+@Schema({ _id: false })
+export class CompanyBenefit {
+  @Prop({ type: String, enum: Object.values(ECompanyBenefit), required: true })
+  type: ECompanyBenefit;
+
+  @Prop({ type: String, trim: true, maxlength: MAX_BENEFIT_NOTE_LENGTH, default: null })
+  note?: string | null;
+}
+
+export const CompanyBenefitSchema = SchemaFactory.createForClass(CompanyBenefit);
 
 @Schema({ timestamps: true })
 export class Company {
@@ -22,6 +36,19 @@ export class Company {
 
   @Prop({ trim: true, default: null })
   logo?: string;
+
+  @Prop({ type: String, default: null })
+  coverImage?: string | null;
+
+  @Prop({ type: String, enum: Object.values(ECompanyIndustry), default: null })
+  industry?: ECompanyIndustry | null;
+
+  // Canonical skill labels from the skills catalog.
+  @Prop({ type: [String], default: [] })
+  techStack?: string[];
+
+  @Prop({ type: [CompanyBenefitSchema], default: [] })
+  benefits?: CompanyBenefit[];
 
   @Prop()
   createdAt?: Date;
@@ -58,3 +85,4 @@ export const CompanySchema = SchemaFactory.createForClass(Company);
 
 CompanySchema.index({ name: 1, isDeleted: 1 });
 CompanySchema.index({ createdAt: -1 });
+CompanySchema.index({ industry: 1, isDeleted: 1 });

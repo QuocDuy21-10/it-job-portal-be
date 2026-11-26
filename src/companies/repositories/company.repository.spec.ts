@@ -88,6 +88,8 @@ describe('CompanyRepository', () => {
               address: '$company.address',
               website: '$company.website',
               numberOfEmployees: '$company.numberOfEmployees',
+              industry: '$company.industry',
+              coverImage: '$company.coverImage',
               totalOpenJobs: 1,
             },
           },

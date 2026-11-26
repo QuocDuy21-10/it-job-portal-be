@@ -23,8 +23,8 @@ export const UPLOAD_POLICIES: Readonly<Record<UploadFolderType, UploadPolicy>> =
   },
   [UploadFolderType.COMPANY]: {
     folder: UploadFolderType.COMPANY,
-    allowedMimeTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'],
-    allowedExtensions: ['jpg', 'jpeg', 'png', 'gif'],
+    allowedMimeTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
+    allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
     maxSizeBytes: 5 * 1024 * 1024,
     requiredRoles: [ERole.SUPER_ADMIN, ERole.HR],
   },

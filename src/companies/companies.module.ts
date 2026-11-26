@@ -8,6 +8,7 @@ import { User, UserSchema } from 'src/users/schemas/user.schema';
 import { FilesModule } from 'src/files/files.module';
 import { CompanyRepository } from './repositories/company.repository';
 import { StatisticsModule } from 'src/statistics/statistics.module';
+import { SkillsModule } from 'src/skills/skills.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { StatisticsModule } from 'src/statistics/statistics.module';
     ]),
     FilesModule,
     StatisticsModule,
+    SkillsModule,
   ],
   controllers: [CompaniesController],
   providers: [CompaniesService, CompanyRepository],
