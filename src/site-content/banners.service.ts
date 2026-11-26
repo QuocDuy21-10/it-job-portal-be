@@ -13,7 +13,7 @@ import { IUser } from 'src/users/user.interface';
 import { buildVisibleSlidesFilter, getSlideStatus } from './banner-visibility';
 import { CreateBannerDto } from './dto/create-banner.dto';
 import { UpdateBannerDto } from './dto/update-banner.dto';
-import { Banner, BannerDocument } from './schemas/banner.schema';
+import { Banner, BannerDocument, SlideText } from './schemas/banner.schema';
 import { MAX_ACTIVE_SLIDES } from './site-content.constants';
 
 const FOLDER = UploadFolderType.BANNER;
@@ -25,6 +25,14 @@ type SlideRules = {
   startAt?: Date | string | null;
   endAt?: Date | string | null;
 };
+
+// The global soft-delete plugin adds its fields to nested schemas too; the public gets slide text only.
+const toPublicText = ({ title, description, ctaLabel, ctaUrl }: SlideText): SlideText => ({
+  title,
+  description,
+  ctaLabel,
+  ctaUrl,
+});
 
 @Injectable()
 export class BannersService {
@@ -45,7 +53,9 @@ export class BannersService {
       id: slide._id.toString(),
       imageUrl: this.url(slide.fileName),
       mobileImageUrl: slide.mobileFileName ? this.url(slide.mobileFileName) : null,
-      content: slide.content ?? null,
+      content: slide.content
+        ? { vi: toPublicText(slide.content.vi), en: toPublicText(slide.content.en) }
+        : null,
     }));
   }
 
