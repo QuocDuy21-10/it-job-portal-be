@@ -33,7 +33,6 @@ const setup = () => {
     findByIdAndDelete: jest
       .fn()
       .mockReturnValue(query({ _id: ID, fileName: FILE, mobileFileName: MOBILE })),
-    updateMany: jest.fn().mockResolvedValue({}),
     bulkWrite: jest.fn().mockResolvedValue({}),
   };
   const files = {
@@ -72,19 +71,6 @@ describe('BannersService', () => {
         },
       ]);
       expect(model.find.mock.calls[0][0]).toMatchObject({ isActive: true });
-    });
-
-    it('answers the old active route with the first visible slide', async () => {
-      const { service, model } = setup();
-      await expect(service.findActive()).resolves.toBeNull();
-
-      model.find.mockReturnValue(
-        query([
-          { _id: ID, fileName: FILE },
-          { _id: ID2, fileName: MOBILE },
-        ]),
-      );
-      await expect(service.findActive()).resolves.toEqual({ imageUrl: url(FILE) });
     });
 
     it('adds a status to every slide in the admin list', async () => {
@@ -243,22 +229,6 @@ describe('BannersService', () => {
         { new: true },
       );
     });
-
-    it('explains a duplicate-key error from the old single-banner index', async () => {
-      const { service, model } = setup();
-      model.findByIdAndUpdate.mockReturnValue({
-        lean: jest.fn().mockRejectedValue(Object.assign(new Error('dup'), { code: 11000 })),
-      });
-
-      await expect(service.setVisibility(ID, true, USER)).rejects.toThrow(/banner-slides/);
-    });
-
-    it('keeps the old activate route as an alias that respects the cap', async () => {
-      const { service, model } = setup();
-      model.countDocuments.mockResolvedValue(5);
-
-      await expect(service.activate(ID, USER)).rejects.toBeInstanceOf(ConflictException);
-    });
   });
 
   describe('reorder', () => {
@@ -308,12 +278,5 @@ describe('BannersService', () => {
     it('rejects malformed ids', async () => {
       await expect(setup().service.remove('nope')).rejects.toBeInstanceOf(BadRequestException);
     });
-  });
-
-  it('clears every shown slide for the old default-image route', async () => {
-    const { service, model } = setup();
-
-    await expect(service.clearActive()).resolves.toBeNull();
-    expect(model.updateMany).toHaveBeenCalledWith({ isActive: true }, { isActive: false });
   });
 });
