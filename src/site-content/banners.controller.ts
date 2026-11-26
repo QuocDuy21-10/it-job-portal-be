@@ -41,8 +41,8 @@ export class BannersController {
   @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Show this banner on the home page' })
   @ResponseMessage('Đã đặt banner hiển thị')
-  activate(@Param('id') id: string) {
-    return this.bannersService.activate(id);
+  activate(@Param('id') id: string, @User() user: IUser) {
+    return this.bannersService.activate(id, user);
   }
 
   // Declared before ':id' so 'active' is not read as an id.
