@@ -161,7 +161,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production exec backen
   node dist/databases/migrations/banner-slides.js
 ```
 
-Script xóa index unique `isActive_1`, đánh `order` cho banner cũ (mới nhất trước) và đặt `null` cho field mới. Chạy lại an toàn. Trước khi chạy, bật slide thứ hai báo `409`. Sau đó deploy frontend (carousel và màn quản trị mới). Rollback: image cũ bỏ qua field mới. Khi khởi động, `autoIndex` của image cũ tạo lại index unique `isActive_1` nếu đang có tối đa 1 banner bật (deploy lại bản mới thì phải chạy script lần nữa); nhiều hơn thì tạo index thất bại (chỉ log lỗi) và nhiều banner vẫn cùng bật.
+Script xóa index unique `isActive_1`, đánh `order` cho banner cũ (mới nhất trước) và đặt `null` cho field mới. Chạy lại an toàn. Trước khi chạy, bật slide thứ hai báo `409`. Sau đó deploy frontend (carousel và màn quản trị mới). Từ bản bỏ các route banner cũ (`/banners/active`, `/activate`), frontend trước carousel không còn dùng được banner với backend này. Rollback: image cũ bỏ qua field mới. Khi khởi động, `autoIndex` của image cũ tạo lại index unique `isActive_1` nếu đang có tối đa 1 banner bật (deploy lại bản mới thì phải chạy script lần nữa); nhiều hơn thì tạo index thất bại (chỉ log lỗi) và nhiều banner vẫn cùng bật.
 
 ### 7. Sao lưu
 

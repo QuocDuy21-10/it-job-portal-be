@@ -23,7 +23,7 @@ Tài liệu kỹ thuật và nghiệp vụ của DevLink, nền tảng tuyển d
 | `02-architecture` | Sơ đồ C4, phụ thuộc module, luồng dữ liệu, cache, bất đồng bộ, công nghệ, quan sát, mở rộng | Có |
 | `03-modules` | Giải thích từng module | Có (17 tài liệu) |
 | `04-database` | Data dictionary 17 collection, quan hệ, index | Có |
-| `05-api` | 121 route theo từng controller, thời gian thực | Có |
+| `05-api` | 118 route theo từng controller, thời gian thực | Có |
 | `06-workflows` | Use case, sequence, state diagram | Có |
 | `07-integrations` | AI, email, Google, nguồn tin, Sentry | Có |
 | `08-security` | Xác thực, phân quyền, bảo vệ dữ liệu, checklist | Có |

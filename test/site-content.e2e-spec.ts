@@ -68,7 +68,6 @@ describe('Site content (e2e)', () => {
     const id = '6720a1b2c3d4e5f6a7b8c9d0';
     await request(t.server).get(BANNERS).set(auth(key)).expect(403);
     await request(t.server).post(BANNERS).set(auth(key)).send({}).expect(403);
-    await request(t.server).patch(`${BANNERS}/${id}/activate`).set(auth(key)).expect(403);
     await request(t.server).patch(`${BANNERS}/${id}`).set(auth(key)).send({}).expect(403);
     await request(t.server)
       .patch(`${BANNERS}/${id}/visibility`)
@@ -76,7 +75,6 @@ describe('Site content (e2e)', () => {
       .send({ isActive: true })
       .expect(403);
     await request(t.server).put(`${BANNERS}/order`).set(auth(key)).send({ ids: [] }).expect(403);
-    await request(t.server).delete(`${BANNERS}/active`).set(auth(key)).expect(403);
     await request(t.server).delete(`${BANNERS}/${id}`).set(auth(key)).expect(403);
     await request(t.server).put(LEGAL).set(auth(key)).send(BODY).expect(403);
     await request(t.server)
@@ -122,10 +120,6 @@ describe('Site content (e2e)', () => {
           en: { ...content.en, description: null },
         },
       });
-      expect((await request(t.server).get(`${BANNERS}/active`).expect(200)).body.data).toEqual({
-        imageUrl: expect.stringContaining(second.fileName),
-      });
-
       const all = (await request(t.server).get(BANNERS).set(auth('admin')).expect(200)).body.data;
       expect(all.map((banner: { status: string }) => banner.status)).toEqual([
         'live',
@@ -135,19 +129,24 @@ describe('Site content (e2e)', () => {
       ]);
     });
 
-    it('allows at most 5 slides on, through both visibility routes', async () => {
+    it('allows at most 5 slides on', async () => {
       const ids: string[] = [];
       for (let i = 0; i < 6; i++) ids.push((await addBanner()).id);
       for (const id of ids.slice(0, 5)) await show(id).expect(200);
 
       await show(ids[5]).expect(409);
-      await request(t.server).patch(`${BANNERS}/${ids[5]}/activate`).set(auth('admin')).expect(409);
 
       await show(ids[0], false).expect(200);
-      await request(t.server).patch(`${BANNERS}/${ids[5]}/activate`).set(auth('admin')).expect(200);
+      await show(ids[5]).expect(200);
+    });
 
-      await request(t.server).delete(`${BANNERS}/active`).set(auth('admin')).expect(200);
-      expect(await publicSlides()).toEqual([]);
+    it('no longer serves the single-banner routes', async () => {
+      const { id } = await addBanner();
+
+      await request(t.server).get(`${BANNERS}/active`).expect(404);
+      await request(t.server).patch(`${BANNERS}/${id}/activate`).set(auth('admin')).expect(404);
+      // 'active' is now read as a slide id.
+      await request(t.server).delete(`${BANNERS}/active`).set(auth('admin')).expect(400);
     });
 
     it('deletes a replaced image, then both files with the slide', async () => {

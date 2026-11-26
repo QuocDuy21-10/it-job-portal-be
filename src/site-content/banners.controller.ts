@@ -24,15 +24,6 @@ export class BannersController {
     return this.bannersService.findPublic();
   }
 
-  // shortcut: compatibility route for the frontend released before slides; removed once it is gone.
-  @Public()
-  @Get('active')
-  @ApiOperation({ summary: 'Deprecated: image of the first visible slide, or null' })
-  @ResponseMessage('Lấy banner đang hiển thị thành công')
-  findActive() {
-    return this.bannersService.findActive();
-  }
-
   @Get()
   @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({ summary: 'List every slide in display order, with its status' })
@@ -58,16 +49,6 @@ export class BannersController {
     return this.bannersService.reorder(dto.ids);
   }
 
-  // Declared before ':id' so 'active' is not read as an id.
-  // shortcut: compatibility route for the admin screen released before slides; removed with it.
-  @Delete('active')
-  @Roles(ERole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Deprecated: hide every slide' })
-  @ResponseMessage('Đã dùng lại ảnh mặc định')
-  clearActive() {
-    return this.bannersService.clearActive();
-  }
-
   @Patch(':id')
   @Roles(ERole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Edit a slide; a replaced image file is deleted' })
@@ -82,15 +63,6 @@ export class BannersController {
   @ResponseMessage('Đã đổi trạng thái hiển thị banner')
   setVisibility(@Param('id') id: string, @Body() dto: BannerVisibilityDto, @User() user: IUser) {
     return this.bannersService.setVisibility(id, dto.isActive, user);
-  }
-
-  // shortcut: compatibility route for the admin screen released before slides; removed with it.
-  @Patch(':id/activate')
-  @Roles(ERole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Deprecated: show this slide (others stay as they are)' })
-  @ResponseMessage('Đã đặt banner hiển thị')
-  activate(@Param('id') id: string, @User() user: IUser) {
-    return this.bannersService.activate(id, user);
   }
 
   @Delete(':id')

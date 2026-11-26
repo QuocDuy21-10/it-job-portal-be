@@ -1,6 +1,6 @@
 # Tổng quan API
 
-REST API của DevLink Backend: 121 route trên 16 controller. Tài liệu này mô tả các quy ước chung; từng route nằm ở [endpoints/](endpoints/). Phần thời gian thực (Socket.IO, stream chat) ở [realtime.md](realtime.md).
+REST API của DevLink Backend: 118 route trên 16 controller. Tài liệu này mô tả các quy ước chung; từng route nằm ở [endpoints/](endpoints/). Phần thời gian thực (Socket.IO, stream chat) ở [realtime.md](realtime.md).
 
 ## Địa chỉ và tài liệu tương tác
 

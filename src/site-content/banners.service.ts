@@ -59,12 +59,6 @@ export class BannersService {
     }));
   }
 
-  // shortcut: keeps the frontend released before slides working; removed once the new frontend is live.
-  async findActive(): Promise<{ imageUrl: string } | null> {
-    const [first] = await this.findPublic();
-    return first ? { imageUrl: first.imageUrl } : null;
-  }
-
   async findAll() {
     const now = new Date();
     const banners = await this.bannerModel
@@ -154,39 +148,18 @@ export class BannersService {
       }
     }
 
-    let banner: StoredBanner | null;
-    try {
-      banner = await this.bannerModel
-        .findByIdAndUpdate(
-          id,
-          { isActive, updatedBy: { _id: user._id, email: user.email } },
-          { new: true },
-        )
-        .lean<StoredBanner>();
-    } catch (error) {
-      if ((error as { code?: number }).code === 11000) {
-        throw new ConflictException(
-          'Chỉ bật được một banner cho tới khi chạy migration banner-slides',
-        );
-      }
-      throw error;
-    }
+    const banner = await this.bannerModel
+      .findByIdAndUpdate(
+        id,
+        { isActive, updatedBy: { _id: user._id, email: user.email } },
+        { new: true },
+      )
+      .lean<StoredBanner>();
     if (!banner) {
       throw this.notFound(id);
     }
 
     return { ...this.withUrls(banner), status: getSlideStatus(banner, new Date()) };
-  }
-
-  // shortcut: alias for the admin screen released before slides; removed with it.
-  activate(id: string, user: IUser) {
-    return this.setVisibility(id, true, user);
-  }
-
-  // shortcut: alias for the admin screen released before slides; removed with it.
-  async clearActive(): Promise<null> {
-    await this.bannerModel.updateMany({ isActive: true }, { isActive: false });
-    return null;
   }
 
   async reorder(ids: string[]) {
