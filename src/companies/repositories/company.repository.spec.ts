@@ -30,6 +30,28 @@ describe('CompanyRepository', () => {
     });
   });
 
+  describe('getJobCountsForCompanies', () => {
+    it('counts only approved, active, non-expired jobs, like top hiring', async () => {
+      const id = new mongoose.Types.ObjectId().toString();
+      mockJobModel.aggregate.mockResolvedValue([
+        { _id: new mongoose.Types.ObjectId(id), totalJobs: 2 },
+      ]);
+
+      const counts = await repository.getJobCountsForCompanies([id]);
+
+      expect(mockJobModel.aggregate.mock.calls[0][0][0]).toEqual({
+        $match: {
+          'company._id': { $in: [id, new mongoose.Types.ObjectId(id)] },
+          isActive: true,
+          isDeleted: { $ne: true },
+          approvalStatus: EJobApprovalStatus.APPROVED,
+          $or: [{ endDate: { $gte: expect.any(Date) } }, { endDate: null }],
+        },
+      });
+      expect(counts.get(id)).toBe(2);
+    });
+  });
+
   describe('findTopHiringCompanies', () => {
     it('should aggregate approved active non-expired jobs and rank companies', async () => {
       await repository.findTopHiringCompanies(10);
