@@ -12,6 +12,14 @@ import { buildEmbeddedCompanyIdsInCondition } from '../company-snapshot.util';
 import { EJobApprovalStatus } from 'src/jobs/enums/job-approval-status.enum';
 import { TopHiringCompanyDto } from '../dto/top-hiring-company.dto';
 
+// Jobs a candidate can apply to right now. Top hiring and every company job count use this one rule.
+export const buildOpenJobMatch = (now = new Date()) => ({
+  isActive: true,
+  isDeleted: { $ne: true },
+  approvalStatus: EJobApprovalStatus.APPROVED,
+  $or: [{ endDate: { $gte: now } }, { endDate: null }],
+});
+
 @Injectable()
 export class CompanyRepository {
   constructor(
@@ -124,8 +132,7 @@ export class CompanyRepository {
       {
         $match: {
           'company._id': buildEmbeddedCompanyIdsInCondition(companyIds),
-          isActive: true,
-          isDeleted: { $ne: true },
+          ...buildOpenJobMatch(),
         },
       },
       {
@@ -144,17 +151,8 @@ export class CompanyRepository {
   }
 
   async findTopHiringCompanies(limit: number): Promise<TopHiringCompanyDto[]> {
-    const now = new Date();
-
     return this.jobModel.aggregate<TopHiringCompanyDto>([
-      {
-        $match: {
-          isActive: true,
-          isDeleted: { $ne: true },
-          approvalStatus: EJobApprovalStatus.APPROVED,
-          $or: [{ endDate: { $gte: now } }, { endDate: null }],
-        },
-      },
+      { $match: buildOpenJobMatch() },
       {
         $addFields: {
           companyIdString: { $toString: '$company._id' },
